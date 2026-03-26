@@ -111,6 +111,12 @@ async function processState() {
         case 'escalation':
             renderEscalationState(stateDef);
             break;
+        case 'input':
+            renderInputState(stateDef);
+            break;
+        case 'referral':
+            renderReferralState(stateDef);
+            break;
         case 'resolution':
             renderResolutionState(stateDef);
             break;
@@ -318,6 +324,20 @@ function renderEscalationState(stateDef) {
 
     oohState.triageSummary.push(`Escalation (${severity}): ${resolveTemplate(stateDef.title)}`);
 
+    if (stateDef.summary) {
+        oohState.triageSummary.push(resolveTemplate(stateDef.summary));
+    }
+
+    // Track referrals from escalation states
+    if (stateDef.referralTo) {
+        if (!oohState.sessionContext.referrals) oohState.sessionContext.referrals = [];
+        oohState.sessionContext.referrals.push({
+            to: stateDef.referralTo,
+            phone: stateDef.referralPhone || '',
+            reason: resolveTemplate(stateDef.title || '')
+        });
+    }
+
     addChatAction('Create Zendesk Ticket & Escalate', () => {
         completeTriageWithEscalation(stateDef);
     }, 'send');
@@ -336,6 +356,87 @@ function renderResolutionState(stateDef) {
 
     if (stateDef.summary) {
         oohState.triageSummary.push(resolveTemplate(stateDef.summary));
+    }
+
+    addChatAction('Post Summary to Zendesk Ticket', () => {
+        postTriageSummary();
+    }, 'note_add');
+
+    addChatAction('Start New Triage', () => {
+        resetOohState();
+        renderOohView();
+    }, 'restart_alt');
+}
+
+// ============================================================================
+// Input & Referral State Renderers (v2 additions)
+// ============================================================================
+
+/**
+ * Input state: free-text input from the agent
+ * Stores value in sessionContext.inputValue for use in subsequent states
+ */
+function renderInputState(stateDef) {
+    const msg = resolveTemplate(stateDef.message);
+    addChatMessage('bot', msg, 'edit', { stateId: oohState.currentState });
+
+    const inputIdx = oohState.chatMessages.length;
+    oohState.chatMessages.push({
+        role: 'input',
+        placeholder: stateDef.placeholder || 'Enter details...',
+        _stateId: oohState.currentState
+    });
+
+    addChatAction('Submit', () => {
+        const inputEl = document.getElementById(`ooh-input-${inputIdx}`);
+        const value = inputEl ? inputEl.value.trim() : '';
+        if (!value) {
+            inputEl?.focus();
+            return;
+        }
+        oohState.sessionContext.inputValue = value;
+        oohState.triageSummary.push(`Agent input: ${value}`);
+        addChatMessage('agent', value, 'person');
+        transitionTo(stateDef.next);
+    }, 'send');
+
+    addChatAction('Skip', () => {
+        oohState.sessionContext.inputValue = '(not provided)';
+        transitionTo(stateDef.next);
+    }, 'skip_next');
+}
+
+/**
+ * Referral state: advises caller to contact an external party
+ * Similar to resolution but also logs the referral
+ */
+function renderReferralState(stateDef) {
+    const msg = resolveTemplate(stateDef.message);
+    addChatMessage('referral', msg, 'phone_forwarded', {
+        stateId: oohState.currentState,
+        colour: 'var(--info)'
+    });
+
+    if (stateDef.summary) {
+        oohState.triageSummary.push(resolveTemplate(stateDef.summary));
+    }
+
+    // Track referral in handoff data
+    if (stateDef.referralTo) {
+        if (!oohState.sessionContext.referrals) oohState.sessionContext.referrals = [];
+        oohState.sessionContext.referrals.push({
+            to: stateDef.referralTo,
+            phone: stateDef.referralPhone || '',
+            reason: resolveTemplate(stateDef.title || '')
+        });
+    }
+
+    // If this referral also escalates to IoT, offer that
+    if (stateDef.alsoEscalate) {
+        addChatAction('Also Escalate to IoT Team', () => {
+            oohState.triageSummary.push('Also escalated to IoT Support.');
+            postTriageSummary();
+        }, 'send');
     }
 
     addChatAction('Post Summary to Zendesk Ticket', () => {
@@ -440,10 +541,66 @@ function buildTriageSummaryText() {
         `Flow: ${flow?.name || oohState.currentFlow}`,
         `Duration: ${duration} min`,
         `Agent: ${oohState.sessionContext.agentName || 'OOH handler'}`,
-        '',
-        ...oohState.triageSummary
+        `Site: ${oohState.sessionContext.siteName || '(not selected)'}`,
+        ''
     ];
 
+    // --- Structured handoff (Change 11) ---
+
+    // T1 Checks Completed — derive from flow history
+    const completedStates = oohState.history
+        .map(id => flow?.states?.[id])
+        .filter(Boolean);
+    const t1Steps = completedStates
+        .filter(s => s.title && (s.type === 'question' || s.type === 'info' || s.type === 'input'))
+        .map(s => s.title);
+    if (t1Steps.length > 0) {
+        lines.push('--- T1 Checks Completed ---');
+        t1Steps.forEach(s => lines.push(`• ${s}`));
+        lines.push('');
+    }
+
+    // T1 Findings — agent selections and inputs
+    const findings = oohState.triageSummary.filter(s => s.startsWith('Agent'));
+    if (findings.length > 0) {
+        lines.push('--- T1 Findings ---');
+        findings.forEach(f => lines.push(`• ${f}`));
+        lines.push('');
+    }
+
+    // Suggested Diagnostic Flow
+    const lastState = completedStates[completedStates.length - 1];
+    if (lastState?.suggestedDiagnostic) {
+        lines.push(`--- Suggested Diagnostic Flow ---`);
+        lines.push(`${lastState.suggestedDiagnostic}`);
+        lines.push('');
+    }
+
+    // What's Been Ruled Out — derive from question paths NOT taken
+    const ruledOut = oohState.triageSummary.filter(s =>
+        s.includes('not Lighthouse') || s.includes('Appliance fault') ||
+        s.includes('not responding') || s.includes('GK Repairs') ||
+        s.includes('site power')
+    );
+    if (ruledOut.length > 0) {
+        lines.push('--- What\'s Been Ruled Out ---');
+        ruledOut.forEach(r => lines.push(`• ${r}`));
+        lines.push('');
+    }
+
+    // Non-LH Referral Made
+    const referrals = oohState.sessionContext.referrals || [];
+    if (referrals.length > 0) {
+        lines.push('--- Non-LH Referral Made ---');
+        referrals.forEach(r => lines.push(`• ${r.to}${r.phone ? ` (${r.phone})` : ''}: ${r.reason}`));
+        lines.push('');
+    }
+
+    // Full triage log
+    lines.push('--- Triage Log ---');
+    oohState.triageSummary.forEach(s => lines.push(`• ${s}`));
+
+    // Pocket changes
     if (oohState.pocketChanges.length > 0) {
         lines.push('', '--- Pocket Changes ---');
         for (const pc of oohState.pocketChanges) {
@@ -1001,13 +1158,22 @@ function renderChatMessages() {
             `;
         }
 
+        if (msg.role === 'input') {
+            return `
+                <div class="ooh-chat-input">
+                    <textarea id="ooh-input-${i}" class="ooh-input-field" placeholder="${msg.placeholder || 'Enter details...'}" rows="3"></textarea>
+                </div>
+            `;
+        }
+
         const roleClass = {
             bot: 'ooh-msg-bot',
             agent: 'ooh-msg-agent',
             system: 'ooh-msg-system',
             error: 'ooh-msg-error',
             escalation: 'ooh-msg-escalation',
-            resolution: 'ooh-msg-resolution'
+            resolution: 'ooh-msg-resolution',
+            referral: 'ooh-msg-referral'
         }[msg.role] || 'ooh-msg-bot';
 
         return `

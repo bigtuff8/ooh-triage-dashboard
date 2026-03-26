@@ -1,6 +1,6 @@
 {
   "name": "ooh-triage-dashboard",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Out of Hours Triage Dashboard — guided flows for OOH call handlers to triage and resolve IoT site issues",
   "type": "module",
   "main": "server.js",
