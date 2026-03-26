@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>OOH Triage Dashboard</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Outlined" rel="stylesheet">
+    <link rel="stylesheet" href="/css/styles.css">
+</head>
+<body>
+    <div class="app-shell">
+        <!-- Header -->
+        <header class="app-header">
+            <div class="header-left">
+                <span class="material-icons-outlined" style="font-size:22px;color:var(--primary)">support_agent</span>
+                <span class="app-title">OOH Triage</span>
+            </div>
+            <div class="header-right">
+                <span class="header-badge" id="readOnlyBadge" style="display:none">READ ONLY</span>
+                <span class="header-version" id="appVersion"></span>
+            </div>
+        </header>
+
+        <!-- Main layout -->
+        <div class="app-body">
+            <!-- Sidebar navigation -->
+            <nav class="sidebar" id="sidebarNav"></nav>
+
+            <!-- Main content area -->
+            <main class="main-content" id="viewContainer">
+                <div class="loading-state">
+                    <span class="material-icons-outlined spinning">refresh</span>
+                    Loading...
+                </div>
+            </main>
+        </div>
+    </div>
+
+    <script src="/js/triage-flows.js"></script>
+    <script src="/js/ooh.js"></script>
+    <script src="/js/app.js"></script>
+</body>
+</html>
