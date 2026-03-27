@@ -24,9 +24,9 @@ try {
 
 // Salus API endpoints (AWS-hosted)
 const SALUS_API_URL = 'https://eu.salusconnect.io/api';
-const COGNITO_REGION = 'eu-west-1';
-const COGNITO_CLIENT_ID = '3mv93lkgcmaj87i44n3a7dfqk3';
-const COGNITO_POOL_ID = `${COGNITO_REGION}_CK5vOdfhC`;
+const COGNITO_REGION = 'eu-central-1';
+const COGNITO_CLIENT_ID = '4pk5efh3v84g5dav43imsv4fbj';
+const COGNITO_POOL_ID = `${COGNITO_REGION}_XGRz3CgoY`;
 
 // Cognito user pool — shared across all accounts
 const userPool = new CognitoUserPool({

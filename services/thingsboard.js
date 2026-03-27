@@ -130,16 +130,20 @@ router.get('/sites/:siteNo/devices', async (req, res) => {
     try {
         const { siteNo } = req.params;
         const data = await getCached(`site-devices:${siteNo}`, CACHE_TTL_DEVICES, async () => {
-            // First get the asset (site) entity
+            // First get the asset (site) entity — filter to Building type only
             const assets = await tbRequest('GET',
                 `/api/tenant/assets?pageSize=100&page=0&textSearch=${encodeURIComponent(siteNo)}`
             );
             if (!assets.data?.length) return { devices: [], siteFound: false };
 
-            const assetId = assets.data[0].id.id;
+            // Find the Building asset (not Property Schedule or Brand)
+            const building = assets.data.find(a => a.type === 'Building') || assets.data[0];
+            const assetId = building.id.id;
+            const assetName = building.name;
+
             // Get related devices
             const relations = await tbRequest('GET',
-                `/api/relations?fromId=${assetId}&fromType=ASSET&relationType=Contains&relationTypeGroup=COMMON`
+                `/api/relations?fromId=${assetId}&fromType=ASSET`
             );
 
             const devices = [];
@@ -153,7 +157,7 @@ router.get('/sites/:siteNo/devices', async (req, res) => {
                     }
                 }
             }
-            return { devices, siteFound: true, assetId };
+            return { devices, siteFound: true, assetId, assetName };
         });
         res.json(data);
     } catch (err) {
@@ -217,6 +221,186 @@ router.get('/devices/:deviceId/status', async (req, res) => {
         res.status(err.response?.status || 500).json({
             error: err.message, service: 'thingsboard', available: false
         });
+    }
+});
+
+// ============================================================================
+// Site Index — maps house numbers to TB asset IDs
+// Built once from GK customer assets + attributes, cached for 1 hour
+// ============================================================================
+let siteIndex = null;
+let siteIndexExpiry = 0;
+const SITE_INDEX_TTL = 60 * 60 * 1000; // 1 hour
+
+async function buildSiteIndex() {
+    if (siteIndex && Date.now() < siteIndexExpiry) return siteIndex;
+
+    console.log('[TB] Building site index from customer assets...');
+    const GK_CUSTOMER_ID = '275b1bc0-d212-11ed-93fd-070d53843730';
+
+    // Get all GK assets
+    const assets = await tbRequest('GET', `/api/customer/${GK_CUSTOMER_ID}/assets?pageSize=1000&page=0`);
+    const buildings = (assets.data || []).filter(a => a.type === 'Building');
+
+    const index = new Map();
+    // Fetch siteNo attribute for each building (batched)
+    for (const building of buildings) {
+        try {
+            const attrs = await tbRequest('GET',
+                `/api/plugins/telemetry/ASSET/${building.id.id}/values/attributes/SERVER_SCOPE?keys=siteNo,siteShortName`
+            );
+            const siteNo = attrs?.find(a => a.key === 'siteNo')?.value ||
+                           attrs?.find(a => a.key === 'siteShortName')?.value;
+            if (siteNo) {
+                index.set(String(siteNo), {
+                    assetId: building.id.id,
+                    name: building.name,
+                    siteNo: String(siteNo)
+                });
+            }
+        } catch (e) {
+            // Skip — some buildings may not have attributes
+        }
+    }
+
+    siteIndex = index;
+    siteIndexExpiry = Date.now() + SITE_INDEX_TTL;
+    console.log(`[TB] Site index built: ${index.size} sites mapped of ${buildings.length} buildings`);
+    return index;
+}
+
+/**
+ * GET /api/tb/site-by-number/:siteNo/devices — Look up by house number (4-digit code)
+ */
+router.get('/site-by-number/:siteNo/devices', async (req, res) => {
+    try {
+        const { siteNo } = req.params;
+        const index = await buildSiteIndex();
+        const entry = index.get(String(siteNo));
+
+        if (!entry) {
+            return res.json({ devices: [], siteFound: false, siteNo });
+        }
+
+        // Get devices via relations
+        const data = await getCached(`site-devices-num:${siteNo}`, CACHE_TTL_DEVICES, async () => {
+            const relations = await tbRequest('GET',
+                `/api/relations?fromId=${entry.assetId}&fromType=ASSET`
+            );
+
+            const devices = [];
+            for (const rel of (relations || [])) {
+                if (rel.to?.entityType === 'DEVICE') {
+                    try {
+                        const device = await tbRequest('GET', `/api/device/${rel.to.id}`);
+                        devices.push(device);
+                    } catch (e) {
+                        // Skip
+                    }
+                }
+            }
+            return { devices, siteFound: true, assetId: entry.assetId, assetName: entry.name, siteNo };
+        });
+
+        res.json(data);
+    } catch (err) {
+        console.error(`[TB] Site-by-number lookup failed: ${err.message}`);
+        res.status(err.response?.status || 500).json({
+            error: err.message, service: 'thingsboard', available: false
+        });
+    }
+});
+
+/**
+ * GET /api/tb/site-index — Return the full site index (for debugging / dropdown enrichment)
+ */
+router.get('/site-index', async (req, res) => {
+    try {
+        const index = await buildSiteIndex();
+        const entries = [];
+        index.forEach((v, k) => entries.push(v));
+        res.json({ count: entries.length, sites: entries });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+/**
+ * GET /api/tb/assets/:assetId/attributes — Read asset attributes (house number, etc.)
+ */
+router.get('/assets/:assetId/attributes', async (req, res) => {
+    try {
+        const { assetId } = req.params;
+        const [server, shared, client] = await Promise.all([
+            tbRequest('GET', `/api/plugins/telemetry/ASSET/${assetId}/values/attributes/SERVER_SCOPE`).catch(() => []),
+            tbRequest('GET', `/api/plugins/telemetry/ASSET/${assetId}/values/attributes/SHARED_SCOPE`).catch(() => []),
+            tbRequest('GET', `/api/plugins/telemetry/ASSET/${assetId}/values/attributes/CLIENT_SCOPE`).catch(() => [])
+        ]);
+        res.json({ server, shared, client });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+/**
+ * GET /api/tb/debug/relations/:entityType/:entityId — Debug: show all relations for an entity
+ */
+router.get('/debug/relations/:entityType/:entityId', async (req, res) => {
+    try {
+        const { entityType, entityId } = req.params;
+        const fromRels = await tbRequest('GET',
+            `/api/relations?fromId=${entityId}&fromType=${entityType.toUpperCase()}`
+        );
+        const toRels = await tbRequest('GET',
+            `/api/relations?toId=${entityId}&toType=${entityType.toUpperCase()}`
+        );
+        res.json({ from: fromRels, to: toRels });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+/**
+ * GET /api/tb/customers — List all customers (for discovering site hierarchy)
+ */
+router.get('/customers', async (req, res) => {
+    try {
+        const data = await getCached('tb-customers', CACHE_TTL_DEVICES, () =>
+            tbRequest('GET', '/api/customers?pageSize=100&page=0')
+        );
+        res.json(data);
+    } catch (err) {
+        res.status(err.response?.status || 500).json({ error: err.message });
+    }
+});
+
+/**
+ * GET /api/tb/customers/:customerId/assets — Assets for a customer
+ */
+router.get('/customers/:customerId/assets', async (req, res) => {
+    try {
+        const { customerId } = req.params;
+        const data = await getCached(`customer-assets:${customerId}`, CACHE_TTL_DEVICES, () =>
+            tbRequest('GET', `/api/customer/${customerId}/assets?pageSize=1000&page=0`)
+        );
+        res.json(data);
+    } catch (err) {
+        res.status(err.response?.status || 500).json({ error: err.message });
+    }
+});
+
+/**
+ * GET /api/tb/customers/:customerId/devices — Devices for a customer
+ */
+router.get('/customers/:customerId/devices', async (req, res) => {
+    try {
+        const { customerId } = req.params;
+        const data = await getCached(`customer-devices:${customerId}`, CACHE_TTL_DEVICES, () =>
+            tbRequest('GET', `/api/customer/${customerId}/devices?pageSize=1000&page=0`)
+        );
+        res.json(data);
+    } catch (err) {
+        res.status(err.response?.status || 500).json({ error: err.message });
     }
 });
 
