@@ -1319,7 +1319,7 @@ function renderWrapUp(c){
     '<div class="form-section"><h3><span class="material-icons-outlined">summarize</span> Triage Summary</h3>'+
     '<div style="background:var(--bg);border:1px solid var(--bdr);border-radius:var(--rs);padding:14px;font-family:monospace;font-size:11px;line-height:1.6;white-space:pre-wrap">'+esc(sumText)+'</div></div>'+
     '<div style="display:flex;gap:8px">'+
-    '<button class="ab ok" onclick="toast(\'Summary posted to Zendesk\',\'check_circle\')"><span class="material-icons-outlined">note_add</span> Post to Zendesk & Close</button>'+
+    '<button class="ab ok" onclick="toast(\'Summary posted to Zendesk\',\'check_circle\');setTimeout(goHome,1500)"><span class="material-icons-outlined">note_add</span> Post to Zendesk & Close</button>'+
     '<button class="ab" onclick="newIssue()"><span class="material-icons-outlined">add_call</span> Caller has another issue</button></div>';
 }
 
@@ -1502,20 +1502,143 @@ async function fetchTelemetry(deviceId){
 // Equipment type mapping — TB device types to plain English L1 categories
 var DEVICE_TYPE_MAP={
     'fryerMonitoringProfile':'Kitchen Appliance','fryerProfile':'Kitchen Appliance',
+    'ovenMonitoringProfile':'Kitchen Appliance','unoxDevice':'Kitchen Appliance',
+    'warewashMonitoringProfile':'Warewash','directLoraMeterProfile':'Warewash',
     'salusDevice':'Heating','salusReceiver':'Heating','salusGateway':'Heating',
-    'R10A Modbus Gateway':'Networking','r10aGateway':'Networking',
-    'tongouTimerSwitch':'Kitchen Appliance','tongouSwitch':'Lighting',
-    'temperatureSensor':'Sensors','watteco':'Sensors','doorSensor':'Sensors',
-    'acUnit':'HVAC','intesisDevice':'HVAC',
-    'cellarMonitoring':'Refrigeration','cellarSensor':'Refrigeration',
-    'externalLighting':'Lighting','festoonLighting':'Lighting',
+    'boilerControl':'Heating','heatingHotWaterMonitoringProfile':'Heating',
+    'airConditioningProfile':'HVAC','acUnit':'HVAC','intesisDevice':'HVAC',
+    'cellar profile':'Refrigeration','fridge and freezer profile':'Refrigeration',
+    'ambientTempMonitoringProfile':'Sensors',
+    'tuya Profile':'_tuya', // Tuya devices need name-based categorisation
+    'meterOnlyProfile':'_meter', // Meter devices need name-based categorisation
+    'R10A Modbus Gateway':'_hidden','r10aGateway':'_hidden',
+    'remoteItProfile':'_hidden','roof profile':'_hidden',
+    'door profile':'_hidden','AMR_profile':'_hidden',
     'default':'Other'
 };
 var L1_ICONS={
-    'Kitchen Appliance':'restaurant','Heating':'thermostat','Networking':'router',
-    'Sensors':'sensors','HVAC':'ac_unit','Refrigeration':'kitchen',
-    'Lighting':'lightbulb','Other':'devices'
+    'Kitchen Appliance':'restaurant','Warewash':'local_laundry_service','Heating':'thermostat',
+    'Ventilation':'air','HVAC':'ac_unit','Refrigeration':'kitchen',
+    'External':'lightbulb','Sensors':'sensors','Other':'devices'
 };
+// OOH-hidden types — not shown to handlers
+var HIDDEN_TYPES=['_hidden'];
+
+// Friendly device name — converts TB names to plain English
+var DEVICE_NAME_MAP={
+    'fryer':'Fryer','pastacooker':'Pasta Cooker','combioven':'Combi Oven',
+    'presteamer':'Pre-Steamer','bainmarie':'Bain Marie','heatedgantry':'Heated Gantry',
+    'hotcupboard':'Hot Cupboard','hcupboard':'Hot Cupboard','cookandhold':'Cook & Hold',
+    'griddle':'Griddle','rfgrill':'Rise & Fall Grill','solidtop':'Solid Top Range',
+    'convectionoven':'Convection Oven','highspeedoven':'High Speed Oven',
+    'boilingtop':'Boiling Top','chiller':'Blast Chiller',
+    'merrychef':'Merrychef','coffeemachine':'Coffee Machine',
+    'dishwasher':'Dishwasher','glasswasher':'Glasswasher','glasswash':'Glasswasher',
+    'salusit700':'Heating Zone','salusit700gateway':'Heating Gateway',
+    'boilercontrol':'Boiler Controller','hhw':'Hot Water System',
+    'immersion':'Immersion Heater','accomdhw':'Accommodation Hot Water',
+    'extractfan':'Kitchen Extract Fan','supplyfan':'Kitchen Supply Fan',
+    'loftfan':'Loft Fan','barfan':'Bar Fan',
+    'fridge':'Fridge','freezer':'Freezer','cellar':'Beer Cellar',
+    'ac':'AC Unit','externallighting':'External Lights',
+    'externalheating':'Patio Heater','overdoorheater':'Over-Door Heater',
+    'outdoortv':'Outdoor TV','hlamps':'Heat Lamp','hmat':'Heated Mat',
+    'grill':'Grill','roof':'Roof Sensor',
+    'kitchentemp':'Kitchen Temperature','cellartemp':'Cellar Temperature'
+};
+// Tuya/meter name-based L1 categorisation
+var NAME_TO_L1={
+    'fryer':'Kitchen Appliance','grill':'Kitchen Appliance','merrychef':'Kitchen Appliance',
+    'coffeemachine':'Kitchen Appliance','bainmarie':'Kitchen Appliance','heatedgantry':'Kitchen Appliance',
+    'hcupboard':'Kitchen Appliance','cookandhold':'Kitchen Appliance','hotcupboard':'Kitchen Appliance',
+    'combioven':'Kitchen Appliance','convectionoven':'Kitchen Appliance','highspeedoven':'Kitchen Appliance',
+    'solidtop':'Kitchen Appliance','boilingtop':'Kitchen Appliance','griddle':'Kitchen Appliance',
+    'rfgrill':'Kitchen Appliance','chiller':'Kitchen Appliance','pastacooker':'Kitchen Appliance',
+    'dishwasher':'Warewash','glasswasher':'Warewash','glasswash':'Warewash',
+    'extractfan':'Ventilation','supplyfan':'Ventilation','loftfan':'Ventilation','barfan':'Ventilation',
+    'externallighting':'External','externalheating':'External','overdoorheater':'External',
+    'outdoortv':'External','hlamps':'External','hmat':'External',
+    'immersion':'Heating','accomdhw':'Heating',
+    'fridge':'Refrigeration','freezer':'Refrigeration','cellar':'Refrigeration'
+};
+// Salus zone code decoder: f=Front of House, r=Rear/Restaurant
+var SALUS_ZONE_MAP={'f':'Front of House','r':'Rear','b':'Bar','k':'Kitchen','a':'Accommodation'};
+
+function friendlyDeviceName(tbName,tbType){
+    var name=(tbName||'');
+    // Strip site prefix: gk-sitename- or gk-1234- or gk_sitename_
+    name=name.replace(/^gk[-_][a-zA-Z]+[-_]/,'').replace(/^gk[-_]\d+[-_]/,'');
+    // Handle Salus devices with serial numbers
+    if(tbType==='salusDevice'){
+        var salusMatch=name.match(/salus_STA\d+\s*\((\d+)-([a-z])-(\d+)\)/i);
+        if(salusMatch){
+            var area=SALUS_ZONE_MAP[salusMatch[2]]||salusMatch[2];
+            return area+' Zone '+salusMatch[3];
+        }
+        if(name.includes('gateway')) return 'Heating Gateway';
+        if(name.includes('salusit700')) return 'Heating Zone';
+    }
+    // Handle Unox
+    if(tbType==='unoxDevice') return 'Carvery Oven';
+    // Extract number suffix
+    var numMatch=name.match(/[-_](\d+[a-z]?)$/);
+    var num=numMatch?' #'+numMatch[1].toUpperCase():'';
+    var base=name.replace(/[-_]\d+[a-z]?$/,'').replace(/[-_]/g,'').toLowerCase();
+    return (DEVICE_NAME_MAP[base]||base.replace(/([a-z])([A-Z])/g,'$1 $2').replace(/^\w/,function(c){return c.toUpperCase();}))+num;
+}
+
+function getDeviceL1(d){
+    var mapped=DEVICE_TYPE_MAP[d.type];
+    if(mapped==='_tuya'||mapped==='_meter'){
+        // Categorise by equipment name
+        var name=(d.name||'').replace(/^gk[-_][a-zA-Z]+[-_]/,'').replace(/^gk[-_]\d+[-_]/,'');
+        var base=name.replace(/[-_]\d+[a-z]?$/,'').replace(/[-_]/g,'').toLowerCase();
+        // Check for DB/distribution board — hide these
+        if(base.includes('db')||base.includes('mainsdb')||base.includes('maindb')) return '_hidden';
+        return NAME_TO_L1[base]||'Other';
+    }
+    return mapped||'Other';
+}
+
+function isOOHVisible(d){
+    var l1=getDeviceL1(d);
+    return l1!=='_hidden'&&HIDDEN_TYPES.indexOf(l1)===-1;
+}
+
+// Group devices by L1, filtered for OOH visibility
+function groupDevicesForOOH(devices){
+    var groups={};var total=0;
+    devices.forEach(function(d){
+        if(!isOOHVisible(d)) return;
+        var l1=getDeviceL1(d);
+        if(!groups[l1])groups[l1]=[];
+        groups[l1].push(d);total++;
+    });
+    return{groups:groups,total:total};
+}
+
+// Render expandable device group HTML
+function renderDeviceGroups(grouped,compact){
+    var html='';
+    Object.keys(grouped.groups).sort().forEach(function(l1){
+        var devices=grouped.groups[l1];
+        var icon=L1_ICONS[l1]||'devices';
+        var id='devgrp_'+l1.replace(/\s/g,'_')+'_'+Math.random().toString(36).substr(2,4);
+        html+='<div style="margin-top:'+(compact?'4':'8')+'px">';
+        html+='<div onclick="var el=document.getElementById(\''+id+'\');el.style.display=el.style.display===\'none\'?\'block\':\'none\';this.querySelector(\'.expand-icon\').textContent=el.style.display===\'none\'?\'expand_more\':\'expand_less\'" style="font-size:'+(compact?'11':'10')+'px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:var(--txt2);display:flex;align-items:center;gap:4px;cursor:pointer;padding:2px 0;user-select:none">';
+        html+='<span class="material-icons-outlined" style="font-size:14px">'+icon+'</span>';
+        html+=esc(l1)+' <span style="font-weight:400">('+devices.length+')</span>';
+        html+='<span class="material-icons-outlined expand-icon" style="font-size:14px;margin-left:auto">expand_more</span>';
+        html+='</div>';
+        html+='<div id="'+id+'" style="display:none">';
+        devices.forEach(function(d){
+            var fname=friendlyDeviceName(d.name,d.type);
+            html+='<div style="font-size:11px;padding:2px 0 2px 18px;color:var(--txt)">'+esc(fname)+'</div>';
+        });
+        html+='</div></div>';
+    });
+    return html;
+}
 
 // Load TB devices into triage sidebar (called after render)
 async function loadSidebarDevices(){
@@ -1526,24 +1649,9 @@ async function loadSidebarDevices(){
         return;
     }
     liveSiteDevices=result.devices;
-    // Group by L1 category
-    var groups={};
-    result.devices.forEach(function(d){
-        var l1=DEVICE_TYPE_MAP[d.type]||DEVICE_TYPE_MAP['default'];
-        if(!groups[l1])groups[l1]=[];
-        groups[l1].push(d);
-    });
-    var html='<h4><span class="material-icons-outlined" style="font-size:14px">router</span> '+result.devices.length+' Devices '+liveBadge()+'</h4>';
-    Object.keys(groups).sort().forEach(function(l1){
-        var icon=L1_ICONS[l1]||'devices';
-        html+='<div style="margin-top:8px"><div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:var(--txt2);display:flex;align-items:center;gap:4px;margin-bottom:4px"><span class="material-icons-outlined" style="font-size:14px">'+icon+'</span>'+esc(l1)+' ('+groups[l1].length+')</div>';
-        groups[l1].slice(0,5).forEach(function(d){
-            var name=(d.name||'').replace(/^gk[-_]/i,'').replace(/[-_]/g,' ');
-            html+='<div style="font-size:11px;padding:2px 0 2px 18px;color:var(--txt)">'+esc(name)+'</div>';
-        });
-        if(groups[l1].length>5) html+='<div style="font-size:10px;padding:2px 0 2px 18px;color:var(--txt2);font-style:italic">+'+( groups[l1].length-5)+' more</div>';
-        html+='</div>';
-    });
+    var grouped=groupDevicesForOOH(result.devices);
+    var html='<h4><span class="material-icons-outlined" style="font-size:14px">router</span> '+grouped.total+' Devices '+liveBadge()+'</h4>';
+    html+=renderDeviceGroups(grouped,false);
     el.innerHTML=html;
 }
 
@@ -1556,16 +1664,9 @@ async function loadLandingDevices(){
         el.innerHTML='<div style="font-size:11px;color:var(--txt2)">'+(liveServices.tb?'No devices found for this site in ThingsBoard':'ThingsBoard not connected')+'</div>';
         return;
     }
-    var groups={};
-    result.devices.forEach(function(d){
-        var l1=DEVICE_TYPE_MAP[d.type]||DEVICE_TYPE_MAP['default'];
-        if(!groups[l1])groups[l1]=[];groups[l1].push(d);
-    });
-    var html='<div style="font-size:12px;font-weight:600;margin-bottom:8px;display:flex;align-items:center;gap:6px">'+result.devices.length+' devices at this site '+liveBadge()+'</div>';
-    Object.keys(groups).sort().forEach(function(l1){
-        var icon=L1_ICONS[l1]||'devices';
-        html+='<div style="display:flex;align-items:center;gap:6px;padding:4px 0;font-size:12px"><span class="material-icons-outlined" style="font-size:16px;color:var(--pri)">'+icon+'</span><strong>'+esc(l1)+'</strong> <span style="color:var(--txt2)">('+groups[l1].length+')</span></div>';
-    });
+    var grouped=groupDevicesForOOH(result.devices);
+    var html='<div style="font-size:12px;font-weight:600;margin-bottom:8px;display:flex;align-items:center;gap:6px">'+grouped.total+' devices at this site '+liveBadge()+'</div>';
+    html+=renderDeviceGroups(grouped,true);
     el.innerHTML=html;
 }
 
