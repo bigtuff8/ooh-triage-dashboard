@@ -83,6 +83,7 @@ body{font-family:'Inter',sans-serif;background:#f1f5f9;color:#1e293b}
 .ab:hover{background:var(--pri);color:#fff}
 .ab.err{border-color:var(--err);color:var(--err)}.ab.err:hover{background:var(--err);color:#fff}
 .ab.ok{border-color:var(--ok);color:var(--ok)}.ab.ok:hover{background:var(--ok);color:#fff}
+.ab.warn{border-color:var(--warn);color:#92400e}.ab.warn:hover{background:var(--warn);color:#fff}
 .ab.sec{border-color:var(--bdr);color:var(--txt2)}.ab.sec:hover{background:var(--bg);color:var(--txt)}
 .ab .material-icons-outlined{font-size:16px}
 .dc{padding:14px;background:var(--surf);border:1px solid var(--bdr);border-radius:var(--r);font-size:13px}
@@ -248,7 +249,7 @@ body{font-family:'Inter',sans-serif;background:#f1f5f9;color:#1e293b}
 // ============================================================================
 var GK_REPAIRS_PHONE='0345 603 4566';
 var GK_REPAIRS_EMAIL='repairsadmin@greeneking.co.uk';
-var GK_REPAIRS_INFO='GK Repairs: '+GK_REPAIRS_PHONE+' / '+GK_REPAIRS_EMAIL;
+var GK_REPAIRS_INFO='GK Repairs: '+GK_REPAIRS_PHONE+' / '+GK_REPAIRS_EMAIL+'. Please be aware any engineer visit may be chargeable — all work goes through GK Repairs Admin.';
 
 // ============================================================================
 // DATA — loaded from APIs, with demo fallbacks
@@ -713,7 +714,7 @@ kitchenEquip:function(){
     aa([
         {label:'YES — has a PowerPause sticker',fn:'F._ke_interlock'},
         {label:'NO — no sticker',fn:'F._ke_notLH'},
-        {label:'UNSURE — can\'t tell',fn:'F._ke_interlock'}
+        {label:'UNSURE — can\'t tell (we\'ll check for the interlock panel instead)',fn:'F._ke_interlock'}
     ]);
     render();
 },
@@ -721,7 +722,7 @@ _ke_notLH:function(){
     ag('No PowerPause sticker');structuredHandoff.ruledOut.push('Not Lighthouse-controlled');structuredHandoff.referrals.push('GK Repairs');
     ab('This appliance isn\'t controlled by the Lighthouse system. Advise the caller to contact GK Repairs for appliance faults.\n\n<strong>'+GK_REPAIRS_INFO+'</strong>');
     summary.push('Not Lighthouse-controlled — referred to GK Repairs');
-    endFlow('<strong>Read to caller:</strong>\n\n<em>"This appliance isn\'t connected to our remote management system, so we can\'t control it from here. I\'d suggest calling GK Repairs on '+GK_REPAIRS_PHONE+' — they handle appliance faults directly. Is there anything else?"</em>');render();
+    endFlow('<strong>Read to caller:</strong>\n\n<em>"This appliance isn\'t connected to our remote management system, so we can\'t control it from here. I\'d suggest calling GK Repairs on '+GK_REPAIRS_PHONE+' — they handle appliance faults directly. Please be aware any visit may be chargeable. Is there anything else?"</em>');render();
 },
 _ke_interlock:function(){
     ag('Checking interlock panel');structuredHandoff.t1Checks.push('Interlock panel green light');
@@ -751,7 +752,7 @@ _ke_appFault:function(){
     ag('Click but appliance off');structuredHandoff.findings.push('Power reaching equipment but appliance not responding');structuredHandoff.ruledOut.push('Lighthouse/PowerPause fault');structuredHandoff.referrals.push('GK Repairs');
     ab('The power is reaching the appliance via the interlock panel, but the appliance itself isn\'t responding. This is likely an appliance fault rather than a Lighthouse issue.\n\n<strong>'+GK_REPAIRS_INFO+'</strong>');
     summary.push('Appliance fault — power delivered but not responding. Referred to GK Repairs.');
-    endFlow('<strong>Read to caller:</strong>\n\n<em>"The power supply to the appliance is working fine — I can see the interlock responded when you pressed it. The issue seems to be with the appliance itself. I\'d suggest calling GK Repairs on '+GK_REPAIRS_PHONE+' — they can send an engineer. Is there anything else?"</em>');render();
+    endFlow('<strong>Read to caller:</strong>\n\n<em>"The power supply to the appliance is working fine — I can see the interlock responded when you pressed it. The issue seems to be with the appliance itself. I\'d suggest calling GK Repairs on '+GK_REPAIRS_PHONE+' — they can send an engineer. Please be aware any visit may be chargeable. Is there anything else?"</em>');render();
 },
 _ke_contactorFault:function(){
     ag('No click — contactor fault');structuredHandoff.findings.push('Contactor not engaging — no click on button press');structuredHandoff.suggestedDiagnostic='R5 — PowerPause interlock fault';
@@ -958,11 +959,11 @@ _nhw_boiler:function(){
     aa([{label:'Boiler looks faulty (no pilot / error visible)',fn:'F._nhw_boilerFault'},{label:'Caller reports error code',fn:'F._nhw_captureCode'},{label:'Boiler looks fine / can\'t check',fn:'F._nhw_t2'}]);render();
 },
 _nhw_captureCode:function(){aft('What error code is showing?','F._nhw_codeSubmit');render();},
-_nhw_codeSubmit:function(){var t=document.getElementById('ftInput');var val=t?t.value:'';if(val){ag('Error code: '+val);structuredHandoff.findings.push('Boiler error code: '+val);}structuredHandoff.referrals.push('GK Repairs');escalateWithModal('No Hot Water','medium','Boiler error code "'+val+'" at '+sn()+'. Caller also referred to GK Repairs.','IoT Support Team','Between 8am-5pm','<strong>Read to caller:</strong>\n\n<em>"I\'ve logged that error code. I\'d also suggest calling GK Repairs on '+GK_REPAIRS_PHONE+' as the boiler may need servicing. Is there anything else?"</em>');render();},
+_nhw_codeSubmit:function(){var t=document.getElementById('ftInput');var val=t?t.value:'';if(val){ag('Error code: '+val);structuredHandoff.findings.push('Boiler error code: '+val);}structuredHandoff.referrals.push('GK Repairs');escalateWithModal('No Hot Water','medium','Boiler error code "'+val+'" at '+sn()+'. Caller also referred to GK Repairs.','IoT Support Team','Between 8am-5pm','<strong>Read to caller:</strong>\n\n<em>"I\'ve logged that error code. I\'d also suggest calling GK Repairs on '+GK_REPAIRS_PHONE+' as the boiler may need servicing. Please be aware any visit may be chargeable. Is there anything else?"</em>');render();},
 _nhw_boilerFault:function(){
     ag('Boiler looks faulty');structuredHandoff.findings.push('Boiler appears faulty');structuredHandoff.referrals.push('GK Repairs');
     ab('This looks like a boiler issue. Logging for IoT team and advising caller to also contact GK Repairs.\n\n<strong>'+GK_REPAIRS_INFO+'</strong>');
-    escalateWithModal('No Hot Water','medium','Boiler fault at '+sn()+' — no pilot/visual fault. Caller referred to GK Repairs.','IoT Support Team','Between 8am-5pm','<strong>Read to caller:</strong>\n\n<em>"It sounds like there\'s a boiler issue. I\'ll log this for our team, but I\'d also suggest calling GK Repairs on '+GK_REPAIRS_PHONE+' as they handle boiler faults. Is there anything else?"</em>');render();
+    escalateWithModal('No Hot Water','medium','Boiler fault at '+sn()+' — no pilot/visual fault. Caller referred to GK Repairs.','IoT Support Team','Between 8am-5pm','<strong>Read to caller:</strong>\n\n<em>"It sounds like there\'s a boiler issue. I\'ll log this for our team, but I\'d also suggest calling GK Repairs on '+GK_REPAIRS_PHONE+' as they handle boiler faults. Please be aware any visit may be chargeable. Is there anything else?"</em>');render();
 },
 _nhw_t2:function(){
     asyncLoad('ThingsBoard boiler data',fetchTBSiteDevices,function(result){
@@ -1007,7 +1008,7 @@ _kto_appFault:function(){
     ag('Light stays on');structuredHandoff.findings.push('Power delivered but equipment stopping');structuredHandoff.ruledOut.push('Lighthouse/PowerPause fault');structuredHandoff.referrals.push('GK Repairs');
     ab('The green light stays on — power IS being delivered. This is an appliance fault.\n\n<strong>'+GK_REPAIRS_INFO+'</strong>');
     summary.push('Equipment turning off — appliance fault, referred to GK Repairs');
-    endFlow('<strong>Read to caller:</strong>\n\n<em>"The power supply is working — the issue is with the appliance itself. I\'d suggest calling GK Repairs on '+GK_REPAIRS_PHONE+'. Is there anything else?"</em>');render();
+    endFlow('<strong>Read to caller:</strong>\n\n<em>"The power supply is working — the issue is with the appliance itself. I\'d suggest calling GK Repairs on '+GK_REPAIRS_PHONE+'. Please be aware any visit may be chargeable. Is there anything else?"</em>');render();
 },
 _kto_howMany:function(){
     structuredHandoff.t1Checks.push('Single vs multiple appliances');
@@ -1018,7 +1019,7 @@ _kto_sitePower:function(){
     ag('Multiple appliances');structuredHandoff.findings.push('Multiple appliances affected');structuredHandoff.referrals.push('GK Repairs');
     ab('Multiple appliances turning off suggests a site power issue at the distribution board level.\n\n<strong>'+GK_REPAIRS_INFO+'</strong> (for electrician)');
     summary.push('Multiple appliances turning off — site power issue, referred to GK Repairs');
-    escalateWithModal('Keeps Turning Off','medium','Multiple appliances turning off at '+sn()+' — site power issue suspected','IoT Support Team','Between 8am-5pm','<strong>Read to caller:</strong>\n\n<em>"If multiple things are turning off, it\'s likely a site power issue. Please check the distribution board, and if it continues, call GK Repairs on '+GK_REPAIRS_PHONE+' for an electrician. I\'ll also log this for our team. Is there anything else?"</em>');render();
+    escalateWithModal('Keeps Turning Off','medium','Multiple appliances turning off at '+sn()+' — site power issue suspected','IoT Support Team','Between 8am-5pm','<strong>Read to caller:</strong>\n\n<em>"If multiple things are turning off, it\'s likely a site power issue. Please check the distribution board, and if it continues, call GK Repairs on '+GK_REPAIRS_PHONE+' for an electrician. I\'ll also log this for our team. Please be aware any visit may be chargeable. Is there anything else?"</em>');render();
 },
 _kto_timing:function(){
     structuredHandoff.t1Checks.push('Timing pattern');
@@ -1038,7 +1039,7 @@ _og_notLH:function(){
     ag('No sticker');structuredHandoff.ruledOut.push('Not Lighthouse-controlled');structuredHandoff.referrals.push('GK Repairs');
     ab('This appliance isn\'t controlled by Lighthouse. Advise the caller to check power/gas and contact GK Repairs.\n\n<strong>'+GK_REPAIRS_INFO+'</strong>');
     summary.push('Oven/grill not Lighthouse-controlled — referred to GK Repairs');
-    endFlow('<strong>Read to caller:</strong>\n\n<em>"This appliance isn\'t connected to our system. Please check that the gas and power are on, and if it\'s still not working, call GK Repairs on '+GK_REPAIRS_PHONE+'. Is there anything else?"</em>');render();
+    endFlow('<strong>Read to caller:</strong>\n\n<em>"This appliance isn\'t connected to our system. Please check that the gas and power are on, and if it\'s still not working, call GK Repairs on '+GK_REPAIRS_PHONE+'. Please be aware any visit may be chargeable. Is there anything else?"</em>');render();
 },
 _og_checkPanels:function(){
     structuredHandoff.t1Checks.push('Visual check for switch panels');
@@ -1071,7 +1072,7 @@ _hs_pubRadiator:function(){
 _hs_valveCheck:function(){
     ag('Radiators hot but should be off');structuredHandoff.findings.push('Radiators hot when system off — likely stuck valve');structuredHandoff.suggestedDiagnostic='R8 — Stuck zone valve';structuredHandoff.referrals.push('GK Repairs');
     ab('This is likely a stuck zone valve — a physical issue. Logging for IoT team and advising caller to contact heating maintenance.\n\n<strong>'+GK_REPAIRS_INFO+'</strong>');
-    escalateWithModal('Heating Stuck','medium','Stuck zone valve suspected at '+sn()+' — radiators hot but system shows off','IoT Support Team','Between 8am-5pm','<strong>Read to caller:</strong>\n\n<em>"It sounds like a valve may be stuck open. I\'ll log this for the IoT team. You might also want to contact GK Repairs on '+GK_REPAIRS_PHONE+' for the heating system. Is there anything else?"</em>');render();
+    escalateWithModal('Heating Stuck','medium','Stuck zone valve suspected at '+sn()+' — radiators hot but system shows off','IoT Support Team','Between 8am-5pm','<strong>Read to caller:</strong>\n\n<em>"It sounds like a valve may be stuck open. I\'ll log this for the IoT team. You might also want to contact GK Repairs on '+GK_REPAIRS_PHONE+' for the heating system. Please be aware any visit may be chargeable. Is there anything else?"</em>');render();
 },
 _hs_t2:function(){
     asyncLoad('Salus heating system',fetchZoneData,function(result){
@@ -1092,7 +1093,7 @@ _hs_t2:function(){
     });
 },
 _hs_setpointReset:function(){structuredHandoff.suggestedDiagnostic='R2 — Setpoint/schedule misconfiguration';escalateWithModal('Heating Stuck','medium','Heating actively calling when it shouldn\'t at '+sn()+' — needs remote setpoint reset','IoT Support Team','Within 4 hours during business hours','<strong>Read to caller:</strong>\n\n<em>"The system needs a remote adjustment. I\'ll escalate this to the IoT team. Is there anything else?"</em>');render();},
-_hs_physicalValve:function(){structuredHandoff.suggestedDiagnostic='R8 — Stuck zone valve';structuredHandoff.referrals.push('GK Repairs');escalateWithModal('Heating Stuck','medium','System shows off but heating still running at '+sn()+' — physical valve issue','IoT Support Team','Between 8am-5pm','<strong>Read to caller:</strong>\n\n<em>"The system is showing the heating should be off but something physical is keeping it on. I\'ll log this and I\'d also suggest calling GK Repairs on '+GK_REPAIRS_PHONE+'. Is there anything else?"</em>');render();},
+_hs_physicalValve:function(){structuredHandoff.suggestedDiagnostic='R8 — Stuck zone valve';structuredHandoff.referrals.push('GK Repairs');escalateWithModal('Heating Stuck','medium','System shows off but heating still running at '+sn()+' — physical valve issue','IoT Support Team','Between 8am-5pm','<strong>Read to caller:</strong>\n\n<em>"The system is showing the heating should be off but something physical is keeping it on. I\'ll log this and I\'d also suggest calling GK Repairs on '+GK_REPAIRS_PHONE+'. Please be aware any visit may be chargeable. Is there anything else?"</em>');render();},
 
 // ---- CONTROLS ISSUE (Change 7) ---- Branch by control type
 controlsIssue:function(){
@@ -1119,7 +1120,7 @@ _ci_boilerError:function(){
     ab('<strong>Ask the caller:</strong> "Can you read the error code to me? Is there a QR code on the boiler panel?"');
     aft('Error code (e.g. E1, F28, 3 flashing lights)','F._ci_boilerSubmit');render();
 },
-_ci_boilerSubmit:function(){var t=document.getElementById('ftInput');var val=t?t.value:'';if(val){ag('Error: '+val);structuredHandoff.findings.push('Boiler error: '+val);}structuredHandoff.referrals.push('GK Repairs');structuredHandoff.suggestedDiagnostic='R7 — Boiler fault';escalateWithModal('Controls Issue','medium','Boiler error code "'+(val||'unknown')+'" at '+sn()+'. Caller referred to GK Repairs.','IoT Support Team','Between 8am-5pm','<strong>Read to caller:</strong>\n\n<em>"I\'ve logged that error code. I\'d also suggest calling GK Repairs on '+GK_REPAIRS_PHONE+' as the boiler may need servicing. Is there anything else?"</em>');render();},
+_ci_boilerSubmit:function(){var t=document.getElementById('ftInput');var val=t?t.value:'';if(val){ag('Error: '+val);structuredHandoff.findings.push('Boiler error: '+val);}structuredHandoff.referrals.push('GK Repairs');structuredHandoff.suggestedDiagnostic='R7 — Boiler fault';escalateWithModal('Controls Issue','medium','Boiler error code "'+(val||'unknown')+'" at '+sn()+'. Caller referred to GK Repairs.','IoT Support Team','Between 8am-5pm','<strong>Read to caller:</strong>\n\n<em>"I\'ve logged that error code. I\'d also suggest calling GK Repairs on '+GK_REPAIRS_PHONE+' as the boiler may need servicing. Please be aware any visit may be chargeable. Is there anything else?"</em>');render();},
 _ci_escalate:function(){escalateWithModal('Controls Issue','medium','Control/display issue at '+sn()+' — type uncertain','IoT Support Team','Between 8am-5pm','<strong>Read to caller:</strong>\n\n<em>"I\'ll log this for the IoT team to investigate. Is there anything else?"</em>');render();},
 
 // ---- FRIDGE ISSUE (Change 8) ---- monitoring only, door check, temp thresholds
@@ -1208,8 +1209,9 @@ _el_t2:function(){
             ab('<strong style="color:var(--err)">Lighting device is OFFLINE.</strong> Connectivity or hardware fault.');
             aa([{label:'Escalate — device offline',fn:'F._el_escalate',cls:'err'}]);
         }else if(isOn){
-            ab('Lights are already <strong>ON</strong> according to the device. The issue may be physical (bulb, wiring).');
-            aa([{label:'Escalate to IoT team',fn:'F._el_escalate'}]);
+            ab('Lights are already <strong>ON</strong> according to our system, but the caller says they\'re not working. This is likely a physical issue (bulb, wiring, fuse) rather than a Lighthouse problem.\n\nAdvise the caller to also contact GK Repairs: <strong>'+GK_REPAIRS_PHONE+'</strong>. Please be aware any visit may be chargeable.');
+            structuredHandoff.referrals.push('GK Repairs (physical lighting fault)');
+            aa([{label:'Escalate to IoT team as well',fn:'F._el_escalate'},{label:'GK Repairs referral only — no IoT escalation needed',fn:'F._el_gkOnly'}]);
         }else{
             ab('Device is <strong>online</strong> but lights are <strong>OFF</strong>. Would you like to turn on the lights remotely?');
             aa([{label:'Yes — turn on lights',fn:'F._el_override',cls:'ok'},{label:'Escalate to IoT team',fn:'F._el_escalate'}]);
@@ -1228,6 +1230,7 @@ _el_override:function(){
 },
 _el_confirmed:function(){ag('Confirmed working');ar('<strong>External lighting on and confirmed.</strong>');summary.push('External lighting turned on — confirmed working');endFlow('<strong>Read to caller:</strong>\n\n<em>"Great, the lights are on. Is there anything else I can help with?"</em>');render();},
 _el_notWorked:function(){ag('Didn\'t work');structuredHandoff.findings.push('Remote override sent but lights did not come on');escalateWithModal('External Lighting','medium','External lighting override sent but did not work at '+sn()+' — possible hardware/wiring fault','IoT Support Team','Between 8am-5pm','<strong>Read to caller:</strong>\n\n<em>"The command was sent but the lights haven\'t responded. I\'ll escalate this to the IoT team — there may be a wiring or hardware issue. Is there anything else?"</em>');render();},
+_el_gkOnly:function(){ag('GK Repairs referral only');summary.push('External lighting — physical fault, referred to GK Repairs');endFlow('<strong>Read to caller:</strong>\n\n<em>"Our system shows the lights should be on, so it\'s likely a physical issue like a bulb or wiring fault. I\'d suggest calling GK Repairs on '+GK_REPAIRS_PHONE+' — they can arrange an electrician. Please be aware the visit may be chargeable. Is there anything else?"</em>');render();},
 _el_escalate:function(){structuredHandoff.suggestedDiagnostic='R3 — Device/connectivity investigation';escalateWithModal('External Lighting','medium','External lighting issue at '+sn(),'IoT Support Team','Between 8am-5pm','<strong>Read to caller:</strong>\n\n<em>"I\'ll log this for the IoT team. Is there anything else?"</em>');render();},
 
 // ---- EXTERNAL HEATING (patio heaters — Tuya controlled) ----
@@ -1263,7 +1266,7 @@ _wto_totalPower:function(){
     ag('Total power failure');structuredHandoff.findings.push('Total power failure reported');structuredHandoff.ruledOut.push('Lighthouse issue');structuredHandoff.referrals.push('GK Repairs');
     ab('This is a site power issue, not Lighthouse.\n\n<strong>Ask:</strong> "Can you check the main fuse board?"\n\nIf unresolved, advise GK Repairs for an electrician.\n\n<strong>'+GK_REPAIRS_INFO+'</strong>');
     summary.push('Total power failure — not Lighthouse, referred to GK Repairs');
-    endFlow('<strong>Read to caller:</strong>\n\n<em>"If nothing is working, it\'s a site power issue rather than something we can fix remotely. Please check the main fuse board, and if that doesn\'t resolve it, call GK Repairs on '+GK_REPAIRS_PHONE+' for an electrician. Is there anything else?"</em>');render();
+    endFlow('<strong>Read to caller:</strong>\n\n<em>"If nothing is working, it\'s a site power issue rather than something we can fix remotely. Please check the main fuse board, and if that doesn\'t resolve it, call GK Repairs on '+GK_REPAIRS_PHONE+' for an electrician. Please be aware any visit may be chargeable. Is there anything else?"</em>');render();
 },
 _wto_whatType:function(){
     ab('Other equipment is working, so power is getting to the building. What type of equipment won\'t turn on?');
@@ -1297,13 +1300,14 @@ _se_freetextSubmit:function(){var t=document.getElementById('ftInput');var val=t
 itsFreezing:function(){
     as('Starting: <strong>It\'s Freezing</strong>','play_arrow');
     ab('The customer is reporting it\'s too cold. Let\'s narrow down the issue.');
-    aa([{label:'Building / room is cold (heating)',fn:'F.tooCold'},{label:'No hot water',fn:'F.noHotWater'},{label:'AC is blowing cold air',fn:'F._if_ac'},{label:'Not sure — general complaint',fn:'F.tooCold'}]);render();
+    aa([{label:'Building / room is cold (heating)',fn:'F.tooCold'},{label:'No hot water',fn:'F.noHotWater'},{label:'AC is blowing cold air',fn:'F._if_ac'}]);render();
 },
 _if_ac:function(){escalateWithModal("It's Freezing",'medium','AC blowing cold at '+sn()+' — OOH cannot change AC settings','IoT Support Team','Between 8am-5pm','<strong>Read to caller:</strong>\n\n<em>"The air conditioning settings need to be changed by the IoT team. I\'ll log this now. Is there anything else?"</em>');render();},
 
 // ---- GATEWAY OFFLINE ----
 gatewayOffline:function(){
     as('Starting: <strong>Gateway Offline</strong>','play_arrow');
+    ab('This flow is typically used when the IoT team has flagged that a site\'s gateway is offline and needs someone on-site to check. The gateway is a small box (usually near the router or in a cupboard) that connects the site\'s equipment to our monitoring system.');
     asyncLoad('ThingsBoard gateway data',fetchTBSiteDevices,function(result){
         var badge=dataBadge(result.live);
         var gateways=(result.devices||[]).filter(function(d){var t=(d.type||'').toLowerCase();var n=(d.name||'').toLowerCase();return t.includes('r10a')||t.includes('gateway')||n.includes('r10a')||n.includes('gateway');});
@@ -1348,7 +1352,7 @@ directEscalation:function(){
 _de_captured:function(){
     var t=document.getElementById('ftInput');var val=t?t.value:'';if(val){ag(val);structuredHandoff.findings.push(val);}
     ab('Select the urgency level:');
-    aa([{label:'Critical — site cannot operate, needs immediate help',fn:'F._de_p1',cls:'err'},{label:'Important — service degraded but site is operating',fn:'F._de_p2'},{label:'Non-urgent — can wait until next business day',fn:'F._de_p3',cls:'sec'}]);render();
+    aa([{label:'Critical — site cannot operate, needs immediate help',fn:'F._de_p1',cls:'err'},{label:'Important — service degraded but site is operating',fn:'F._de_p2',cls:'warn'},{label:'Non-urgent — can wait until next business day',fn:'F._de_p3',cls:'sec'}]);render();
 },
 _de_p1:function(){escalateWithModal('Direct Escalation','crit','P1 — Critical escalation at '+sn(),'IoT Support Team','Immediate — on-call engineer notified','<strong>Read to caller:</strong>\n\n<em>"I\'ve raised this as critical and the on-call engineer has been notified. Someone will be in contact very shortly. Is there anything else?"</em>');render();},
 _de_p2:function(){escalateWithModal('Direct Escalation','high','P2 — Important escalation at '+sn(),'IoT Support Team','Within 2 hours during business hours','<strong>Read to caller:</strong>\n\n<em>"I\'ve escalated this and someone will be in contact within 2 hours during business hours. Is there anything else?"</em>');render();},
