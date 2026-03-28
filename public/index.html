@@ -215,7 +215,7 @@ body{font-family:'Inter',sans-serif;background:#f1f5f9;color:#1e293b}
 <div class="app">
 <aside class="sb">
     <div class="sb-hdr"><h2><span class="material-icons-outlined" style="color:var(--pri)">support_agent</span> IoT OOH Triage</h2><p>Out-of-hours call handler</p></div>
-    <div class="ns"><div class="nl">Triage</div><div class="ni act" onclick="goHome();closeSidebar()" id="navHome"><span class="material-icons-outlined">home</span> New Call</div></div>
+    <div class="ns"><div class="nl">Triage</div><div class="ni act" onclick="goHome();closeSidebar()" id="navHome"><span class="material-icons-outlined">home</span> New Call</div><div class="ni" onclick="showCallback();closeSidebar()" id="navCallback"><span class="material-icons-outlined">history</span> Callback Lookup</div></div>
     <div class="ns"><div class="nl">Monitor</div><div class="ni" onclick="showPocket();closeSidebar()" id="navPocket"><span class="material-icons-outlined">timer</span> Active Overrides <span class="nb" id="overrideCount">0</span></div><div class="ni" onclick="showDashboard();closeSidebar()" id="navDash"><span class="material-icons-outlined">dashboard</span> Service Dashboard</div></div>
     <div style="margin-top:auto;padding:12px 16px;font-size:11px;color:var(--txt2);border-top:1px solid var(--bdr)" id="sbVersion">OOH Triage</div>
 </aside>
@@ -227,6 +227,7 @@ body{font-family:'Inter',sans-serif;background:#f1f5f9;color:#1e293b}
 <div class="sb-overlay" id="sbOverlay" onclick="toggleSidebar()"></div>
 <nav class="mob-nav" id="mobNav">
     <button class="act" onclick="goHome();closeSidebar()" id="mobHome"><span class="material-icons-outlined">home</span>New Call</button>
+    <button onclick="showCallback();closeSidebar()" id="mobCallback"><span class="material-icons-outlined">history</span>Callback</button>
     <button onclick="showPocket();closeSidebar()" id="mobPocket"><span class="material-icons-outlined">timer</span>Overrides</button>
     <button onclick="showDashboard();closeSidebar()" id="mobDash"><span class="material-icons-outlined">dashboard</span>Dashboard</button>
 </nav>
@@ -274,8 +275,9 @@ async function loadSites(){
     }
 }
 
+var READ_ONLY=true; // Updated from health endpoint
 async function loadVersion(){
-    try{var res=await fetch('/api/health');var data=await res.json();var el=document.getElementById('sbVersion');if(el) el.textContent='IoT OOH Triage v'+data.version;}catch(e){}
+    try{var res=await fetch('/api/health');var data=await res.json();var el=document.getElementById('sbVersion');if(el) el.textContent='IoT OOH Triage v'+data.version;READ_ONLY=!!data.readOnly;}catch(e){}
 }
 
 // Mock zone data (replaced by live Salus data when credentials configured)
@@ -331,18 +333,18 @@ var structuredHandoff={t1Checks:[],findings:[],suggestedDiagnostic:'',ruledOut:[
 function render(){
     var c=document.getElementById('vc');
     if(!c) return;
-    var views={landing:renderLanding,intake:renderIntake,triage:renderTriage,wrapUp:renderWrapUp,pocket:renderPocket,dashboard:renderDashboard};
+    var views={landing:renderLanding,intake:renderIntake,triage:renderTriage,wrapUp:renderWrapUp,pocket:renderPocket,dashboard:renderDashboard,callback:renderCallback,callbackDetail:renderCallbackDetail};
     (views[view]||renderLanding)(c);
     tick();
     updateNav();
 }
 function updateNav(){
     document.querySelectorAll('.ni').forEach(function(n){n.classList.remove('act')});
-    var id={landing:'navHome',intake:'navHome',triage:'navHome',wrapUp:'navHome',pocket:'navPocket',dashboard:'navDash'}[view];
+    var id={landing:'navHome',intake:'navHome',triage:'navHome',wrapUp:'navHome',pocket:'navPocket',dashboard:'navDash',callback:'navCallback',callbackDetail:'navCallback'}[view];
     var el=document.getElementById(id);if(el)el.classList.add('act');
     // Mobile bottom nav
     document.querySelectorAll('.mob-nav button').forEach(function(b){b.classList.remove('act')});
-    var mobId={landing:'mobHome',intake:'mobHome',triage:'mobHome',wrapUp:'mobHome',pocket:'mobPocket',dashboard:'mobDash'}[view];
+    var mobId={landing:'mobHome',intake:'mobHome',triage:'mobHome',wrapUp:'mobHome',pocket:'mobPocket',dashboard:'mobDash',callback:'mobCallback',callbackDetail:'mobCallback'}[view];
     var mobEl=document.getElementById(mobId);if(mobEl)mobEl.classList.add('act');
 }
 function toggleSidebar(){
@@ -1465,6 +1467,252 @@ function renderPocket(c){
 // ============================================================================
 var liveServices={tb:false,tuya:false,salus:false,intesis:false};
 var liveSiteDevices=null; // cached TB devices for current site
+
+// ============================================================================
+// CALLBACK / FOLLOW-UP LOOKUP
+// ============================================================================
+var callbackResults=null;
+var callbackSelectedTicket=null;
+
+function showCallback(){view='callback';callbackResults=null;callbackSelectedTicket=null;render();}
+
+function renderCallback(c){
+    document.getElementById('pT').textContent='Callback / Follow-Up';
+    var html='<div style="max-width:800px">';
+    html+='<h2 style="display:flex;align-items:center;gap:8px;font-size:18px;margin-bottom:8px"><span class="material-icons-outlined">history</span> Callback / Follow-Up Lookup</h2>';
+    html+='<p style="color:var(--txt2);font-size:13px;margin-bottom:20px">The caller says they\'ve called before about an issue. Let\'s find their site and check what\'s happening.</p>';
+
+    // Site search
+    html+='<div class="form-section"><h3><span class="material-icons-outlined">location_on</span> Find the site</h3>';
+    html+='<div class="form-grid"><div class="fg full" style="position:relative">';
+    html+='<label>Site</label>';
+    html+='<input type="text" id="cbSiteSearch" placeholder="'+(sitesLoaded?SITES.length+' sites — type house ID, name, or postcode...':'Loading...')+'" oninput="renderSiteDropdown(this.value,\'cbSiteDD\')" onfocus="renderSiteDropdown(this.value,\'cbSiteDD\')" autocomplete="off">';
+    html+='<div id="cbSiteDD" class="site-dd"></div>';
+    html+='</div>';
+    html+='<div class="fg"><label>Or search by ticket number</label><input type="text" id="cbTicketNum" placeholder="e.g. 28401" onkeydown="if(event.key===\'Enter\')callbackTicketLookup()"></div>';
+    html+='</div>';
+    html+='<div style="display:flex;gap:8px;margin-top:12px"><button class="ab ok" onclick="callbackSiteLookup()"><span class="material-icons-outlined">search</span> Search tickets</button>';
+    html+='<button class="ab sec" onclick="callbackTicketLookup()"><span class="material-icons-outlined">confirmation_number</span> Lookup by ticket #</button></div>';
+    html+='</div>';
+
+    // Results area
+    if(callbackResults){
+        if(callbackResults.error){
+            html+='<div class="form-section" style="border-left:3px solid var(--err)"><p style="color:var(--err)"><strong>'+esc(callbackResults.error)+'</strong></p></div>';
+        }else if(callbackResults.tickets){
+            var active=callbackResults.tickets.active||[];
+            var resolved=callbackResults.tickets.resolved||[];
+            var closed=callbackResults.tickets.closed||[];
+            var total=active.length+resolved.length+closed.length;
+
+            if(total===0){
+                // UC-6: No tickets found
+                html+='<div class="form-section">';
+                html+='<h3 style="color:var(--warn)"><span class="material-icons-outlined">search_off</span> No recent tickets found</h3>';
+                html+='<p>No IoT-related tickets for this site in the last '+callbackResults.searchDays+' days.</p>';
+                html+='<div style="background:var(--bg);border:1px solid var(--bdr);border-radius:var(--rs);padding:12px;margin:12px 0"><strong>Ask the caller:</strong><ul style="margin:8px 0 0 16px;font-size:13px"><li>"When did you call? Was it today or a different day?"</li><li>"Do you know the site\'s four-digit house number?"</li><li>"Could the call have been about a different site?"</li></ul></div>';
+                html+='<div style="display:flex;gap:8px;margin-top:12px">';
+                if(callbackResults.searchDays<30) html+='<button class="ab" onclick="callbackWiderSearch()"><span class="material-icons-outlined">expand</span> Search wider (30 days)</button>';
+                html+='<button class="ab ok" onclick="goHome()"><span class="material-icons-outlined">add_call</span> Start fresh triage for this site</button>';
+                html+='</div></div>';
+            }else{
+                html+='<div style="font-size:12px;color:var(--txt2);margin-bottom:12px">Found '+total+' ticket(s) in the last '+callbackResults.searchDays+' days</div>';
+
+                // Active tickets
+                if(active.length>0){
+                    html+='<div style="margin-bottom:16px"><div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:var(--err);margin-bottom:8px;display:flex;align-items:center;gap:4px"><span class="material-icons-outlined" style="font-size:14px">warning</span> '+active.length+' Active</div>';
+                    active.forEach(function(t){html+=renderCallbackTicketCard(t,'active');});
+                    html+='</div>';
+                }
+                // Resolved
+                if(resolved.length>0){
+                    html+='<div style="margin-bottom:16px"><div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:var(--ok);margin-bottom:8px;display:flex;align-items:center;gap:4px"><span class="material-icons-outlined" style="font-size:14px">check_circle</span> '+resolved.length+' Recently Resolved</div>';
+                    resolved.forEach(function(t){html+=renderCallbackTicketCard(t,'resolved');});
+                    html+='</div>';
+                }
+                // Closed (collapsed)
+                if(closed.length>0){
+                    html+='<div style="margin-bottom:16px"><div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:var(--txt2);margin-bottom:8px">'+closed.length+' Closed</div>';
+                    closed.forEach(function(t){html+=renderCallbackTicketCard(t,'closed');});
+                    html+='</div>';
+                }
+
+                html+='<button class="ab sec" onclick="goHome()" style="margin-top:8px"><span class="material-icons-outlined">add_call</span> Start new triage for this site instead</button>';
+            }
+        }
+    }
+
+    html+='</div>';
+    c.innerHTML=html;
+}
+
+function renderCallbackTicketCard(t,group){
+    var borderColor=group==='active'?'var(--warn)':group==='resolved'?'var(--ok)':'var(--bdr)';
+    var html='<div class="dc" style="border-left:3px solid '+borderColor+';margin-bottom:8px;cursor:pointer" onclick="showCallbackDetail('+t.id+')">';
+    html+='<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:4px">';
+    html+='<strong style="font-size:13px">#'+t.id+' — '+esc(t.subject)+'</strong>';
+    html+='<span class="sev '+(t.priority.raw==='urgent'?'crit':t.priority.raw==='high'?'high':'med')+'">'+esc(t.priority.translated)+'</span>';
+    html+='</div>';
+    html+='<div style="font-size:12px;color:var(--txt2);margin-bottom:4px">'+esc(t.status.agent)+' — '+esc(t.updatedFriendly)+'</div>';
+    if(t.latestActivity) html+='<div style="font-size:11px;color:var(--txt);background:var(--bg);padding:6px 8px;border-radius:var(--rs)">'+esc(t.latestActivity.translated)+'</div>';
+    html+='<div style="margin-top:6px;font-size:11px;color:var(--pri);font-weight:500">Click to view script & actions →</div>';
+    html+='</div>';
+    return html;
+}
+
+function showCallbackDetail(ticketId){
+    // Find the ticket in results
+    var all=[...(callbackResults.tickets.active||[]),...(callbackResults.tickets.resolved||[]),...(callbackResults.tickets.closed||[])];
+    callbackSelectedTicket=all.find(function(t){return t.id===ticketId;})||null;
+    if(callbackSelectedTicket){view='callbackDetail';render();}
+}
+
+function renderCallbackDetail(c){
+    var t=callbackSelectedTicket;
+    if(!t){showCallback();return;}
+    document.getElementById('pT').textContent='Ticket #'+t.id;
+    var html='<div style="max-width:900px">';
+
+    // Back button
+    html+='<button class="ab sec" onclick="view=\'callback\';render()" style="margin-bottom:16px"><span class="material-icons-outlined">arrow_back</span> Back to results</button>';
+
+    // Script panel — the core
+    html+='<div class="form-section" style="border-left:4px solid #8b5cf6">';
+    html+='<h3 style="color:#7c3aed"><span class="material-icons-outlined">record_voice_over</span> What to tell the caller</h3>';
+    html+='<div style="background:rgba(139,92,246,.06);border:1px solid rgba(139,92,246,.15);border-radius:var(--rs);padding:16px;font-size:14px;line-height:1.7;font-style:italic;margin-bottom:12px">"'+esc(t.script)+'"</div>';
+
+    // What you can offer
+    if(t.offers&&t.offers.length>0){
+        html+='<div style="margin-bottom:12px"><strong style="font-size:12px;color:var(--txt2)">WHAT YOU CAN OFFER:</strong><ul style="margin:6px 0 0 16px;font-size:13px">';
+        t.offers.forEach(function(o){html+='<li>'+esc(o)+'</li>';});
+        html+='</ul></div>';
+    }
+
+    // Action buttons
+    html+='<div class="acts">';
+    if(t.actions.indexOf('addNote')!==-1) html+='<button class="ab" onclick="callbackAction(\'addNote\','+t.id+')"><span class="material-icons-outlined">note_add</span> Add follow-up note</button>';
+    if(t.actions.indexOf('bumpPriority')!==-1) html+='<button class="ab err" onclick="callbackAction(\'bump\','+t.id+')"><span class="material-icons-outlined">priority_high</span> Bump priority</button>';
+    if(t.actions.indexOf('reEscalate')!==-1) html+='<button class="ab" onclick="callbackAction(\'reescalate\','+t.id+')"><span class="material-icons-outlined">send</span> Re-escalate</button>';
+    if(t.actions.indexOf('reportReturned')!==-1) html+='<button class="ab err" onclick="callbackAction(\'returned\','+t.id+')"><span class="material-icons-outlined">replay</span> Issue has returned</button>';
+    html+='</div></div>';
+
+    // Ticket details
+    html+='<div class="form-section"><h3><span class="material-icons-outlined">confirmation_number</span> Ticket Details</h3>';
+    html+='<div class="ts-kv"><span>Ticket</span><span>#'+t.id+'</span></div>';
+    html+='<div class="ts-kv"><span>Subject</span><span>'+esc(t.subject)+'</span></div>';
+    html+='<div class="ts-kv"><span>Status</span><span>'+esc(t.status.agent)+'</span></div>';
+    html+='<div class="ts-kv"><span>Priority</span><span>'+esc(t.priority.translated)+'</span></div>';
+    html+='<div class="ts-kv"><span>Assigned to</span><span>'+esc(t.assignee.name)+'</span></div>';
+    html+='<div class="ts-kv"><span>Created</span><span>'+esc(t.createdFriendly)+'</span></div>';
+    html+='<div class="ts-kv"><span>Last updated</span><span>'+esc(t.updatedFriendly)+'</span></div>';
+    html+='</div>';
+
+    // Timeline
+    if(t.timeline&&t.timeline.length>0){
+        html+='<div class="form-section"><h3><span class="material-icons-outlined">timeline</span> Timeline</h3>';
+        t.timeline.forEach(function(e){
+            html+='<div style="display:flex;gap:12px;padding:6px 0;border-bottom:1px solid rgba(0,0,0,.04);font-size:12px">';
+            html+='<span style="color:var(--txt2);min-width:50px;font-weight:600">'+esc(e.time)+'</span>';
+            html+='<span><strong>'+esc(e.event)+'</strong>'+(e.detail?' — '+esc(e.detail):'')+'</span>';
+            html+='</div>';
+        });
+        html+='</div>';
+    }
+
+    html+='</div>';
+    c.innerHTML=html;
+}
+
+// Callback search functions
+var callbackSiteTag=null;
+function callbackPickSite(v){
+    callbackSiteTag=v;
+    var s=SITES.find(function(s){return s.v===v;});
+    var dd=document.getElementById('cbSiteDD');if(dd)dd.style.display='none';
+    var input=document.getElementById('cbSiteSearch');
+    if(input&&s) input.value=s.name.split('::').pop()+' — '+s.client;
+}
+
+async function callbackSiteLookup(){
+    if(!callbackSiteTag){toast('Select a site first','warning');return;}
+    callbackResults={loading:true};render();
+    try{
+        var res=await fetch('/api/zendesk/callback-lookup?site='+encodeURIComponent(callbackSiteTag)+'&days=7');
+        callbackResults=await res.json();
+        // If 0 results on 7 days, auto-try 30
+        var total=(callbackResults.tickets?.active?.length||0)+(callbackResults.tickets?.resolved?.length||0)+(callbackResults.tickets?.closed?.length||0);
+        if(total===0&&callbackResults.searchDays===7){
+            res=await fetch('/api/zendesk/callback-lookup?site='+encodeURIComponent(callbackSiteTag)+'&days=30');
+            callbackResults=await res.json();
+        }
+    }catch(e){
+        callbackResults={error:'Failed to search Zendesk. Please try again.'};
+    }
+    render();
+}
+
+async function callbackWiderSearch(){
+    try{
+        var res=await fetch('/api/zendesk/callback-lookup?site='+encodeURIComponent(callbackSiteTag)+'&days=30');
+        callbackResults=await res.json();
+    }catch(e){callbackResults={error:'Search failed'};}
+    render();
+}
+
+async function callbackTicketLookup(){
+    var num=document.getElementById('cbTicketNum')?.value;
+    if(!num){toast('Enter a ticket number','warning');return;}
+    try{
+        var res=await fetch('/api/zendesk/tickets/'+num.trim()+'.json');
+        if(!res.ok) throw new Error('Not found');
+        var data=await res.json();
+        // Wrap in callback result format
+        callbackResults={tickets:{active:[{
+            id:data.ticket.id,subject:data.ticket.subject,
+            status:{raw:data.ticket.status,agent:data.ticket.status,caller:''},
+            priority:{raw:data.ticket.priority,translated:data.ticket.priority||'Normal'},
+            assignee:{name:'—'},created:data.ticket.created_at,updated:data.ticket.updated_at,
+            createdFriendly:data.ticket.created_at,updatedFriendly:data.ticket.updated_at,
+            latestActivity:null,timeline:[],script:'Ticket found by number. Check details below.',
+            offers:["I'll add a note that you've called back."],actions:['addNote','bumpPriority']
+        }],resolved:[],closed:[]},searchDays:0,totalFound:1};
+    }catch(e){callbackResults={error:'Ticket #'+num+' not found. Check the number and try again.'};}
+    render();
+}
+
+function callbackAction(action,ticketId){
+    if(READ_ONLY){
+        toast('Prototype mode — action recorded but not sent to Zendesk','info');
+        if(action==='bump'){
+            ab_callback('Priority bumped. In production, the ticket would be updated in Zendesk and the escalation manager notified.');
+        }else if(action==='addNote'){
+            ab_callback('Follow-up note recorded. In production, an internal note would be posted to the Zendesk ticket.');
+        }else if(action==='reescalate'){
+            ab_callback('Re-escalation recorded. In production, a new escalation would be created linked to ticket #'+ticketId+'.');
+        }else if(action==='returned'){
+            ab_callback('Issue-returned recorded. In production, a new ticket would be created linked to #'+ticketId+'.');
+        }
+        return;
+    }
+}
+function ab_callback(msg){toast(msg,'check_circle');}
+
+// Override renderSiteDropdown to support callback site picker
+var _origRenderSiteDropdown=renderSiteDropdown;
+function renderSiteDropdown(q,ddId){
+    var dd=document.getElementById(ddId||'siteDropdown');if(!dd||!sitesLoaded)return;
+    var matches;
+    if(!q||q.length<1){matches=SITES.slice(0,100);}
+    else{q=q.toLowerCase();matches=SITES.filter(function(s){return s.name.toLowerCase().includes(q);}).slice(0,100);}
+    if(matches.length===0){dd.innerHTML='<div style="padding:12px;font-size:13px;color:var(--txt2)">No sites match</div>';dd.style.display='block';return;}
+    var isCallback=ddId==='cbSiteDD';
+    dd.innerHTML=matches.map(function(s){
+        var parts=s.name.split('::');var siteName=parts[parts.length-1]||s.name;var brand=parts.length>=2?parts.slice(0,-1).join(' > '):'';
+        var onclick=isCallback?'callbackPickSite(\''+s.v.replace(/'/g,"\\'")+'\')'  :'pickSite(\''+s.v.replace(/'/g,"\\'")+'\')';
+        return '<div class="site-dd-item" onclick="'+onclick+'">'+(brand?'<div class="site-brand">'+brand+'</div>':'')+'<div class="site-name">'+siteName+'</div></div>';
+    }).join('');
+    dd.style.display='block';
+}
 
 async function checkServiceStatus(){
     var services=['tb','tuya','salus','intesis'];
