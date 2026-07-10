@@ -78,7 +78,11 @@ export function requireAuth(req, res, next) {
     if (req.originalUrl.startsWith('/api/') || req.headers.accept?.includes('application/json')) {
         return res.status(401).json({ error: 'Not signed in', signIn: '/auth/login' });
     }
-    req.session.returnTo = req.originalUrl;
+    // Only capture real page navigations — asset requests (favicon, css, js) must
+    // not overwrite the post-sign-in destination
+    if (req.headers.accept?.includes('text/html') && !/\.[a-z0-9]+$/i.test(req.path)) {
+        req.session.returnTo = req.originalUrl;
+    }
     return res.redirect('/auth/login');
 }
 
