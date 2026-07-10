@@ -1,7 +1,7 @@
 {
-  "name": "ooh-triage-dashboard",
-  "version": "0.3.0",
-  "description": "Out of Hours Triage Dashboard — guided flows for OOH call handlers to triage and resolve IoT site issues",
+  "name": "ooh-dashboard",
+  "version": "1.0.0",
+  "description": "OOH Dashboard — guided triage and device control for out-of-hours call handlers (SD-492 write path, B2C SSO, Zendesk ticketing)",
   "type": "module",
   "main": "server.js",
   "scripts": {
@@ -11,12 +11,13 @@
     "test:headed": "npx playwright test --headed"
   },
   "dependencies": {
-    "amazon-cognito-identity-js": "^6.3.16",
+    "@azure/cosmos": "^4.9.3",
     "axios": "^1.6.0",
-    "cors": "^2.8.5",
     "dotenv": "^16.3.1",
     "express": "^4.18.2",
-    "express-rate-limit": "^8.3.0"
+    "express-rate-limit": "^8.3.0",
+    "express-session": "^1.19.0",
+    "openid-client": "^6.8.4"
   },
   "engines": {
     "node": ">=18.0.0"
