@@ -1,0 +1,76 @@
+# OOH Dashboard — deployment into AKS iot-services alongside the IoT Hub (F018/F024).
+# Pipeline, secrets and ingress are Spencer-owned (SR-2); this manifest declares the
+# app's own contract: resource limits, probes, config surface.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ooh-dashboard
+  namespace: iot-services
+  labels:
+    app: ooh-dashboard
+spec:
+  # NOTE: replicas MUST stay at 1 until session affinity (or a shared session store)
+  # is agreed — express-session state is in-process. Override reverts are already
+  # multi-replica-safe (lease claims), sessions are not yet.
+  replicas: 1
+  selector:
+    matchLabels:
+      app: ooh-dashboard
+  template:
+    metadata:
+      labels:
+        app: ooh-dashboard
+        azure.workload.identity/use: "true"
+    spec:
+      serviceAccountName: ooh-dashboard
+      containers:
+        - name: ooh-dashboard
+          image: REGISTRY_PLACEHOLDER/ooh-dashboard:latest
+          ports:
+            - containerPort: 3001
+          resources:
+            requests:
+              cpu: 100m
+              memory: 192Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: 3001
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: 3001
+            initialDelaySeconds: 15
+            periodSeconds: 30
+          env:
+            - name: NODE_ENV
+              value: "production"
+            - name: AUTH_MODE
+              value: "oidc"
+            - name: DATA_MODE
+              value: "live"
+            - name: PORT
+              value: "3001"
+            # APP_ORIGIN, BRIDGE_BASE_URL, OIDC_*, TB_*, ZENDESK_*, COSMOS_*,
+            # SESSION_SECRET, SMS_* and IOT_DASH_BASE_URL come from the
+            # Spencer-managed K8s Secret (ooh-dashboard-secrets)
+          envFrom:
+            - secretRef:
+                name: ooh-dashboard-secrets
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ooh-dashboard
+  namespace: iot-services
+spec:
+  selector:
+    app: ooh-dashboard
+  ports:
+    - port: 80
+      targetPort: 3001
