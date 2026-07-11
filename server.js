@@ -80,6 +80,8 @@ app.use('/api', rateLimit({
     message: { error: 'Too many requests — please wait a moment' }
 }));
 app.use('/api', requireAuth, apiRouter);
+// Any /api path not matched by the router is a 404 JSON — never the SPA shell
+app.use('/api', (req, res) => res.status(404).json({ error: 'Unknown API route' }));
 
 /* ---------------- static frontend + SPA fallback (authenticated) ---------------- */
 

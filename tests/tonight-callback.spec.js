@@ -96,6 +96,32 @@ test.describe('tonight & callback', () => {
         await expect(page.locator('[data-testid="flow-panel"]')).toContainText('Which area is the caller talking about?');
     });
 
+    test('smart issue entry works with quotes/apostrophes in the caller’s words (rework-1 regression)', async ({ page }) => {
+        // Tester finding 2026-07-11: apostrophes ("won't", "it's") broke the inline
+        // onclick handlers — the chip did nothing and the caller's words were lost.
+        const callerWords = `it's freezing and the heating won't come on`;
+        await signIn(page, 'Test Handler');
+        await confirmSite(page, '6832', 'Old Grey Mare');
+        await page.locator('[data-testid="smart-entry"]').pressSequentially(callerWords, { delay: 20 });
+        await expect(page.locator('[data-testid="suggest-heating"]')).toContainText('Heating');
+        const consoleErrors = [];
+        page.on('pageerror', e => consoleErrors.push(e.message));
+        await page.locator('[data-testid="suggest-heating"]').click();
+        // the flow MUST start and carry the words verbatim (apostrophes intact)
+        await expect(page.locator('[data-testid="flow-panel"]')).toContainText('Which area is the caller talking about?');
+        await expect(page.locator('[data-testid="flow-panel"]')).toContainText(callerWords);
+        expect(consoleErrors).toEqual([]);
+
+        // "Continue with what you typed" must survive the same input (second entry point, same bug class)
+        page.once('dialog', d => d.accept());
+        await page.locator('[data-testid="flow-panel"] button:has-text("Cancel issue")').click();
+        await expect(page.locator('[data-testid="smart-entry"]')).toBeVisible();
+        await page.locator('[data-testid="smart-entry"]').pressSequentially(`the voltage optimiser won't reset — is that you?`, { delay: 20 });
+        await page.locator('[data-testid="suggest-other"]').click();
+        await expect(page.locator('[data-testid="flow-panel"]')).toContainText(`the voltage optimiser won't reset`);
+        expect(consoleErrors).toEqual([]);
+    });
+
     test('connection-check banner appears automatically for an offline site (Bay Horse) and flow captures', async ({ page }) => {
         await signIn(page, 'Test Handler');
         await confirmSite(page, '6750', 'Bay Horse');

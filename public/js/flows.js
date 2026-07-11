@@ -32,16 +32,24 @@ function catOf(k) { return CATS.concat(HIDDENCATS).find(c => c.k === k); }
 
 function issueSearch(q) {
     const box = $('#isugg');
-    const raw = q;
+    // The caller's words are held in state and read back by startSuggestedFlow —
+    // NEVER interpolated into inline handler source (quotes in natural speech,
+    // e.g. "won't", break a JS string inside an onclick attribute).
+    state.smartEntryText = q;
     q = q.trim().toLowerCase();
     if (q.length < 3) { box.innerHTML = ''; return; }
     const scores = {};
     for (const g of KEYWORDS) for (const w of g.words) if (q.includes(w)) scores[g.k] = (scores[g.k] || 0) + w.length;
     const ranked = Object.entries(scores).sort((a, b) => b[1] - a[1]).slice(0, 2).map(([k]) => catOf(k)).filter(Boolean);
     box.innerHTML = (ranked.length
-        ? `Sounds like: ${ranked.map(c => `<button class="chip" data-testid="suggest-${c.k}" style="padding:5px 12px;min-height:0" onclick="startFlow('${c.k}','${esc(raw).replace(/'/g, '&#39;')}')">${c.ic} ${c.t}</button>`).join(' ')} or `
+        ? `Sounds like: ${ranked.map(c => `<button class="chip" data-testid="suggest-${c.k}" style="padding:5px 12px;min-height:0" onclick="startSuggestedFlow('${c.k}')">${c.ic} ${c.t}</button>`).join(' ')} or `
         : 'No obvious match — ')
-        + `<button class="chip" style="padding:5px 12px;min-height:0" onclick="startFlow('other','${esc(raw).replace(/'/g, '&#39;')}')">✍️ Continue with what you typed</button>`;
+        + `<button class="chip" data-testid="suggest-other" style="padding:5px 12px;min-height:0" onclick="startSuggestedFlow('other')">✍️ Continue with what you typed</button>`;
+}
+
+/** Starts a flow suggested from smart entry, carrying the typed caller words from state. */
+function startSuggestedFlow(k) {
+    startFlow(k, state.smartEntryText || '');
 }
 
 /* ------------------------ flow engine ------------------------ */

@@ -25,6 +25,11 @@ import { scheduleOverride } from './overrides.js';
 import { addLateSyncNote } from './zendesk.js';
 import { recordControlEvent } from './metrics.js';
 
+/** Formats an ISO timestamp as e.g. "Sat 07:00" for audit detail strings. */
+function friendlyTime(iso) {
+    return new Date(iso).toLocaleString('en-GB', { weekday: 'short', hour: '2-digit', minute: '2-digit' });
+}
+
 const COMMAND_ACTION_TYPE = {
     setpoint: v => `setpoint-${v.direction || 'change'}`,
     frost: () => 'heating-off-frost',
@@ -77,7 +82,7 @@ export async function dispatch({ operator, confirmToken, siteNo, deviceId, comma
         siteName: site.siteName,
         deviceId: device.deviceId,
         zone: device.zone,
-        detail: `${check.attribute} → ${check.value}${previousValue != null ? ` (was ${previousValue})` : ''}${hold ? ` · hold until ${hold.revertAt}` : ''}`,
+        detail: `${check.attribute} → ${check.value}${previousValue != null ? ` (was ${previousValue})` : ''}${hold ? ` · hold until ${friendlyTime(hold.revertAt)}` : ''}`,
         outcome: 'pending',
         controlActionId: actionId
     });

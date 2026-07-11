@@ -62,7 +62,7 @@ function holdPicker() {
         `<button class="chip ${c.hold === v ? 'sel' : ''}" data-testid="hold-${v}" onclick="ctlHold('${v}')">${l}</button>`).join('')}</div>
  <p class="small" style="margin-top:8px">${c.hold === 'none'
         ? 'Without a hold, the device’s own schedule reclaims this at the next slot — fine for daytime, but evening changes usually need a hold.'
-        : `⏱️ Will automatically revert to the previous value at <b>${holdRevertText(c.hold)}</b>. The revert survives restarts (durable store).`}</p>`;
+        : `⏱️ Will automatically revert${c.device?.telemetry?.heatingSetpoint != null ? ` to <b>${c.device.telemetry.heatingSetpoint}°C</b>` : ' to the previous value'} at <b>${holdRevertText(c.hold)}</b>. The revert survives restarts (durable store).`}</p>`;
 }
 
 function ctlHold(v) { window.ctl.hold = v; drawControl(); }
