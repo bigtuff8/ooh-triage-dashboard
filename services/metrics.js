@@ -83,7 +83,8 @@ export async function computeMetrics(windowDays = 7) {
 
     const captureByClass = {};
     for (const c of captures) {
-        const cls = c.captureClass || c.zone || 'unclassified';
+        // c.captureClass covers audit entries written before the 1.0.2 field rename (dev stores only)
+        const cls = c.OohCaptureClass || c.captureClass || c.zone || 'unclassified';
         captureByClass[cls] = (captureByClass[cls] || 0) + 1;
     }
 

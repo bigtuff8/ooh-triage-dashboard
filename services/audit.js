@@ -16,7 +16,7 @@ import { collection } from './store.js';
  * heating-off-frost | heating-off-mode | hw-boost | capture | escalate-p1 |
  * scope-only | no-action | query | note | revert | admin-*.
  */
-export async function logAction({ actionType, operator, siteNo, siteName, deviceId, zone, detail, outcome, ticketId, controlActionId, captureClass }) {
+export async function logAction({ actionType, operator, siteNo, siteName, deviceId, zone, detail, outcome, ticketId, controlActionId, OohCaptureClass }) {
     const entry = {
         id: randomUUID(),
         OohActionType: actionType,
@@ -31,7 +31,7 @@ export async function logAction({ actionType, operator, siteNo, siteName, device
         outcome: outcome || null,
         ticketId: ticketId || null,
         controlActionId: controlActionId || null,
-        captureClass: captureClass || null,
+        OohCaptureClass: OohCaptureClass || null,
         OohActionAt: new Date().toISOString()
     };
     try {

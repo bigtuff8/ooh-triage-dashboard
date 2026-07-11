@@ -138,9 +138,9 @@ function finishOutcome(f, key, payload, renderCard) {
     return '<div class="alert info">Recording the outcome…</div>';
 }
 
-function outcomeCaptured(f, key, { subject, detail, script, captureClass }) {
+function outcomeCaptured(f, key, { subject, detail, script, OohCaptureClass }) {
     return finishOutcome(f, key,
-        { type: 'capture', subject, detail, captureClass, issueLabel: subject, issueCls: 'blue' },
+        { type: 'capture', subject, detail, OohCaptureClass, issueLabel: subject, issueCls: 'blue' },
         res => `<div class="outcome captured" data-testid="outcome-captured"><h3>📥 Captured for the IoT team</h3><p>${detail}</p>
   <p style="margin-top:4px">This will be actioned on the <b>next working day</b> — it is logged, not lost.</p>
   <div class="script">“${script}”</div><p class="small">Ticket <b>#${res.ticket.id}</b></p></div>`);
@@ -208,7 +208,7 @@ const FLOWR = {
                     subject: `Pub heating change requested (${z.zone})`,
                     detail: `Caller asked for a pub heating adjustment; boiler-panel control isn’t available remotely yet. Logged with the reading ${temp != null ? temp + '°C' : 'n/a'}. (SR-4① pressure recorded.)`,
                     script: 'I’ve logged this for the IoT team — pub heating on this site can’t be adjusted remotely yet, so they’ll pick this up as a priority.',
-                    captureClass: 'boiler-panel-heating'
+                    OohCaptureClass: 'boiler-panel-heating'
                 });
             }
             if (need === 'noact') {
@@ -285,7 +285,7 @@ const FLOWR = {
                     subject: 'Hot water issue — not resolvable remotely tonight',
                     detail: `Caller reports hot-water problems${dhwDev ? ' beyond what a boost resolves' : ' and no boostable device exists here'}. Needs IoT/boiler-side investigation.`,
                     script: 'I’ve logged this for the IoT team as a priority for the morning. If it’s urgent overnight the boiler’s own override panel may help — and if a boiler engineer attends, remember a visit can be chargeable if the fault isn’t Lighthouse equipment.',
-                    captureClass: 'hot-water'
+                    OohCaptureClass: 'hot-water'
                 });
             }
             if (f.data.sc) {
@@ -327,7 +327,7 @@ const FLOWR = {
                 subject: 'Kitchen equipment / schedule request',
                 detail: `Caller needs kitchen equipment outside the current schedule window (${ksched}). Remote switching and schedule changes aren’t available OOH yet — logged for the IoT team.`,
                 script: 'The equipment is on a schedule and comes on at its set time. I can’t safely change that tonight, but I’ve logged it and the IoT team will sort the times with you tomorrow.',
-                captureClass: 'kitchen-powerpause'
+                OohCaptureClass: 'kitchen-powerpause'
             });
         }
         return '';
@@ -349,14 +349,14 @@ const FLOWR = {
                     subject: 'External lighting — resolved with on-site override',
                     detail: 'Caller used the manual override successfully after guidance. Logged so the IoT team can check why the schedule/automation didn’t fire.',
                     script: 'Great — that’s them on. I’ve still logged it so the team can check why they didn’t come on automatically.',
-                    captureClass: 'lighting'
+                    OohCaptureClass: 'lighting'
                 });
             }
             return outcomeCaptured(f, 'cap', {
                 subject: 'External lighting not working',
                 detail: 'Manual override did not resolve; possible tripped supply or failed controller. Needs IoT/electrical follow-up.',
                 script: 'I’ve logged this for the IoT team to investigate first thing. If the pub frontage being dark is a safety concern tonight, your own electrician or duty manager procedure applies — this may be an electrical supply issue rather than the lighting control.',
-                captureClass: 'lighting'
+                OohCaptureClass: 'lighting'
             });
         }
         return '';
@@ -377,7 +377,7 @@ const FLOWR = {
                 subject: 'Extractor fan request',
                 detail: `Caller request: ${f.data.note}. Remote fan control not available OOH — logged for the IoT team.`,
                 script: 'I’ve logged exactly what you need with the times. The IoT team will action it — if the fans are needed for cooking safety right now, the on-site override switch is the fallback.',
-                captureClass: 'fans'
+                OohCaptureClass: 'fans'
             });
         }
         return '';
@@ -431,14 +431,14 @@ const FLOWR = {
                 subject: 'Lighthouse gateway offline — restored on the call',
                 detail: 'Gateway was offline; caller checked fuse board/power and it recovered. Logged for the IoT team to verify overnight stability.',
                 script: 'That’s it back online. Give it ten minutes to settle — I’ve logged it so the team check it stayed healthy overnight.',
-                captureClass: 'connectivity'
+                OohCaptureClass: 'connectivity'
             });
         }
         return outcomeCaptured(f, 'cap', {
             subject: 'Lighthouse gateway / equipment offline',
             detail: `Equipment unreachable after on-site power/router checks. No remote action possible; needs IoT connectivity investigation${f.data.from ? ` (raised from ${f.data.from} flow)` : ''}.`,
             script: 'It’s not something I can fix remotely while the Lighthouse unit is offline, so I’ve logged it as a priority for the IoT team. Anything electrical — like a tripped board that won’t reset — is one for your own electrician tonight.',
-            captureClass: 'connectivity'
+            OohCaptureClass: 'connectivity'
         });
     },
 
@@ -474,7 +474,7 @@ const FLOWR = {
                     subject: 'General issue captured',
                     detail: `Caller reported: ${f.data.q}. Captured verbatim for the IoT team.`,
                     script: 'I’ve logged exactly what you’ve described for the IoT team — they’ll pick it up on the next working day. If it gets urgent tonight, ring back and we’ll escalate.',
-                    captureClass: 'general'
+                    OohCaptureClass: 'general'
                 });
             }
             return `<div class="stepq">Which of these is it closest to?</div><div class="chips">

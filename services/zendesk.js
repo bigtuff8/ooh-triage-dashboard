@@ -66,6 +66,10 @@ async function resolveSiteTag(siteNo) {
 /* Fixture ticket store (dev/tests only)                               */
 /* ------------------------------------------------------------------ */
 
+// In-memory by design: ids restart at 45121 on every boot, so after a dev-server
+// restart the durable audit log can reference ids that now belong to different
+// fixture tickets. Impossible in live mode (Zendesk assigns real ids); accepted
+// for dev (tester finding 7, 2026-07-11).
 let fixtureSeq = 45121;
 const fixtureTickets = [
     { id: 45097, siteNo: '6234', subject: 'No hot water — intermittent', status: 'hold', custom_status_id: 25999056633884, priority: 'normal', created_at: daysAgo(3), updated_at: daysAgo(1), tags: ['ooh'], visit: true, comments: [

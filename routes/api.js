@@ -158,7 +158,7 @@ router.post('/control/actions/:id/wait', wrap(async (req, res) => {
 
 router.post('/outcomes', wrap(async (req, res) => {
     const op = req.session.operator;
-    const { type, siteNo, siteName, subject, detail, callerWords, captureClass, actionId, holdText, p1Summary } = req.body;
+    const { type, siteNo, siteName, subject, detail, callerWords, OohCaptureClass, actionId, holdText, p1Summary } = req.body;
     if (!type || !siteNo || !subject || !detail) {
         return res.status(400).json({ error: 'type, siteNo, subject and detail are required' });
     }
@@ -188,10 +188,10 @@ router.post('/outcomes', wrap(async (req, res) => {
         // the full detail lives on the ticket
         await audit.logAction({
             actionType: type, operator: op, siteNo, siteName,
-            detail: subject + (captureClass ? ` · class: ${captureClass}` : ''),
+            detail: subject + (OohCaptureClass ? ` · class: ${OohCaptureClass}` : ''),
             outcome: { 'escalate-p1': 'p1', capture: 'captured', 'scope-only': 'scope', 'no-action': 'no-action' }[type] || type,
             ticketId: ticket.id,
-            captureClass: captureClass || null
+            OohCaptureClass: OohCaptureClass || null
         });
     }
 

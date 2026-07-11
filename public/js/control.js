@@ -254,7 +254,7 @@ async function ctlEscalate() {
             subject: `${what} — NOT applied, escalated`,
             detail: `Attempted ${what} (${ctlValTxt(c)}) on ${c.device.deviceId} but ${why}. Change must be treated as not applied.`,
             callerWords: state.flow?.data?.freeText || null,
-            captureClass: 'control-failure'
+            OohCaptureClass: 'control-failure'
         });
         registerIssue(`${what} — NOT applied`, 'blue', res.ticket.id);
         html = `<div class="outcome captured" data-testid="outcome-escalated"><h3>📥 Captured for the IoT team</h3>

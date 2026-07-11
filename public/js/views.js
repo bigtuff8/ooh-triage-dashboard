@@ -72,7 +72,7 @@ async function ambiguousCapture() {
             siteName: `Ambiguous (${a.matches.map(m => m.siteName).join(' / ')})`,
             subject: `Ambiguous house ID ${a.siteNo} — caller could not be resolved to one site`,
             detail: `OOH could not safely resolve house ID ${a.siteNo} (matches ${a.matches.map(m => m.siteName).join(' and ')}). Captured for IoT priority review.`,
-            captureClass: 'data-quality'
+            OohCaptureClass: 'data-quality'
         });
         toast(`✅ Captured as ticket <b>#${ticket.id}</b> — IoT team will resolve the duplicate ID`);
     } catch (err) {
