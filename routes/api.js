@@ -184,11 +184,14 @@ router.post('/outcomes', wrap(async (req, res) => {
         if (action?.auditId) await audit.attachTicket(action.auditId, ticket.id);
         if (action?.overrideId) await overrides.attachTicketToOverride(action.overrideId, ticket.id);
     } else {
+        // Tonight/review-queue "What happened" column carries the concise subject —
+        // the full detail lives on the ticket
         await audit.logAction({
             actionType: type, operator: op, siteNo, siteName,
-            detail: detail + (captureClass ? ` · class: ${captureClass}` : ''),
+            detail: subject + (captureClass ? ` · class: ${captureClass}` : ''),
             outcome: { 'escalate-p1': 'p1', capture: 'captured', 'scope-only': 'scope', 'no-action': 'no-action' }[type] || type,
-            ticketId: ticket.id
+            ticketId: ticket.id,
+            captureClass: captureClass || null
         });
     }
 

@@ -21,7 +21,8 @@ import { randomUUID } from 'crypto';
 import { config } from '../config.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const FILE_DIR = join(__dirname, '..', 'data', 'store');
+// OOH_STORE_DIR override keeps test runs isolated from local dev state
+const FILE_DIR = process.env.OOH_STORE_DIR || join(__dirname, '..', 'data', 'store');
 
 export class ConcurrencyError extends Error {
     constructor() { super('Document was modified concurrently'); this.name = 'ConcurrencyError'; }

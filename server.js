@@ -76,7 +76,7 @@ app.use('/auth', express.urlencoded({ extended: false }), authRouter());
 
 app.use('/api', rateLimit({
     windowMs: 60 * 1000,
-    max: 240,
+    max: parseInt(process.env.RATE_LIMIT_MAX || '240', 10), // per client IP; raised for test runs
     message: { error: 'Too many requests — please wait a moment' }
 }));
 app.use('/api', requireAuth, apiRouter);
@@ -84,7 +84,12 @@ app.use('/api', requireAuth, apiRouter);
 /* ---------------- static frontend + SPA fallback (authenticated) ---------------- */
 
 app.use(requireAuth, express.static(join(__dirname, 'public')));
-app.get('*', requireAuth, (req, res) => res.sendFile(join(__dirname, 'public', 'index.html')));
+app.get('*', requireAuth, (req, res) => {
+    // SPA fallback serves the shell for page routes only — a missing asset is a 404,
+    // never index.html (retired files must not silently resolve)
+    if (/\.[a-z0-9]+$/i.test(req.path)) return res.status(404).json({ error: 'Not found' });
+    res.sendFile(join(__dirname, 'public', 'index.html'));
+});
 
 /* ---------------- error handler (no stack traces to clients) ---------------- */
 
