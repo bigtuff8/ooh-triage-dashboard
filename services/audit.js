@@ -60,6 +60,24 @@ export async function attachTicket(auditId, ticketId) {
 }
 
 /**
+ * Records the Zendesk Talk call ticket reconciled to an outcome (F003 provenance).
+ * outcome is one of merged|linked|ambiguous|none; callTicketId is null when nothing matched.
+ */
+export async function attachReconciledCallTicket(auditId, callTicketId, reconcileOutcome) {
+    if (!auditId) return;
+    try {
+        const col = await collection('OohAuditLog');
+        const entry = await col.get(auditId);
+        if (!entry) return;
+        entry.OohReconciledCallTicketId = callTicketId ?? null;
+        entry.OohReconcileOutcome = reconcileOutcome || null;
+        await col.upsert(entry);
+    } catch (err) {
+        console.error(`[AUDIT] Failed to attach reconciled call ticket to audit entry ${auditId}: ${err.message}`);
+    }
+}
+
+/**
  * Updates the outcome of an existing audit entry (e.g. timeout → late sync).
  */
 export async function updateOutcome(auditId, outcome, extraDetail) {

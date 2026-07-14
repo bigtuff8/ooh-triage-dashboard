@@ -14,9 +14,12 @@ import * as control from '../services/control.js';
 import * as killswitch from '../services/killswitch.js';
 import * as overrides from '../services/overrides.js';
 import * as zendesk from '../services/zendesk.js';
+import { hhmm } from '../services/zendesk.js';
 import * as escalation from '../services/escalation.js';
+import * as reconciliation from '../services/reconciliation.js';
 import * as audit from '../services/audit.js';
 import * as metrics from '../services/metrics.js';
+import * as liveness from '../services/liveness.js';
 import * as notices from '../services/notices.js';
 
 const router = Router();
@@ -154,7 +157,51 @@ router.post('/control/actions/:id/wait', wrap(async (req, res) => {
     res.json({ action });
 }));
 
-/* ---------------- outcomes → tickets (F011/F014/F017) ---------------- */
+/* ---------------- outcomes → tickets (F011/F014/F017/F001/F002/F003) ---------------- */
+
+// Sync-state → human transcript line. Keeps the raw code out of the timeline while the
+// anchor Outcome: line stays a bare code for the consumer's server parser.
+const SYNC_STEP_TEXT = {
+    synced: 'Sync: device confirmed (synced)',
+    'late-synced': 'Sync: late confirmation (late-synced)',
+    timeout: 'Sync: timed out — not confirmed',
+    failed: 'Sync: write failed',
+    rejected: 'Sync: rejected by device',
+    pending: 'Sync: awaiting device confirmation'
+};
+
+/** Friendly Europe/London day+time for a hold revert (e.g. "Sat 07:00"). */
+function friendlyHold(iso) {
+    try {
+        return new Date(iso).toLocaleString('en-GB', { timeZone: 'Europe/London', weekday: 'short', hour: '2-digit', minute: '2-digit' });
+    } catch {
+        return iso;
+    }
+}
+
+/**
+ * Assembles the [TRG] transcript (F001) from data the producer already holds — no new capture.
+ * Control outcomes get the full site→zone→read→dispatch→sync→hold trail from the control action;
+ * non-control outcomes get the shorter site→detail trail. Every line carries an HH:MM timestamp.
+ */
+function buildOutcomeTranscript({ action, type, siteNo, siteName, detail, holdText, outcomeTime }) {
+    const steps = [];
+    if (action) {
+        const t0 = action.dispatchedAt || outcomeTime;
+        steps.push({ time: hhmm(t0), text: `Site selected: ${action.siteName || siteName || 'unknown'} (${action.siteNo || siteNo})` });
+        if (action.zone) steps.push({ time: hhmm(t0), text: `Zone: ${action.zone}` });
+        if (action.previousValue != null) steps.push({ time: hhmm(t0), text: `Live read: ${action.attribute} = ${action.previousValue}` });
+        steps.push({ time: hhmm(t0), text: `Dispatched value: ${action.attribute} → ${action.value}${action.previousValue != null ? ` (was ${action.previousValue})` : ''}` });
+        steps.push({ time: hhmm(action.settledAt || t0), text: SYNC_STEP_TEXT[action.state] || `Sync: ${action.state}` });
+        if (action.hold?.revertAt) steps.push({ time: hhmm(action.settledAt || t0), text: `Hold: until ${friendlyHold(action.hold.revertAt)}` });
+    } else {
+        steps.push({ time: hhmm(outcomeTime), text: `Site selected: ${siteName || 'unknown'} (${siteNo})` });
+        if (detail) steps.push({ time: hhmm(outcomeTime), text: detail });
+        if (holdText) steps.push({ time: hhmm(outcomeTime), text: holdText });
+    }
+    if (type === 'escalate-p1') steps.push({ time: hhmm(outcomeTime), text: 'P1 escalation → SMS dispatched to on-duty manager' });
+    return steps;
+}
 
 router.post('/outcomes', wrap(async (req, res) => {
     const op = req.session.operator;
@@ -163,9 +210,16 @@ router.post('/outcomes', wrap(async (req, res) => {
         return res.status(400).json({ error: 'type, siteNo, subject and detail are required' });
     }
     const isP1 = type === 'escalate-p1';
+
+    // F001 — build the timestamped [TRG] transcript from the control action (if any) + context.
+    const action = actionId ? control.getAction(actionId) : null;
+    const outcomeTime = new Date().toISOString();
+    const transcript = buildOutcomeTranscript({ action, type, siteNo, siteName, detail, holdText, outcomeTime });
+
     const ticket = await zendesk.createOutcomeTicket({
         operator: op, siteNo, siteName, subject,
-        detail: holdText ? `${detail}\n${holdText}` : detail,
+        summary: subject,          // clean one-liner (≤180); detail/holdText live in the transcript
+        transcript,
         callerWords,
         outcomeType: type,
         priority: isP1 ? 'urgent' : 'normal',
@@ -177,25 +231,50 @@ router.post('/outcomes', wrap(async (req, res) => {
         p1 = await escalation.escalateP1({ operator: op, siteNo, siteName, ticketId: ticket.id, summary: p1Summary || subject });
     }
 
+    let auditId = action?.auditId || null;
     if (actionId) {
         // Control outcome: the dispatch already wrote the audit entry — link the ticket
         control.attachTicket(actionId, ticket.id);
-        const action = control.getAction(actionId);
         if (action?.auditId) await audit.attachTicket(action.auditId, ticket.id);
         if (action?.overrideId) await overrides.attachTicketToOverride(action.overrideId, ticket.id);
     } else {
         // Tonight/review-queue "What happened" column carries the concise subject —
         // the full detail lives on the ticket
-        await audit.logAction({
+        const auditEntry = await audit.logAction({
             actionType: type, operator: op, siteNo, siteName,
             detail: subject + (OohCaptureClass ? ` · class: ${OohCaptureClass}` : ''),
             outcome: { 'escalate-p1': 'p1', capture: 'captured', 'scope-only': 'scope', 'no-action': 'no-action' }[type] || type,
             ticketId: ticket.id,
             OohCaptureClass: OohCaptureClass || null
         });
+        auditId = auditEntry?.id || null;
     }
 
-    res.json({ ticket, p1: p1 ? { dispatchedAt: p1.dispatchedAt, sentTo: p1.sentTo, link: p1.OohP1EscalationLink, dispatchOk: p1.dispatchOk } : null });
+    // F003 — call-ticket reconciliation is the LAST step and must never block or fail the outcome
+    // (like SMS: it logs + alerts on failure and returns the OOH ticket regardless). It only ever
+    // appends internal comments / merges the call ticket INTO the OOH ticket — the [TRG] first
+    // comment is never mutated, so the oversight parse is preserved (freeze rule).
+    let reconcileResult = null;
+    try {
+        reconcileResult = await reconciliation.reconcileCallTicket({
+            oohTicketId: ticket.id,
+            operator: op,
+            siteNo,
+            sessionStart: action?.dispatchedAt || outcomeTime,
+            outcomeTime
+        });
+        // F003 provenance — record the matched call ticket on the audit entry.
+        await audit.attachReconciledCallTicket(auditId, reconcileResult?.callTicketId ?? null, reconcileResult?.action ?? null);
+    } catch (err) {
+        console.error(`[API] Call-ticket reconciliation failed for OOH ticket #${ticket.id}: ${err.message}`);
+        metrics.raiseAlert('reconciliation-failed', `Call-ticket reconciliation for OOH ticket #${ticket.id} failed — check for an un-merged call ticket`);
+    }
+
+    res.json({
+        ticket,
+        p1: p1 ? { dispatchedAt: p1.dispatchedAt, sentTo: p1.sentTo, link: p1.OohP1EscalationLink, dispatchOk: p1.dispatchOk } : null,
+        reconciliation: reconcileResult
+    });
 }));
 
 /* ---------------- callback lookup (F013) + tickets ---------------- */
@@ -242,6 +321,23 @@ router.post('/query', wrap(async (req, res) => {
 router.get('/tonight', wrap(async (req, res) => {
     res.json({ entries: await audit.entriesTonight(), periodStart: audit.oohPeriodStart().toISOString() });
 }));
+
+/* ---------------- fixture-only test support (F003 reconciliation) ---------------- */
+// These routes exist ONLY in fixture mode (dev/tests) — they let the test suite seed synthetic
+// Zendesk Talk call tickets. In live mode (production) they are never registered, so there is no
+// path to inject fake call tickets against real Zendesk.
+if (config.dataMode !== 'live') {
+    router.post('/test/call-tickets', wrap(async (req, res) => {
+        res.json({ ticket: zendesk.seedFixtureCallTicket(req.body || {}) });
+    }));
+    router.post('/test/call-tickets/reset', wrap(async (req, res) => {
+        zendesk.resetFixtureCallTickets();
+        res.json({ ok: true });
+    }));
+    router.get('/test/call-tickets/:id', wrap(async (req, res) => {
+        res.json({ ticket: zendesk.getFixtureCallTicket(req.params.id) });
+    }));
+}
 
 /* ---------------- admin (IoT role only) ---------------- */
 
@@ -304,6 +400,24 @@ admin.get('/metrics', wrap(async (req, res) => {
 
 admin.get('/alerts', wrap(async (req, res) => res.json({ alerts: metrics.activeAlerts() })));
 admin.post('/alerts/:id/clear', wrap(async (req, res) => { metrics.clearAlert(req.params.id); res.json({ ok: true }); }));
+
+/* F010 — producer-liveness self-check. GET returns the live assessment of the last OOH period;
+ * POST /simulate lets ops (and the test suite) validate the alert wiring with explicit numbers. */
+admin.get('/liveness', wrap(async (req, res) => {
+    res.json(await liveness.evaluateOvernightActivity(new Date(), { healthy: liveness.producerHealthy() }));
+}));
+admin.post('/liveness/simulate', wrap(async (req, res) => {
+    const { current, baseline, healthy = true } = req.body || {};
+    if (current === undefined || baseline === undefined) {
+        return res.status(400).json({ error: 'current and baseline are required' });
+    }
+    const assessment = liveness.assessActivity({ current: Number(current), baseline: Number(baseline), healthy: !!healthy });
+    if (assessment.suspect) {
+        metrics.raiseAlert('no-overnight-activity',
+            `No OOH tickets were created in the last overnight period, but the typical volume is ~${Number(baseline)}. The producer may be silently down — verify it is running.`);
+    }
+    res.json({ current: Number(current), baseline: Number(baseline), healthy: !!healthy, ...assessment });
+}));
 
 router.use('/admin', admin);
 

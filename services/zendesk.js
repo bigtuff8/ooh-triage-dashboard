@@ -86,42 +86,105 @@ const fixtureTickets = [
 function daysAgo(n) { return new Date(Date.now() - n * 24 * 60 * 60 * 1000).toISOString(); }
 
 /* ------------------------------------------------------------------ */
-/* F011 — outcome tickets                                              */
+/* F011/F001/F002 — outcome tickets ([TRG] contract with the frozen    */
+/* IoT Support dashboard consumer — design-spec.md §1/§2)              */
 /* ------------------------------------------------------------------ */
+
+/** Collapses any string to a single trimmed line (anchors + summary must be one line each). */
+function oneLine(str) {
+    return String(str ?? '').replace(/\s+/g, ' ').trim();
+}
+
+/** Local Europe/London HH:MM for a transcript timestamp (matches the consumer step regex). */
+export function hhmm(iso) {
+    try {
+        return new Date(iso).toLocaleTimeString('en-GB', { timeZone: 'Europe/London', hour: '2-digit', minute: '2-digit' });
+    } catch {
+        return '';
+    }
+}
+
+/**
+ * The consumer's server parser captures Outcome with /Outcome:\s*([\w-]+)/ — a bare hyphenated
+ * code only. A space silently truncates the capture, so coerce anything non-conforming to a safe
+ * code (design-spec §4 note 2). App outcome types are already raw codes; this is defence-in-depth.
+ */
+function sanitizeOutcomeCode(outcomeType) {
+    const raw = oneLine(outcomeType);
+    if (/^[\w-]+$/.test(raw)) return raw;
+    return raw.toLowerCase().replace(/[^\w-]+/g, '-').replace(/^-+|-+$/g, '') || 'no-action';
+}
+
+/**
+ * Builds the canonical [TRG] first-comment body (design-spec §2.1). ORDER IS FREEZE-CRITICAL:
+ * summary → Operator → Caller's words → Outcome → Transcript. The three anchor lines MUST precede
+ * the (unbounded) transcript so they survive Zendesk's ~1500-char description truncation (CT-I1),
+ * which is what the consumer's oversight parser reads.
+ */
+function buildTrgBody({ operator, summary, callerWords, outcomeType, transcript, defaultTime, dataQualityNote }) {
+    const lines = [`[TRG] ${oneLine(summary).slice(0, 180)}`];
+    lines.push(`Operator: ${oneLine(operator?.name) || 'OOH'} (OOH)`);
+    if (callerWords) lines.push(`Caller's words: "${oneLine(callerWords)}"`);
+    lines.push(`Outcome: ${sanitizeOutcomeCode(outcomeType)}`);
+
+    const steps = (Array.isArray(transcript) ? transcript : []).filter(s => s && s.text);
+    if (steps.length) {
+        lines.push('Transcript:');
+        for (const s of steps) {
+            const time = /^\d{1,2}:\d{2}$/.test(s.time) ? s.time : defaultTime;
+            lines.push(`${time} | ${oneLine(s.text)}`);
+        }
+    }
+    if (dataQualityNote) lines.push('', dataQualityNote);
+    return lines.join('\n');
+}
 
 /**
  * Creates the Zendesk ticket for a completed OOH issue. Returns { id, url }.
- * The [TRG] internal comment carries the operator identity and full detail.
+ * The [TRG] internal first comment carries the operator identity, caller words, raw outcome code
+ * and the full timestamped action transcript (the ticket requester is the API service account,
+ * so identity always lives in the comment body).
  */
-export async function createOutcomeTicket({ operator, siteNo, siteName, subject, detail, callerWords, outcomeType, priority = 'normal', extraTags = [] }) {
-    const trgComment =
-        `[TRG] ${detail}` +
-        (callerWords ? `\n\nCaller's words: “${callerWords}”` : '') +
-        `\n\nOutcome: ${outcomeType}` +
-        `\nOperator: ${operator.name} (${operator.email || operator.id}) — OOH Dashboard`;
+export async function createOutcomeTicket({ operator, siteNo, siteName, subject, summary, transcript = [], detail, callerWords, outcomeType, priority = 'normal', extraTags = [] }) {
+    const summaryLine = summary || subject || detail || 'OOH outcome';
+    const defaultTime = hhmm(new Date().toISOString());
+    // If no structured transcript was supplied but a detail string exists, keep at least one step
+    // so degraded/non-control outcomes still render a transcript line.
+    let steps = Array.isArray(transcript) ? transcript.filter(s => s && s.text) : [];
+    if (!steps.length && detail) steps = [{ time: defaultTime, text: detail }];
+
+    const buildBody = dataQualityNote =>
+        buildTrgBody({ operator, summary: summaryLine, callerWords, outcomeType, transcript: steps, defaultTime, dataQualityNote });
+
+    // F002 — Ticket Category is set on every OOH outcome ticket (Explore reporting only).
+    const categoryField = { id: config.zendesk.categoryFieldId, value: config.zendesk.categoryValue };
 
     if (!live()) {
         const t = {
             id: fixtureSeq++, siteNo, subject, status: 'new', custom_status_id: 11404223315612,
             priority, created_at: new Date().toISOString(), updated_at: new Date().toISOString(),
             tags: [config.zendesk.oohTag, ...extraTags], visit: false,
-            comments: [{ public: false, body: trgComment, created_at: new Date().toISOString() }]
+            custom_fields: [categoryField],
+            comments: [{ public: false, body: buildBody(null), created_at: new Date().toISOString() }]
         };
         fixtureTickets.unshift(t);
         return { id: t.id, url: `#fixture-ticket-${t.id}` };
     }
 
     const siteTag = await resolveSiteTag(siteNo);
+    const customFields = [categoryField];
+    if (siteTag) customFields.push({ id: config.zendesk.siteFieldId, value: siteTag });
+    const dataQualityNote = siteTag ? null
+        : `(Site field could not be resolved for house ID ${siteNo} — flagged for data-quality review)`;
     const payload = {
         ticket: {
             subject: `[OOH] ${subject}`,
-            comment: { body: trgComment, public: false },
+            comment: { body: buildBody(dataQualityNote), public: false },
             priority,
             tags: [config.zendesk.oohTag, ...extraTags],
-            custom_fields: siteTag ? [{ id: config.zendesk.siteFieldId, value: siteTag }] : []
+            custom_fields: customFields
         }
     };
-    if (!siteTag) payload.ticket.comment.body += `\n\n(Site field could not be resolved for house ID ${siteNo} — flagged for data-quality review)`;
     const data = await zd('POST', '/tickets.json', payload);
     return { id: data.ticket.id, url: `https://${config.zendesk.subdomain}.zendesk.com/agent/tickets/${data.ticket.id}` };
 }
@@ -303,14 +366,132 @@ export async function ticketsForSite(siteNo) {
  * "Raise a query" from the Tonight view — lands on a ticket for the IoT team.
  */
 export async function raiseQuery(operator, siteNo, text) {
+    const subject = `OOH query${siteNo ? ` — site ${siteNo}` : ''}`;
     return createOutcomeTicket({
         operator,
         siteNo: siteNo || 'unknown',
-        subject: `OOH query${siteNo ? ` — site ${siteNo}` : ''}`,
-        detail: `OOH handler query: ${text}`,
+        subject,
+        summary: subject,
+        transcript: [{ time: hhmm(new Date().toISOString()), text: `Query raised: ${text}` }],
         outcomeType: 'query',
         extraTags: ['ooh_query']
     });
+}
+
+/* ------------------------------------------------------------------ */
+/* F003 — call-ticket reconciliation (Zendesk Talk)                    */
+/* ------------------------------------------------------------------ */
+
+// Fixture Talk call tickets (dev/tests only). Seeded via the fixture-mode /api test route so
+// reconciliation is exercisable without live Zendesk; empty in normal runs → reconciliation no-ops.
+let fixtureCallTickets = [];
+
+/**
+ * FIXTURE ONLY — seeds a Zendesk Talk call ticket for reconciliation tests. No-op in live mode.
+ */
+export function seedFixtureCallTicket({ id, subject, siteHint, recordingUrl, answeredById, answeredByName, startedAt, from }) {
+    if (live()) return null;
+    const ticket = {
+        id: Number(id), subject: subject || 'Inbound call', status: 'open',
+        siteHint: siteHint || subject || '',
+        voice: {
+            recording_url: recordingUrl || null,
+            answered_by_id: answeredById ?? null,
+            answered_by_name: answeredByName || null,
+            started_at: startedAt || new Date().toISOString(),
+            from: from || null
+        }
+    };
+    fixtureCallTickets.push(ticket);
+    return ticket;
+}
+
+/** FIXTURE ONLY — resets seeded call tickets (test isolation). */
+export function resetFixtureCallTickets() { fixtureCallTickets = []; }
+
+/** FIXTURE ONLY — returns a seeded call ticket by id (test assertions). */
+export function getFixtureCallTicket(id) { return fixtureCallTickets.find(c => c.id === Number(id)) || null; }
+
+/** Extracts the native VoiceComment metadata (recording, answered-by, started-at, caller) from a call ticket. */
+async function extractVoiceMeta(ticket) {
+    try {
+        const data = await zd('GET', `/tickets/${ticket.id}/comments.json`);
+        const vc = (data.comments || []).find(c => c.type === 'VoiceComment' || c.data?.recording_url);
+        const d = vc?.data || {};
+        return {
+            recording_url: d.recording_url || null,
+            answered_by_id: d.answered_by_id ?? null,
+            answered_by_name: null,
+            started_at: d.started_at || vc?.created_at || ticket.created_at || null,
+            from: d.from || null
+        };
+    } catch (err) {
+        console.error(`[ZD] Voice metadata read failed for call ticket ${ticket.id}: ${err.message}`);
+        return { recording_url: null, answered_by_id: null, answered_by_name: null, started_at: ticket.created_at || null, from: null };
+    }
+}
+
+/**
+ * Candidate Zendesk Talk call tickets created since `sinceIso` (normalised for scoring).
+ * Returns [] when nothing matches — reconciliation then no-ops.
+ */
+export async function findCallTickets({ sinceIso }) {
+    if (!live()) {
+        return fixtureCallTickets.map(c => ({ id: c.id, subject: c.subject, status: c.status, siteHint: c.siteHint, voice: { ...c.voice } }));
+    }
+    const dateStr = String(sinceIso).split('T')[0];
+    const data = await zd('GET', '/search.json', null, {
+        query: `type:ticket via:voice created>=${dateStr}`, sort_by: 'created_at', sort_order: 'desc'
+    });
+    const results = (data.results || []).slice(0, 25);
+    const candidates = [];
+    for (const t of results) {
+        candidates.push({
+            id: t.id,
+            subject: t.subject,
+            status: t.status,
+            siteHint: `${t.subject || ''} ${t.raw_subject || ''}`.trim(),
+            voice: await extractVoiceMeta(t)
+        });
+    }
+    return candidates;
+}
+
+/**
+ * Merges a Zendesk Talk call ticket INTO the OOH outcome ticket (OOH is the survivor and keeps
+ * [TRG] as its first comment, so the oversight parse is preserved — freeze rule). The call's
+ * comments (incl. the native VoiceComment) come across; the call ticket is closed as merged.
+ */
+export async function mergeTickets(oohTicketId, callTicketId, { targetComment, sourceComment } = {}) {
+    if (!live()) {
+        const src = fixtureCallTickets.find(c => c.id === Number(callTicketId));
+        const target = fixtureTickets.find(x => x.id === Number(oohTicketId));
+        if (src) { src.status = 'closed'; src.mergedInto = Number(oohTicketId); }
+        if (target && src) {
+            // Simulate the call's voice comment coming across onto the OOH ticket
+            target.comments.push({
+                public: false,
+                body: `${targetComment || `Merged OOH call ticket #${callTicketId}.`}${src.voice?.recording_url ? `\nCall recording: ${src.voice.recording_url}` : ''}`,
+                created_at: new Date().toISOString()
+            });
+            target.updated_at = new Date().toISOString();
+        }
+        return { ok: true, merged: true, oohTicketId: Number(oohTicketId), callTicketId: Number(callTicketId) };
+    }
+    await zd('POST', `/tickets/${oohTicketId}/merge.json`, {
+        ids: [Number(callTicketId)],
+        target_comment: targetComment,
+        source_comment: sourceComment
+    });
+    return { ok: true, merged: true, oohTicketId: Number(oohTicketId), callTicketId: Number(callTicketId) };
+}
+
+/**
+ * Posts an internal (public:false) provenance/recording note on the OOH ticket. NEVER the first
+ * comment — [TRG] stays first — so the oversight parse is untouched (link-only / ambiguous paths).
+ */
+export async function addRecordingNote(oohTicketId, body) {
+    return addInternalComment(oohTicketId, body);
 }
 
 /**
