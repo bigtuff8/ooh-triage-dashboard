@@ -67,8 +67,18 @@ export const config = {
         apiToken: env('ZENDESK_API_TOKEN'),
         siteFieldId: 11405878329244,
         followUpFieldId: 26074112194076,
+        // Ticket Category tagger field — "Support Request" (F002). The consumer does not read
+        // this; it drives Zendesk-native Explore reporting only. Verified live 2026-07-14.
+        categoryFieldId: 25999250486684,
+        categoryValue: 'tcat_support_request',
         oohTag: 'ooh'
     },
+
+    // Deploy-time device-write lock (F005). A synchronous, Cosmos-independent kill that engages
+    // at first live boot regardless of the runtime kill-switch state — every device write routes
+    // through killswitch.writesBlocked(), which checks this FIRST. Fail-safe by design: absence
+    // leaves writes allowed only in a live, credentialed deploy that has explicitly not set it.
+    writesDisabled: env('WRITES_DISABLED') === 'true',
 
     // Durable store: Cosmos DB in live mode, local JSON files in fixture/dev mode
     cosmos: {
@@ -88,13 +98,25 @@ export const config = {
         onDutyName: env('ESCALATION_ONDUTY_NAME', 'On-duty escalation manager')
     },
 
-    // IoT Support dashboard base URL for P1 deep-links (F014/F026)
-    iotDashBaseUrl: env('IOT_DASH_BASE_URL', 'https://iot-support-dashboard.airedalegroup.io'),
+    // IoT Support dashboard base URL for P1 deep-links (F004/F026). Default is the live UAT host
+    // so the P1 SMS deep-link (/?ticket={id}) resolves correctly even if the env var is unset;
+    // production still sets IOT_DASH_BASE_URL explicitly via the Spencer-managed secret.
+    iotDashBaseUrl: env('IOT_DASH_BASE_URL', 'https://zendesk-uat.airedale-api.co.uk'),
 
     control: {
         syncPollIntervalMs: parseInt(env('SYNC_POLL_INTERVAL_MS', '3000'), 10),
         syncTimeoutMs: parseInt(env('SYNC_TIMEOUT_MS', '90000'), 10),
         lateSyncWatchMs: parseInt(env('LATE_SYNC_WATCH_MS', '600000'), 10)
+    },
+
+    // Call-ticket reconciliation (F003). Thresholds are the numbers James tunes at the Design Gate
+    // (locked: auto-merge ≥0.80 / link-only 0.50–0.79); env-overridable so they can be retuned
+    // without a code change. operatorAgentMap maps operator email → Zendesk agent id for the
+    // answered-by signal (falls back to answered_by_name match when the map is empty).
+    reconciliation: {
+        operatorAgentMap: env('OOH_OPERATOR_AGENT_MAP', '{}'),
+        autoMergeThreshold: parseFloat(env('OOH_RECON_AUTOMERGE_THRESHOLD', '0.80')),
+        linkThreshold: parseFloat(env('OOH_RECON_LINK_THRESHOLD', '0.50'))
     }
 };
 

@@ -6,6 +6,7 @@
  * global banner and the audit trail. Reads always continue.
  */
 
+import { config } from '../config.js';
 import { collection } from './store.js';
 
 const DOC_ID = 'killswitch';
@@ -26,6 +27,11 @@ async function getDoc() {
  * Returns null when writes are allowed, or a human-readable blocking reason.
  */
 export async function writesBlocked(siteNo) {
+    // F005 — deploy-time lock. Checked FIRST and synchronously (no Cosmos read), so a device
+    // write cannot fire at first live boot / during the canary regardless of runtime state.
+    if (config.writesDisabled) {
+        return 'Device control is disabled at deploy time (WRITES_DISABLED) — safety/canary lock';
+    }
     const doc = await getDoc();
     if (doc.OohWriteKillSwitchGlobal) {
         return `Device control is switched off globally${doc.OohKillSwitchReason ? ` — ${doc.OohKillSwitchReason} (${doc.OohKillSwitchActor})` : ''}`;
@@ -43,6 +49,8 @@ export async function writesBlocked(siteNo) {
 export async function killSwitchState() {
     const doc = await getDoc();
     return {
+        // F005 deploy-time lock — reported so the banner and canary can prove it is engaged
+        writesDisabled: config.writesDisabled,
         global: doc.OohWriteKillSwitchGlobal,
         reason: doc.OohKillSwitchReason,
         actor: doc.OohKillSwitchActor,

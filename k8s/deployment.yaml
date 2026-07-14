@@ -56,9 +56,20 @@ spec:
               value: "live"
             - name: PORT
               value: "3001"
-            # APP_ORIGIN, BRIDGE_BASE_URL, OIDC_*, TB_*, ZENDESK_*, COSMOS_*,
-            # SESSION_SECRET, SMS_* and IOT_DASH_BASE_URL come from the
-            # Spencer-managed K8s Secret (ooh-dashboard-secrets)
+            # --- CANARY SAFETY LEVERS (F005/F009) — held here in git so they are auditable ---
+            # WRITES_DISABLED locks every device-write path at deploy time (control dispatch AND
+            # the override revert worker) regardless of the runtime kill-switch. SMS_PROVIDER=log
+            # exercises the P1 path end-to-end without sending. BOTH stay set until the SteerCo
+            # conditions are met: flip WRITES_DISABLED off only at James go/no-go #3 (device writes),
+            # and SMS_PROVIDER to the real gateway only at go/no-go #4 (Q-F).
+            - name: WRITES_DISABLED
+              value: "true"
+            - name: SMS_PROVIDER
+              value: "log"
+            # APP_ORIGIN, BRIDGE_BASE_URL, OIDC_*, TB_*, ZENDESK_*, COSMOS_*, SESSION_SECRET,
+            # ESCALATION_* and IOT_DASH_BASE_URL come from the Spencer-managed K8s Secret
+            # (ooh-dashboard-secrets). IOT_DASH_BASE_URL MUST be the live dashboard host
+            # (https://zendesk-uat.airedale-api.co.uk) so the P1 deep-link resolves (F004).
           envFrom:
             - secretRef:
                 name: ooh-dashboard-secrets

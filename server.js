@@ -24,6 +24,7 @@ import { storeStatus } from './services/store.js';
 import { startWorker } from './services/overrides.js';
 import { activeAlerts } from './services/metrics.js';
 import { controlQueueStatus } from './services/control.js';
+import { startLivenessMonitor } from './services/liveness.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -60,6 +61,7 @@ app.get('/healthz', (req, res) => {
         version: config.appVersion,
         authMode: config.authMode,
         dataMode: config.dataMode,
+        writesDisabled: config.writesDisabled, // F005 canary proof — deploy-time device-write lock
         subsystems,
         controlQueue: controlQueueStatus(),
         activeAlerts: alerts.map(a => ({ code: a.code, message: a.message, raisedAt: a.raisedAt, count: a.count }))
@@ -105,7 +107,8 @@ app.use((err, req, res, next) => {
 
 async function start() {
     await initOidc();
-    startWorker(); // durable hold reverts resume after restart (F010)
+    startWorker(); // durable hold reverts resume after restart (F010 overrides)
+    startLivenessMonitor(); // F010 — producer business-liveness self-check (no-overnight-activity)
     app.listen(config.port, () => {
         console.log(`OOH Dashboard v${config.appVersion} on port ${config.port}`);
         console.log(`  auth: ${config.authMode} · data: ${config.dataMode} · origin: ${config.appOrigin}`);
