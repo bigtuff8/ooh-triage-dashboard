@@ -17,6 +17,11 @@
 
 import { randomUUID } from 'crypto';
 import * as audit from './audit.js';
+import { collection } from './store.js';
+
+// F011 go-live success bar: a P1 is "claimed in time" if acknowledged within this many minutes
+// of SMS dispatch (ack = ticket claim; the retired ooh_p1_acked button is superseded by claim).
+const P1_CLAIM_TARGET_MINUTES = 15;
 
 const CONTROL_OUTCOME_TYPES = ['setpoint-up', 'setpoint-down', 'setpoint-change', 'heating-off-frost', 'heating-off-mode', 'hw-boost'];
 const CALL_OUTCOME_TYPES = [...CONTROL_OUTCOME_TYPES, 'capture', 'escalate-p1', 'scope-only', 'no-action'];
@@ -88,10 +93,18 @@ export async function computeMetrics(windowDays = 7) {
         captureByClass[cls] = (captureByClass[cls] || 0) + 1;
     }
 
-    // P1 SLA: dispatch → acknowledgement (ack times recorded on the SMS log entries)
-    const p1AckMinutes = p1s
-        .filter(e => e.p1AckAt && e.OohActionAt)
-        .map(e => (new Date(e.p1AckAt) - new Date(e.OohActionAt)) / 60000);
+    // F011 P1 SLA: dispatch → acknowledgement is recorded on the OohSmsLog entries (dispatchedAt →
+    // OohP1AckAt), NOT on the audit entries — read the SMS log directly. ack = the P1 being claimed.
+    let smsEntries = [];
+    try {
+        const smsCol = await collection('OohSmsLog');
+        smsEntries = await smsCol.query(e => e.dispatchedAt && e.dispatchedAt >= since);
+    } catch (err) {
+        console.error(`[METRICS] SMS log read failed: ${err.message}`);
+    }
+    const acked = smsEntries.filter(e => e.OohP1AckAt && e.dispatchedAt);
+    const p1AckMinutes = acked.map(e => (new Date(e.OohP1AckAt) - new Date(e.dispatchedAt)) / 60000);
+    const p1WithinTarget = p1AckMinutes.filter(m => m <= P1_CLAIM_TARGET_MINUTES).length;
 
     return {
         windowDays,
@@ -101,13 +114,20 @@ export async function computeMetrics(windowDays = 7) {
             controlActions: controls.length,
             captured: captures.length,
             p1Escalations: p1s.length,
+            p1Dispatched: smsEntries.length,
+            p1Acked: acked.length,
             scopeOnly: entries.filter(e => e.OohActionType === 'scope-only').length,
             noAction: entries.filter(e => e.OohActionType === 'no-action').length
         },
         selfServeRate: callOutcomes.length ? +(applied.length / callOutcomes.length).toFixed(3) : null,
         controlSuccessRate: controls.length ? +(applied.length / controls.length).toFixed(3) : null,
         controlFailures: failed.length,
+        // Metric 2 (go-live bar): median P1 claim time + the share claimed within 15 min of dispatch.
         p1SlaMedianMinutes: p1AckMinutes.length ? +median(p1AckMinutes).toFixed(1) : null,
+        p1ClaimTargetMinutes: P1_CLAIM_TARGET_MINUTES,
+        p1ClaimWithinTargetRate: acked.length ? +(p1WithinTarget / acked.length).toFixed(3) : null,
+        // Metric 3 (trend, not a gate): how often a call escalates to P1 rather than self-serving.
+        captureToEscalationRate: (captures.length + p1s.length) ? +(p1s.length / (captures.length + p1s.length)).toFixed(3) : null,
         captureVolumeByClass: captureByClass
     };
 }
