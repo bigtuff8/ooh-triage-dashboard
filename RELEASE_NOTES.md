@@ -1,5 +1,37 @@
 # Release Notes — OOH Dashboard
 
+## v1.1.0 — OOH producer conformance + coordinated go-live prep (harness cycle 2026-07-14T10-30-11)
+
+**Date:** 2026-07-14 · **Mode:** Airedale · **Design gate approved:** 2026-07-14 · **Test phase:** PASS (1 rework cycle) · **Branch:** `feature/live-build-v1` (NOT deployed — go-live gated to Phase C)
+
+Backend/data-contract cycle bringing the OOH producer into exact conformance with the FROZEN IoT Support dashboard consumer (v1.49.1). The operator UI is unchanged. No consumer file was touched.
+
+### What's New
+
+- **Full timestamped `[TRG]` transcript (F001):** every OOH outcome writes an anchors-first `[TRG]` internal comment — `summary → Operator → Caller's words → Outcome (bare code) → Transcript (HH:MM | step)` — assembled from data the producer already holds. Anchors are always emitted before the (unbounded) transcript so they survive Zendesk's description truncation and the frozen consumer's oversight parse still extracts operator/outcome/caller/site.
+- **Call-ticket reconciliation (F003):** at outcome time the producer auto-identifies the originating Zendesk Talk call ticket (multi-signal confidence: answered-by + time window + site + caller number) and **merges it into the OOH ticket** — one record, recording attached, no duplicate, no manual merging. Confident match (≥0.80) auto-merges; a probable match (0.50–0.79) or ambiguous (≥2 plausible) posts the recording as an internal link and leaves tickets intact.
+- **Ticket Category = "Support Request" (F002)** on every outcome ticket for Zendesk-native reporting.
+- **Deploy-time device-write lock (F005):** a synchronous, Cosmos-independent `WRITES_DISABLED` check as the first gate on every device-write path — a first-boot safety guarantee for the canary, independent of the runtime kill-switch.
+- **Producer-liveness monitoring (F010):** business-liveness self-check raises `no-overnight-activity` when a healthy producer creates zero tickets against a non-zero baseline (closes the consumer's "empty window reads as all-clear" gap; layer-1 uptime remains Spencer's).
+- **Success-criteria instrumentation (F011):** P1-claim SLA + capture/escalation metrics on `/api/admin/metrics`.
+
+### Bug Fixes
+
+- **F004:** corrected the P1 deep-link host default to the live UAT dashboard; `IOT_DASH_BASE_URL` is now required explicitly in production (fail loud).
+- **F011:** P1 SLA now reads `OohSmsLog` (dispatch→ack) — fixes a latent lookup that always returned null.
+
+### Technical Notes
+
+- **Rework cycle 1 (Critical-Thinker review):** the first test pass was fixture-mode; a CT review found F003 auto-merge was unreachable in the *default live* config. Fixed: `answered_by_name` is now derived from `answered_by_id` via a Zendesk users lookup (so auto-merge works live without an operator→agent map), the match window was widened 5→45 min (captures are logged after the call), the merge path posts the recording note belt-and-braces, and the added lookup is cached to avoid an N+1 fan-out. CT re-review: all findings CLOSED against the live path.
+- Verification: Playwright 41/41, dev-selfverify 25/25, tester-verify 16/16, verify-rework-cr01 10/10.
+
+### ⚠️ Known limitations / go-live conditions (NOT closed this cycle)
+
+- **P1-claim SLA metric is NOT yet live-measurable.** "P1 claimed within 15 min" (metric 2) has no live write path for `OohP1AckAt` — the claim happens on the frozen consumer/Zendesk and is not fed back into the producer's `OohSmsLog`. Until a claim→ack feedback path exists, this metric reports **null** — a null must NOT be read as "target met." (Tracked: IM-02.)
+- **Layer-1 producer-uptime monitoring** (detecting a *dead* producer, vs merely idle) is Spencer's (F008) — the in-process self-check cannot detect its own process death. (Tracked: IM-04.)
+- **Recommended:** populate `OOH_OPERATOR_AGENT_MAP` for answered-by robustness where a Zendesk display name may differ from the app operator name (AD-07).
+- **Device writes and live SMS remain LOCKED** (`WRITES_DISABLED=true`, `SMS_PROVIDER=log`) behind the 7 SteerCo conditions. This release is for merge + a locked/canary deploy only — NOT device-write cutover (F012/F013).
+
 ## v1.0.0 → v1.0.2 — Live build (harness cycle 2026-07-10T22-01-41)
 
 **Date:** 2026-07-11 · **Mode:** Airedale · **Design gate approved:** 2026-07-10 · **Test phase:** PASS (1 rework cycle)

@@ -1,6 +1,6 @@
 {
   "name": "ooh-dashboard",
-  "version": "1.0.2",
+  "version": "1.1.0",
   "description": "OOH Dashboard — guided triage and device control for out-of-hours call handlers (SD-492 write path, B2C SSO, Zendesk ticketing)",
   "type": "module",
   "main": "server.js",
