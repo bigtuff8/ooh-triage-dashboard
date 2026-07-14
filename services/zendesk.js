@@ -428,16 +428,26 @@ export function normalizeVoiceMeta(voiceData, ticket, answeredByName = null) {
     };
 }
 
+// Agent-name cache (IM-05): reconciliation runs on every outcome and can inspect up to 25 candidate
+// call tickets, each triggering an answered-by lookup. OOH is handled by a handful of operators, so
+// a per-process cache collapses the added GET /users/{id} calls to ~one-per-operator-per-boot and
+// removes the N+1 fan-out the CR-01 fix would otherwise add. Successful names only — failures are
+// not cached so a transient error retries next time.
+const agentNameCache = new Map();
+
 /**
- * Resolves a Zendesk agent's display name by id (the answered-by reconciliation signal). Returns
- * null on any failure — reconciliation then falls back to the agent-id-map signal or degrades to
- * link-only, never throws.
+ * Resolves a Zendesk agent's display name by id (the answered-by reconciliation signal). Cached.
+ * Returns null on any failure — reconciliation then falls back to the agent-id-map signal or
+ * degrades to link-only, never throws.
  */
 async function resolveAgentName(agentId) {
     if (agentId == null) return null;
+    if (agentNameCache.has(agentId)) return agentNameCache.get(agentId);
     try {
         const data = await zd('GET', `/users/${agentId}.json`);
-        return data?.user?.name || null;
+        const name = data?.user?.name || null;
+        if (name) agentNameCache.set(agentId, name);
+        return name;
     } catch (err) {
         console.error(`[ZD] Agent name lookup failed for user ${agentId}: ${err.message}`);
         return null;
