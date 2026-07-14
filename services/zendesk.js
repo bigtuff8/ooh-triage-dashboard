@@ -412,22 +412,55 @@ export function resetFixtureCallTickets() { fixtureCallTickets = []; }
 /** FIXTURE ONLY — returns a seeded call ticket by id (test assertions). */
 export function getFixtureCallTicket(id) { return fixtureCallTickets.find(c => c.id === Number(id)) || null; }
 
-/** Extracts the native VoiceComment metadata (recording, answered-by, started-at, caller) from a call ticket. */
+/**
+ * Pure mapping of raw Zendesk voice data (+ an optionally-resolved agent name) → the normalised
+ * voice-meta shape reconciliation scores against. Exported so the live answered-by path is
+ * unit-testable without hitting Zendesk (CR-01 regression guard).
+ */
+export function normalizeVoiceMeta(voiceData, ticket, answeredByName = null) {
+    const d = voiceData || {};
+    return {
+        recording_url: d.recording_url || null,
+        answered_by_id: d.answered_by_id ?? null,
+        answered_by_name: answeredByName || d.answered_by_name || null,
+        started_at: d.started_at || ticket?.created_at || null,
+        from: d.from || null
+    };
+}
+
+/**
+ * Resolves a Zendesk agent's display name by id (the answered-by reconciliation signal). Returns
+ * null on any failure — reconciliation then falls back to the agent-id-map signal or degrades to
+ * link-only, never throws.
+ */
+async function resolveAgentName(agentId) {
+    if (agentId == null) return null;
+    try {
+        const data = await zd('GET', `/users/${agentId}.json`);
+        return data?.user?.name || null;
+    } catch (err) {
+        console.error(`[ZD] Agent name lookup failed for user ${agentId}: ${err.message}`);
+        return null;
+    }
+}
+
+/**
+ * Extracts the native VoiceComment metadata (recording, answered-by, started-at, caller) from a
+ * call ticket. CR-01 fix: answered_by_name is derived from answered_by_id via a users lookup so the
+ * name-match reconciliation signal works live WITHOUT requiring OOH_OPERATOR_AGENT_MAP to be set
+ * (the map remains an optional, higher-precedence signal).
+ */
 async function extractVoiceMeta(ticket) {
     try {
         const data = await zd('GET', `/tickets/${ticket.id}/comments.json`);
         const vc = (data.comments || []).find(c => c.type === 'VoiceComment' || c.data?.recording_url);
         const d = vc?.data || {};
-        return {
-            recording_url: d.recording_url || null,
-            answered_by_id: d.answered_by_id ?? null,
-            answered_by_name: null,
-            started_at: d.started_at || vc?.created_at || ticket.created_at || null,
-            from: d.from || null
-        };
+        const startedAt = d.started_at || vc?.created_at || ticket.created_at || null;
+        const answeredByName = await resolveAgentName(d.answered_by_id);
+        return normalizeVoiceMeta({ ...d, started_at: startedAt }, ticket, answeredByName);
     } catch (err) {
         console.error(`[ZD] Voice metadata read failed for call ticket ${ticket.id}: ${err.message}`);
-        return { recording_url: null, answered_by_id: null, answered_by_name: null, started_at: ticket.created_at || null, from: null };
+        return normalizeVoiceMeta(null, ticket);
     }
 }
 

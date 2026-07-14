@@ -20,7 +20,13 @@
 import * as zendeskDefault from './zendesk.js';
 import { config } from '../config.js';
 
-const WINDOW_BEFORE_MS = 5 * 60 * 1000; // OOH sessions are short — a tight pre-session window
+// IM-03 fix: for non-control outcomes (captures — the bulk of OOH volume) sessionStart is the
+// outcome time (now), and the operator commonly logs the outcome well after the call started. A
+// 5-min pre-window missed those calls entirely (time signal never awarded → recording never
+// surfaced). Widened to 45 min to cover realistic call-handling duration. This is a positive
+// scoring signal, not a filter; the answered-by + site signals still disambiguate, and ≥2 plausible
+// candidates fall to the safe ambiguous link-only path (R11) rather than a wrong auto-merge.
+const WINDOW_BEFORE_MS = 45 * 60 * 1000;
 
 /** Single trimmed line, lower-cased, for tolerant name comparison. */
 function normName(str) {
@@ -116,6 +122,10 @@ export async function reconcileCallTicket({ oohTicketId, operator, siteNo, sessi
             targetComment: `Merged OOH call ticket #${best.ticket.id} into this ticket (recording + call history preserved). Matched with confidence ${best.score}.`,
             sourceComment: `Merged into OOH outcome ticket #${oohTicketId}.`
         });
+        // IM-01 belt-and-braces: guarantee the recording URL is on the OOH survivor regardless of
+        // whether Zendesk's merge carries the source VoiceComment across (documented merge behaviour
+        // closes the source + adds a link note; it does not reliably copy comments to the target).
+        if (recordingUrl) await zendesk.addRecordingNote(oohTicketId, `Call recording: ${recordingUrl}`);
         return { action: 'merged', callTicketId: best.ticket.id, score: best.score, recordingUrl };
     }
 

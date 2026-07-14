@@ -112,7 +112,9 @@ export const config = {
     // Call-ticket reconciliation (F003). Thresholds are the numbers James tunes at the Design Gate
     // (locked: auto-merge ≥0.80 / link-only 0.50–0.79); env-overridable so they can be retuned
     // without a code change. operatorAgentMap maps operator email → Zendesk agent id for the
-    // answered-by signal (falls back to answered_by_name match when the map is empty).
+    // answered-by signal — now OPTIONAL (higher-precedence bonus): since the CR-01 fix derives
+    // answered_by_name from answered_by_id via a users lookup, the name-match signal works live
+    // without the map, so auto-merge no longer depends on Spencer supplying it.
     reconciliation: {
         operatorAgentMap: env('OOH_OPERATOR_AGENT_MAP', '{}'),
         autoMergeThreshold: parseFloat(env('OOH_RECON_AUTOMERGE_THRESHOLD', '0.80')),
@@ -130,6 +132,9 @@ export function validateConfig() {
         if (config.dataMode !== 'live') problems.push('DATA_MODE must be "live" in production');
         if (!config.session.secret) problems.push('SESSION_SECRET is required in production');
         if (!config.appOrigin.startsWith('https://')) problems.push('APP_ORIGIN must be https in production');
+        // AD-04: require the P1 deep-link host explicitly in production — fail loud rather than
+        // silently falling back to the UAT default (which would send live P1 SMS links to UAT).
+        if (!env('IOT_DASH_BASE_URL')) problems.push('IOT_DASH_BASE_URL must be set explicitly in production (P1 deep-link host; no silent fallback)');
     }
     if (config.authMode === 'oidc') {
         if (!config.oidc.issuer || !config.oidc.clientId || !config.oidc.clientSecret) {
