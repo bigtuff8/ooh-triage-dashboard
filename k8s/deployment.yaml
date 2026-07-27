@@ -22,10 +22,13 @@ spec:
         app: ooh-dashboard
         azure.workload.identity/use: "true"
     spec:
-      serviceAccountName: ooh-dashboard
+      # F004/SD-586: federated to the prod workload identity id-ooh-dashboard-prod (keyless Cosmos).
+      serviceAccountName: sa-ooh-dashboard
       containers:
         - name: ooh-dashboard
-          image: REGISTRY_PLACEHOLDER/ooh-dashboard:latest
+          # F004/SD-586: real registry + immutable git short-sha (never :latest) so rollback is
+          # deterministic (runbook Step 3 / Rollback). CI substitutes <sha> at deploy time.
+          image: apitechhub.azurecr.io/ooh-dashboard:<sha>
           ports:
             - containerPort: 3001
           resources:
