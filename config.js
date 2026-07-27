@@ -42,8 +42,10 @@ export const config = {
         clientSecret: env('OIDC_CLIENT_SECRET'),
         scope: env('OIDC_SCOPE', 'openid profile email'),
         roleClaim: env('OIDC_ROLE_CLAIM', 'extension_Role'),
-        // Claim value → app role mapping (JSON), e.g. {"ClaimArea.IoT":"iot","OOH.Handler":"handler"}
-        roleMap: JSON.parse(env('OIDC_ROLE_MAP', '{"OOH.Handler":"handler","OOH.IoTAdmin":"iot","ClaimArea.IoT":"iot"}'))
+        // claimArea int → app role mapping (JSON). F002/SD-586: extension_Role is a serialised
+        // AreaClaim[] keyed on the claimArea int — 1500 = Zendesk/OOH → handler, 1400 = IoT → iot.
+        // Prod sets OIDC_ROLE_MAP explicitly; this default keeps a missing env correct.
+        roleMap: JSON.parse(env('OIDC_ROLE_MAP', '{"1500":"handler","1400":"iot"}'))
     },
 
     // Integration-bridge internal read API (SD-545; cluster-internal in iot-services)
@@ -137,8 +139,10 @@ export function validateConfig() {
         if (!env('IOT_DASH_BASE_URL')) problems.push('IOT_DASH_BASE_URL must be set explicitly in production (P1 deep-link host; no silent fallback)');
     }
     if (config.authMode === 'oidc') {
-        if (!config.oidc.issuer || !config.oidc.clientId || !config.oidc.clientSecret) {
-            problems.push('OIDC_ISSUER, OIDC_CLIENT_ID and OIDC_CLIENT_SECRET are required when AUTH_MODE=oidc');
+        // F001/SD-586: Techhub-Production is a PUBLIC PKCE client — OIDC_CLIENT_SECRET is
+        // intentionally NOT required (the two-arg discovery() never hands a secret to the client).
+        if (!config.oidc.issuer || !config.oidc.clientId) {
+            problems.push('OIDC_ISSUER and OIDC_CLIENT_ID are required when AUTH_MODE=oidc');
         }
     }
     if (config.dataMode === 'live') {
@@ -146,7 +150,10 @@ export function validateConfig() {
         if (!config.thingsboard.writeUsername || !config.thingsboard.writePassword) {
             problems.push('TB_WRITE_USERNAME / TB_WRITE_PASSWORD (SR-3 scoped credential) are required when DATA_MODE=live');
         }
-        if (!config.cosmos.endpoint || !config.cosmos.key) problems.push('COSMOS_ENDPOINT / COSMOS_KEY are required when DATA_MODE=live');
+        // F003/SD-586: Cosmos is reached keyless via workload identity — COSMOS_KEY is
+        // intentionally NOT required. COSMOS_DATABASE defaults (config.cosmos.database) so only
+        // the endpoint is mandatory here.
+        if (!config.cosmos.endpoint) problems.push('COSMOS_ENDPOINT is required when DATA_MODE=live');
     }
     return problems;
 }

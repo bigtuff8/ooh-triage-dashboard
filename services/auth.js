@@ -46,28 +46,48 @@ export function sessionMiddleware() {
 
 /**
  * Discovers the OIDC issuer once at startup (AUTH_MODE=oidc).
+ *
+ * Public client (F001/SD-586): the shared Techhub-Production B2C client carries NO
+ * secret. openid-client v6 `discovery(server, clientId, metadata?, clientAuthentication?)`
+ * defaults `clientAuthentication` to `None()` when no secret is supplied, so the two-arg
+ * form is the correct public-client idiom; PKCE (see authRouter) carries the flow. The
+ * token exchange therefore sends no client secret. (Confirmed against openid-client@6.8.4.)
  */
 export async function initOidc() {
     if (config.authMode !== 'oidc') return;
     oidcLib = await import('openid-client');
     oidcConfig = await oidcLib.discovery(
         new URL(config.oidc.issuer),
-        config.oidc.clientId,
-        config.oidc.clientSecret
+        config.oidc.clientId
     );
-    console.log('[AUTH] OIDC issuer discovered');
+    console.log('[AUTH] OIDC issuer discovered (public client, PKCE)');
 }
 
+// Deterministic role precedence (CT AD-01): a user carrying BOTH an IoT (1400) and a
+// handler (1500) claim resolves to the higher-privilege role, independent of claim order.
+const ROLE_PRECEDENCE = ['iot', 'handler'];
+
 /**
- * Maps raw claim values to the app role ('handler' | 'iot'); unknown values get no role.
+ * Maps the extension_Role claim to the app role ('handler' | 'iot'); unknown values get null.
+ *
+ * F002/SD-586: extension_Role arrives as a JSON string of an array of AreaClaim objects
+ * ({claimArea, claimGroup, claimPermission, ...}), keyed on the claimArea int
+ * (1500 = Zendesk/OOH → handler, 1400 = IoT → iot). Malformed / legacy / missing input
+ * must not throw — it resolves to null, which drives the existing 403 path in /callback.
  */
-function mapRole(claims) {
-    const raw = claims[config.oidc.roleClaim];
-    const values = Array.isArray(raw) ? raw : [raw];
-    for (const v of values) {
-        if (v && config.oidc.roleMap[v]) return config.oidc.roleMap[v];
+export function mapRole(claims) {
+    let raw = claims?.[config.oidc.roleClaim];
+    if (typeof raw === 'string') {
+        try { raw = JSON.parse(raw); } catch { raw = []; }
     }
-    return null;
+    const areas = Array.isArray(raw) ? raw : (raw != null ? [raw] : []);
+    const matched = new Set();
+    for (const c of areas) {
+        // AreaClaim objects key on claimArea; tolerate bare ints/strings (legacy tokens)
+        const key = String(c?.claimArea ?? c);
+        if (config.oidc.roleMap[key]) matched.add(config.oidc.roleMap[key]);
+    }
+    return ROLE_PRECEDENCE.find(r => matched.has(r)) ?? null;
 }
 
 /**
