@@ -4,6 +4,11 @@ FROM node:24-alpine AS build
 WORKDIR /app
 COPY package.json package-lock.json ./
 RUN npm ci --omit=dev
+# Build-time smoke check (CT IM-02): the keyless-Cosmos path imports @azure/identity at
+# runtime. It must be a first-class dependency, not merely a transitive dev dep, or
+# `npm ci --omit=dev` silently omits it and the prod image throws ERR_MODULE_NOT_FOUND
+# on first store access. Fail the build loudly here if it is not resolvable.
+RUN node -e "require.resolve('@azure/identity')"
 
 # Runtime stage
 FROM node:24-alpine

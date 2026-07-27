@@ -140,22 +140,47 @@ let storeHealthy = true;
 async function initCosmos() {
     const { CosmosClient } = await import('@azure/cosmos');
     // Singleton client, Direct-equivalent (Node SDK uses TCP-less gateway; keep defaults + retries)
-    const client = new CosmosClient({
+    const clientOptions = {
         endpoint: config.cosmos.endpoint,
-        key: config.cosmos.key,
         connectionPolicy: { requestTimeout: 10000, enableEndpointDiscovery: true }
-    });
-    const { database } = await client.databases.createIfNotExists({ id: config.cosmos.database });
+    };
+    if (config.cosmos.key) {
+        clientOptions.key = config.cosmos.key;              // local / keyed back-compat path
+    } else {
+        // Prod (F003/SD-586): keyless via Workload Identity — no master key in-cluster.
+        // Prefer the explicit WorkloadIdentityCredential for a faster, clearer failure than
+        // DefaultAzureCredential's full-chain walk (CT AD-05); fall back to the chain locally.
+        const { WorkloadIdentityCredential, DefaultAzureCredential } = await import('@azure/identity');
+        clientOptions.aadCredentials =
+            (process.env.AZURE_FEDERATED_TOKEN_FILE && process.env.AZURE_CLIENT_ID)
+                ? new WorkloadIdentityCredential()
+                : new DefaultAzureCredential();
+    }
+    const client = new CosmosClient(clientOptions);
+    // The database is PRE-CREATED out-of-band (Spencer) — the granted data-plane role cannot
+    // create it, so take a handle, never databases.createIfNotExists (CR-01).
+    const database = client.database(config.cosmos.database);
     for (const name of COLLECTIONS) {
-        const { container } = await database.containers.createIfNotExists({
-            id: name,
-            partitionKey: { paths: ['/storePartition'] },
-            indexingPolicy: {
-                indexingMode: 'consistent',
-                includedPaths: [{ path: '/storePartition/?' }, { path: '/OohOverrideRevertAt/?' }, { path: '/OohActionAt/?' }, { path: '/status/?' }],
-                excludedPaths: [{ path: '/*' }]
+        // Containers are PRE-CREATED out-of-band (CR-01). Attempt create for local/keyed envs,
+        // but tolerate a 403/Forbidden (data-plane role cannot create) by falling back to a handle.
+        let container;
+        try {
+            ({ container } = await database.containers.createIfNotExists({
+                id: name,
+                partitionKey: { paths: ['/storePartition'] },
+                indexingPolicy: {
+                    indexingMode: 'consistent',
+                    includedPaths: [{ path: '/storePartition/?' }, { path: '/OohOverrideRevertAt/?' }, { path: '/OohActionAt/?' }, { path: '/status/?' }],
+                    excludedPaths: [{ path: '/*' }]
+                }
+            }));
+        } catch (err) {
+            if (err.code === 403 || err.code === 'Forbidden') {
+                container = database.container(name);
+            } else {
+                throw err;
             }
-        });
+        }
         collections.set(name, new CosmosCollection(container));
     }
 }
@@ -176,7 +201,35 @@ export async function collection(name) {
 }
 
 /**
- * Health signal for /healthz.
+ * Actively probes real store reachability and updates the health flag (F003, CR-02).
+ *
+ * In live mode this forces initCosmos() (keyless WI client construction) and performs a
+ * real point-read against a pre-created container — so it proves data-plane connectivity
+ * and AAD/WI token acquisition, NOT merely that the client object was built. A 404 (probe
+ * doc absent) is a SUCCESS for connectivity; a 401/403/network error is a failure. Called
+ * eagerly at boot from server.js so a Cosmos/WI failure surfaces with a clear log line at
+ * startup instead of silently at first store write. Never throws.
+ */
+export async function storeProbe() {
+    if (config.dataMode !== 'live') {
+        storeHealthy = true;
+        return storeStatus();
+    }
+    try {
+        const c = await collection('OohAppConfig'); // forces initCosmos() on first call
+        await c.get('__ooh_health_probe__');        // real point-read; 404 → null (still healthy)
+        storeHealthy = true;
+    } catch (err) {
+        storeHealthy = false;
+        console.error(`[STORE] health probe failed (Cosmos unreachable / WI token / RBAC): ${err.code || ''} ${err.message}`);
+    }
+    return storeStatus();
+}
+
+/**
+ * Health signal for /healthz. Reflects the last real store operation or storeProbe() result
+ * (CR-02 fix: the flag is only trustworthy once storeProbe() or a real store call has run —
+ * server.js runs storeProbe() eagerly at boot in live mode so this is meaningful from startup).
  */
 export function storeStatus() {
     return { mode: config.dataMode === 'live' ? 'cosmos' : 'file', healthy: storeHealthy };

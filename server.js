@@ -20,7 +20,7 @@ import apiRouter from './routes/api.js';
 import * as bridge from './services/bridge.js';
 import * as tb from './services/tb-client.js';
 import { zendeskStatus } from './services/zendesk.js';
-import { storeStatus } from './services/store.js';
+import { storeStatus, storeProbe } from './services/store.js';
 import { startWorker } from './services/overrides.js';
 import { activeAlerts } from './services/metrics.js';
 import { controlQueueStatus } from './services/control.js';
@@ -56,8 +56,20 @@ app.get('/healthz', (req, res) => {
         zendesk: zendeskStatus(),
         store: storeStatus()
     };
+    // CR-02: report real subsystem state in the body. A subsystem is degraded when it
+    // explicitly reports healthy:false (store — now backed by a real probe — bridge, zendesk)
+    // or, for ThingsBoard, when its READ auth is down (write may be intentionally unconfigured
+    // during the write-locked canary, so it does not count against health). We deliberately
+    // keep HTTP 200 even when degraded: both K8s liveness and readiness probes hit /healthz and,
+    // with replicas:1 (RB-4/AD-04), a non-2xx on a transient Cosmos blip would restart/deregister
+    // the only pod — a full outage plus forced re-SSO. Degrade is surfaced in the body, not the code.
+    const degraded =
+        subsystems.store?.healthy === false ||
+        subsystems.bridge?.healthy === false ||
+        subsystems.zendesk?.healthy === false ||
+        (subsystems.thingsboard?.mode === 'live' && subsystems.thingsboard?.read === false);
     res.json({
-        status: 'ok',
+        status: degraded ? 'degraded' : 'ok',
         version: config.appVersion,
         authMode: config.authMode,
         dataMode: config.dataMode,
@@ -107,6 +119,14 @@ app.use((err, req, res, next) => {
 
 async function start() {
     await initOidc();
+    // Eager store warm-up (CR-02): in live mode, actively probe Cosmos at boot so a keyless-WI
+    // token / RBAC / missing-container failure surfaces immediately with a clear log line, rather
+    // than silently at first store write. A failure is logged and flips store health, but must NOT
+    // exit — the device board still reads from the bridge, and /healthz then reports 'degraded'.
+    if (config.dataMode === 'live') {
+        const store = await storeProbe();
+        console.log(`  store warm-up: ${store.mode} · healthy=${store.healthy}`);
+    }
     startWorker(); // durable hold reverts resume after restart (F010 overrides)
     startLivenessMonitor(); // F010 — producer business-liveness self-check (no-overnight-activity)
     app.listen(config.port, () => {
