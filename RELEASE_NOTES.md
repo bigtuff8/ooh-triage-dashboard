@@ -1,5 +1,32 @@
 # Release Notes — OOH Dashboard
 
+## v1.2.0 — SD-586 go-live build: alignment to Spencer's secure prod model (harness cycle 2026-07-27T12-29-00)
+
+**Date:** 2026-07-27 · **Mode:** Airedale · **Design gate approved:** 2026-07-27 · **Test phase:** PASS (0 rework) · **Critical Thinker:** 0 critical / 3 important / 3 advisory · **Branch:** `feature/go-live-sd586` (commit `7d4b5f2`, **NOT deployed** — gated on F10 Azure RBAC + SteerCo go/no-go)
+
+Change + operational cycle re-pointing the built app from the OLD infra model to Spencer's **secure production model**. **The operator UI is unchanged** — no consumer or UI file was touched. Deploys as a write-locked canary.
+
+### What's New
+
+- **Public PKCE OIDC client (F01):** the shared Techhub-Production B2C client carries **no secret** — `initOidc` uses openid-client v6 two-arg discovery (public-client idiom); `validateConfig` no longer requires `OIDC_CLIENT_SECRET`. PKCE carries the flow.
+- **`AreaClaim[]` role mapping (F02):** `extension_Role` is parsed as a serialised array of AreaClaim objects keyed on `claimArea` (1500 → handler, 1400 → iot), deterministic `iot>handler` precedence, malformed/legacy/missing → null (no throw).
+- **Keyless Cosmos via workload identity (F03):** `WorkloadIdentityCredential`/`DefaultAzureCredential` when no `COSMOS_KEY`; the app takes a DB handle (no `createIfNotExists`) and tolerates a 403 on container create (CR-01); an **active boot-time store probe** replaces the old false-green `/healthz` (CR-02). `@azure/identity` is now a first-class dependency with a Dockerfile build-resolve guard.
+- **Production manifest (F04):** `serviceAccountName: sa-ooh-dashboard`, image `apitechhub.azurecr.io/ooh-dashboard:<sha>`, workload-identity label, `replicas:1`, canary levers `WRITES_DISABLED=true` + `SMS_PROVIDER=log` retained.
+- **Unit suite for the new model (F07):** `node:test` suite (22/22) covering mapRole AreaClaim[] + validateConfig relaxations, alongside Playwright 41/41 (total **63/0**).
+
+### Technical Notes
+
+- **Config decisions (F05/F06):** SMS = Twilio reusing the IoT Support dashboard's account (config-only, live at go/no-go #4); Zendesk = Jonathan Wilkinson's existing creds/API key (no service account).
+- **D-2 ingress-exemption spec (F09):** the P1 deep-link exemption on the SD-330 ingress is scoped to **exact path `/` + a signed HMAC token** (never query-param-presence, which would be a whole-site auth bypass — IM-04). Handed to Spencer/platform.
+- **Critical Thinker (pre-deploy):** verified the build matches spec and CR-01/CR-02 fixes are real in source. 0 critical.
+
+### ⚠️ Known limitations / go-live conditions (NOT closed this cycle)
+
+- **Deploy is blocked on F10** — Azure RBAC grant to obj `ec79d06a-…` (KV/ACR/AKS) **and** pre-creation of the 4 Cosmos containers (control-plane, RB-3). External human step; see `DEPLOYMENT_REQUEST.md`.
+- **F01 live SSO + F03 keyless write are canary-only proofs** (design §6.5) — proven at the canary matrix (step 2 + the **hard-gated step 4a real write**), not in fixture.
+- **`/healthz` store health is boot-honest but stale at runtime (IM-01):** a Cosmos outage *after* boot does not yet flip it to degraded — a Developer fix is scheduled **before go/no-go #3** (device-write BAU).
+- **Boot probe cannot detect a missing container (IM-02):** reads as 404/green; the real backstop is the hard-gated step 4a live write. Runbook wording corrected this cycle.
+
 ## v1.1.0 — OOH producer conformance + coordinated go-live prep (harness cycle 2026-07-14T10-30-11)
 
 **Date:** 2026-07-14 · **Mode:** Airedale · **Design gate approved:** 2026-07-14 · **Test phase:** PASS (1 rework cycle) · **Branch:** `feature/live-build-v1` (NOT deployed — go-live gated to Phase C)
