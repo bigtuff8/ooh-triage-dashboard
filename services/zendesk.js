@@ -15,10 +15,19 @@ import { config } from '../config.js';
 
 const live = () => config.dataMode === 'live';
 const baseUrl = () => `https://${config.zendesk.subdomain}.zendesk.com/api/v2`;
-const authHeader = () => ({
-    Authorization: `Basic ${Buffer.from(`${config.zendesk.email}/token:${config.zendesk.apiToken}`).toString('base64')}`,
+
+/**
+ * Builds the Zendesk request headers. OOHDASH-2 (B7): the token Spencer loaded into
+ * ooh-dashboard-secrets is a `scapi_` OAuth-style token, so we authenticate with
+ * `Authorization: Bearer <token>` — NOT the classic `email/token` Basic scheme (superseded).
+ * Pure function of cfg so the header shape is unit-testable without live mode. The live
+ * value (validity/scopes) is proven by a 401→200 check post-deploy (OOHDASH-4).
+ */
+export const buildAuthHeader = (cfg = config) => ({
+    Authorization: `Bearer ${cfg.zendesk.apiToken}`,
     'Content-Type': 'application/json'
 });
+const authHeader = () => buildAuthHeader(config);
 
 let zendeskHealthy = true;
 
