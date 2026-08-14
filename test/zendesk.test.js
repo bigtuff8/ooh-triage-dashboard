@@ -1,40 +1,42 @@
 /**
  * OOHDASH-2 (B7) — Zendesk auth header unit tests.
  *
- * The token Spencer loaded into `ooh-dashboard-secrets` is a `scapi_` OAuth-style token,
- * so the client authenticates with `Authorization: Bearer <token>` rather than the classic
- * `email/token` Basic scheme (DEPLOY_RUNBOOK RB-2's "Basic/API token" wording is superseded).
+ * This Zendesk account authenticates ONLY with classic `email/token` Basic auth. Verified live
+ * 14 Aug 2026 (read-only GET /users/me.json): the classic 40-char API token via Basic → 200; a
+ * Bearer call → 401 even with that same good token (this account rejects Bearer entirely). The
+ * `scapi_` token in the earlier handover turned out to be for a different system. So the client
+ * uses Basic — matching the IoT Support Dash — NOT Bearer.
  *
- * These assert header SHAPE only (pure `buildAuthHeader(cfg)`); the token's live validity/scopes
- * are proven separately by a 401→200 check against Zendesk post-deploy (OOHDASH-4).
- * Behaviour-only; runs under `node --test`.
+ * These assert header SHAPE only (pure `buildAuthHeader(cfg)`); the token's live validity is
+ * proven separately by the 401→200 read check above. Behaviour-only; runs under `node --test`.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { buildAuthHeader } from '../services/zendesk.js';
 
-const cfg = { zendesk: { subdomain: 'theairedalegroup', email: 'ops@example.com', apiToken: 'scapi_TESTTOKEN123' } };
+const cfg = { zendesk: { subdomain: 'theairedalegroup', email: 'ops@example.com', apiToken: 'CLASSICtoken123' } };
+const expectedBasic = 'Basic ' + Buffer.from('ops@example.com/token:CLASSICtoken123').toString('base64');
 
-test('authorization uses the Bearer scheme with the raw token', () => {
+test('authorization uses classic email/token Basic auth', () => {
     const h = buildAuthHeader(cfg);
-    assert.equal(h.Authorization, 'Bearer scapi_TESTTOKEN123');
+    assert.equal(h.Authorization, expectedBasic);
 });
 
-test('authorization does NOT use the classic Basic scheme', () => {
+test('authorization does NOT use the Bearer scheme (this account rejects Bearer)', () => {
     const h = buildAuthHeader(cfg);
-    assert.ok(!h.Authorization.startsWith('Basic'), `expected non-Basic auth, got: ${h.Authorization}`);
+    assert.ok(!h.Authorization.startsWith('Bearer'), `expected Basic auth, got: ${h.Authorization}`);
 });
 
-test('the token is sent verbatim — not base64-encoded (Bearer ≠ Basic)', () => {
+test('the credential pair is base64-encoded, not sent verbatim', () => {
     const h = buildAuthHeader(cfg);
-    // A Basic header would base64 the email/token pair; Bearer carries the token as-is.
-    assert.ok(h.Authorization.includes('scapi_TESTTOKEN123'));
-    assert.ok(!h.Authorization.includes(Buffer.from('ops@example.com/token:scapi_TESTTOKEN123').toString('base64')));
+    assert.ok(!h.Authorization.includes('CLASSICtoken123'), 'raw token must not appear — Basic base64-encodes it');
+    assert.ok(h.Authorization.includes(Buffer.from('ops@example.com/token:CLASSICtoken123').toString('base64')));
 });
 
-test('the email is not consumed by the header (Basic-only field)', () => {
-    const h = buildAuthHeader({ zendesk: { apiToken: 'scapi_XYZ' } }); // no email present
-    assert.equal(h.Authorization, 'Bearer scapi_XYZ');
+test('the email IS part of the header (Basic uses email/token)', () => {
+    const h = buildAuthHeader(cfg);
+    const decoded = Buffer.from(h.Authorization.replace('Basic ', ''), 'base64').toString();
+    assert.equal(decoded, 'ops@example.com/token:CLASSICtoken123');
 });
 
 test('content-type stays application/json', () => {

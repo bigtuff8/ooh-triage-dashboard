@@ -17,14 +17,15 @@ const live = () => config.dataMode === 'live';
 const baseUrl = () => `https://${config.zendesk.subdomain}.zendesk.com/api/v2`;
 
 /**
- * Builds the Zendesk request headers. OOHDASH-2 (B7): the token Spencer loaded into
- * ooh-dashboard-secrets is a `scapi_` OAuth-style token, so we authenticate with
- * `Authorization: Bearer <token>` — NOT the classic `email/token` Basic scheme (superseded).
- * Pure function of cfg so the header shape is unit-testable without live mode. The live
- * value (validity/scopes) is proven by a 401→200 check post-deploy (OOHDASH-4).
+ * Builds the Zendesk request headers. OOHDASH-2 (B7): this Zendesk account authenticates ONLY
+ * with classic `email/token` Basic auth — empirically verified 14 Aug 2026 (read-only GET
+ * /users/me.json): classic 40-char API token via Basic → 200; the `scapi_` token Spencer loaded
+ * → 401 both ways; and Bearer → 401 even with the good classic token (this account rejects Bearer
+ * entirely). So Bearer was the wrong scheme; we use Basic with the classic token, matching the
+ * IoT Support Dash. Pure function of cfg so the header shape is unit-testable without live mode.
  */
 export const buildAuthHeader = (cfg = config) => ({
-    Authorization: `Bearer ${cfg.zendesk.apiToken}`,
+    Authorization: `Basic ${Buffer.from(`${cfg.zendesk.email}/token:${cfg.zendesk.apiToken}`).toString('base64')}`,
     'Content-Type': 'application/json'
 });
 const authHeader = () => buildAuthHeader(config);
