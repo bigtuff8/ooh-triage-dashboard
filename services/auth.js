@@ -189,7 +189,15 @@ export function authRouter() {
             const dest = req.session.returnTo || '/';
             delete req.session.returnTo;
             return res.redirect(dest);
-        } catch (err) { return next(err); }
+        } catch (err) {
+            // Surface the OIDC/OAuth error detail — oauth4webapi ResponseBodyError carries the
+            // provider's error code/description (e.g. B2C AADB2C90xxx), which the generic handler
+            // would otherwise hide. Critical for diagnosing token-exchange failures at go-live.
+            const detail = [err?.error, err?.error_description, err?.cause?.error, err?.cause?.error_description]
+                .filter(Boolean).join(' — ');
+            console.error(`[AUTH] /auth/callback token exchange failed: ${err?.name || 'Error'}: ${err?.message}${detail ? ` | provider: ${detail}` : ''}`);
+            return next(err);
+        }
     });
 
     if (config.authMode === 'dev') {
