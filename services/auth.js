@@ -47,20 +47,24 @@ export function sessionMiddleware() {
 /**
  * Discovers the OIDC issuer once at startup (AUTH_MODE=oidc).
  *
- * Public client (F001/SD-586): the shared Techhub-Production B2C client carries NO
- * secret. openid-client v6 `discovery(server, clientId, metadata?, clientAuthentication?)`
- * defaults `clientAuthentication` to `None()` when no secret is supplied, so the two-arg
- * form is the correct public-client idiom; PKCE (see authRouter) carries the flow. The
- * token exchange therefore sends no client secret. (Confirmed against openid-client@6.8.4.)
+ * The shared Techhub-Production B2C client is a **confidential** client: verified live
+ * 18 Aug 2026 — the token exchange without a secret is rejected with
+ * `AADB2C90079: Clients must send a client_secret when redeeming a confidential grant`
+ * (the SD-586 handoff's "public client, no secret" was wrong; the .NET hubs sharing this
+ * client send the secret). So when OIDC_CLIENT_SECRET is set we discover with it
+ * (openid-client v6 3-arg form → client_secret_basic) and the token exchange authenticates;
+ * PKCE (see authRouter) is still sent. If no secret is present we fall back to the public
+ * (`None()`) idiom, which is correct for a genuinely public client but will 401 against
+ * this confidential one — surfaced by the /auth/callback error logging.
  */
 export async function initOidc() {
     if (config.authMode !== 'oidc') return;
     oidcLib = await import('openid-client');
-    oidcConfig = await oidcLib.discovery(
-        new URL(config.oidc.issuer),
-        config.oidc.clientId
-    );
-    console.log('[AUTH] OIDC issuer discovered (public client, PKCE)');
+    const secret = config.oidc.clientSecret;
+    oidcConfig = secret
+        ? await oidcLib.discovery(new URL(config.oidc.issuer), config.oidc.clientId, secret)
+        : await oidcLib.discovery(new URL(config.oidc.issuer), config.oidc.clientId);
+    console.log(`[AUTH] OIDC issuer discovered (${secret ? 'confidential client + secret' : 'public client, PKCE'})`);
 }
 
 // Deterministic role precedence (CT AD-01): a user carrying BOTH an IoT (1400) and a
