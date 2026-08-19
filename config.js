@@ -67,6 +67,8 @@ export const config = {
         subdomain: env('ZENDESK_SUBDOMAIN'),
         email: env('ZENDESK_EMAIL'),
         apiToken: env('ZENDESK_API_TOKEN'),
+        // Platform switched OOH to plain account-password Basic auth (email:password, no /token).
+        password: env('ZENDESK_PASSWORD'),
         siteFieldId: 11405878329244,
         followUpFieldId: 26074112194076,
         // Ticket Category tagger field — "Support Request" (F002). The consumer does not read
@@ -139,8 +141,9 @@ export function validateConfig() {
         if (!env('IOT_DASH_BASE_URL')) problems.push('IOT_DASH_BASE_URL must be set explicitly in production (P1 deep-link host; no silent fallback)');
     }
     if (config.authMode === 'oidc') {
-        // F001/SD-586: Techhub-Production is a PUBLIC PKCE client — OIDC_CLIENT_SECRET is
-        // intentionally NOT required (the two-arg discovery() never hands a secret to the client).
+        // F001/SD-586: Techhub-Production is a secret-less client used for implicit id_token
+        // sign-in (response_type=id_token, form_post) — OIDC_CLIENT_SECRET is intentionally NOT
+        // required and there is no token-endpoint call, so no secret is ever sent.
         if (!config.oidc.issuer || !config.oidc.clientId) {
             problems.push('OIDC_ISSUER and OIDC_CLIENT_ID are required when AUTH_MODE=oidc');
         }

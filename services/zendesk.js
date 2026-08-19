@@ -17,15 +17,14 @@ const live = () => config.dataMode === 'live';
 const baseUrl = () => `https://${config.zendesk.subdomain}.zendesk.com/api/v2`;
 
 /**
- * Builds the Zendesk request headers. OOHDASH-2 (B7): this Zendesk account authenticates ONLY
- * with classic `email/token` Basic auth — empirically verified 14 Aug 2026 (read-only GET
- * /users/me.json): classic 40-char API token via Basic → 200; the `scapi_` token Spencer loaded
- * → 401 both ways; and Bearer → 401 even with the good classic token (this account rejects Bearer
- * entirely). So Bearer was the wrong scheme; we use Basic with the classic token, matching the
- * IoT Support Dash. Pure function of cfg so the header shape is unit-testable without live mode.
+ * Builds the Zendesk request headers. The platform switched OOH to plain account-password Basic
+ * auth: `Authorization: Basic base64(email:password)` where the username is the plain account email
+ * (NO `/token` suffix) and the password is ZENDESK_PASSWORD. (This supersedes the earlier classic
+ * `email/token` API-token scheme; Bearer is still rejected by this account.) Pure function of cfg
+ * so the header shape stays unit-testable without live mode.
  */
 export const buildAuthHeader = (cfg = config) => ({
-    Authorization: `Basic ${Buffer.from(`${cfg.zendesk.email}/token:${cfg.zendesk.apiToken}`).toString('base64')}`,
+    Authorization: `Basic ${Buffer.from(`${cfg.zendesk.email}:${cfg.zendesk.password}`).toString('base64')}`,
     'Content-Type': 'application/json'
 });
 const authHeader = () => buildAuthHeader(config);
@@ -551,5 +550,5 @@ export async function addRecordingNote(oohTicketId, body) {
  * Health signal for /healthz.
  */
 export function zendeskStatus() {
-    return { mode: live() ? 'live' : 'fixture', healthy: live() ? zendeskHealthy : true, configured: !!(config.zendesk.subdomain && config.zendesk.apiToken) };
+    return { mode: live() ? 'live' : 'fixture', healthy: live() ? zendeskHealthy : true, configured: !!(config.zendesk.subdomain && config.zendesk.email && config.zendesk.password) };
 }
