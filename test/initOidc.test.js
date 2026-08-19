@@ -1,13 +1,13 @@
 /**
  * F01/F07 — initOidc contract test (SD-586).
  *
- * initOidc() discovers the OIDC issuer as a PUBLIC client (two-arg discovery(), no secret).
+ * initOidc() fetches the issuer's `.well-known/openid-configuration` anonymously (no secret) to
+ * obtain authorization_endpoint / jwks_uri / issuer for the implicit id_token sign-in flow.
  * The deterministic, offline-provable contract is that it is a strict no-op when
- * AUTH_MODE!=='oidc' (dev/fixture) — it must not attempt discovery or throw. The actual
- * public-client token exchange (token_endpoint_auth_method='none') requires the real B2C
- * tenant and is proven at the CANARY (§6.5 / verification matrix step 2), not in fixture
- * mode — asserting "builds without throwing" here would not prove the auth method, so we
- * do not fake that assertion.
+ * AUTH_MODE!=='oidc' (dev/fixture) — it must not attempt discovery or throw. The live discovery +
+ * id_token round trip requires the real B2C tenant and is proven at the CANARY (§6.5 / verification
+ * matrix step 2), not in fixture mode; the id_token *validation* itself is covered offline in
+ * verifyIdToken.test.js.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
