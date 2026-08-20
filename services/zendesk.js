@@ -17,14 +17,16 @@ const live = () => config.dataMode === 'live';
 const baseUrl = () => `https://${config.zendesk.subdomain}.zendesk.com/api/v2`;
 
 /**
- * Builds the Zendesk request headers. The platform switched OOH to plain account-password Basic
- * auth: `Authorization: Basic base64(email:password)` where the username is the plain account email
- * (NO `/token` suffix) and the password is ZENDESK_PASSWORD. (This supersedes the earlier classic
- * `email/token` API-token scheme; Bearer is still rejected by this account.) Pure function of cfg
- * so the header shape stays unit-testable without live mode.
+ * Builds the Zendesk request headers using the standard Zendesk API-token Basic scheme:
+ * `Authorization: Basic base64(email/token:ZENDESK_API_TOKEN)` — the username is the account email
+ * with a literal `/token` suffix and the credential is the API token. This is the same auth the
+ * rest of the Airedale Zendesk estate (iot-remediation and its sync services) uses in production.
+ * (An earlier build briefly used plain `email:password`; that was reverted — the account uses an API
+ * token, not a password, and Bearer is rejected.) Pure function of cfg so the header shape stays
+ * unit-testable without live mode.
  */
 export const buildAuthHeader = (cfg = config) => ({
-    Authorization: `Basic ${Buffer.from(`${cfg.zendesk.email}:${cfg.zendesk.password}`).toString('base64')}`,
+    Authorization: `Basic ${Buffer.from(`${cfg.zendesk.email}/token:${cfg.zendesk.apiToken}`).toString('base64')}`,
     'Content-Type': 'application/json'
 });
 const authHeader = () => buildAuthHeader(config);
@@ -550,5 +552,5 @@ export async function addRecordingNote(oohTicketId, body) {
  * Health signal for /healthz.
  */
 export function zendeskStatus() {
-    return { mode: live() ? 'live' : 'fixture', healthy: live() ? zendeskHealthy : true, configured: !!(config.zendesk.subdomain && config.zendesk.email && config.zendesk.password) };
+    return { mode: live() ? 'live' : 'fixture', healthy: live() ? zendeskHealthy : true, configured: !!(config.zendesk.subdomain && config.zendesk.email && config.zendesk.apiToken) };
 }

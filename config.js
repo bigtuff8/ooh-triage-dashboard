@@ -66,8 +66,10 @@ export const config = {
     zendesk: {
         subdomain: env('ZENDESK_SUBDOMAIN'),
         email: env('ZENDESK_EMAIL'),
+        // Standard Zendesk API-token Basic auth: base64(email/token:apiToken) — same scheme the rest
+        // of the Airedale Zendesk estate uses. This is the live credential.
         apiToken: env('ZENDESK_API_TOKEN'),
-        // Platform switched OOH to plain account-password Basic auth (email:password, no /token).
+        // Deprecated: an earlier build used plain email:password; retained only for back-compat/no-op.
         password: env('ZENDESK_PASSWORD'),
         siteFieldId: 11405878329244,
         followUpFieldId: 26074112194076,
