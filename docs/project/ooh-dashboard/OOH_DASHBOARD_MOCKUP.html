@@ -1,0 +1,1057 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>OOH Agent Dashboard — Mockup v5</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/icon?family=Material+Icons+Outlined" rel="stylesheet">
+<style>
+:root{--primary:#594AE2;--primary-dark:#4338CA;--primary-light:#EEF2FF;--success:#10B981;--warning:#F59E0B;--danger:#EF4444;--danger-dark:#DC2626;--info:#3B82F6;--sidebar-bg:#1E293B;--sidebar-text:#94A3B8;--sidebar-hover:#334155;--surface:#FFF;--background:#F1F5F9;--border:#E2E8F0;--text-primary:#1E293B;--text-secondary:#64748B;--text-muted:#94A3B8;--sidebar-width:220px;--header-height:56px;--r-sm:6px;--r-md:8px;--r-lg:12px}
+*{margin:0;padding:0;box-sizing:border-box}body{font-family:'Inter',sans-serif;font-size:14px;line-height:1.5;color:var(--text-primary);background:var(--background)}
+.app{display:flex;height:100vh;overflow:hidden}
+
+/* SIDEBAR */
+.sb{width:var(--sidebar-width);background:var(--sidebar-bg);color:var(--sidebar-text);display:flex;flex-direction:column;flex-shrink:0}
+.sb-head{padding:16px 20px;border-bottom:1px solid rgba(255,255,255,.08);display:flex;align-items:center;gap:10px}
+.sb-logo{width:32px;height:32px;background:var(--primary);border-radius:var(--r-md);display:flex;align-items:center;justify-content:center;color:#fff;font-size:18px}
+.sb-sec{padding:12px 0}.sb-sec-t{padding:4px 20px 8px;font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.05em;color:var(--sidebar-text);opacity:.6}
+.ni{display:flex;align-items:center;gap:10px;padding:9px 20px;cursor:pointer;color:var(--sidebar-text);font-size:13px;font-weight:500;transition:all .15s;text-decoration:none}
+.ni:hover{background:var(--sidebar-hover);color:#fff}.ni.active{background:rgba(89,74,226,.15);color:#fff;border-right:3px solid var(--primary)}
+.ni .material-icons-outlined{font-size:20px}
+.nb{margin-left:auto;background:var(--danger);color:#fff;font-size:10px;font-weight:700;padding:1px 6px;border-radius:10px}
+.nb-dim{background:var(--sidebar-hover);color:var(--sidebar-text)}
+.sb-foot{margin-top:auto;padding:16px 20px;border-top:1px solid rgba(255,255,255,.08);display:flex;align-items:center;gap:10px}
+.av{width:32px;height:32px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;color:#fff;flex-shrink:0}
+
+/* MAIN */
+.main{flex:1;display:flex;flex-direction:column;overflow:hidden}
+.hdr{height:var(--header-height);background:var(--surface);border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;padding:0 24px;flex-shrink:0}
+.hdr-t{font-size:16px;font-weight:700}.hdr-st{font-size:12px;color:var(--text-secondary)}
+.cnt{flex:1;overflow-y:auto;padding:20px 24px}
+.banner{background:linear-gradient(135deg,#7C3AED,var(--primary));color:#fff;padding:8px 24px;font-size:12px;font-weight:600;display:flex;align-items:center;gap:8px;flex-shrink:0}
+
+/* BTN */
+.btn{display:inline-flex;align-items:center;gap:6px;padding:8px 14px;border-radius:var(--r-md);font-size:13px;font-weight:500;cursor:pointer;border:1px solid transparent;transition:all .15s;font-family:inherit}
+.btn-p{background:var(--primary);color:#fff}.btn-p:hover{background:var(--primary-dark)}
+.btn-s{background:#fff;color:var(--text-primary);border-color:var(--border)}.btn-s:hover{background:var(--background)}
+.btn-d{background:var(--danger);color:#fff}.btn-ok{background:var(--success);color:#fff}.btn-w{background:var(--warning);color:#fff}
+.btn-sm{padding:5px 10px;font-size:12px}.btn-lg{padding:12px 24px;font-size:15px;font-weight:600}
+.btn .material-icons-outlined{font-size:16px}.btn:disabled{opacity:.5;cursor:default;pointer-events:none}
+.btn-ghost{background:none;border:none;color:var(--text-secondary);cursor:pointer;padding:4px}
+
+/* CARD */
+.card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r-lg);box-shadow:0 1px 2px rgba(0,0,0,.05)}
+.card-h{padding:12px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between}
+.card-t{font-size:13px;font-weight:600;display:flex;align-items:center;gap:8px}
+.badge{display:inline-flex;align-items:center;gap:4px;padding:2px 8px;border-radius:4px;font-size:10px;font-weight:600;text-transform:uppercase}
+.bg-ok{background:#D1FAE5;color:#065F46}.bg-w{background:#FEF3C7;color:#92400E}.bg-d{background:#FEE2E2;color:var(--danger)}.bg-i{background:#DBEAFE;color:#1E40AF}.bg-p{background:var(--primary-light);color:var(--primary)}
+.dot{width:8px;height:8px;border-radius:50%;display:inline-block}.dot-ok{background:var(--success)}.dot-off{background:var(--danger)}.dot-w{background:var(--warning)}
+
+/* VIEW */
+.view{display:none}.view.on{display:flex;flex-direction:column;flex:1;overflow:hidden}
+#v-home.on,#v-cb.on,#v-esc.on,#v-not.on,#v-sl.on{display:block;overflow:auto}
+#v-sitedetail.on{display:flex;flex-direction:column;overflow:hidden}
+
+/* CALL */
+.call-bar{background:linear-gradient(135deg,#7C3AED,var(--primary));border-radius:var(--r-lg);padding:20px 24px;color:#fff;display:flex;align-items:center;justify-content:space-between;animation:glow 2s infinite;margin-bottom:20px}
+@keyframes glow{0%{box-shadow:0 0 0 0 rgba(89,74,226,.4)}70%{box-shadow:0 0 0 12px rgba(89,74,226,0)}100%{box-shadow:0 0 0 0 rgba(89,74,226,0)}}
+.call-ico{width:48px;height:48px;border-radius:50%;background:rgba(255,255,255,.2);display:flex;align-items:center;justify-content:center}
+
+/* ===================== CHAT ===================== */
+.tri-layout{display:grid;grid-template-columns:1fr 300px;gap:0;flex:1;overflow:hidden}
+.chat-wrap{display:flex;flex-direction:column;overflow:hidden;border-right:1px solid var(--border)}
+.chat-msgs{flex:1;overflow-y:auto;padding:20px;background:var(--background);scroll-behavior:smooth}
+.chat-bar{padding:12px 20px;background:var(--surface);border-top:1px solid var(--border);display:flex;gap:8px;align-items:flex-end}
+.chat-in{flex:1;border:1px solid var(--border);border-radius:var(--r-md);padding:10px 14px;font-size:13px;font-family:inherit;resize:none;min-height:42px;outline:none}
+.chat-in:focus{border-color:var(--primary)}
+
+.msg{margin-bottom:16px;max-width:85%;animation:mi .25s ease-out}
+@keyframes mi{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
+.msg-b{margin-right:auto}.msg-u{margin-left:auto}
+.bub{padding:12px 16px;border-radius:16px;font-size:13px;line-height:1.6}
+.msg-b .bub{background:var(--surface);border:1px solid var(--border);border-bottom-left-radius:4px}
+.msg-u .bub{background:var(--primary);color:#fff;border-bottom-right-radius:4px}
+.msg-who{font-size:11px;font-weight:600;color:var(--text-muted);margin-bottom:4px;display:flex;align-items:center;gap:4px}
+.msg-who .material-icons-outlined{font-size:14px}
+.msg-t{font-size:10px;color:var(--text-muted);margin-top:4px}
+
+/* Options */
+.opts{display:flex;flex-direction:column;gap:6px;margin-top:10px}
+.opt{display:flex;align-items:center;gap:8px;padding:10px 14px;background:var(--background);border:1.5px solid var(--border);border-radius:var(--r-md);font-size:13px;font-weight:500;transition:all .15s;opacity:.35;cursor:default;pointer-events:none}
+.opt.live{opacity:1;cursor:pointer;pointer-events:auto;border-color:var(--primary);background:var(--primary-light);animation:nudge 1.8s ease-in-out infinite}
+.opt.live:hover{background:#E0E7FF;border-color:var(--primary-dark)}
+.opt .material-icons-outlined{font-size:18px;color:var(--text-secondary)}
+.opt.live .material-icons-outlined{color:var(--primary)}
+.opt.picked{opacity:1;background:var(--primary);color:#fff;border-color:var(--primary);pointer-events:none;animation:none}
+.opt.picked .material-icons-outlined{color:#fff}
+.opt.dead{opacity:.25;pointer-events:none;animation:none}
+@keyframes nudge{0%,100%{transform:translateX(0)}50%{transform:translateX(3px)}}
+
+/* Data card */
+.dcard{background:var(--surface);border:1px solid var(--border);border-radius:var(--r-md);padding:14px;margin-top:10px}
+.dgrid{display:grid;gap:12px}
+.dgrid-3{grid-template-columns:repeat(3,1fr)}.dgrid-4{grid-template-columns:repeat(4,1fr)}
+.ditem{text-align:center}.dlbl{font-size:10px;font-weight:600;color:var(--text-muted);text-transform:uppercase}
+.dval{font-size:18px;font-weight:700;margin-top:2px}.v-ok{color:var(--success)}.v-lo{color:var(--info)}.v-hi{color:var(--danger)}.v-w{color:var(--warning)}
+
+/* Confirm block */
+.cblock{border-radius:var(--r-md);padding:14px;margin-top:10px}
+.cblock-ok{background:#F0FDF4;border:1px solid #BBF7D0}
+.cblock-d{background:#FEF2F2;border:1px solid #FECACA}
+.cblock h4{font-size:13px;font-weight:700;display:flex;align-items:center;gap:6px;margin-bottom:8px}
+.cblock-ok h4{color:#065F46}.cblock-d h4{color:var(--danger-dark)}
+.crow{display:flex;justify-content:space-between;font-size:12px;margin-bottom:4px}
+.crow .l{color:var(--text-secondary)}.crow .v{font-weight:600}
+.cnote{font-size:11px;color:var(--text-secondary);margin-top:8px;padding-top:8px;border-top:1px solid #BBF7D0;display:flex;align-items:center;gap:4px}
+.cnote .material-icons-outlined{font-size:14px;color:var(--warning)}
+
+.mact{margin-top:10px}.mact .btn{width:100%;justify-content:center;padding:12px;font-size:14px;font-weight:600}
+
+/* Typing */
+.typing{display:flex;gap:4px;padding:12px 16px;align-items:center}
+.td{width:8px;height:8px;border-radius:50%;background:var(--text-muted);animation:tb .6s ease-in-out infinite}
+.td:nth-child(2){animation-delay:.1s}.td:nth-child(3){animation-delay:.2s}
+@keyframes tb{0%,100%{transform:translateY(0);opacity:.4}50%{transform:translateY(-4px);opacity:1}}
+
+/* Right sidebar */
+.isb{overflow-y:auto;background:var(--surface)}
+.isec{padding:14px 16px;border-bottom:1px solid var(--border)}
+.isec-t{font-size:10px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:.03em;margin-bottom:8px}
+.ifld{margin-bottom:8px}.ilbl{font-size:11px;color:var(--text-muted)}.ival{font-size:13px;font-weight:500}.ival-l{font-size:14px;font-weight:600}
+.schip{background:#F0FDF4;border:1px solid #BBF7D0;border-radius:var(--r-md);padding:10px 12px}
+.schip-n{font-size:14px;font-weight:700}.schip-s{font-size:11px;color:var(--text-secondary);margin-top:1px}
+.schip-m{display:flex;gap:10px;font-size:11px;color:var(--text-secondary);margin-top:4px}
+.schip-m .material-icons-outlined{font-size:13px}
+.scl{list-style:none;padding:0}.scl li{font-size:12px;padding:3px 0;display:flex;align-items:center;gap:5px}
+.scl .material-icons-outlined{font-size:14px}.sc-y{color:var(--success)}.sc-n{color:var(--text-muted)}
+.ni-t{font-size:12px;color:var(--text-secondary);margin-bottom:8px}.ni-t strong{color:var(--text-primary)}
+.rchip{display:inline-flex;align-items:center;gap:4px;padding:3px 8px;background:#FEF3C7;border-radius:4px;font-size:11px;font-weight:600;color:#92400E}
+
+/* Notices / lists */
+.nit{padding:14px 16px;border-bottom:1px solid var(--border);display:flex;gap:12px}.nit:last-child{border-bottom:none}
+.nico{width:28px;height:28px;border-radius:var(--r-sm);flex-shrink:0;display:flex;align-items:center;justify-content:center}
+.nico-w{background:#FEF3C7;color:var(--warning)}.nico-n{background:#D1FAE5;color:var(--success)}.nico-i{background:#DBEAFE;color:var(--info)}
+.ntit{font-size:13px;font-weight:600}.nbod{font-size:12px;color:var(--text-secondary);margin-top:2px}.ntim{font-size:11px;color:var(--text-muted);margin-top:4px}
+.lit{padding:14px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between}.lit:last-child{border-bottom:none}
+.lit-t{font-size:13px;font-weight:600}.lit-s{font-size:12px;color:var(--text-secondary);margin-top:2px}
+.est{display:inline-flex;align-items:center;gap:4px;padding:4px 10px;border-radius:var(--r-sm);font-size:12px;font-weight:600}
+.est-w{background:#FEF3C7;color:#92400E}.est-ok{background:#D1FAE5;color:#065F46}
+.etm{font-weight:700;color:var(--danger);font-variant-numeric:tabular-nums}
+
+.resolved{background:var(--success);color:#fff;padding:16px 24px;border-radius:var(--r-lg);display:flex;align-items:center;gap:12px;margin-bottom:16px;animation:mi .3s ease-out}
+.empty{text-align:center;color:var(--text-muted);padding:40px 20px}.empty .material-icons-outlined{font-size:32px;opacity:.3}.empty p{font-size:13px;margin-top:8px}
+.hidden{display:none!important}
+
+/* Script phrase styling */
+.script{background:#F8FAFC;border-left:3px solid var(--primary);padding:10px 14px;margin:8px 0;border-radius:0 var(--r-sm) var(--r-sm) 0;font-style:italic;color:var(--text-secondary)}
+
+/* Intake form */
+.intake{padding:24px;overflow-y:auto;flex:1}
+.intake-title{font-size:18px;font-weight:700;margin-bottom:4px}
+.intake-sub{font-size:13px;color:var(--text-secondary);margin-bottom:20px}
+.intake-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.intake-full{grid-column:1/-1}
+.fg{margin-bottom:0}.fg label{display:block;font-size:12px;font-weight:600;color:var(--text-secondary);margin-bottom:5px}
+.fg input,.fg select,.fg textarea{width:100%;padding:9px 12px;border:1px solid var(--border);border-radius:var(--r-md);font-size:13px;font-family:inherit;background:#fff;transition:border-color .15s}
+.fg input:focus,.fg select:focus,.fg textarea:focus{outline:none;border-color:var(--primary);box-shadow:0 0 0 3px rgba(89,74,226,.1)}
+.fg textarea{resize:vertical;min-height:60px}
+.fg .req{color:var(--danger);margin-left:2px}
+.intake-pri-opts{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:4px}
+.pri-opt{padding:10px 12px;border:2px solid var(--border);border-radius:var(--r-md);cursor:pointer;transition:all .15s;text-align:center}
+.pri-opt:hover{border-color:var(--primary);background:var(--primary-light)}
+.pri-opt.sel{border-color:var(--primary);background:var(--primary-light)}
+.pri-opt-name{font-size:13px;font-weight:600}.pri-opt-desc{font-size:11px;color:var(--text-secondary);margin-top:2px}
+.intake-foot{margin-top:20px;display:flex;justify-content:flex-end;gap:8px}
+
+/* Site search dropdown */
+.site-dd{position:relative}
+.site-dd-input{cursor:pointer;background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24'%3E%3Cpath fill='%2394a3b8' d='M7 10l5 5 5-5z'/%3E%3C/svg%3E") no-repeat right 12px center}
+.site-dd-list{position:absolute;top:100%;left:0;right:0;background:#fff;border:1px solid var(--border);border-radius:var(--r-md);box-shadow:0 8px 16px rgba(0,0,0,.12);max-height:240px;overflow-y:auto;z-index:100;display:none}
+.site-dd-list.open{display:block}
+.site-dd-item{padding:10px 14px;cursor:pointer;border-bottom:1px solid var(--border);font-size:13px;transition:background .1s}
+.site-dd-item:hover{background:var(--primary-light)}
+.site-dd-item:last-child{border-bottom:none}
+.site-dd-brand{font-size:11px;color:var(--text-secondary)}
+.site-dd-name{font-weight:600}
+
+/* Override reason in chat */
+.reason-box{background:var(--background);border:1px solid var(--border);border-radius:var(--r-md);padding:12px;margin-top:10px}
+.reason-box label{font-size:12px;font-weight:600;color:var(--text-secondary);display:block;margin-bottom:6px}
+.reason-box textarea{width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:var(--r-sm);font-size:12px;font-family:inherit;resize:vertical;min-height:50px}
+.reason-box textarea:focus{outline:none;border-color:var(--primary)}
+.reason-box .reason-note{font-size:11px;color:var(--text-muted);margin-top:6px;display:flex;align-items:center;gap:4px}
+
+/* Site detail tabs */
+.sd-tab{padding:8px 16px;font-size:13px;font-weight:500;color:var(--text-secondary);cursor:pointer;border:none;background:none;border-bottom:2px solid transparent;margin-bottom:-2px;font-family:inherit;transition:all .15s}
+.sd-tab:hover{color:var(--text-primary)}.sd-tab.active{color:var(--primary);border-bottom-color:var(--primary);font-weight:600}
+.sd-layout{height:calc(100vh - var(--header-height) - 30px)}
+
+/* Timeline */
+.tl-date-head{font-size:11px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:.03em;padding:12px 0 6px;border-bottom:1px solid var(--border);margin-bottom:8px}
+.tl-entry{display:flex;gap:10px;padding:8px 4px;border-radius:var(--r-sm);margin-bottom:4px}
+.tl-click{cursor:pointer;transition:background .1s}.tl-click:hover{background:var(--primary-light)}
+.tl-t{font-size:11px;color:var(--text-muted);width:42px;flex-shrink:0;font-variant-numeric:tabular-nums;padding-top:2px}
+.tl-pip{width:10px;height:10px;border-radius:50%;flex-shrink:0;margin-top:4px}
+.tl-pip-ok{background:var(--success)}.tl-pip-warn{background:var(--warning)}.tl-pip-info{background:var(--info)}.tl-pip-sys{background:var(--border)}
+.tl-who{font-size:12px;font-weight:600;margin-bottom:2px}
+.tl-desc{font-size:12px;color:var(--text-secondary);line-height:1.5}
+.tl-sys-text{font-style:italic;color:var(--text-muted);font-size:11px}
+.tl-tag{font-size:9px;font-weight:700;padding:1px 6px;border-radius:3px;text-transform:uppercase;vertical-align:middle}
+.tl-tag-ooh{background:#FEF3C7;color:#92400E}.tl-tag-iot{background:#DBEAFE;color:#1E40AF}
+
+/* Site detail comments */
+.sd-cmt{padding:12px 16px;margin-bottom:8px;border-radius:var(--r-md);border:1px solid var(--border)}
+.sd-cmt-int{background:#FFFBEB;border-color:#FDE68A}
+.sd-cmt-pub{background:#F0F9FF;border-color:#BAE6FD}
+.sd-cmt-h{display:flex;justify-content:space-between;align-items:center;margin-bottom:6px}
+.sd-cmt-b{font-size:13px;line-height:1.6;color:var(--text-primary);white-space:pre-wrap}
+
+/* Search results */
+.sl-item{padding:14px 16px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;cursor:pointer;transition:background .1s}
+.sl-item:hover{background:var(--primary-light)}
+.sl-item:last-child{border-bottom:none}
+.sl-item-brand{font-size:11px;color:var(--text-secondary)}.sl-item-name{font-size:14px;font-weight:600;margin-top:1px}
+.sl-item-id{font-size:14px;font-weight:600;color:var(--text-muted)}
+
+/* Sidebar device hierarchy */
+.dev-group{margin-bottom:10px}
+.dev-group-head{font-size:12px;font-weight:600;color:var(--text-primary);display:flex;align-items:center;gap:5px;padding:4px 0;cursor:default}
+.dev-group-head .material-icons-outlined{font-size:16px;color:var(--text-secondary)}
+.dev-item{font-size:11px;padding:3px 0 3px 22px;display:flex;align-items:center;justify-content:space-between}
+.dev-item-name{color:var(--text-secondary)}
+.dev-item-status{font-size:10px;font-weight:600}
+.dev-st-on{color:var(--success)}.dev-st-off{color:var(--danger)}.dev-st-sched{color:var(--warning)}
+</style>
+</head>
+<body>
+<div class="app">
+
+<nav class="sb">
+    <div class="sb-head"><div class="sb-logo"><span class="material-icons-outlined">headset_mic</span></div><div><div style="font-size:14px;font-weight:600;color:#fff">IoT Support</div><div style="font-size:11px;color:var(--sidebar-text)">Out of Hours</div></div></div>
+    <div class="sb-sec"><div class="sb-sec-t">Main</div>
+        <a class="ni active" id="n-home" onclick="go('home')"><span class="material-icons-outlined">home</span> Home</a>
+        <a class="ni" id="n-triage" onclick="go('triage')"><span class="material-icons-outlined">support_agent</span> Active Call <span class="nb hidden" id="cbadge">1</span></a>
+        <a class="ni" id="n-sl" onclick="go('sl')"><span class="material-icons-outlined">search</span> Site Lookup</a>
+    </div>
+    <div class="sb-sec"><div class="sb-sec-t">My Activity</div>
+        <a class="ni" id="n-cb" onclick="go('cb')"><span class="material-icons-outlined">phone_callback</span> My Callbacks <span class="nb nb-dim">1</span></a>
+        <a class="ni" id="n-esc" onclick="go('esc')"><span class="material-icons-outlined">priority_high</span> My Escalations <span class="nb">1</span></a>
+    </div>
+    <div class="sb-sec"><div class="sb-sec-t">Info</div>
+        <a class="ni" id="n-not" onclick="go('not')"><span class="material-icons-outlined">campaign</span> Shift Notices</a>
+    </div>
+    <div class="sb-foot"><div class="av" style="background:#F59E0B">KR</div><div><div style="color:#fff;font-weight:600;font-size:12px">Kellie Roche</div><div style="font-size:11px;color:var(--sidebar-text)">OOH Call Handler</div><div style="display:flex;align-items:center;gap:4px;font-size:11px;color:var(--success);margin-top:1px"><span style="width:6px;height:6px;border-radius:50%;background:var(--success)"></span> On Shift</div></div></div>
+</nav>
+
+<div class="main">
+    <div class="banner"><span class="material-icons-outlined" style="font-size:16px">brush</span> MOCKUP v5 — 5 full triage paths — All options are clickable</div>
+
+    <!-- HOME -->
+    <div class="view on" id="v-home">
+        <div class="hdr"><div><div class="hdr-t">Good Evening, Kellie</div><div class="hdr-st">Friday 21 Mar 2026 — Evening Shift</div></div><div class="header-right"><span class="badge bg-ok" style="font-size:11px"><span class="dot dot-ok" style="width:6px;height:6px;margin-right:3px"></span> Sam Day — Available (Limited)</span></div></div>
+        <div class="cnt">
+            <div id="call-banner" class="call-bar"><div style="display:flex;align-items:center;gap:16px"><div class="call-ico"><span class="material-icons-outlined">phone_in_talk</span></div><div><h3 style="font-size:16px;font-weight:700">Incoming Call</h3><p style="font-size:13px;opacity:.85">01132 647943 — Ticket #28421</p></div></div><button class="btn btn-lg" style="background:rgba(255,255,255,.2);color:#fff;border:2px solid rgba(255,255,255,.4)" onclick="startTriage()"><span class="material-icons-outlined">support_agent</span> Start Triage</button></div>
+            <div id="resolved-bar" class="resolved hidden"><span class="material-icons-outlined" style="font-size:28px">check_circle</span><div><h3 style="font-size:15px;font-weight:700" id="resolved-title"></h3><p style="font-size:12px;opacity:.9" id="resolved-sub"></p></div></div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+                <div class="card"><div class="card-h"><div class="card-t"><span class="material-icons-outlined" style="font-size:18px">campaign</span> Shift Notices</div></div><div style="padding:0">
+                    <div class="nit"><div class="nico nico-w"><span class="material-icons-outlined">warning</span></div><div><div class="ntit">Power Pause Re-engagement Today</div><div class="nbod">Expect more calls. Ask sites to check email first.</div><div class="ntim">Sam Day — 13:07</div></div></div>
+                    <div class="nit"><div class="nico nico-n"><span class="material-icons-outlined">add_circle</span></div><div><div class="ntit">McDonald's Sites Now Live</div><div class="nbod">LE-postcode McDonald's on Lighthouse.</div><div class="ntim">Jonathan — 3 Mar</div></div></div>
+                </div></div>
+                <div>
+                    <div class="card" style="margin-bottom:12px"><div class="card-h"><div class="card-t"><span class="material-icons-outlined" style="font-size:18px">phone_callback</span> My Callbacks</div><span class="badge bg-w">1</span></div><div style="padding:0"><div class="lit"><div><div class="lit-t">Devon 7714 — Heating follow-up</div><div class="lit-s">Wifi → Wavenet. Callback AM.</div></div><button class="btn btn-sm btn-ok"><span class="material-icons-outlined">check</span> Done</button></div></div></div>
+                    <div class="card"><div class="card-h"><div class="card-t"><span class="material-icons-outlined" style="font-size:18px">priority_high</span> My Escalations</div><span class="badge bg-d">1</span></div><div style="padding:0"><div class="lit"><div><div class="lit-t">Wheatsheaf 6885 — No heating (accom)</div><div class="lit-s">Sent to Sam Day</div></div><div class="est est-w"><span class="material-icons-outlined" style="font-size:14px">timer</span> <span class="etm">38:12</span></div></div></div></div>
+                </div>
+            </div>
+            <div class="empty" style="margin-top:40px"><span class="material-icons-outlined">headset_mic</span><p>Waiting for next call.</p></div>
+        </div>
+    </div>
+
+    <!-- TRIAGE -->
+    <div class="view" id="v-triage">
+        <div class="hdr"><div><div class="hdr-t" id="tri-title">Active Call — #28421</div><div class="hdr-st">01132 647943 — 18:42</div></div><div style="display:flex;gap:10px"><button class="btn btn-s btn-sm"><span class="material-icons-outlined">phone_callback</span> Schedule Callback</button><button class="btn btn-ok btn-sm" id="resolve-btn" disabled onclick="resolveCall()"><span class="material-icons-outlined">check_circle</span> Resolve & Close</button></div></div>
+
+        <!-- INTAKE FORM (shown first) -->
+        <div class="intake" id="intake-form">
+            <div class="intake-title">Log Call Details</div>
+            <div class="intake-sub">Capture the basics before starting triage. Fields marked <span style="color:var(--danger)">*</span> are required.</div>
+            <div class="intake-grid">
+                <div class="fg">
+                    <label>Site<span class="req">*</span></label>
+                    <div class="site-dd">
+                        <input class="site-dd-input" id="site-search" placeholder="Search by house ID or name..." autocomplete="off" onclick="toggleSiteDD()" oninput="filterSites(this.value)">
+                        <div class="site-dd-list" id="site-dd-list">
+                            <div class="site-dd-item" onclick="selectSite('Whistling Goose','6886','GK Farmhouse Inns','NG2 4PQ')"><div class="site-dd-brand">GK Farmhouse Inns</div><div class="site-dd-name">Whistling Goose (6886)</div></div>
+                            <div class="site-dd-item" onclick="selectSite('Angel Inn','6749','GK Flaming Grill','DL10 4DW')"><div class="site-dd-brand">GK Flaming Grill</div><div class="site-dd-name">Angel Inn (6749)</div></div>
+                            <div class="site-dd-item" onclick="selectSite('Robin Hood','6851','GK Flaming Grill','S12 3BN')"><div class="site-dd-brand">GK Flaming Grill</div><div class="site-dd-name">Robin Hood (6851)</div></div>
+                            <div class="site-dd-item" onclick="selectSite('Brentwood','6759','GK Farmhouse Inns','CM14 4AE')"><div class="site-dd-brand">GK Farmhouse Inns</div><div class="site-dd-name">Brentwood (6759)</div></div>
+                            <div class="site-dd-item" onclick="selectSite('Mill House','6360','GK Farmhouse Inns','CH4 0DP')"><div class="site-dd-brand">GK Farmhouse Inns</div><div class="site-dd-name">Mill House (6360)</div></div>
+                            <div class="site-dd-item" onclick="selectSite('Bay Horse','6750','GK Farmhouse Inns','WN4 9PJ')"><div class="site-dd-brand">GK Farmhouse Inns</div><div class="site-dd-name">Bay Horse (6750)</div></div>
+                            <div class="site-dd-item" onclick="selectSite('Polite Vicar','6841','GK','SO15 1AA')"><div class="site-dd-brand">Greene King</div><div class="site-dd-name">Polite Vicar (6841)</div></div>
+                            <div class="site-dd-item" onclick="selectSite('Donkey Derby','6786','GK Flaming Grill','WS2 9AE')"><div class="site-dd-brand">GK Flaming Grill</div><div class="site-dd-name">Donkey Derby (6786)</div></div>
+                            <div class="site-dd-item" onclick="selectSite('Meridian McDonalds','MCD01','McDonalds','LE19 1WZ')"><div class="site-dd-brand">McDonalds</div><div class="site-dd-name">Meridian (MCD01)</div></div>
+                        </div>
+                    </div>
+                </div>
+                <div class="fg">
+                    <label>Caller Name<span class="req">*</span></label>
+                    <input id="in-caller" placeholder="e.g. Holly" value="Holly">
+                </div>
+                <div class="fg">
+                    <label>Caller Role</label>
+                    <select id="in-role">
+                        <option value="">Select...</option>
+                        <option value="gm" selected>General Manager</option>
+                        <option value="agm">Assistant Manager</option>
+                        <option value="chef">Head Chef / Chef</option>
+                        <option value="staff">Staff Member</option>
+                        <option value="contractor">Contractor / Engineer on site</option>
+                        <option value="other">Other</option>
+                    </select>
+                </div>
+                <div class="fg">
+                    <label>Contact Phone<span class="req">*</span></label>
+                    <input id="in-phone" value="01132 647943" placeholder="e.g. 01234 567890">
+                </div>
+                <div class="fg">
+                    <label>Contact Email</label>
+                    <input id="in-email" placeholder="e.g. holly@example.com">
+                </div>
+                <div class="fg">
+                    <label>Alternative Contact</label>
+                    <input id="in-alt" placeholder="Name and number if different person">
+                </div>
+                <div class="fg intake-full">
+                    <label>How urgent is this?<span class="req">*</span></label>
+                    <div class="intake-pri-opts">
+                        <div class="pri-opt" onclick="pickPri(this,'P1 — Trade/Business Critical')" style="border-color:var(--danger)"><div class="pri-opt-name" style="color:var(--danger)">Trade / Business Critical</div><div class="pri-opt-desc">Can't serve customers, kitchen down, revenue impact now</div></div>
+                        <div class="pri-opt sel" onclick="pickPri(this,'P2 — Comfort / Urgent')"><div class="pri-opt-name">Comfort / Urgent</div><div class="pri-opt-desc">Uncomfortable but still trading — heating, hot water</div></div>
+                        <div class="pri-opt" onclick="pickPri(this,'P3 — Health & Safety')" style="border-color:var(--warning)"><div class="pri-opt-name" style="color:var(--warning)">Health & Safety</div><div class="pri-opt-desc">Welfare risk — no heating with vulnerable occupants, scalding water</div></div>
+                        <div class="pri-opt" onclick="pickPri(this,'P4 — Advisory / Query')"><div class="pri-opt-name">Advisory / Query</div><div class="pri-opt-desc">Schedule question, information request, not urgent</div></div>
+                    </div>
+                </div>
+            </div>
+            <div class="intake-foot">
+                <button class="btn btn-p btn-lg" onclick="submitIntake()"><span class="material-icons-outlined">support_agent</span> Start Triage</button>
+            </div>
+        </div>
+
+        <!-- CHAT TRIAGE (hidden until intake submitted) -->
+        <div class="tri-layout hidden" id="triage-chat">
+            <div class="chat-wrap">
+                <div class="chat-msgs" id="chat"></div>
+                <div class="chat-bar" id="chat-bar"><textarea class="chat-in" id="chat-in" rows="1" placeholder="Type..." disabled></textarea><button class="btn btn-p" id="send-btn" disabled onclick="sendMsg()"><span class="material-icons-outlined">send</span></button></div>
+            </div>
+            <div class="isb" id="isb">
+                <div class="isec"><div class="isec-t">Ticket</div><div class="ifld"><div class="ilbl">Caller</div><div class="ival-l" id="s-caller">—</div></div><div class="ifld"><div class="ilbl">Role</div><div class="ival" id="s-role">—</div></div><div class="ifld"><div class="ilbl">Phone</div><div class="ival" id="s-phone">—</div></div><div class="ifld"><div class="ilbl">Priority</div><div class="ival" id="s-pri">—</div></div></div>
+                <div class="isec hidden" id="s-site"><div class="isec-t">Site</div><div class="schip"><div class="schip-n" id="s-sn"></div><div class="schip-s" id="s-ss"></div><div class="schip-m"><span><span class="material-icons-outlined">location_on</span> <span id="s-sp"></span></span><span><span class="material-icons-outlined">business</span> <span id="s-sb"></span></span></div></div><div style="margin-top:8px" id="s-repeat" class="hidden"><div class="rchip"><span class="material-icons-outlined" style="font-size:13px">repeat</span> 3 in 30 days</div></div></div>
+                <div class="isec hidden" id="s-devices">
+                    <div class="isec-t">Site Devices</div>
+                    <div class="dev-group"><div class="dev-group-head"><span class="material-icons-outlined">power</span> Power Pause</div>
+                        <div class="dev-item"><span class="dev-item-name">Fryer 1</span><span class="dev-item-status dev-st-sched">Sched</span></div>
+                        <div class="dev-item"><span class="dev-item-name">Fryer 2</span><span class="dev-item-status dev-st-sched">Sched</span></div>
+                        <div class="dev-item"><span class="dev-item-name">Merrychef</span><span class="dev-item-status dev-st-sched">Sched</span></div>
+                        <div class="dev-item"><span class="dev-item-name">Glasswasher</span><span class="dev-item-status dev-st-on">On</span></div>
+                        <div class="dev-item"><span class="dev-item-name">Dishwasher</span><span class="dev-item-status dev-st-on">On</span></div>
+                        <div class="dev-item"><span class="dev-item-name">Extractors</span><span class="dev-item-status dev-st-sched">Sched</span></div>
+                        <div class="dev-item"><span class="dev-item-name">Car Park Lights</span><span class="dev-item-status dev-st-on">On</span></div>
+                        <div class="dev-item"><span class="dev-item-name">Festoon Lights</span><span class="dev-item-status dev-st-off">Offline</span></div>
+                    </div>
+                    <div class="dev-group"><div class="dev-group-head"><span class="material-icons-outlined">thermostat</span> Heating</div>
+                        <div class="dev-item"><span class="dev-item-name">Restaurant (Zone 1)</span><span class="dev-item-status dev-st-on">17.4°C → 21°C</span></div>
+                        <div class="dev-item"><span class="dev-item-name">Bar (Zone 2)</span><span class="dev-item-status dev-st-on">20.8°C → 21°C</span></div>
+                        <div class="dev-item"><span class="dev-item-name">Accommodation (Zone 3)</span><span class="dev-item-status dev-st-on">21.2°C → 22°C</span></div>
+                        <div class="dev-item"><span class="dev-item-name">DHW (Hot Water)</span><span class="dev-item-status dev-st-on">58°C → 60°C</span></div>
+                    </div>
+                    <div class="dev-group"><div class="dev-group-head"><span class="material-icons-outlined">sensors</span> Monitoring</div>
+                        <div class="dev-item"><span class="dev-item-name">Energy (all Power Pause)</span><span class="dev-item-status dev-st-on">Live</span></div>
+                        <div class="dev-item"><span class="dev-item-name">Temp Sensors (3 zones)</span><span class="dev-item-status dev-st-on">Live</span></div>
+                        <div class="dev-item"><span class="dev-item-name">Warewash Sensors</span><span class="dev-item-status dev-st-on">Live</span></div>
+                        <div class="dev-item"><span class="dev-item-name">Fridge/Freezer Sensors</span><span class="dev-item-status dev-st-on">Live</span></div>
+                    </div>
+                    <div class="dev-group"><div class="dev-group-head"><span class="material-icons-outlined">wifi</span> Connectivity</div>
+                        <div class="dev-item"><span class="dev-item-name">IoT Gateway</span><span class="dev-item-status dev-st-on">Online</span></div>
+                        <div class="dev-item"><span class="dev-item-name">GK WiFi Link</span><span class="dev-item-status dev-st-on">OK</span></div>
+                    </div>
+                </div>
+                <div class="isec hidden" id="s-notes"><div class="isec-t">Recent Notes</div><div id="s-notes-c"></div></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- SITE LOOKUP -->
+    <div class="view" id="v-sl">
+        <div class="hdr"><div><div class="hdr-t">Site Lookup</div><div class="hdr-st">Search by house ID, name, or postcode</div></div></div>
+        <div class="cnt">
+            <div style="display:flex;align-items:center;gap:12px;background:var(--surface);border:2px solid var(--border);border-radius:var(--r-lg);padding:12px 16px;margin-bottom:20px;transition:border-color .15s" onfocusin="this.style.borderColor='var(--primary)'" onfocusout="this.style.borderColor='var(--border)'">
+                <span class="material-icons-outlined" style="color:var(--text-muted)">search</span>
+                <input id="sl-input" style="flex:1;border:none;font-size:15px;font-family:inherit;outline:none" placeholder="Type a house ID, site name, or postcode..." oninput="filterSL(this.value)">
+            </div>
+            <div class="card"><div style="padding:0" id="sl-results">
+                <div id="sl-default"></div>
+            </div></div>
+        </div>
+    </div>
+
+    <!-- SITE DETAIL -->
+    <div class="view" id="v-sitedetail">
+        <div class="hdr">
+            <div><div class="hdr-t" id="sd-title">Whistling Goose — 6886</div><div class="hdr-st" id="sd-sub">Greene King — Farmhouse Inns — NG2 4PQ</div></div>
+            <div style="display:flex;gap:10px">
+                <button class="btn btn-s btn-sm" onclick="go('sl')"><span class="material-icons-outlined">arrow_back</span> Back</button>
+                <button class="btn btn-p btn-sm" onclick="startTriageFromSite()"><span class="material-icons-outlined">support_agent</span> Start Triage</button>
+            </div>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 320px;flex:1;overflow:hidden" class="sd-layout">
+            <!-- LEFT: Timeline + Comments -->
+            <div style="overflow-y:auto;padding:20px;border-right:1px solid var(--border)">
+                <div style="display:flex;border-bottom:2px solid var(--border);margin-bottom:16px">
+                    <button class="sd-tab active" onclick="sdTab(this,'sd-tl')"><span class="material-icons-outlined" style="font-size:15px;vertical-align:middle">timeline</span> Timeline</button>
+                    <button class="sd-tab" onclick="sdTab(this,'sd-cm')"><span class="material-icons-outlined" style="font-size:15px;vertical-align:middle">chat_bubble_outline</span> Comments (4)</button>
+                </div>
+                <!-- Add note -->
+                <div class="card" style="margin-bottom:16px"><div style="padding:12px 16px;display:flex;gap:8px;align-items:flex-start">
+                    <div class="av" style="background:#F59E0B;font-size:10px;width:28px;height:28px;flex-shrink:0">KR</div>
+                    <textarea id="sd-note" style="flex:1;border:1px solid var(--border);border-radius:var(--r-md);padding:8px 12px;font-size:13px;font-family:inherit;resize:vertical;min-height:36px" placeholder="Add a note..."></textarea>
+                    <button class="btn btn-p btn-sm" onclick="addSiteNote()"><span class="material-icons-outlined">send</span></button>
+                </div></div>
+                <!-- Timeline -->
+                <div id="sd-tl">
+                    <div class="tl-date-head">Today — 21 March 2026</div>
+                    <div class="tl-entry tl-click" onclick="sdTab(document.querySelectorAll('.sd-tab')[1],'sd-cm');document.getElementById('c1').scrollIntoView({behavior:'smooth'})">
+                        <div class="tl-t">18:45</div><div class="tl-pip tl-pip-ok"></div>
+                        <div><div class="tl-who">Kellie Roche <span class="tl-tag tl-tag-ooh">OOH</span></div><div class="tl-desc">Heating boost applied — Restaurant setpoint 21→23°C (4hr). Review ticket #28421 created.</div></div>
+                    </div>
+                    <div class="tl-date-head">18 March 2026</div>
+                    <div class="tl-entry tl-click" onclick="sdTab(document.querySelectorAll('.sd-tab')[1],'sd-cm');document.getElementById('c2').scrollIntoView({behavior:'smooth'})">
+                        <div class="tl-t">17:50</div><div class="tl-pip tl-pip-warn"></div>
+                        <div><div class="tl-who">Csaba Jakab <span class="tl-tag tl-tag-iot">IoT</span></div><div class="tl-desc">Upped setpoint. Flow temps dropped 75→50°C — condenser suspected.</div></div>
+                    </div>
+                    <div class="tl-entry tl-click" onclick="sdTab(document.querySelectorAll('.sd-tab')[1],'sd-cm');document.getElementById('c3').scrollIntoView({behavior:'smooth'})">
+                        <div class="tl-t">18:03</div><div class="tl-pip tl-pip-info"></div>
+                        <div><div class="tl-who">Tony Willetts <span class="tl-tag tl-tag-iot">IoT</span></div><div class="tl-desc">Same as 6834 — condenser may be blocked.</div></div>
+                    </div>
+                    <div class="tl-entry">
+                        <div class="tl-t">18:04</div><div class="tl-pip tl-pip-sys"></div>
+                        <div><div class="tl-desc tl-sys-text">Ticket #27983 resolved. House ID corrected 7244→6886.</div></div>
+                    </div>
+                    <div class="tl-date-head">26 January 2026</div>
+                    <div class="tl-entry tl-click" onclick="sdTab(document.querySelectorAll('.sd-tab')[1],'sd-cm');document.getElementById('c4').scrollIntoView({behavior:'smooth'})">
+                        <div class="tl-t">18:41</div><div class="tl-pip tl-pip-warn"></div>
+                        <div><div class="tl-who">Kellie Roche <span class="tl-tag tl-tag-ooh">OOH</span></div><div class="tl-desc">No outside lighting. Sam checked — device removed by someone on site.</div></div>
+                    </div>
+                    <div class="tl-entry">
+                        <div class="tl-t">19:35</div><div class="tl-pip tl-pip-ok"></div>
+                        <div><div class="tl-desc">Sam found device, switched on remotely. Confirmed with site.</div></div>
+                    </div>
+                </div>
+                <!-- Comments -->
+                <div id="sd-cm" style="display:none">
+                    <div class="sd-cmt sd-cmt-int" id="c1"><div class="sd-cmt-h"><div style="display:flex;align-items:center;gap:8px"><span class="badge bg-w" style="font-size:9px">Internal</span><strong>Kellie Roche</strong></div><span style="font-size:11px;color:var(--text-muted)">Today 18:45</span></div><div class="sd-cmt-b">Heating boost applied via OOH triage. Restaurant zone setpoint 21→23°C for 4 hours (reverts 22:45). Flow temp low at 48°C (was 75°C). Known pattern. P1 review ticket #28421 created.</div></div>
+                    <div class="sd-cmt sd-cmt-int" id="c2"><div class="sd-cmt-h"><div style="display:flex;align-items:center;gap:8px"><span class="badge bg-w" style="font-size:9px">Internal</span><strong>Csaba Jakab</strong></div><span style="font-size:11px;color:var(--text-muted)">18 Mar 17:50</span></div><div class="sd-cmt-b">Upped setpoint for tonight — flow temps reduced from ~75°C to ~50°C. Very weird. May need to check if boiler engineer changed settings. Upped setpoint should keep things going.</div></div>
+                    <div class="sd-cmt sd-cmt-int" id="c3"><div class="sd-cmt-h"><div style="display:flex;align-items:center;gap:8px"><span class="badge bg-w" style="font-size:9px">Internal</span><strong>Tony Willetts</strong></div><span style="font-size:11px;color:var(--text-muted)">18 Mar 18:03</span></div><div class="sd-cmt-b">Looks like the condenser might be blocked, had the same issue with 6834 a while back.</div></div>
+                    <div class="sd-cmt sd-cmt-pub" id="c4"><div class="sd-cmt-h"><div style="display:flex;align-items:center;gap:8px"><span class="badge bg-i" style="font-size:9px">Public</span><strong>Sam Day</strong></div><span style="font-size:11px;color:var(--text-muted)">26 Jan 19:35</span></div><div class="sd-cmt-b">Sorry Kellie, signal was awful. They don't have a device set up for festoon. Site need manual overrides. Found the device — they'd pressed the button and removed it from system. Got it solid green again.</div></div>
+                </div>
+            </div>
+            <!-- RIGHT: Site info + Devices -->
+            <div style="overflow-y:auto;background:var(--surface)">
+                <div class="isec"><div class="isec-t">Site</div><div class="schip"><div class="schip-n">Whistling Goose</div><div class="schip-s">6886 — Greene King</div><div class="schip-m"><span><span class="material-icons-outlined">location_on</span> NG2 4PQ</span><span><span class="material-icons-outlined">business</span> Farmhouse Inns</span></div></div><div style="margin-top:8px"><div class="rchip"><span class="material-icons-outlined" style="font-size:13px">repeat</span> 3 in 30 days</div></div></div>
+                <div class="isec"><div class="isec-t">Devices</div>
+                    <div class="dev-group"><div class="dev-group-head"><span class="material-icons-outlined">power</span> Power Pause</div><div class="dev-item"><span class="dev-item-name">Fryer 1</span><span class="dev-item-status dev-st-sched">Sched</span></div><div class="dev-item"><span class="dev-item-name">Fryer 2</span><span class="dev-item-status dev-st-sched">Sched</span></div><div class="dev-item"><span class="dev-item-name">Merrychef</span><span class="dev-item-status dev-st-sched">Sched</span></div><div class="dev-item"><span class="dev-item-name">Glasswasher</span><span class="dev-item-status dev-st-on">On</span></div><div class="dev-item"><span class="dev-item-name">Dishwasher</span><span class="dev-item-status dev-st-on">On</span></div><div class="dev-item"><span class="dev-item-name">Extractors</span><span class="dev-item-status dev-st-sched">Sched</span></div><div class="dev-item"><span class="dev-item-name">Car Park Lights</span><span class="dev-item-status dev-st-on">On</span></div><div class="dev-item"><span class="dev-item-name">Festoon</span><span class="dev-item-status dev-st-off">Offline</span></div></div>
+                    <div class="dev-group"><div class="dev-group-head"><span class="material-icons-outlined">thermostat</span> Heating</div><div class="dev-item"><span class="dev-item-name">Restaurant</span><span class="dev-item-status dev-st-on">17.4→21°C</span></div><div class="dev-item"><span class="dev-item-name">Bar</span><span class="dev-item-status dev-st-on">20.8→21°C</span></div><div class="dev-item"><span class="dev-item-name">Accommodation</span><span class="dev-item-status dev-st-on">21.2→22°C</span></div><div class="dev-item"><span class="dev-item-name">DHW</span><span class="dev-item-status dev-st-on">58→60°C</span></div></div>
+                    <div class="dev-group"><div class="dev-group-head"><span class="material-icons-outlined">sensors</span> Monitoring</div><div class="dev-item"><span class="dev-item-name">Energy</span><span class="dev-item-status dev-st-on">Live</span></div><div class="dev-item"><span class="dev-item-name">Temp Sensors (3)</span><span class="dev-item-status dev-st-on">Live</span></div><div class="dev-item"><span class="dev-item-name">Warewash</span><span class="dev-item-status dev-st-on">Live</span></div><div class="dev-item"><span class="dev-item-name">Fridge/Freezer</span><span class="dev-item-status dev-st-on">Live</span></div></div>
+                    <div class="dev-group"><div class="dev-group-head"><span class="material-icons-outlined">wifi</span> Connectivity</div><div class="dev-item"><span class="dev-item-name">IoT Gateway</span><span class="dev-item-status dev-st-on">Online</span></div><div class="dev-item"><span class="dev-item-name">GK WiFi</span><span class="dev-item-status dev-st-on">OK</span></div></div>
+                </div>
+                <div class="isec"><div class="isec-t">Quick Actions</div><button class="btn btn-p btn-sm" style="width:100%;justify-content:center;margin-bottom:8px" onclick="startTriageFromSite()"><span class="material-icons-outlined">support_agent</span> Start Triage</button><button class="btn btn-s btn-sm" style="width:100%;justify-content:center"><span class="material-icons-outlined">phone_callback</span> Schedule Callback</button></div>
+            </div>
+        </div>
+    </div>
+    <div class="view" id="v-cb"><div class="hdr"><div><div class="hdr-t">My Callbacks</div></div></div><div class="cnt"><div class="card"><div style="padding:0"><div class="lit"><div><div class="lit-t">Devon 7714 — Heating follow-up</div><div class="lit-s">Wifi → Wavenet. Callback AM. 01132 647943</div></div><div style="display:flex;gap:8px"><span class="badge bg-w">Due AM</span><button class="btn btn-sm btn-ok"><span class="material-icons-outlined">check</span></button></div></div></div></div></div></div>
+    <div class="view" id="v-esc"><div class="hdr"><div><div class="hdr-t">My Escalations</div></div></div><div class="cnt"><div class="card"><div style="padding:0"><div class="lit" style="flex-direction:column;align-items:stretch"><div style="display:flex;justify-content:space-between"><div class="lit-t">Wheatsheaf 6885</div><div class="est est-w"><span class="material-icons-outlined" style="font-size:14px">timer</span> <span class="etm">38:12</span></div></div><div class="lit-s" style="margin-top:4px">Equipment fault. Sent to Sam Day. Auto-routes 17:08.</div></div><div class="lit" style="flex-direction:column;align-items:stretch;opacity:.6"><div style="display:flex;justify-content:space-between"><div class="lit-t">Brentwood 6759</div><div class="est est-ok"><span class="material-icons-outlined" style="font-size:14px">check_circle</span> Approved</div></div><div class="lit-s" style="margin-top:4px">Contractor — Bellrock. Sam approved → Network Engineers. 18 Feb.</div></div></div></div></div></div>
+    <div class="view" id="v-not"><div class="hdr"><div><div class="hdr-t">Shift Notices</div></div></div><div class="cnt"><div class="card"><div style="padding:0"><div class="nit"><div class="nico nico-w"><span class="material-icons-outlined">warning</span></div><div><div class="ntit">Power Pause Re-engagement</div><div class="nbod">Sites emailed new schedules. Ask sites to check email. Schedule changes = reply to IoT email.</div><div class="ntim">Sam Day — 13:07</div></div></div><div class="nit"><div class="nico nico-n"><span class="material-icons-outlined">add_circle</span></div><div><div class="ntit">McDonald's Now Live</div><div class="nbod">LE-postcode sites. FryStation scheduling active.</div><div class="ntim">Jonathan — 3 Mar</div></div></div><div class="nit"><div class="nico nico-i"><span class="material-icons-outlined">info</span></div><div><div class="ntit">Innovation Sites = Different Rules</div><div class="nbod">E.g. Charnwood Arms — non-standard schedules. Always check site lookup.</div><div class="ntim">Sam Day — 15 Feb</div></div></div></div></div></div></div>
+
+</div></div>
+
+<script>
+let C, T='18:42', resolveMsg={}, intakePri='P2 — Comfort / Urgent', selectedSite={};
+
+function go(id){document.querySelectorAll('.view').forEach(v=>v.classList.remove('on'));document.getElementById('v-'+id).classList.add('on');document.querySelectorAll('.ni').forEach(n=>n.classList.remove('active'));const navId=id==='sitedetail'?'sl':id;const n=document.getElementById('n-'+navId);if(n)n.classList.add('active')}
+
+// ---- INTAKE FORM ----
+function startTriage(){document.getElementById('cbadge').classList.remove('hidden');go('triage');document.getElementById('intake-form').classList.remove('hidden');document.getElementById('triage-chat').classList.add('hidden')}
+
+function toggleSiteDD(){document.getElementById('site-dd-list').classList.toggle('open')}
+function filterSites(v){const items=document.querySelectorAll('.site-dd-item');const q=v.toLowerCase();items.forEach(i=>{i.style.display=i.textContent.toLowerCase().includes(q)?'':'none'});document.getElementById('site-dd-list').classList.add('open')}
+function selectSite(name,id,brand,pc){selectedSite={name,id,brand,pc};document.getElementById('site-search').value=name+' ('+id+')';document.getElementById('site-dd-list').classList.remove('open')}
+function pickPri(el,val){document.querySelectorAll('.pri-opt').forEach(o=>o.classList.remove('sel'));el.classList.add('sel');intakePri=val}
+
+function submitIntake(){
+    if(!selectedSite.name){alert('Please select a site');return}
+    const caller=document.getElementById('in-caller').value.trim()||'Unknown';
+    const role=document.getElementById('in-role');
+    const roleText=role.options[role.selectedIndex].text;
+    const phone=document.getElementById('in-phone').value.trim();
+
+    // Show chat, hide form
+    document.getElementById('intake-form').classList.add('hidden');
+    const tc=document.getElementById('triage-chat');tc.classList.remove('hidden');tc.style.display='grid';
+    C=document.getElementById('chat');C.innerHTML='';hideBar();
+
+    // Populate sidebar
+    document.getElementById('s-caller').textContent=caller;
+    document.getElementById('s-role').textContent=roleText;
+    document.getElementById('s-phone').textContent=phone||'—';
+    document.getElementById('s-pri').textContent=intakePri;
+    document.getElementById('s-site').classList.remove('hidden');
+    document.getElementById('s-sn').textContent=selectedSite.name;
+    document.getElementById('s-ss').textContent=selectedSite.id+' — '+selectedSite.brand;
+    document.getElementById('s-sp').textContent=selectedSite.pc;
+    document.getElementById('s-sb').textContent=selectedSite.brand;
+    document.getElementById('s-repeat').classList.remove('hidden');
+    document.getElementById('s-devices').classList.remove('hidden');
+    document.getElementById('s-notes').classList.remove('hidden');
+    document.getElementById('s-notes-c').innerHTML=[
+        ['18 Mar — CJ','Flow temps dropped 75→50°C. Condenser suspected.'],
+        ['18 Feb — Tony','Same as 6834. Possible blocked condenser.']
+    ].map(n=>`<div class="ni-t"><strong>${n[0]}:</strong> ${n[1]}</div>`).join('');
+
+    run('issue_select');
+}
+
+document.addEventListener('click',e=>{if(!e.target.closest('.site-dd'))document.getElementById('site-dd-list').classList.remove('open')});
+
+function setSidebar(data){if(data.pri)document.getElementById('s-pri').textContent=data.pri}
+
+// ---- SITE LOOKUP ----
+const SITES=[
+    {name:'Whistling Goose',id:'6886',brand:'GK Farmhouse Inns',pc:'NG2 4PQ'},
+    {name:'Angel Inn',id:'6749',brand:'GK Flaming Grill',pc:'DL10 4DW'},
+    {name:'Robin Hood',id:'6851',brand:'GK Flaming Grill',pc:'S12 3BN'},
+    {name:'Brentwood',id:'6759',brand:'GK Farmhouse Inns',pc:'CM14 4AE'},
+    {name:'Mill House',id:'6360',brand:'GK Farmhouse Inns',pc:'CH4 0DP'},
+    {name:'Bay Horse',id:'6750',brand:'GK Farmhouse Inns',pc:'WN4 9PJ'},
+    {name:'Polite Vicar',id:'6841',brand:'Greene King',pc:'SO15 1AA'},
+    {name:'Donkey Derby',id:'6786',brand:'GK Flaming Grill',pc:'WS2 9AE'},
+    {name:'Fox Hunters',id:'6795',brand:'GK Farmhouse Inns',pc:'LS25 1NB'},
+    {name:'Shuttle & Loom',id:'7971',brand:'GK Farmhouse Inns',pc:'BD1 1EE'},
+    {name:'Rosedene',id:'7949',brand:'GK Farmhouse Inns',pc:'CB9 8HF'},
+    {name:'Devon',id:'7714',brand:'Greene King',pc:'LS11 5QD'},
+    {name:'Quakerwood',id:'6845',brand:'Greene King',pc:'SK17 6AZ'},
+    {name:'Whitehills',id:'6888',brand:'Greene King',pc:'LL18 5UH'},
+    {name:'Meridian McDonalds',id:'MCD01',brand:'McDonalds',pc:'LE19 1WZ'},
+    {name:'Harrier',id:'4331',brand:'Greene King',pc:'HU7 4DW'},
+    {name:'Sailmaker',id:'6600',brand:'GK Farmhouse Inns',pc:'IP3 0AZ'},
+    {name:'Wheatsheaf',id:'6885',brand:'GK Farmhouse Inns',pc:'NG9 1JG'},
+    {name:'Badger Box',id:'4631',brand:'Greene King',pc:'NG6 8WR'},
+    {name:'Bull & Anchor',id:'0220',brand:'Greene King',pc:'WA14 1LN'}
+];
+
+function filterSL(q){
+    const box=document.getElementById('sl-results');
+    if(!q.trim()){box.innerHTML='<div style="padding:40px;text-align:center;color:var(--text-muted);font-size:13px">Type to search across all sites</div>';return}
+    const lq=q.toLowerCase();
+    const matches=SITES.filter(s=>s.name.toLowerCase().includes(lq)||s.id.toLowerCase().includes(lq)||s.pc.toLowerCase().includes(lq)||s.brand.toLowerCase().includes(lq));
+    if(!matches.length){box.innerHTML='<div style="padding:40px;text-align:center;color:var(--text-muted);font-size:13px">No sites found</div>';return}
+    box.innerHTML=matches.map(s=>`<div class="sl-item" onclick="openSiteDetail('${s.name}','${s.id}','${s.brand}','${s.pc}')"><div><div class="sl-item-brand">${s.brand}</div><div class="sl-item-name">${s.name}</div></div><div class="sl-item-id">${s.id}</div></div>`).join('');
+}
+
+function openSiteDetail(name,id,brand,pc){
+    document.getElementById('sd-title').textContent=name+' — '+id;
+    document.getElementById('sd-sub').textContent=brand+' — '+pc;
+    go('sitedetail');
+}
+
+function sdTab(el,tabId){
+    el.parentElement.querySelectorAll('.sd-tab').forEach(t=>t.classList.remove('active'));
+    el.classList.add('active');
+    const tl=document.getElementById('sd-tl');const cm=document.getElementById('sd-cm');
+    if(tabId==='sd-tl'){tl.style.display='';cm.style.display='none'}
+    else{tl.style.display='none';cm.style.display=''}
+}
+
+function addSiteNote(){
+    const ta=document.getElementById('sd-note');
+    const text=ta.value.trim();
+    if(!text)return;
+    // Add to timeline
+    const tl=document.getElementById('sd-tl');
+    const first=tl.querySelector('.tl-date-head');
+    const entry=document.createElement('div');
+    entry.className='tl-entry';
+    entry.style.animation='mi .25s ease-out';
+    entry.innerHTML=`<div class="tl-t">Now</div><div class="tl-pip tl-pip-info"></div><div><div class="tl-who">Kellie Roche <span class="tl-tag tl-tag-ooh">OOH</span></div><div class="tl-desc">${text}</div></div>`;
+    first.after(entry);
+    ta.value='';
+}
+
+function startTriageFromSite(){
+    // Pre-fill intake with selected site
+    const title=document.getElementById('sd-title').textContent;
+    const parts=title.split(' — ');
+    if(parts.length>=2){
+        const name=parts[0],id=parts[1];
+        selectedSite={name:name,id:id,brand:'Greene King',pc:''};
+        document.getElementById('site-search').value=name+' ('+id+')';
+    }
+    go('triage');
+    document.getElementById('intake-form').classList.remove('hidden');
+    document.getElementById('triage-chat').classList.add('hidden');
+    document.getElementById('cbadge').classList.remove('hidden');
+}
+
+// ---- CHAT ENGINE ----
+function bot(html,d){return new Promise(r=>{const t=document.createElement('div');t.className='msg msg-b';t.innerHTML=`<div class="msg-who"><span class="material-icons-outlined">smart_toy</span> Triage Assistant</div><div class="bub"><div class="typing"><span class="td"></span><span class="td"></span><span class="td"></span></div></div>`;C.appendChild(t);C.scrollTop=C.scrollHeight;setTimeout(()=>{t.remove();const m=document.createElement('div');m.className='msg msg-b';m.innerHTML=`<div class="msg-who"><span class="material-icons-outlined">smart_toy</span> Triage Assistant</div><div class="bub">${html}</div><div class="msg-t">${T}</div>`;C.appendChild(m);C.scrollTop=C.scrollHeight;r(m)},d||1200)})}
+
+function usr(t){const m=document.createElement('div');m.className='msg msg-u';m.innerHTML=`<div class="bub">${t}</div><div class="msg-t">${T}</div>`;C.appendChild(m);C.scrollTop=C.scrollHeight}
+
+function showBar(ph){const b=document.getElementById('chat-bar');b.style.display='flex';const i=document.getElementById('chat-in');const s=document.getElementById('send-btn');i.disabled=false;s.disabled=false;i.placeholder=ph||'Type...';i.focus();i.onkeydown=e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();sendMsg()}}}
+function hideBar(){document.getElementById('chat-bar').style.display='none'}
+
+function sendMsg(){const i=document.getElementById('chat-in');const v=i.value.trim();if(!v)return;usr(v);i.value='';hideBar();run('issue_select')}
+
+function pick(el,next){const p=el.parentElement;p.querySelectorAll('.opt').forEach(o=>{if(o===el){o.classList.remove('live');o.classList.add('picked')}else{o.classList.remove('live');o.classList.add('dead')}});const label=el.childNodes[1]?el.childNodes[1].textContent.trim():el.textContent.trim();usr(label);setTimeout(()=>run(next),300)}
+
+function applyAction(btn,next){
+    // Check if there's a reason textarea and it's empty
+    const reasonEl=btn.closest('.bub').querySelector('.reason-ta');
+    if(reasonEl&&!reasonEl.value.trim()){reasonEl.style.borderColor='var(--danger)';reasonEl.focus();return}
+    btn.innerHTML='<span class="material-icons-outlined">hourglass_empty</span> Applying...';btn.style.background='var(--warning)';btn.disabled=true;
+    setTimeout(()=>{btn.innerHTML='<span class="material-icons-outlined">check_circle</span> Applied ✓';btn.style.background='var(--success)';setTimeout(()=>run(next),600)},1500)
+}
+
+function resolveCall(){document.getElementById('cbadge').classList.add('hidden');document.getElementById('call-banner').classList.add('hidden');const rb=document.getElementById('resolved-bar');rb.classList.remove('hidden');document.getElementById('resolved-title').textContent=resolveMsg.title||'Ticket Resolved';document.getElementById('resolved-sub').textContent=resolveMsg.sub||'';go('home');setTimeout(()=>{rb.style.transition='opacity 1s';rb.style.opacity='0';setTimeout(()=>{rb.classList.add('hidden');rb.style.opacity='1'},1200)},8000)}
+
+// Override reason HTML helper
+function reasonCapture(){return `<div class="reason-box"><label>Why does the site need this override?<span style="color:var(--danger)"> *</span></label><textarea class="reason-ta" placeholder="e.g. Still serving food, kitchen needs to stay open until 11pm for a private function..."></textarea><div class="reason-note"><span class="material-icons-outlined" style="font-size:14px;color:var(--warning)">info</span> Captured for audit trail. Overrides impact the agreed energy schedule.</div></div>`}
+
+// "Anything else?" HTML helper
+function anythingElse(){return `<br><div style="margin-top:12px;padding-top:12px;border-top:1px solid var(--border)"><strong>Ask ${document.getElementById('in-caller').value||'the caller'}: "Is there anything else I can help with?"</strong><div class="opts" style="margin-top:8px"><div class="opt live" onclick="pick(this,'issue_select')"><span class="material-icons-outlined">add_circle</span> Yes — another issue</div><div class="opt live" onclick="enableResolve()"><span class="material-icons-outlined">check_circle</span> No — that's everything</div></div></div>`}
+
+function enableResolve(){document.getElementById('resolve-btn').disabled=false}
+
+// ===================== TRIAGE STATE MACHINE =====================
+async function run(state){
+switch(state){
+
+// ---- COMMON ----
+case 'issue_select':
+    T='18:43';
+    const cn=document.getElementById('in-caller').value||'the caller';
+    await bot(`OK — <strong>${selectedSite.name} (${selectedSite.id})</strong> logged. ${cn} is on the line.<br><br><strong>What's the problem?</strong>
+    <div class="opts">
+        <div class="opt live" onclick="pick(this,'heat_type')"><span class="material-icons-outlined">thermostat</span> Heating problem</div>
+        <div class="opt live" onclick="pick(this,'kit_which')"><span class="material-icons-outlined">restaurant</span> Kitchen equipment not working</div>
+        <div class="opt live" onclick="pick(this,'light_which')"><span class="material-icons-outlined">lightbulb</span> Lighting not working</div>
+        <div class="opt live" onclick="pick(this,'hw_check')"><span class="material-icons-outlined">hot_tub</span> Hot water issue</div>
+        <div class="opt live" onclick="pick(this,'other_scope')"><span class="material-icons-outlined">help_outline</span> Something else / not sure</div>
+    </div>`,800);
+    break;
+
+// ==================== HEATING ====================
+case 'heat_type':
+    T='18:43';setSidebar({pri:'P2 — Comfort'});
+    await bot(`Heating issue. This site has <strong>3 zones</strong>.<br><br><strong>Ask Holly: is the pub too cold, or too hot?</strong>
+    <div class="opts">
+        <div class="opt live" onclick="pick(this,'heat_cold_zone')"><span class="material-icons-outlined">ac_unit</span> Too cold — heating not warming up</div>
+        <div class="opt live" onclick="pick(this,'heat_hot_zone')"><span class="material-icons-outlined">whatshot</span> Too hot — overheating / can't turn off</div>
+    </div>`,1000);
+    break;
+
+case 'heat_cold_zone':
+    await bot(`<strong>Ask Holly: which part of the pub is cold?</strong>
+    <div class="opts">
+        <div class="opt live" onclick="pick(this,'heat_cold_check_rest')"><span class="material-icons-outlined">thermostat</span> Restaurant</div>
+        <div class="opt live" onclick="pick(this,'heat_cold_check_bar')"><span class="material-icons-outlined">thermostat</span> Bar</div>
+        <div class="opt live" onclick="pick(this,'heat_cold_check_accom')"><span class="material-icons-outlined">thermostat</span> Accommodation</div>
+        <div class="opt live" onclick="pick(this,'heat_cold_check_all')"><span class="material-icons-outlined">thermostat</span> Whole pub / not sure</div>
+    </div>`,800);
+    break;
+
+case 'heat_cold_check_rest':
+    await bot(`Checking <strong>Zone 1 — Restaurant</strong>...`,600);
+    await bot(`<div class="dcard"><div class="dgrid dgrid-4">
+        <div class="ditem"><div class="dlbl">Current</div><div class="dval v-lo">17.4°C</div></div>
+        <div class="ditem"><div class="dlbl">Target</div><div class="dval">21°C</div></div>
+        <div class="ditem"><div class="dlbl">Heating</div><div class="dval v-ok">Active</div></div>
+        <div class="ditem"><div class="dlbl">Flow Temp</div><div class="dval v-w">48°C</div></div>
+    </div></div><br>
+    Restaurant is <strong>17.4°C</strong> (target 21°C). Heating is running but the boiler flow temp is low (48°C vs normal 75°C). This is a known pattern at this site — possible blocked condenser.<br><br>
+    <div class="script">Tell Holly: "I can see your heating is running but it's not warming up as fast as it should. I'm going to boost it for you now, and our team will investigate the boiler side of things first thing tomorrow."</div>
+    <div class="cblock cblock-ok"><h4><span class="material-icons-outlined">flash_on</span> Temporary boost</h4><div class="crow"><span class="l">Restaurant setpoint</span><span class="v">21°C → 23°C</span></div><div class="crow"><span class="l">Duration</span><span class="v">4 hours (reverts 22:45)</span></div><div class="cnote"><span class="material-icons-outlined">info</span> Auto-reverts. P1 review ticket created for IoT team.</div></div>
+    ${reasonCapture()}
+    <div class="mact"><button class="btn btn-p" onclick="applyAction(this,'heat_done')"><span class="material-icons-outlined">flash_on</span> Apply Boost</button></div>`,2000);
+    break;
+
+case 'heat_cold_check_bar':
+    await bot(`Checking <strong>Zone 2 — Bar</strong>...`,600);
+    await bot(`<div class="dcard"><div class="dgrid dgrid-3"><div class="ditem"><div class="dlbl">Current</div><div class="dval v-ok">20.8°C</div></div><div class="ditem"><div class="dlbl">Target</div><div class="dval">21°C</div></div><div class="ditem"><div class="dlbl">Heating</div><div class="dval v-ok">Active</div></div></div></div><br>
+    Bar is <strong>20.8°C</strong> — almost at the 21°C target and heating is active. This looks normal.<br><br>
+    <div class="script">Tell Holly: "The bar area is reading almost exactly on target at 20.8 degrees, and the heating is running. It should reach full temperature shortly. If it's still cold in 30 minutes, call us back."</div>
+    <div class="mact"><button class="btn btn-ok" onclick="applyAction(this,'heat_done_nochg')"><span class="material-icons-outlined">check_circle</span> No change needed — Resolve</button></div>`,1800);
+    break;
+
+case 'heat_cold_check_accom':
+    await bot(`Checking <strong>Zone 3 — Accommodation</strong>...`,600);
+    await bot(`<div class="dcard"><div class="dgrid dgrid-3"><div class="ditem"><div class="dlbl">Current</div><div class="dval v-ok">21.2°C</div></div><div class="ditem"><div class="dlbl">Target</div><div class="dval">22°C</div></div><div class="ditem"><div class="dlbl">Heating</div><div class="dval v-ok">Active</div></div></div></div><br>
+    Accommodation is <strong>21.2°C</strong> against 22°C target. Heating is active and working normally.<br><br>⚠️ Accommodation setpoint changes need <strong>BDM approval</strong>. I can raise it by 1°C temporarily, or log it for the team.<br><br>
+    <div class="script">Tell Holly: "The accommodation is reading 21 degrees which is close to target. The heating is on. I can give it a small boost, but any bigger changes would need to be approved by your area manager."</div>
+    <div class="opts">
+        <div class="opt live" onclick="pick(this,'heat_accom_boost')"><span class="material-icons-outlined">thermostat</span> Boost +1°C (within approval limit)</div>
+        <div class="opt live" onclick="pick(this,'heat_done_nochg')"><span class="material-icons-outlined">check_circle</span> No change — log for team</div>
+    </div>`,2000);
+    break;
+
+case 'heat_accom_boost':
+    await bot(`<div class="cblock cblock-ok"><h4><span class="material-icons-outlined">flash_on</span> Temporary boost</h4><div class="crow"><span class="l">Accommodation setpoint</span><span class="v">22°C → 23°C</span></div><div class="crow"><span class="l">Duration</span><span class="v">4 hours (reverts 22:45)</span></div><div class="cnote"><span class="material-icons-outlined">info</span> Within BDM pre-approval limit (+1°C). Auto-reverts.</div></div>
+    ${reasonCapture()}
+    <div class="mact"><button class="btn btn-p" onclick="applyAction(this,'heat_done')"><span class="material-icons-outlined">flash_on</span> Apply Boost</button></div>`,800);
+    break;
+
+case 'heat_cold_check_all':
+    await bot(`Checking <strong>all zones</strong>...`,600);
+    await bot(`<div class="dcard"><div class="dgrid dgrid-4"><div class="ditem"><div class="dlbl">Gateway</div><div class="dval v-hi">Offline</div></div><div class="ditem"><div class="dlbl">Restaurant</div><div class="dval" style="color:var(--text-muted)">No data</div></div><div class="ditem"><div class="dlbl">Bar</div><div class="dval" style="color:var(--text-muted)">No data</div></div><div class="ditem"><div class="dlbl">Last Seen</div><div class="dval v-w">4h ago</div></div></div></div><br>
+    <strong style="color:var(--danger)">⚠️ The IoT gateway is offline.</strong> Last seen 4 hours ago. I can't read temperatures or make any changes remotely — the system is in <strong>fallback mode</strong>, which means the heating will run on its last known settings until the gateway reconnects.<br><br>
+    This could be caused by:<br>
+    • A power cut or tripped fuse at the site<br>
+    • GK WiFi going down<br>
+    • A hardware fault with the gateway itself<br><br>
+    <div class="script">Tell Holly: "I can see that our monitoring equipment has gone offline at your site, which means I can't make any changes from here right now. Your heating should still be running on its last settings. Can you check if there's been a power cut, or if any switches have tripped on your fuse board? In the meantime, I'm going to escalate this to our technical team so they can investigate."</div>
+    <div class="opts">
+        <div class="opt live" onclick="pick(this,'heat_gw_fuse_ok')"><span class="material-icons-outlined">check_circle</span> Site checked fuse — power restored, gateway coming back</div>
+        <div class="opt live" onclick="pick(this,'heat_gw_escalate')"><span class="material-icons-outlined">priority_high</span> Fuse OK / can't resolve — escalate</div>
+    </div>`,2500);
+    break;
+
+case 'heat_gw_fuse_ok':
+    await bot(`Waiting for gateway to reconnect...`,800);
+    await bot(`<div class="dcard"><div class="dgrid dgrid-4"><div class="ditem"><div class="dlbl">Gateway</div><div class="dval v-ok">Online ✓</div></div><div class="ditem"><div class="dlbl">Restaurant</div><div class="dval v-lo">16.8°C</div></div><div class="ditem"><div class="dlbl">Bar</div><div class="dval v-lo">17.2°C</div></div><div class="ditem"><div class="dlbl">Accom</div><div class="dval v-ok">19.5°C</div></div></div></div><br>
+    Gateway is back online. Temperatures are low across the board — the heating was in fallback while the gateway was down. I can boost all zones now.<br><br>
+    <div class="script">Tell Holly: "Good news — the system's back online. I can see it's cold throughout because the heating wasn't being managed properly while the equipment was offline. I'm going to boost all three zones for you now."</div>
+    <div class="cblock cblock-ok"><h4><span class="material-icons-outlined">flash_on</span> Boost all zones</h4><div class="crow"><span class="l">Restaurant</span><span class="v">21°C → 23°C</span></div><div class="crow"><span class="l">Bar</span><span class="v">21°C → 23°C</span></div><div class="crow"><span class="l">Duration</span><span class="v">4 hours (auto-reverts)</span></div><div class="cnote"><span class="material-icons-outlined">info</span> Review ticket created — IoT team to check why gateway dropped.</div></div>
+    ${reasonCapture()}
+    <div class="mact"><button class="btn btn-p" onclick="applyAction(this,'heat_done')"><span class="material-icons-outlined">flash_on</span> Apply Boost All Zones</button></div>`,2200);
+    break;
+
+case 'heat_gw_escalate':
+    T='18:46';
+    resolveMsg={title:'Ticket #28421 Escalated',sub:selectedSite.name+' — Gateway offline. No remote access. Escalated to Sam Day.'};
+    await bot(`<div class="cblock cblock-d"><h4><span class="material-icons-outlined">priority_high</span> Escalating to IoT Team</h4>
+    <p style="font-size:12px">Gateway has been offline for 4+ hours. No remote access. Site has checked fuse board — no obvious power issue. This needs the IoT team to investigate, possibly a site visit.</p>
+    <div class="crow"><span class="l">Reason</span><span class="v">Equipment fault — gateway offline, can't resolve remotely</span></div>
+    <div class="crow"><span class="l">Impact</span><span class="v">No heating control — entire pub affected</span></div>
+    <div class="crow"><span class="l">SMS sent to</span><span class="v">Sam Day (Escalation Manager)</span></div>
+    <div class="crow"><span class="l">Auto-routes in</span><span class="v">45 minutes if no response</span></div></div><br>
+    <div class="script">Tell ${document.getElementById('in-caller').value||'the caller'}: "I've escalated this to our technical team as a priority. Your heating should still be running on its last settings in the meantime. Someone from our team will be in touch — if you don't hear back within an hour, give us another call and we'll chase it up."</div>
+    ${anythingElse()}`,1800);
+    break;
+
+case 'heat_hot_zone':
+    await bot(`Checking <strong>all zones</strong> for overheating...`,600);
+    await bot(`<div class="dcard"><div class="dgrid dgrid-4"><div class="ditem"><div class="dlbl">Gateway</div><div class="dval v-ok">Online</div></div><div class="ditem"><div class="dlbl">Restaurant</div><div class="dval v-hi">24.2°C</div></div><div class="ditem"><div class="dlbl">Bar</div><div class="dval v-w">23.1°C</div></div><div class="ditem"><div class="dlbl">Accom</div><div class="dval v-ok">21.8°C</div></div></div></div><br>
+    Restaurant is <strong>24.2°C</strong> against a 21°C setpoint — that's too hot. The heating should have cut off. This sometimes happens when the Dragino gateway loses connection and the system enters <strong>fallback mode</strong> (heating runs continuously).<br><br>Gateway is online now, so I can lower the setpoint to bring it down.<br><br>
+    <div class="script">Tell Holly: "I can see it's running hot. I'm going to turn the target down for you now — you should feel the difference within 20 minutes as the radiators cool."</div>
+    <div class="cblock cblock-ok"><h4><span class="material-icons-outlined">thermostat</span> Lower setpoint</h4><div class="crow"><span class="l">Restaurant setpoint</span><span class="v">21°C → 19°C (temporary)</span></div><div class="crow"><span class="l">Duration</span><span class="v">3 hours (reverts to 21°C at 21:45)</span></div><div class="cnote"><span class="material-icons-outlined">info</span> Temporary. Review ticket created — IoT team to check for gateway dropouts.</div></div>
+    <div class="mact"><button class="btn btn-p" onclick="applyAction(this,'heat_done')"><span class="material-icons-outlined">thermostat</span> Lower Setpoint</button></div>`,2200);
+    break;
+
+case 'heat_done':
+    T='18:45';
+    resolveMsg={title:'Ticket #28421 Resolved',sub:selectedSite.name+' '+selectedSite.id+' — Heating adjustment applied. Review ticket created.'};
+    await bot(`<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px"><span class="material-icons-outlined" style="color:var(--success);font-size:22px">check_circle</span><strong style="color:#065F46;font-size:14px">Done!</strong></div>
+    Change applied. Auto-reverts as scheduled. A <strong>P1 review ticket</strong> has been created for the IoT team to investigate tomorrow morning.<br><br>
+    <div class="script">Tell ${document.getElementById('in-caller').value||'the caller'}: "That's all done for you — you should feel the difference shortly. Our team will check into it tomorrow to make sure everything's working properly."</div>
+    ${anythingElse()}`,1200);
+    break;
+
+case 'heat_done_nochg':
+    T='18:45';
+    resolveMsg={title:'Ticket #28421 Resolved',sub:selectedSite.name+' '+selectedSite.id+' — Heating checked, no change needed.'};
+    await bot(`<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px"><span class="material-icons-outlined" style="color:var(--success);font-size:22px">check_circle</span><strong style="color:#065F46;font-size:14px">Resolved — no change needed</strong></div>
+    Heating is working as expected. Note logged on the ticket.<br><br>
+    ${anythingElse()}`,1000);
+    break;
+
+// ==================== KITCHEN EQUIPMENT ====================
+case 'kit_which':
+    T='18:43';setSidebar({pri:'P1 — Business Critical'});
+    await bot(`Kitchen equipment issue. This site has the following on Lighthouse:<br><br><strong>Ask Holly: which equipment isn't working?</strong>
+    <div class="opts">
+        <div class="opt live" onclick="pick(this,'kit_fryer')"><span class="material-icons-outlined">local_fire_department</span> Fryers</div>
+        <div class="opt live" onclick="pick(this,'kit_wash')"><span class="material-icons-outlined">water_drop</span> Glasswasher / Dishwasher</div>
+        <div class="opt live" onclick="pick(this,'kit_merrychef')"><span class="material-icons-outlined">microwave</span> Merrychef / Oven</div>
+        <div class="opt live" onclick="pick(this,'kit_extract')"><span class="material-icons-outlined">air</span> Extractor fans</div>
+        <div class="opt live" onclick="pick(this,'kit_all')"><span class="material-icons-outlined">power_off</span> Everything is off / multiple items</div>
+    </div>`,1000);
+    break;
+
+case 'kit_fryer':
+    await bot(`Checking <strong>Fryers</strong>...`,600);
+    await bot(`<div class="dcard"><div class="dgrid dgrid-4"><div class="ditem"><div class="dlbl">Fryer 1</div><div class="dval v-hi">Off</div></div><div class="ditem"><div class="dlbl">Fryer 2</div><div class="dval v-hi">Off</div></div><div class="ditem"><div class="dlbl">Power Pause</div><div class="dval v-ok">Online</div></div><div class="ditem"><div class="dlbl">Schedule</div><div class="dval v-w">Ended</div></div></div></div><br>
+    Both fryers are <strong>off</strong>. The Power Pause device is online but the schedule has ended — fryers were set to turn off at 21:30 today. If they need them on later, I can override.<br><br>
+    <div class="script">Tell Holly: "Your fryers are turned off because they've reached the end of their schedule for today. I can turn them back on for you right now — how long do you need them?"</div>
+    <div class="opts">
+        <div class="opt live" onclick="pick(this,'kit_override_2h')"><span class="material-icons-outlined">timer</span> Override for 2 hours</div>
+        <div class="opt live" onclick="pick(this,'kit_override_4h')"><span class="material-icons-outlined">timer</span> Override for 4 hours</div>
+        <div class="opt live" onclick="pick(this,'kit_done_nochg')"><span class="material-icons-outlined">check_circle</span> Site doesn't need them — resolve</div>
+    </div>`,2000);
+    break;
+
+case 'kit_wash':
+    await bot(`Checking <strong>Glasswasher & Dishwasher</strong>...`,600);
+    await bot(`<div class="dcard"><div class="dgrid dgrid-3"><div class="ditem"><div class="dlbl">Glasswasher</div><div class="dval v-hi">Off</div></div><div class="ditem"><div class="dlbl">Dishwasher</div><div class="dval v-ok">On</div></div><div class="ditem"><div class="dlbl">Power Pause</div><div class="dval v-ok">Online</div></div></div></div><br>
+    Glasswasher is <strong>off</strong>, dishwasher is on. The Tuya device for the glasswasher shows it went offline at 18:12 — this sometimes happens when the GK WiFi drops. The device is back online now so I can trigger an override.<br><br>
+    <div class="script">Tell Holly: "Your glasswasher dropped off briefly but the system's back online. I'm going to turn it on for you now."</div>
+    <div class="cblock cblock-ok"><h4><span class="material-icons-outlined">power_settings_new</span> Turn on glasswasher</h4><div class="crow"><span class="l">Device</span><span class="v">Glasswasher — Tuya override</span></div><div class="crow"><span class="l">Duration</span><span class="v">Until next schedule cycle (23:30)</span></div><div class="cnote"><span class="material-icons-outlined">info</span> Follows normal schedule from tomorrow. Review ticket logged.</div></div>
+    <div class="mact"><button class="btn btn-p" onclick="applyAction(this,'kit_done')"><span class="material-icons-outlined">power_settings_new</span> Turn On Glasswasher</button></div>`,2000);
+    break;
+
+case 'kit_merrychef': case 'kit_extract':
+    const device = state==='kit_merrychef'?'Merrychef':'Extractor Fans';
+    await bot(`Checking <strong>${device}</strong>...`,600);
+    await bot(`<div class="dcard"><div class="dgrid dgrid-3"><div class="ditem"><div class="dlbl">${device}</div><div class="dval v-hi">Off</div></div><div class="ditem"><div class="dlbl">Power Pause</div><div class="dval v-ok">Online</div></div><div class="ditem"><div class="dlbl">Schedule</div><div class="dval v-w">Ended 21:00</div></div></div></div><br>
+    ${device} turned off at the scheduled time (21:00). The Power Pause device is online — I can override to turn it back on.<br><br>
+    ${state==='kit_extract'?'<strong>Note:</strong> Extractor fans are linked to the gas interlock. If extractors are off, gas-powered equipment (grills, fryers) may also cut out as a safety measure.<br><br>':''}
+    <div class="script">Tell Holly: "Your ${device.toLowerCase()} turned off at its scheduled time. I can switch it back on for you now."</div>
+    <div class="cblock cblock-ok"><h4><span class="material-icons-outlined">power_settings_new</span> Turn on ${device.toLowerCase()}</h4><div class="crow"><span class="l">Device</span><span class="v">${device} — Power Pause override</span></div><div class="crow"><span class="l">Duration</span><span class="v">2 hours (reverts 20:45)</span></div></div>
+    <div class="mact"><button class="btn btn-p" onclick="applyAction(this,'kit_done')"><span class="material-icons-outlined">power_settings_new</span> Turn On</button></div>`,1800);
+    break;
+
+case 'kit_all':
+    await bot(`Checking <strong>all kitchen devices</strong>...`,600);
+    await bot(`<div class="dcard"><div class="dgrid dgrid-4"><div class="ditem"><div class="dlbl">Fryer 1</div><div class="dval v-hi">Off</div></div><div class="ditem"><div class="dlbl">Fryer 2</div><div class="dval v-hi">Off</div></div><div class="ditem"><div class="dlbl">Merrychef</div><div class="dval v-hi">Off</div></div><div class="ditem"><div class="dlbl">Extractors</div><div class="dval v-hi">Off</div></div></div></div><br>
+    <strong>Multiple devices are off.</strong> Glasswasher and dishwasher are still running. This looks like the Power Pause schedule kicked in — kitchen cooking equipment was set to turn off at 21:30.<br><br>
+    <div class="script">Tell Holly: "It looks like your kitchen cooking equipment has turned off on schedule. I can turn everything back on for you. How much longer do you need the kitchen running?"</div>
+    <div class="opts">
+        <div class="opt live" onclick="pick(this,'kit_override_2h')"><span class="material-icons-outlined">timer</span> Override all for 2 hours</div>
+        <div class="opt live" onclick="pick(this,'kit_override_4h')"><span class="material-icons-outlined">timer</span> Override all for 4 hours</div>
+    </div>`,2200);
+    break;
+
+case 'kit_override_2h': case 'kit_override_4h':
+    const hrs=state==='kit_override_2h'?'2':'4';
+    const revert=state==='kit_override_2h'?'20:45':'22:45';
+    await bot(`<div class="cblock cblock-ok"><h4><span class="material-icons-outlined">power_settings_new</span> Override kitchen equipment</h4><div class="crow"><span class="l">Devices</span><span class="v">All cooking equipment + extractors</span></div><div class="crow"><span class="l">Duration</span><span class="v">${hrs} hours (reverts ${revert})</span></div><div class="cnote"><span class="material-icons-outlined">info</span> Auto-reverts. Normal schedule resumes tomorrow. Review ticket logged.</div></div>
+    ${reasonCapture()}
+    <div class="mact"><button class="btn btn-p" onclick="applyAction(this,'kit_done')"><span class="material-icons-outlined">power_settings_new</span> Turn On Kitchen Equipment</button></div>`,800);
+    break;
+
+case 'kit_done':
+    T='18:45';resolveMsg={title:'Ticket #28421 Resolved',sub:selectedSite.name+' — Kitchen equipment override applied. Review ticket created.'};
+    await bot(`<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px"><span class="material-icons-outlined" style="color:var(--success);font-size:22px">check_circle</span><strong style="color:#065F46;font-size:14px">Done!</strong></div>Equipment turned on. Should come on within 30 seconds. Override will auto-revert and a <strong>review ticket</strong> has been created.<br><br><div class="script">Tell ${document.getElementById('in-caller').value||'the caller'}: "That's all switched on for you. It'll come on any second."</div>${anythingElse()}`,1200);
+    break;
+
+case 'kit_done_nochg':
+    T='18:45';resolveMsg={title:'Ticket #28421 Resolved',sub:selectedSite.name+' — Kitchen equipment checked, schedule confirmed.'};
+    await bot(`<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px"><span class="material-icons-outlined" style="color:var(--success);font-size:22px">check_circle</span><strong style="color:#065F46;font-size:14px">Resolved</strong></div>No change needed. Schedule correct — equipment turned off as planned.${anythingElse()}`,1000);
+    break;
+
+// ==================== LIGHTING ====================
+case 'light_which':
+    T='18:43';setSidebar({pri:'P3 — Advisory'});
+    await bot(`Lighting issue. <strong>Ask Holly: which lights aren't working?</strong>
+    <div class="opts">
+        <div class="opt live" onclick="pick(this,'light_carpark')"><span class="material-icons-outlined">local_parking</span> Car park lights</div>
+        <div class="opt live" onclick="pick(this,'light_festoon')"><span class="material-icons-outlined">light</span> Festoon / decorative lighting</div>
+        <div class="opt live" onclick="pick(this,'light_outdoor_heat')"><span class="material-icons-outlined">outdoor_grill</span> Outdoor heaters</div>
+        <div class="opt live" onclick="pick(this,'light_notours')"><span class="material-icons-outlined">help_outline</span> Internal / bathroom / signage</div>
+    </div>`,1000);
+    break;
+
+case 'light_carpark':
+    await bot(`Checking <strong>car park lighting</strong>...`,600);
+    await bot(`<div class="dcard"><div class="dgrid dgrid-3"><div class="ditem"><div class="dlbl">Status</div><div class="dval v-hi">Off</div></div><div class="ditem"><div class="dlbl">Tongou Device</div><div class="dval v-ok">Online</div></div><div class="ditem"><div class="dlbl">Schedule</div><div class="dval">16:30–23:00</div></div></div></div><br>
+    Car park lights are <strong>off</strong> but the Tongou Power Pause device is online and within schedule hours. The device may have been manually switched off on site, or the contactor hasn't fired. I can trigger it remotely.<br><br>
+    <div class="script">Tell Holly: "I can see the lights should be on. I'm going to switch them on remotely for you now. If they don't come on within a minute, it might be a fuse — I'll talk you through checking it."</div>
+    <div class="mact"><button class="btn btn-p" onclick="applyAction(this,'light_done')"><span class="material-icons-outlined">lightbulb</span> Turn On Car Park Lights</button></div>`,2000);
+    break;
+
+case 'light_festoon':
+    await bot(`Checking <strong>festoon lighting</strong>...`,600);
+    await bot(`<div class="dcard"><div class="dgrid dgrid-3"><div class="ditem"><div class="dlbl">Status</div><div class="dval v-hi">Offline</div></div><div class="ditem"><div class="dlbl">Tongou Device</div><div class="dval v-hi">No Signal</div></div><div class="ditem"><div class="dlbl">Last Seen</div><div class="dval">18 Feb</div></div></div></div><br>
+    The festoon lighting Tongou device has been <strong>offline since 18 February</strong> — no signal at all. This means either:<br>
+    • The fuse/MCB has tripped in the fuse board<br>
+    • The device has failed<br>
+    • An electrician has disconnected it<br><br>
+    I can't fix this remotely. There may be a <strong>manual override button</strong> on the Power Pause panel on site.<br><br>
+    <div class="script">Tell Holly: "The festoon lighting control box has been offline for about a month, so I can't switch it on from here. Can you check your electrical panel — there should be a small box near the fuse board with a button on it. Try pressing the button to see if the lights come on. If not, I'll log it for our team to get an electrician out."</div>
+    <div class="opts">
+        <div class="opt live" onclick="pick(this,'light_manual_ok')"><span class="material-icons-outlined">check_circle</span> Manual override worked — lights are on</div>
+        <div class="opt live" onclick="pick(this,'light_escalate')"><span class="material-icons-outlined">priority_high</span> Didn't work / can't find it — escalate</div>
+    </div>`,2500);
+    break;
+
+case 'light_outdoor_heat':
+    await bot(`Checking <strong>outdoor heaters</strong>...`,600);
+    await bot(`<div class="dcard"><div class="dgrid dgrid-3"><div class="ditem"><div class="dlbl">Status</div><div class="dval v-hi">Off</div></div><div class="ditem"><div class="dlbl">Tongou</div><div class="dval v-ok">Online</div></div><div class="ditem"><div class="dlbl">Schedule</div><div class="dval v-w">None set</div></div></div></div><br>
+    Outdoor heaters are <strong>off</strong> and there's <strong>no schedule configured</strong>. The Tongou device is online though, so I can turn them on.<br><br>
+    <div class="script">Tell Holly: "The outdoor heaters don't have an automatic schedule set up yet. I'll switch them on for you now and log it so our team can set up a proper schedule."</div>
+    <div class="mact"><button class="btn btn-p" onclick="applyAction(this,'light_done')"><span class="material-icons-outlined">lightbulb</span> Turn On Outdoor Heaters</button></div>`,1800);
+    break;
+
+case 'light_notours':
+    await bot(`<div class="cblock cblock-d"><h4><span class="material-icons-outlined">cancel</span> Not Lighthouse controlled</h4><p style="font-size:12px">Internal lights, bathroom lights, and signage are <strong>not</strong> part of the Lighthouse system at this site. These are controlled by the site's own electrical system.</p></div><br>
+    <div class="script">Tell Holly: "Those lights aren't part of the system we manage. I'd recommend checking the fuse board first — if a switch has tripped, flipping it back should sort it. If not, you can log a job through Pulse for an electrician to take a look."</div>
+    <div class="mact"><button class="btn btn-ok" onclick="applyAction(this,'scope_done')"><span class="material-icons-outlined">check_circle</span> Not ours — Resolve</button></div>`,1500);
+    break;
+
+case 'light_manual_ok':
+    resolveMsg={title:'Ticket #28421 Resolved',sub:selectedSite.name+' — Festoon restored via manual override. Device still offline — review ticket created.'};
+    await bot(`<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px"><span class="material-icons-outlined" style="color:var(--success);font-size:22px">check_circle</span><strong style="color:#065F46;font-size:14px">Lights on!</strong></div>
+    Manual override worked. Tongou device still offline — won't follow schedule automatically. <strong>Review ticket</strong> created for IoT team.${anythingElse()}`,1200);
+    break;
+
+case 'light_escalate':
+    resolveMsg={title:'Ticket #28421 Escalated',sub:selectedSite.name+' — Festoon offline. Escalated to Sam Day.'};
+    await bot(`<div class="cblock cblock-d"><h4><span class="material-icons-outlined">priority_high</span> Escalating</h4><p style="font-size:12px">Device offline since 18 Feb. Manual override failed. Needs electrician.</p><div class="crow"><span class="l">Reason</span><span class="v">Equipment fault — can't resolve remotely</span></div><div class="crow"><span class="l">SMS sent to</span><span class="v">Sam Day (Escalation Manager)</span></div><div class="crow"><span class="l">Auto-routes in</span><span class="v">45 minutes if no response</span></div></div><br>
+    <div class="script">Tell ${document.getElementById('in-caller').value||'the caller'}: "I've escalated this to our technical team. Someone will be in touch — if you don't hear back within the hour, give us another call."</div>
+    ${anythingElse()}`,1500);
+    break;
+
+case 'light_done':
+    T='18:45';resolveMsg={title:'Ticket #28421 Resolved',sub:selectedSite.name+' — Lighting turned on.'};
+    await bot(`<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px"><span class="material-icons-outlined" style="color:var(--success);font-size:22px">check_circle</span><strong style="color:#065F46;font-size:14px">Done!</strong></div>Turned on. Should come on within a few seconds.<br><br><div class="script">Tell ${document.getElementById('in-caller').value||'the caller'}: "That's done — your lights should come on any moment."</div>${anythingElse()}`,1200);
+    break;
+
+// ==================== HOT WATER ====================
+case 'hw_check':
+    T='18:43';setSidebar({pri:'P2 — Comfort'});
+    await bot(`Checking <strong>hot water (DHW)</strong>...`,600);
+    await bot(`<div class="dcard"><div class="dgrid dgrid-4"><div class="ditem"><div class="dlbl">DHW Status</div><div class="dval v-ok">Active</div></div><div class="ditem"><div class="dlbl">Temperature</div><div class="dval v-ok">58°C</div></div><div class="ditem"><div class="dlbl">Setpoint</div><div class="dval">60°C</div></div><div class="ditem"><div class="dlbl">Valve</div><div class="dval v-ok">Open</div></div></div></div><br>
+    Lighthouse shows the DHW is <strong>active at 58°C</strong> with the valve open — that's normal. The system is doing its job.<br><br>
+    <strong>Ask Holly: what exactly is happening?</strong>
+    <div class="opts">
+        <div class="opt live" onclick="pick(this,'hw_no_hot')"><span class="material-icons-outlined">water_drop</span> No hot water at all — taps running cold</div>
+        <div class="opt live" onclick="pick(this,'hw_too_hot')"><span class="material-icons-outlined">whatshot</span> Water is too hot — burning / scalding risk</div>
+        <div class="opt live" onclick="pick(this,'hw_intermittent')"><span class="material-icons-outlined">sync_problem</span> Hot water comes and goes</div>
+    </div>`,2000);
+    break;
+
+case 'hw_no_hot':
+    await bot(`Our system shows hot water is <strong>active and at temperature</strong>. If the taps are running cold, the issue is likely:<br>
+    • <strong>Boiler fault</strong> — pilot light out, PCB failure, or gas supply issue<br>
+    • <strong>Motorised valve stuck</strong> — the valve that directs hot water may be jammed<br>
+    • <strong>Plumbing issue</strong> — blocked pipes or faulty mixer tap<br><br>
+    <strong>None of these are Lighthouse-controlled.</strong> The boiler and plumbing are managed by GK's maintenance contractors.<br><br>
+    <div class="cblock cblock-d"><h4><span class="material-icons-outlined">cancel</span> Not a Lighthouse issue</h4><p style="font-size:12px">DHW is active on our system (58°C, valve open). The fault is with the boiler, valve, or plumbing — outside Lighthouse scope.</p></div><br>
+    <div class="script">Tell Holly: "I've checked our system and the hot water control is working fine on our end — it's showing active at 58 degrees. This sounds like it could be a boiler or plumbing issue. I'd recommend logging a job through Pulse for a plumber or heating engineer to attend. If they need any information from our side, they can call us."</div>
+    <div class="mact"><button class="btn btn-ok" onclick="applyAction(this,'scope_done')"><span class="material-icons-outlined">check_circle</span> Not ours — Resolve with advice</button></div>`,2500);
+    break;
+
+case 'hw_too_hot':
+    await bot(`Water too hot can be a <strong>safety risk</strong>. Our DHW setpoint is 60°C which is standard. If the water at the tap is scalding, the issue is likely:<br>
+    • <strong>Boiler thermostat set too high</strong> — needs adjusting at the boiler<br>
+    • <strong>Mixing valve fault</strong> — the TMV (thermostatic mixing valve) may have failed<br><br>
+    I can lower our setpoint from 60°C to 55°C as a precaution, but the boiler company should attend.<br><br>
+    <div class="script">Tell Holly: "I'm going to turn down the hot water target on our system as a safety measure. But this sounds like it needs a boiler engineer to check the mixing valve. Please log a job through Pulse as urgent."</div>
+    <div class="cblock cblock-ok"><h4><span class="material-icons-outlined">thermostat</span> Lower DHW setpoint (safety)</h4><div class="crow"><span class="l">DHW setpoint</span><span class="v">60°C → 55°C</span></div><div class="crow"><span class="l">Duration</span><span class="v">Until IoT team reviews</span></div><div class="cnote"><span class="material-icons-outlined">info</span> Safety precaution. Review ticket flagged as urgent for IoT team.</div></div>
+    <div class="mact"><button class="btn btn-p" onclick="applyAction(this,'hw_done')"><span class="material-icons-outlined">thermostat</span> Lower DHW Setpoint</button></div>`,2200);
+    break;
+
+case 'hw_intermittent':
+    await bot(`Intermittent hot water with our system showing <strong>active and at temperature</strong> usually means:<br>
+    • <strong>Motorised valve sticking</strong> — opens and closes intermittently<br>
+    • <strong>Boiler cycling on fault</strong> — shuts down then restarts<br>
+    • <strong>Demand conflict</strong> — heating and hot water competing for the same boiler<br><br>
+    I can try an <strong>override boost</strong> to force the DHW valve open continuously for a few hours. This sometimes helps if it's a demand conflict.<br><br>
+    <div class="script">Tell Holly: "I'm going to boost the hot water on our system to keep it running continuously for a couple of hours. If it keeps dropping out after that, it'll need an engineer to look at the boiler."</div>
+    <div class="cblock cblock-ok"><h4><span class="material-icons-outlined">power_settings_new</span> DHW continuous override</h4><div class="crow"><span class="l">Action</span><span class="v">Force DHW valve open</span></div><div class="crow"><span class="l">Duration</span><span class="v">4 hours (reverts 22:45)</span></div></div>
+    <div class="mact"><button class="btn btn-p" onclick="applyAction(this,'hw_done')"><span class="material-icons-outlined">power_settings_new</span> Apply DHW Override</button></div>`,2200);
+    break;
+
+case 'hw_done':
+    T='18:45';resolveMsg={title:'Ticket #28421 Resolved',sub:selectedSite.name+' — Hot water adjustment applied. Review ticket created.'};
+    await bot(`<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px"><span class="material-icons-outlined" style="color:var(--success);font-size:22px">check_circle</span><strong style="color:#065F46;font-size:14px">Done!</strong></div>Change applied. Review ticket created for IoT team.<br><br><div class="script">Tell ${document.getElementById('in-caller').value||'the caller'}: "That's done. Give it 10-15 minutes. If it's still playing up, call us back."</div>${anythingElse()}`,1200);
+    break;
+
+// ==================== SOMETHING ELSE / SCOPE CHECK ====================
+case 'other_scope':
+    T='18:43';setSidebar({pri:'P3 — Advisory'});
+    await bot(`Let's work out if this is something we can help with. <strong>Ask Holly: what's the issue?</strong>
+    <div class="opts">
+        <div class="opt live" onclick="pick(this,'other_boiler')"><span class="material-icons-outlined">local_fire_department</span> Boiler not working / fault</div>
+        <div class="opt live" onclick="pick(this,'other_electrical')"><span class="material-icons-outlined">bolt</span> Electrical issue / power</div>
+        <div class="opt live" onclick="pick(this,'other_plumbing')"><span class="material-icons-outlined">plumbing</span> Plumbing / leak / drainage</div>
+        <div class="opt live" onclick="pick(this,'other_fridge')"><span class="material-icons-outlined">kitchen</span> Fridge / freezer / cellar cooling</div>
+        <div class="opt live" onclick="pick(this,'other_unknown')"><span class="material-icons-outlined">help_outline</span> Not sure — describe the problem</div>
+    </div>`,1000);
+    break;
+
+case 'other_boiler':
+    await bot(`<div class="cblock cblock-d"><h4><span class="material-icons-outlined">cancel</span> Boiler — not Lighthouse controlled</h4><p style="font-size:12px">At this site, the boiler is <strong>not controlled by Lighthouse</strong>. We monitor some temperatures but the boiler itself (pilot light, gas supply, PCB, pressure) is maintained by GK's heating contractors.</p><p style="font-size:12px;margin-top:6px">Common pattern: boiler engineers sometimes blame Lighthouse and leave. If an engineer says "it's a Lighthouse issue," they may be mistaken — our system doesn't control the boiler ignition, gas supply, or internal components.</p></div><br>
+    <div class="script">Tell Holly: "The boiler isn't part of the system we manage — we only monitor some temperatures. For boiler issues like no flame, error codes, or pressure problems, you'll need to log a job through Pulse for a heating engineer. If the engineer needs any information from our monitoring side, they can call us and we'll help."</div>
+    <div class="mact"><button class="btn btn-ok" onclick="applyAction(this,'scope_done')"><span class="material-icons-outlined">check_circle</span> Not ours — Resolve with advice</button></div>`,2000);
+    break;
+
+case 'other_electrical':
+    await bot(`<div class="cblock cblock-d"><h4><span class="material-icons-outlined">cancel</span> Electrical — not Lighthouse</h4><p style="font-size:12px">General electrical issues (tripped breakers, faulty wiring, power cuts) are <strong>not Lighthouse</strong>. However, if a fuse has tripped that powers one of our Tongou/Power Pause devices, it can look like a Lighthouse fault.</p></div><br>
+    <strong>Ask Holly: has the whole site lost power, or just certain equipment?</strong>
+    <div class="opts">
+        <div class="opt live" onclick="pick(this,'other_elec_whole')"><span class="material-icons-outlined">power_off</span> Whole site / large area</div>
+        <div class="opt live" onclick="pick(this,'other_elec_partial')"><span class="material-icons-outlined">electrical_services</span> Just specific equipment</div>
+    </div>`,1800);
+    break;
+
+case 'other_elec_whole':
+    await bot(`Whole site power loss is a <strong>mains issue</strong>, not Lighthouse.<br><br>
+    <div class="script">Tell Holly: "If the whole site has lost power, that's a mains supply issue. Check your main fuse board first — if breakers have tripped, try resetting them. If the whole area is out, it could be a power cut — you can check with your electricity supplier. Once power is back, our equipment should come back on automatically within a few minutes."</div>
+    <div class="mact"><button class="btn btn-ok" onclick="applyAction(this,'scope_done')"><span class="material-icons-outlined">check_circle</span> Not ours — Resolve</button></div>`,1500);
+    break;
+
+case 'other_elec_partial':
+    await bot(`Specific equipment going off could be a <strong>tripped fuse powering a Lighthouse device</strong>. Let me check our equipment status...`,600);
+    await bot(`<div class="dcard"><div class="dgrid dgrid-4"><div class="ditem"><div class="dlbl">Gateway</div><div class="dval v-ok">Online</div></div><div class="ditem"><div class="dlbl">Kitchen PP</div><div class="dval v-ok">Online</div></div><div class="ditem"><div class="dlbl">Lighting PP</div><div class="dval v-hi">Offline</div></div><div class="ditem"><div class="dlbl">Heating</div><div class="dval v-ok">Online</div></div></div></div><br>
+    The <strong>lighting Power Pause device is offline</strong> — that means no power to that circuit. This is likely a tripped breaker.<br><br>
+    <div class="script">Tell Holly: "I can see one of our control boxes has lost power. It's probably a tripped fuse. Can you check your electrical panel — look for any switches that are in the middle or down position and flip them back up. If that brings our box back online, the lights should come back on automatically."</div>
+    <div class="opts">
+        <div class="opt live" onclick="pick(this,'light_manual_ok')"><span class="material-icons-outlined">check_circle</span> Fuse reset worked</div>
+        <div class="opt live" onclick="pick(this,'light_escalate')"><span class="material-icons-outlined">priority_high</span> Didn't work — escalate</div>
+    </div>`,2200);
+    break;
+
+case 'other_plumbing':
+    await bot(`<div class="cblock cblock-d"><h4><span class="material-icons-outlined">cancel</span> Plumbing — not Lighthouse</h4><p style="font-size:12px">Plumbing, leaks, and drainage are <strong>not part of the Lighthouse system</strong>. Even if a leak started after a sensor installation, the sensors are monitoring devices only — they don't connect to plumbing.</p></div><br>
+    <div class="script">Tell Holly: "Plumbing isn't part of our system. I'd recommend logging a job through Pulse for a plumber. If this started after one of our engineers visited, let me know and I'll make a note for our team to follow up."</div>
+    <div class="mact"><button class="btn btn-ok" onclick="applyAction(this,'scope_done')"><span class="material-icons-outlined">check_circle</span> Not ours — Resolve</button></div>`,1500);
+    break;
+
+case 'other_fridge':
+    await bot(`<div class="cblock cblock-d"><h4><span class="material-icons-outlined">cancel</span> Refrigeration — not Lighthouse (at this site)</h4><p style="font-size:12px">Fridges, freezers, and cellar cooling are maintained by <strong>Flowrite</strong> (refrigeration contractor), not Lighthouse. We may have monitoring sensors but no control over refrigeration units.</p><p style="font-size:12px;margin-top:4px"><strong>If stock is at risk</strong>, this should be logged as urgent.</p></div><br>
+    <div class="script">Tell Holly: "Fridges and freezers aren't part of our system. You'll need to log an urgent job through Pulse — the refrigeration contractor is Flowrite. If you have stock at risk, mark it as emergency when you log it."</div>
+    <div class="mact"><button class="btn btn-ok" onclick="applyAction(this,'scope_done')"><span class="material-icons-outlined">check_circle</span> Not ours — Resolve with advice</button></div>`,1800);
+    break;
+
+case 'other_unknown':
+    await bot(`No problem. Here's what Lighthouse controls at this site:<br><br>
+    <strong>✅ We control:</strong><br>
+    • Heating — 3 zones (Restaurant, Bar, Accommodation)<br>
+    • Kitchen equipment — Fryers, glasswasher, dishwasher, Merrychef, extractors<br>
+    • Hot water — DHW schedule and override<br>
+    • External lighting — Car park lights<br><br>
+    <strong>❌ We don't control:</strong><br>
+    • Boiler (ignition, gas, PCB)<br>
+    • Internal / bathroom lights<br>
+    • Plumbing, drainage, leaks<br>
+    • Fridges, freezers, cellar cooling<br>
+    • Signage<br><br>
+    <strong>Does Holly's issue fall under something we control?</strong>
+    <div class="opts">
+        <div class="opt live" onclick="pick(this,'site_found')"><span class="material-icons-outlined">check_circle</span> Yes — go back to issue selection</div>
+        <div class="opt live" onclick="pick(this,'scope_notours')"><span class="material-icons-outlined">cancel</span> No — it's not ours</div>
+    </div>`,1800);
+    break;
+
+case 'scope_notours':
+    await bot(`<div class="script">Tell Holly: "That's not part of the system we manage, but I can point you in the right direction. For general repairs, log a job through Pulse. For fridges and freezers, it's Flowrite. For boiler issues, it's a heating engineer through Pulse. Is there anything else I can help with?"</div>
+    <div class="mact"><button class="btn btn-ok" onclick="applyAction(this,'scope_done')"><span class="material-icons-outlined">check_circle</span> Not ours — Resolve</button></div>`,1200);
+    break;
+
+case 'scope_done':
+    T='18:45';resolveMsg={title:'Ticket #28421 Resolved',sub:selectedSite.name+' — Not Lighthouse scope. Site advised.'};
+    await bot(`<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px"><span class="material-icons-outlined" style="color:var(--success);font-size:22px">check_circle</span><strong style="color:#065F46;font-size:14px">Resolved</strong></div>Not a Lighthouse issue. Site advised on correct process. Ticket noted.${anythingElse()}`,1000);
+    break;
+
+}// end switch
+}// end run
+</script>
+</body>
+</html>

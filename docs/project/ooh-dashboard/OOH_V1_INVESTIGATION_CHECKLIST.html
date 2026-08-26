@@ -1,0 +1,394 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>OOH v1 — Investigation Checklist</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/icon?family=Material+Icons+Outlined" rel="stylesheet">
+<style>
+:root{--primary:#594AE2;--primary-light:#EEF2FF;--success:#10B981;--warning:#F59E0B;--danger:#EF4444;--info:#3B82F6;--surface:#fff;--bg:#F1F5F9;--border:#E2E8F0;--text:#1E293B;--text2:#64748B;--text3:#94A3B8}
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:'Inter',sans-serif;font-size:14px;line-height:1.6;color:var(--text);background:var(--bg)}
+.top-bar{background:linear-gradient(135deg,#1E293B,#334155);color:#fff;padding:16px 32px;display:flex;justify-content:space-between;align-items:center;position:sticky;top:0;z-index:100;box-shadow:0 2px 8px rgba(0,0,0,.15)}
+.top-bar h1{font-size:18px;font-weight:700}.top-bar .sub{font-size:12px;opacity:.7;margin-top:2px}
+.top-actions{display:flex;gap:8px;align-items:center}
+.save-st{font-size:11px;opacity:.7;display:flex;align-items:center;gap:4px}
+.btn-dl{display:inline-flex;align-items:center;gap:6px;padding:8px 16px;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;border:2px solid rgba(255,255,255,.3);background:rgba(255,255,255,.1);color:#fff;font-family:inherit}
+.btn-dl:hover{background:rgba(255,255,255,.2)}
+.container{max-width:960px;margin:0 auto;padding:24px 32px 80px}
+
+/* Progress bar */
+.progress-bar{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:16px 20px;margin-bottom:24px}
+.progress-label{font-size:12px;font-weight:600;color:var(--text2);margin-bottom:8px;display:flex;justify-content:space-between}
+.progress-track{height:8px;background:var(--border);border-radius:4px;overflow:hidden}
+.progress-fill{height:100%;background:var(--success);border-radius:4px;transition:width .5s ease}
+.progress-stats{display:flex;gap:20px;margin-top:10px;font-size:12px;color:var(--text2)}
+.progress-stats span{display:flex;align-items:center;gap:4px}
+.stat-dot{width:8px;height:8px;border-radius:50%}
+
+/* Sections */
+.sec{background:var(--surface);border:1px solid var(--border);border-radius:12px;margin-bottom:16px;overflow:hidden}
+.sec-head{padding:14px 20px;background:var(--bg);border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center}
+.sec-head h2{font-size:14px;font-weight:700;display:flex;align-items:center;gap:8px}
+.sec-count{font-size:11px;font-weight:600;padding:2px 8px;border-radius:10px;background:var(--border);color:var(--text2)}
+.sec-body{padding:0}
+
+/* Items */
+.item{padding:14px 20px;border-bottom:1px solid var(--border);display:grid;grid-template-columns:32px 1fr;gap:12px;align-items:start;transition:background .1s}
+.item:last-child{border-bottom:none}
+.item:hover{background:#FAFBFC}
+.item.done{opacity:.6}
+.item.done .item-title{text-decoration:line-through}
+
+.item-check{width:22px;height:22px;border:2px solid var(--border);border-radius:6px;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all .15s;margin-top:2px;flex-shrink:0}
+.item-check:hover{border-color:var(--primary)}
+.item-check.checked{background:var(--success);border-color:var(--success);color:#fff}
+.item-check .material-icons-outlined{font-size:16px;display:none}
+.item-check.checked .material-icons-outlined{display:block}
+
+.item-content{min-width:0}
+.item-title{font-size:13px;font-weight:600;margin-bottom:4px;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.item-desc{font-size:12px;color:var(--text2);line-height:1.5;margin-bottom:6px}
+.item-tags{display:flex;gap:4px;flex-wrap:wrap;margin-bottom:6px}
+
+.tag{font-size:10px;font-weight:600;padding:2px 8px;border-radius:4px;text-transform:uppercase}
+.tag-read{background:#D1FAE5;color:#065F46}
+.tag-write{background:#EDE9FE;color:#5B21B6}
+.tag-crit{background:#FEE2E2;color:#991B1B}
+.tag-high{background:#FEF3C7;color:#92400E}
+.tag-med{background:#DBEAFE;color:#1E40AF}
+.tag-zd{background:#D1FAE5;color:#065F46}
+.tag-new{background:#FEE2E2;color:#991B1B}
+
+.item-notes{margin-top:6px}
+.item-notes textarea{width:100%;padding:8px 12px;border:1px solid var(--border);border-radius:8px;font-size:12px;font-family:inherit;resize:vertical;min-height:28px;background:#FFFBEB;transition:border-color .15s;line-height:1.5}
+.item-notes textarea:focus{outline:none;border-color:var(--warning);box-shadow:0 0 0 3px rgba(245,158,11,.1)}
+.item-notes textarea:not(:placeholder-shown){border-color:var(--warning);background:#FFFEF5}
+.item-notes-label{font-size:10px;font-weight:600;color:var(--warning);margin-bottom:3px}
+
+/* Already confirmed callout */
+.confirmed{background:#F0FDF4;border:1px solid #BBF7D0;border-radius:8px;padding:10px 14px;margin:8px 0;font-size:12px;color:#065F46}
+.confirmed strong{color:#065F46}
+
+/* Context from your comments */
+.your-note{background:#FFFBEB;border-left:3px solid var(--warning);padding:8px 14px;margin:8px 0;font-size:12px;color:#92400E;border-radius:0 8px 8px 0}
+.your-note strong{color:#78350F}
+</style>
+</head>
+<body>
+<div class="top-bar">
+    <div><h1>OOH v1 — What I Need To Find</h1><div class="sub">Investigation checklist for ThingsBoard, GK Systems, and new capabilities</div></div>
+    <div class="top-actions">
+        <div class="save-st" id="save-st"><span class="material-icons-outlined" style="font-size:14px">cloud_done</span> Saved</div>
+        <button class="btn-dl" onclick="downloadHTML()"><span class="material-icons-outlined" style="font-size:16px">download</span> Download</button>
+    </div>
+</div>
+
+<div class="container">
+
+<!-- PROGRESS -->
+<div class="progress-bar">
+    <div class="progress-label"><span>Investigation Progress</span><span id="prog-pct">0%</span></div>
+    <div class="progress-track"><div class="progress-fill" id="prog-fill" style="width:0%"></div></div>
+    <div class="progress-stats">
+        <span><span class="stat-dot" style="background:var(--success)"></span> <span id="stat-done">0</span> answered</span>
+        <span><span class="stat-dot" style="background:var(--danger)"></span> <span id="stat-crit">0</span> critical remaining</span>
+        <span><span class="stat-dot" style="background:var(--warning)"></span> <span id="stat-high">0</span> high remaining</span>
+        <span><span class="stat-dot" style="background:var(--info)"></span> <span id="stat-med">0</span> medium remaining</span>
+    </div>
+</div>
+
+<!-- ALREADY CONFIRMED -->
+<div class="confirmed">
+    <strong>Already confirmed (Zendesk — no investigation needed):</strong> Ticket CRUD, comments, audits, site dropdown (field 11405878329244), custom statuses (25-step), priority, Equipment L1/L2, user lookup, org lookup. All existing API endpoints working. Triage notes = new activity code TRG in comments. Override reason = captured in posted comment.
+</div>
+
+<!-- YOUR DESIGN DECISIONS -->
+<div class="your-note">
+    <strong>Your design decisions so far:</strong> Escalation always routes to Repairs Admin (RepairsAdmin@greeneking.co.uk), with Network (greene.king@networklimited.co.uk) notified in parallel for certain items. No direct SCC/Flowrite routing. Callbacks = P1 alarm tickets in the existing queue. Shift notices = deferred, not convinced yet. Caller data → Zendesk now, push to Opti/ServiceHub later.
+</div>
+
+<!-- A: SITE & DEVICE DATA (ThingsBoard) -->
+<div class="sec">
+    <div class="sec-head"><h2><span class="material-icons-outlined" style="font-size:20px;color:var(--warning)">dns</span> A. Site & Device Data</h2><div class="sec-count" id="cnt-a">0/9</div></div>
+    <div class="sec-body">
+
+        <div class="item" data-pri="crit"><div class="item-check" onclick="toggle(this)"><span class="material-icons-outlined">check</span></div><div class="item-content">
+            <div class="item-title">A1. How are sites structured in ThingsBoard? <span class="tag tag-crit">Critical</span> <span class="tag tag-read">Read</span></div>
+            <div class="item-desc">When I have a house ID (e.g. "6886"), how do I get from that to a list of devices? Is it Tenant → Customer → Device? Asset groups? What's the entity hierarchy?</div>
+            <div class="item-notes"><div class="item-notes-label">What I found:</div><textarea placeholder="Document the entity structure..." data-key="a1"></textarea></div>
+        </div></div>
+
+        <div class="item" data-pri="crit"><div class="item-check" onclick="toggle(this)"><span class="material-icons-outlined">check</span></div><div class="item-content">
+            <div class="item-title">A2. What devices exist at a site and how are they categorised? <span class="tag tag-crit">Critical</span> <span class="tag tag-read">Read</span></div>
+            <div class="item-desc">I need to filter devices into: Power Pause (kitchen + lighting), Heating (pub zones + accommodation + DHW), Monitoring (energy, temp, warewash, fridge sensors), Connectivity (gateway). How does ThingsBoard distinguish these? Device type attribute? Naming convention? Profile?</div>
+            <div class="item-notes"><div class="item-notes-label">What I found:</div><textarea placeholder="How are device types identified..." data-key="a2"></textarea></div>
+        </div></div>
+
+        <div class="item" data-pri="crit"><div class="item-check" onclick="toggle(this)"><span class="material-icons-outlined">check</span></div><div class="item-content">
+            <div class="item-title">A3. Is each device online or offline? <span class="tag tag-crit">Critical</span> <span class="tag tag-read">Read</span></div>
+            <div class="item-desc">Green/red dot per device. Is there an <code>active</code> attribute? Or do I derive it from last telemetry timestamp? What's the API call?</div>
+            <div class="item-notes"><div class="item-notes-label">What I found:</div><textarea placeholder="API endpoint and method..." data-key="a3"></textarea></div>
+        </div></div>
+
+        <div class="item" data-pri="crit"><div class="item-check" onclick="toggle(this)"><span class="material-icons-outlined">check</span></div><div class="item-content">
+            <div class="item-title">A4. When was a device last seen? <span class="tag tag-crit">Critical</span> <span class="tag tag-read">Read</span></div>
+            <div class="item-desc">For offline devices — "Offline since 18 Feb". Is this <code>lastActivityTime</code>? <code>lastConnectTime</code>? Something else?</div>
+            <div class="item-notes"><div class="item-notes-label">What I found:</div><textarea placeholder="Attribute name and format..." data-key="a4"></textarea></div>
+        </div></div>
+
+        <div class="item" data-pri="high"><div class="item-check" onclick="toggle(this)"><span class="material-icons-outlined">check</span></div><div class="item-content">
+            <div class="item-title">A5. Site address and postcode — where does this live? <span class="tag tag-high">High</span> <span class="tag tag-read">Read</span></div>
+            <div class="item-desc">Not in Zendesk. Candidates: ThingsBoard entity attributes, GK system (opening times API?), ServiceHub, Opti. McDonald's sites may not be in Opti.</div>
+            <div class="your-note"><strong>Your note:</strong> GK system for opening times may hold site info. ServiceHub/Opti have addresses but IoT may serve accounts not in Opti (McDonald's). May need a central repository.</div>
+            <div class="item-notes"><div class="item-notes-label">What I found:</div><textarea placeholder="Which system(s) hold this..." data-key="a5"></textarea></div>
+        </div></div>
+
+        <div class="item" data-pri="high"><div class="item-check" onclick="toggle(this)"><span class="material-icons-outlined">check</span></div><div class="item-content">
+            <div class="item-title">A6. Device-to-device relationships (e.g. extractor → gas interlock) <span class="tag tag-med">Medium</span> <span class="tag tag-read">Read</span></div>
+            <div class="item-desc">When extractors go off, gas equipment cuts out. Is this modelled in ThingsBoard (device relations)? Or is it just knowledge we'd hardcode?</div>
+            <div class="item-notes"><div class="item-notes-label">What I found:</div><textarea placeholder="How are relationships modelled..." data-key="a6"></textarea></div>
+        </div></div>
+
+        <div class="item" data-pri="high"><div class="item-check" onclick="toggle(this)"><span class="material-icons-outlined">check</span></div><div class="item-content">
+            <div class="item-title">A7. What API does ThingsBoard expose? <span class="tag tag-crit">Critical</span> <span class="tag tag-read">Read</span></div>
+            <div class="item-desc">REST API? What auth? Can I query: devices by customer/site, latest telemetry, device attributes, connection status? What are the rate limits?</div>
+            <div class="item-notes"><div class="item-notes-label">What I found:</div><textarea placeholder="API base URL, auth method, key endpoints..." data-key="a7"></textarea></div>
+        </div></div>
+
+        <div class="item" data-pri="high"><div class="item-check" onclick="toggle(this)"><span class="material-icons-outlined">check</span></div><div class="item-content">
+            <div class="item-title">A8. Do we have API credentials / access? <span class="tag tag-crit">Critical</span> <span class="tag tag-read">Read</span></div>
+            <div class="item-desc">Who manages the ThingsBoard instance? Do I need credentials from Jonathan/the IoT team? Is there a dev/sandbox environment?</div>
+            <div class="item-notes"><div class="item-notes-label">What I found:</div><textarea placeholder="Who to ask, what access exists..." data-key="a8"></textarea></div>
+        </div></div>
+
+        <div class="item" data-pri="high"><div class="item-check" onclick="toggle(this)"><span class="material-icons-outlined">check</span></div><div class="item-content">
+            <div class="item-title">A9. How does the house ID in Zendesk map to the site entity in ThingsBoard? <span class="tag tag-crit">Critical</span> <span class="tag tag-read">Read</span></div>
+            <div class="item-desc">Zendesk site field value is like <code>gk_fi_whistling_goose_6886</code>. ThingsBoard probably uses a different identifier. What's the join key?</div>
+            <div class="item-notes"><div class="item-notes-label">What I found:</div><textarea placeholder="Mapping between systems..." data-key="a9"></textarea></div>
+        </div></div>
+
+    </div>
+</div>
+
+<!-- B: TELEMETRY (ThingsBoard Read) -->
+<div class="sec">
+    <div class="sec-head"><h2><span class="material-icons-outlined" style="font-size:20px;color:var(--info)">show_chart</span> B. Live Telemetry (for triage)</h2><div class="sec-count" id="cnt-b">0/7</div></div>
+    <div class="sec-body">
+
+        <div class="item" data-pri="crit"><div class="item-check" onclick="toggle(this)"><span class="material-icons-outlined">check</span></div><div class="item-content">
+            <div class="item-title">B1. Current temperature per heating zone <span class="tag tag-crit">Critical</span> <span class="tag tag-read">Read</span></div>
+            <div class="item-desc">What's the telemetry key? <code>temperature</code>? <code>ambient_temp</code>? Which device entity reports it — the sensor or the controller?</div>
+            <div class="item-notes"><div class="item-notes-label">What I found:</div><textarea placeholder="Key name, entity type..." data-key="b1"></textarea></div>
+        </div></div>
+
+        <div class="item" data-pri="crit"><div class="item-check" onclick="toggle(this)"><span class="material-icons-outlined">check</span></div><div class="item-content">
+            <div class="item-title">B2. Setpoint temperature per heating zone <span class="tag tag-crit">Critical</span> <span class="tag tag-read">Read</span></div>
+            <div class="item-desc">Is setpoint a telemetry key or a device attribute? On the Salus controller entity? What's the key name?</div>
+            <div class="item-notes"><div class="item-notes-label">What I found:</div><textarea placeholder="Key name, attribute vs telemetry..." data-key="b2"></textarea></div>
+        </div></div>
+
+        <div class="item" data-pri="crit"><div class="item-check" onclick="toggle(this)"><span class="material-icons-outlined">check</span></div><div class="item-content">
+            <div class="item-title">B3. Is heating actively calling for heat? <span class="tag tag-crit">Critical</span> <span class="tag tag-read">Read</span></div>
+            <div class="item-desc">How do I know if the heating is "on" vs just "scheduled to be on"? Is there a valve state, relay state, or demand signal in telemetry?</div>
+            <div class="item-notes"><div class="item-notes-label">What I found:</div><textarea placeholder="How is 'heating active' derived..." data-key="b3"></textarea></div>
+        </div></div>
+
+        <div class="item" data-pri="high"><div class="item-check" onclick="toggle(this)"><span class="material-icons-outlined">check</span></div><div class="item-content">
+            <div class="item-title">B4. Boiler flow temperature <span class="tag tag-high">High</span> <span class="tag tag-read">Read</span></div>
+            <div class="item-desc">Used to detect condenser issues (75°C normal → 48°C = problem). Which sensor reports this? Key name?</div>
+            <div class="item-notes"><div class="item-notes-label">What I found:</div><textarea placeholder="Key name, which device..." data-key="b4"></textarea></div>
+        </div></div>
+
+        <div class="item" data-pri="crit"><div class="item-check" onclick="toggle(this)"><span class="material-icons-outlined">check</span></div><div class="item-content">
+            <div class="item-title">B5. Power Pause device state — is equipment on or off? <span class="tag tag-crit">Critical</span> <span class="tag tag-read">Read</span></div>
+            <div class="item-desc">For Tongou/Tuya devices controlling kitchen equipment and lighting. Is there a switch state key? Or do I infer from power consumption telemetry?</div>
+            <div class="item-notes"><div class="item-notes-label">What I found:</div><textarea placeholder="How is on/off determined..." data-key="b5"></textarea></div>
+        </div></div>
+
+        <div class="item" data-pri="high"><div class="item-check" onclick="toggle(this)"><span class="material-icons-outlined">check</span></div><div class="item-content">
+            <div class="item-title">B6. DHW temperature, setpoint, and valve state <span class="tag tag-high">High</span> <span class="tag tag-read">Read</span></div>
+            <div class="item-desc">For hot water triage. Three data points needed: current water temp, target temp, and whether the valve is open/closed.</div>
+            <div class="item-notes"><div class="item-notes-label">What I found:</div><textarea placeholder="Key names for all three..." data-key="b6"></textarea></div>
+        </div></div>
+
+        <div class="item" data-pri="high"><div class="item-check" onclick="toggle(this)"><span class="material-icons-outlined">check</span></div><div class="item-content">
+            <div class="item-title">B7. Device schedules — when is equipment set to come on/off? <span class="tag tag-high">High</span> <span class="tag tag-read">Read</span></div>
+            <div class="item-desc">The triage needs to know "fryers were set to turn off at 21:30". Where are schedules stored? ThingsBoard attributes? Tuya cloud? Device firmware? Can I read them via API?</div>
+            <div class="item-notes"><div class="item-notes-label">What I found:</div><textarea placeholder="Where schedules live, API access..." data-key="b7"></textarea></div>
+        </div></div>
+
+    </div>
+</div>
+
+<!-- C: CONTROL (Write) -->
+<div class="sec">
+    <div class="sec-head"><h2><span class="material-icons-outlined" style="font-size:20px;color:var(--danger)">flash_on</span> C. Control Actions (Write)</h2><div class="sec-count" id="cnt-c">0/5</div></div>
+    <div class="sec-body">
+
+        <div class="item" data-pri="crit"><div class="item-check" onclick="toggle(this)"><span class="material-icons-outlined">check</span></div><div class="item-content">
+            <div class="item-title">C1. Can I change a heating setpoint remotely? <span class="tag tag-crit">Critical</span> <span class="tag tag-write">Write</span></div>
+            <div class="item-desc">The #1 capability (26% of OOH contacts). What's the path? Dashboard → ThingsBoard RPC → Salus controller? Or Dashboard → Salus API directly? What API call, what parameters?</div>
+            <div class="item-notes"><div class="item-notes-label">What I found:</div><textarea placeholder="Full control path, API call..." data-key="c1"></textarea></div>
+        </div></div>
+
+        <div class="item" data-pri="crit"><div class="item-check" onclick="toggle(this)"><span class="material-icons-outlined">check</span></div><div class="item-content">
+            <div class="item-title">C2. Can I turn a Power Pause device on/off remotely? <span class="tag tag-crit">Critical</span> <span class="tag tag-write">Write</span></div>
+            <div class="item-desc">The #2 capability (17% of contacts). Tongou devices controlled via Tuya. Path: Dashboard → ThingsBoard → Tuya Cloud API? Or Dashboard → Tuya API directly? What API call?</div>
+            <div class="item-notes"><div class="item-notes-label">What I found:</div><textarea placeholder="Full control path, API call..." data-key="c2"></textarea></div>
+        </div></div>
+
+        <div class="item" data-pri="high"><div class="item-check" onclick="toggle(this)"><span class="material-icons-outlined">check</span></div><div class="item-content">
+            <div class="item-title">C3. Can I override the DHW (hot water) valve? <span class="tag tag-high">High</span> <span class="tag tag-write">Write</span></div>
+            <div class="item-desc">Force DHW valve open for X hours. Same question — what's the control path and API?</div>
+            <div class="item-notes"><div class="item-notes-label">What I found:</div><textarea placeholder="Full control path, API call..." data-key="c3"></textarea></div>
+        </div></div>
+
+        <div class="item" data-pri="crit"><div class="item-check" onclick="toggle(this)"><span class="material-icons-outlined">check</span></div><div class="item-content">
+            <div class="item-title">C4. How do I auto-revert a change after X hours? <span class="tag tag-crit">Critical</span> <span class="tag tag-write">Write</span></div>
+            <div class="item-desc">Every pocket change must auto-revert. Options: ThingsBoard rule chain with delay? Tuya device timer? Server-side scheduled task? What's safest?</div>
+            <div class="your-note"><strong>Your note:</strong> Will need background timer tracking — code level feature.</div>
+            <div class="item-notes"><div class="item-notes-label">What I found:</div><textarea placeholder="Best approach for auto-revert..." data-key="c4"></textarea></div>
+        </div></div>
+
+        <div class="item" data-pri="high"><div class="item-check" onclick="toggle(this)"><span class="material-icons-outlined">check</span></div><div class="item-content">
+            <div class="item-title">C5. Are control actions audited automatically? <span class="tag tag-high">High</span> <span class="tag tag-read">Read</span></div>
+            <div class="item-desc">When a setpoint is changed via API, does ThingsBoard log who/when/what? Or do we need to log it ourselves (Zendesk comment)?</div>
+            <div class="item-notes"><div class="item-notes-label">What I found:</div><textarea placeholder="Audit logging capability..." data-key="c5"></textarea></div>
+        </div></div>
+
+    </div>
+</div>
+
+<!-- D: NEW CAPABILITIES -->
+<div class="sec">
+    <div class="sec-head"><h2><span class="material-icons-outlined" style="font-size:20px;color:#7C3AED">add_circle</span> D. New Capabilities to Build</h2><div class="sec-count" id="cnt-d">0/4</div></div>
+    <div class="sec-body">
+
+        <div class="item" data-pri="high"><div class="item-check" onclick="toggle(this)"><span class="material-icons-outlined">check</span></div><div class="item-content">
+            <div class="item-title">D1. SMS gateway for escalation notifications <span class="tag tag-high">High</span> <span class="tag tag-new">New</span></div>
+            <div class="item-desc">Send SMS to escalation manager with ticket link. Options: Twilio, Azure Communication Services, MessageBird. Which fits the existing stack / budget?</div>
+            <div class="your-note"><strong>Your note:</strong> New capability. Need to select provider.</div>
+            <div class="item-notes"><div class="item-notes-label">Decision:</div><textarea placeholder="Which provider, cost, setup..." data-key="d1"></textarea></div>
+        </div></div>
+
+        <div class="item" data-pri="high"><div class="item-check" onclick="toggle(this)"><span class="material-icons-outlined">check</span></div><div class="item-content">
+            <div class="item-title">D2. Escalation timeout mechanism (45 min) <span class="tag tag-high">High</span> <span class="tag tag-new">New</span></div>
+            <div class="item-desc">If escalation manager doesn't respond in 45 mins, auto-route to Repairs Admin + notify Network. Timer in server-side code? Separate service?</div>
+            <div class="item-notes"><div class="item-notes-label">Decision:</div><textarea placeholder="Implementation approach..." data-key="d2"></textarea></div>
+        </div></div>
+
+        <div class="item" data-pri="med"><div class="item-check" onclick="toggle(this)"><span class="material-icons-outlined">check</span></div><div class="item-content">
+            <div class="item-title">D3. Telephony integration — auto-pop ticket on call <span class="tag tag-med">Medium</span> <span class="tag tag-new">New</span></div>
+            <div class="item-desc">Currently Zendesk creates a ticket when a call comes in. If OOH agents use the new dashboard instead of Zendesk, how does the call trigger a ticket? Does Zendesk stay in the telephony chain? Or do we need to integrate directly?</div>
+            <div class="item-notes"><div class="item-notes-label">Decision:</div><textarea placeholder="Telephony architecture..." data-key="d3"></textarea></div>
+        </div></div>
+
+        <div class="item" data-pri="med"><div class="item-check" onclick="toggle(this)"><span class="material-icons-outlined">check</span></div><div class="item-content">
+            <div class="item-title">D4. Triage flow authoring — how are flows maintained? <span class="tag tag-med">Medium</span> <span class="tag tag-new">New</span></div>
+            <div class="item-desc">The chatbot triage flows need to be maintainable by the IoT team without code changes. JSON config? Admin UI? Or are we OK with code-based flows for v1?</div>
+            <div class="item-notes"><div class="item-notes-label">Decision:</div><textarea placeholder="Maintenance approach..." data-key="d4"></textarea></div>
+        </div></div>
+
+    </div>
+</div>
+
+<!-- E: PEOPLE & PROCESS -->
+<div class="sec">
+    <div class="sec-head"><h2><span class="material-icons-outlined" style="font-size:20px;color:var(--text2)">people</span> E. People & Process (not technical)</h2><div class="sec-count" id="cnt-e">0/4</div></div>
+    <div class="sec-body">
+
+        <div class="item" data-pri="high"><div class="item-check" onclick="toggle(this)"><span class="material-icons-outlined">check</span></div><div class="item-content">
+            <div class="item-title">E1. Setpoint guardrails — what limits should OOH agents have? <span class="tag tag-high">High</span></div>
+            <div class="item-desc">Max/min setpoint? Max adjustment per change (±3°C?)? BDM approval threshold for accommodation? Confirm with Sam Day / Jonathan.</div>
+            <div class="item-notes"><div class="item-notes-label">What was agreed:</div><textarea placeholder="Guardrail rules..." data-key="e1"></textarea></div>
+        </div></div>
+
+        <div class="item" data-pri="high"><div class="item-check" onclick="toggle(this)"><span class="material-icons-outlined">check</span></div><div class="item-content">
+            <div class="item-title">E2. Override duration — how long should temp changes last? <span class="tag tag-high">High</span></div>
+            <div class="item-desc">2 hours? 4 hours? Different per equipment type? Does it vary by site? Confirm with IoT team.</div>
+            <div class="item-notes"><div class="item-notes-label">What was agreed:</div><textarea placeholder="Duration rules..." data-key="e2"></textarea></div>
+        </div></div>
+
+        <div class="item" data-pri="high"><div class="item-check" onclick="toggle(this)"><span class="material-icons-outlined">check</span></div><div class="item-content">
+            <div class="item-title">E3. Who is the escalation manager on-call rota? <span class="tag tag-high">High</span></div>
+            <div class="item-desc">Currently "Sam Day" in config. Is it always Sam? Is there a rota? Does it change at weekends? Need the actual phone number for SMS.</div>
+            <div class="item-notes"><div class="item-notes-label">What was agreed:</div><textarea placeholder="On-call details..." data-key="e3"></textarea></div>
+        </div></div>
+
+        <div class="item" data-pri="med"><div class="item-check" onclick="toggle(this)"><span class="material-icons-outlined">check</span></div><div class="item-content">
+            <div class="item-title">E4. OOH team buy-in — have they seen the mockup? <span class="tag tag-med">Medium</span></div>
+            <div class="item-desc">Validate the triage flow, the intake form, and the chat-based approach with at least Kellie and one other OOH handler before building.</div>
+            <div class="item-notes"><div class="item-notes-label">Status:</div><textarea placeholder="Who's seen it, feedback..." data-key="e4"></textarea></div>
+        </div></div>
+
+    </div>
+</div>
+
+</div><!-- /container -->
+
+<script>
+const SK='ooh-v1-checklist';
+
+function loadState(){
+    const s=localStorage.getItem(SK);if(!s)return;
+    try{const d=JSON.parse(s);
+        document.querySelectorAll('textarea[data-key]').forEach(t=>{if(d.notes&&d.notes[t.dataset.key])t.value=d.notes[t.dataset.key]});
+        document.querySelectorAll('.item-check').forEach((c,i)=>{if(d.checks&&d.checks[i]){c.classList.add('checked');c.closest('.item').classList.add('done')}});
+    }catch(e){}
+    updateProgress();
+}
+
+function saveState(){
+    const notes={};document.querySelectorAll('textarea[data-key]').forEach(t=>{if(t.value.trim())notes[t.dataset.key]=t.value});
+    const checks=[];document.querySelectorAll('.item-check').forEach(c=>checks.push(c.classList.contains('checked')));
+    localStorage.setItem(SK,JSON.stringify({notes,checks}));
+    const st=document.getElementById('save-st');st.innerHTML='<span class="material-icons-outlined" style="font-size:14px">cloud_done</span> Saved';
+}
+
+function toggle(el){
+    el.classList.toggle('checked');
+    el.closest('.item').classList.toggle('done');
+    saveState();updateProgress();
+}
+
+function updateProgress(){
+    const all=document.querySelectorAll('.item-check');
+    const done=[...all].filter(c=>c.classList.contains('checked')).length;
+    const total=all.length;
+    const pct=Math.round(done/total*100);
+    document.getElementById('prog-fill').style.width=pct+'%';
+    document.getElementById('prog-pct').textContent=pct+'%';
+    document.getElementById('stat-done').textContent=done;
+    // Count remaining by priority
+    let crit=0,high=0,med=0;
+    document.querySelectorAll('.item:not(.done)').forEach(i=>{
+        const p=i.dataset.pri;if(p==='crit')crit++;else if(p==='high')high++;else med++;
+    });
+    document.getElementById('stat-crit').textContent=crit;
+    document.getElementById('stat-high').textContent=high;
+    document.getElementById('stat-med').textContent=med;
+    // Update section counts
+    document.querySelectorAll('.sec').forEach(s=>{
+        const items=s.querySelectorAll('.item-check');
+        const d=[...items].filter(c=>c.classList.contains('checked')).length;
+        const cnt=s.querySelector('.sec-count');if(cnt)cnt.textContent=d+'/'+items.length;
+    });
+}
+
+let saveTimer;
+document.addEventListener('input',e=>{if(e.target.matches('textarea[data-key]')){clearTimeout(saveTimer);saveTimer=setTimeout(saveState,800)}});
+document.addEventListener('DOMContentLoaded',()=>{loadState()});
+
+function downloadHTML(){
+    document.querySelectorAll('textarea[data-key]').forEach(t=>t.textContent=t.value);
+    document.querySelectorAll('.item-check.checked').forEach(c=>c.setAttribute('data-was-checked','true'));
+    const html='<!DOCTYPE html>\n'+document.documentElement.outerHTML;
+    const blob=new Blob([html],{type:'text/html'});
+    const a=document.createElement('a');a.href=URL.createObjectURL(blob);
+    a.download='OOH_V1_CHECKLIST_'+new Date().toISOString().slice(0,10)+'.html';a.click();
+}
+</script>
+</body>
+</html>

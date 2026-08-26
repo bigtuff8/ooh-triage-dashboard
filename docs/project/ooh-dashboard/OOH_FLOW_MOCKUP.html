@@ -1,0 +1,1182 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>OOH Triage Flows — Interactive Mockup</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/icon?family=Material+Icons+Outlined" rel="stylesheet">
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: 'Inter', sans-serif; background: #f1f5f9; color: #1e293b; }
+
+:root {
+    --primary: #3b82f6; --primary-bg: rgba(59,130,246,0.06);
+    --success: #22c55e; --success-bg: rgba(34,197,94,0.06);
+    --warning: #f59e0b; --warning-bg: rgba(245,158,11,0.06);
+    --danger: #ef4444; --danger-bg: rgba(239,68,68,0.06);
+    --text: #1e293b; --text-sec: #64748b; --surface: #fff; --border: #e2e8f0; --bg: #f8fafc;
+    --radius: 10px; --radius-sm: 6px;
+}
+
+/* Layout */
+.app { display: flex; height: 100vh; }
+.sidebar { width: 260px; background: var(--surface); border-right: 1px solid var(--border); display: flex; flex-direction: column; flex-shrink: 0; }
+.sidebar-header { padding: 20px 16px 12px; border-bottom: 1px solid var(--border); }
+.sidebar-header h2 { font-size: 16px; display: flex; align-items: center; gap: 8px; }
+.sidebar-header p { font-size: 11px; color: var(--text-sec); margin-top: 4px; }
+.nav-section { padding: 12px 8px 4px; }
+.nav-label { font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; color: var(--text-sec); padding: 0 8px 6px; }
+.nav-item { display: flex; align-items: center; gap: 10px; padding: 8px 12px; border-radius: var(--radius-sm); cursor: pointer; font-size: 13px; font-weight: 500; color: var(--text); transition: all 0.12s; }
+.nav-item:hover { background: var(--bg); }
+.nav-item.active { background: var(--primary-bg); color: var(--primary); }
+.nav-item .material-icons-outlined { font-size: 18px; }
+.nav-badge { margin-left: auto; font-size: 10px; padding: 2px 7px; border-radius: 10px; background: var(--primary); color: #fff; font-weight: 600; }
+
+/* Main content */
+.main { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+.topbar { padding: 14px 24px; background: var(--surface); border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; }
+.topbar h1 { font-size: 18px; }
+.topbar-right { display: flex; align-items: center; gap: 12px; font-size: 12px; color: var(--text-sec); }
+.content { flex: 1; overflow-y: auto; padding: 20px 24px; }
+
+/* Context Bar */
+.context-bar { display: flex; gap: 12px; padding: 16px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); margin-bottom: 20px; }
+.ctx-field { flex: 1; display: flex; flex-direction: column; gap: 4px; }
+.ctx-field.wide { flex: 2; }
+.ctx-field label { font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; color: var(--text-sec); }
+.ctx-field input, .ctx-field select { padding: 8px 10px; border: 1px solid var(--border); border-radius: var(--radius-sm); font-size: 13px; font-family: inherit; background: var(--bg); }
+.ctx-field input:focus, .ctx-field select:focus { outline: none; border-color: var(--primary); }
+.site-display { padding: 8px 10px; border: 1px solid var(--border); border-radius: var(--radius-sm); font-size: 13px; background: var(--bg); display: flex; align-items: center; gap: 6px; cursor: pointer; }
+.site-display:hover { border-color: var(--primary); }
+.site-selected { background: var(--success-bg); border-color: var(--success); font-weight: 500; }
+
+/* Entry Point Grid */
+.entry-section { margin-bottom: 24px; }
+.entry-title { display: flex; align-items: center; gap: 8px; font-size: 14px; font-weight: 600; margin-bottom: 12px; }
+.entry-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 10px; }
+.entry-card { display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 20px 16px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); cursor: pointer; text-align: center; transition: all 0.15s; position: relative; }
+.entry-card:hover { border-color: var(--primary); box-shadow: 0 2px 8px rgba(0,0,0,0.06); transform: translateY(-1px); }
+.entry-card.disabled { opacity: 0.45; cursor: default; pointer-events: none; }
+.entry-card .material-icons-outlined { font-size: 28px; color: var(--primary); }
+.entry-card span:last-child { font-size: 13px; font-weight: 500; }
+.card-badge { position: absolute; top: 8px; right: 8px; font-size: 10px; padding: 2px 6px; background: var(--primary); color: #fff; border-radius: 10px; }
+
+/* Triage Layout */
+.triage-layout { display: flex; gap: 16px; height: calc(100vh - 160px); }
+.triage-chat { flex: 1; display: flex; flex-direction: column; min-width: 0; }
+.triage-sidebar { width: 340px; flex-shrink: 0; display: flex; flex-direction: column; gap: 12px; overflow-y: auto; }
+.triage-header { display: flex; align-items: center; justify-content: space-between; padding: 10px 14px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); margin-bottom: 8px; }
+.triage-flow-name { display: flex; align-items: center; gap: 6px; font-weight: 600; font-size: 14px; }
+
+/* Chat */
+.chat-area { flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; padding: 4px; }
+.msg { padding: 12px 14px; border-radius: var(--radius); border-left: 3px solid var(--primary); background: var(--surface); font-size: 13px; line-height: 1.6; }
+.msg-bot { border-left-color: var(--primary); }
+.msg-agent { border-left-color: var(--success); background: var(--success-bg); }
+.msg-system { border-left-color: var(--text-sec); background: var(--bg); font-size: 12px; }
+.msg-error { border-left-color: var(--danger); background: var(--danger-bg); }
+.msg-escalation { border-left-color: var(--warning); background: var(--warning-bg); }
+.msg-resolution { border-left-color: var(--success); background: var(--success-bg); }
+.msg-header { display: flex; align-items: center; gap: 6px; margin-bottom: 6px; font-size: 12px; color: var(--text-sec); }
+.msg-header .material-icons-outlined { font-size: 16px; }
+.msg-text { color: var(--text); }
+.msg-text strong { font-weight: 600; }
+
+/* Action Buttons */
+.actions { display: flex; flex-wrap: wrap; gap: 6px; padding: 4px 0; }
+.action-btn { display: inline-flex; align-items: center; gap: 6px; padding: 9px 16px; background: var(--surface); border: 1px solid var(--primary); border-radius: var(--radius-sm); color: var(--primary); font-size: 13px; font-weight: 500; cursor: pointer; transition: all 0.12s; font-family: inherit; }
+.action-btn:hover { background: var(--primary); color: #fff; }
+.action-btn.danger { border-color: var(--danger); color: var(--danger); }
+.action-btn.danger:hover { background: var(--danger); color: #fff; }
+.action-btn.success { border-color: var(--success); color: var(--success); }
+.action-btn.success:hover { background: var(--success); color: #fff; }
+.action-btn .material-icons-outlined { font-size: 16px; }
+.action-btn.secondary { border-color: var(--border); color: var(--text-sec); }
+.action-btn.secondary:hover { background: var(--bg); color: var(--text); }
+
+/* Data Cards */
+.data-card { padding: 14px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); font-size: 13px; }
+.data-card h4 { margin: 0 0 10px; font-size: 13px; font-weight: 600; display: flex; align-items: center; gap: 6px; }
+.data-card.empty { color: var(--text-sec); text-align: center; padding: 24px; }
+.data-table { width: 100%; border-collapse: collapse; }
+.data-table th { text-align: left; font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.3px; color: var(--text-sec); padding: 6px 8px; border-bottom: 1px solid var(--border); }
+.data-table td { padding: 8px; border-bottom: 1px solid rgba(0,0,0,0.04); font-size: 12px; }
+.data-table tr:last-child td { border-bottom: none; }
+.data-table tr.highlight { background: var(--primary-bg); }
+.status-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 4px; }
+.status-dot.green { background: var(--success); }
+.status-dot.red { background: var(--danger); }
+.status-dot.amber { background: var(--warning); }
+.temp-value { font-size: 20px; font-weight: 700; }
+.temp-unit { font-size: 12px; color: var(--text-sec); }
+.temp-row { display: flex; align-items: baseline; gap: 16px; margin: 8px 0; }
+.temp-item { text-align: center; }
+.temp-item label { display: block; font-size: 10px; color: var(--text-sec); text-transform: uppercase; margin-bottom: 2px; }
+
+/* Context Card */
+.ctx-card { padding: 14px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); }
+.ctx-card h4 { margin: 0 0 8px; font-size: 13px; font-weight: 600; }
+.ctx-row { display: flex; justify-content: space-between; padding: 4px 0; border-bottom: 1px solid var(--border); font-size: 12px; }
+.ctx-row:last-child { border-bottom: none; }
+.ctx-row span:first-child { color: var(--text-sec); }
+
+/* Pocket Change Card */
+.pocket-card { padding: 12px; background: var(--warning-bg); border: 1px solid rgba(245,158,11,0.2); border-radius: var(--radius); }
+.pocket-card h4 { margin: 0 0 6px; font-size: 12px; font-weight: 600; color: #92400e; display: flex; align-items: center; gap: 4px; }
+.pocket-countdown { font-size: 18px; font-weight: 700; color: #92400e; }
+
+/* Service Status */
+.service-grid { display: flex; flex-wrap: wrap; gap: 8px; }
+.service-chip { display: flex; align-items: center; gap: 6px; padding: 6px 12px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-sm); font-size: 12px; }
+.service-chip .material-icons-outlined { font-size: 14px; color: var(--text-sec); }
+
+/* Summary Card */
+.summary-card { padding: 14px; background: var(--bg); border: 1px solid var(--border); border-radius: var(--radius); font-family: monospace; font-size: 11px; line-height: 1.6; white-space: pre-wrap; max-height: 200px; overflow-y: auto; }
+
+/* Escalation severity badges */
+.severity { display: inline-flex; align-items: center; gap: 4px; padding: 3px 8px; border-radius: 4px; font-size: 11px; font-weight: 600; }
+.severity.critical { background: var(--danger-bg); color: var(--danger); }
+.severity.high { background: var(--warning-bg); color: #92400e; }
+.severity.medium { background: var(--primary-bg); color: var(--primary); }
+.severity.low { background: var(--bg); color: var(--text-sec); }
+
+/* Toast */
+.toast { position: fixed; bottom: 20px; right: 20px; background: #1e293b; color: #fff; padding: 12px 20px; border-radius: var(--radius-sm); font-size: 13px; display: flex; align-items: center; gap: 8px; transform: translateY(80px); opacity: 0; transition: all 0.3s; z-index: 999; }
+.toast.show { transform: translateY(0); opacity: 1; }
+.toast .material-icons-outlined { font-size: 18px; }
+
+/* Scrollbar */
+::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
+
+@media (max-width: 900px) {
+    .sidebar { display: none; }
+    .triage-layout { flex-direction: column; height: auto; }
+    .triage-sidebar { width: 100%; }
+    .context-bar { flex-direction: column; }
+    .entry-grid { grid-template-columns: repeat(2, 1fr); }
+}
+</style>
+</head>
+<body>
+<div class="app">
+    <!-- Sidebar -->
+    <aside class="sidebar">
+        <div class="sidebar-header">
+            <h2><span class="material-icons-outlined" style="color:var(--primary)">support_agent</span> OOH Triage</h2>
+            <p>Out-of-hours call handler</p>
+        </div>
+        <div class="nav-section">
+            <div class="nav-label">Triage</div>
+            <div class="nav-item active" onclick="showLanding()" id="navHome">
+                <span class="material-icons-outlined">home</span> Triage Home
+            </div>
+        </div>
+        <div class="nav-section">
+            <div class="nav-label">Quick Flows</div>
+            <div class="nav-item" onclick="startFlow('heating-too-cold')"><span class="material-icons-outlined">thermostat</span> Heating Too Cold</div>
+            <div class="nav-item" onclick="startFlow('fryers-not-on')"><span class="material-icons-outlined">restaurant</span> Fryers Not On</div>
+            <div class="nav-item" onclick="startFlow('equipment-turning-off')"><span class="material-icons-outlined">power_off</span> Equipment Turning Off</div>
+            <div class="nav-item" onclick="startFlow('scope-check')"><span class="material-icons-outlined">verified</span> Scope Check</div>
+            <div class="nav-item" onclick="startFlow('gateway-offline')"><span class="material-icons-outlined">router</span> Gateway Offline</div>
+            <div class="nav-item" onclick="startFlow('its-freezing')"><span class="material-icons-outlined">ac_unit</span> It's Freezing</div>
+            <div class="nav-item" onclick="startFlow('hot-water')"><span class="material-icons-outlined">water_drop</span> No Hot Water</div>
+            <div class="nav-item" onclick="startFlow('contractor-escalation')"><span class="material-icons-outlined">engineering</span> Escalation</div>
+        </div>
+        <div class="nav-section">
+            <div class="nav-label">Monitor</div>
+            <div class="nav-item" onclick="showPocketChanges()">
+                <span class="material-icons-outlined">timer</span> Pocket Changes
+                <span class="nav-badge" id="pcCount">1</span>
+            </div>
+        </div>
+        <div style="margin-top:auto;padding:12px 16px;font-size:11px;color:var(--text-sec);border-top:1px solid var(--border)">
+            OOH Dashboard Mockup v1<br>24 Mar 2026
+        </div>
+    </aside>
+
+    <!-- Main -->
+    <div class="main">
+        <div class="topbar">
+            <h1 id="pageTitle">OOH Triage</h1>
+            <div class="topbar-right">
+                <span class="material-icons-outlined" style="font-size:16px">schedule</span>
+                <span id="clock"></span>
+            </div>
+        </div>
+        <div class="content" id="viewContainer"></div>
+    </div>
+</div>
+
+<div class="toast" id="toast"><span class="material-icons-outlined" id="toastIcon">check_circle</span><span id="toastMsg"></span></div>
+
+<script>
+// ============================================================================
+// Fake Data
+// ============================================================================
+
+const SITES = [
+    { value: 'gk_fi_10234', name: 'Greene King::Farmhouse Inns::10234 - The Red Lion, Leeds', siteNo: '10234' },
+    { value: 'gk_fi_10567', name: 'Greene King::Farmhouse Inns::10567 - The White Hart, York', siteNo: '10567' },
+    { value: 'gk_fg_11002', name: 'Greene King::Flaming Grill::11002 - The George & Dragon, Bradford', siteNo: '11002' },
+    { value: 'gk_cb_12100', name: 'Greene King::Chef & Brewer::12100 - The Stag, Harrogate', siteNo: '12100' },
+    { value: 'mcd_20001', name: 'McDonalds::20001 - Leeds City Centre', siteNo: '20001' },
+    { value: 'wc_30010', name: 'Watercare::30010 - Watercare HQ Sheffield', siteNo: '30010' },
+];
+
+const FAKE_DATA = {
+    salusZones: [
+        { zone: 'Bar Area', currentTemp: 14.2, setpoint: 18.0, mode: 'Auto', deviceId: 'sal-001', status: 'heating' },
+        { zone: 'Kitchen', currentTemp: 19.8, setpoint: 20.0, mode: 'Auto', deviceId: 'sal-002', status: 'idle' },
+        { zone: 'Dining Room', currentTemp: 13.5, setpoint: 18.0, mode: 'Auto', deviceId: 'sal-003', status: 'heating' },
+        { zone: 'Upstairs Office', currentTemp: 17.1, setpoint: 16.0, mode: 'Off', deviceId: 'sal-004', status: 'off' },
+    ],
+    tuyaFryerOff: { deviceId: 'tuya-fryer-01', name: 'Fryer Bank Switch', switchState: false, lastUpdate: '2026-03-24 01:42:00', online: true },
+    tuyaFryerOn: { deviceId: 'tuya-fryer-01', name: 'Fryer Bank Switch', switchState: true, lastUpdate: '2026-03-24 05:30:00', online: true },
+    tuyaSchedules: [
+        { name: 'Morning On', time: '05:30', action: 'Switch ON', enabled: true, repeat: 'Mon-Fri' },
+        { name: 'Evening Off', time: '22:00', action: 'Switch OFF', enabled: true, repeat: 'Mon-Fri' },
+        { name: 'Weekend On', time: '07:00', action: 'Switch ON', enabled: true, repeat: 'Sat-Sun' },
+        { name: 'Weekend Off', time: '20:00', action: 'Switch OFF', enabled: true, repeat: 'Sat-Sun' },
+    ],
+    tbSiteDevices: [
+        { name: 'Gateway-GK-10234', type: 'Gateway', active: true, lastSeen: '2 min ago' },
+        { name: 'Boiler Controller', type: 'Salus SQ610', active: true, lastSeen: '5 min ago' },
+        { name: 'Kitchen Fryer Switch', type: 'Tuya Smart Switch', active: true, lastSeen: '3 min ago' },
+        { name: 'Walk-in Fridge Sensor', type: 'Temperature Probe', active: true, lastSeen: '1 min ago' },
+        { name: 'Beer Cellar Sensor', type: 'Temperature Probe', active: false, lastSeen: '3 days ago' },
+    ],
+    tbGatewayOnline: { name: 'Gateway-GK-10234', active: true, lastActivity: '2 min ago', lastConnect: '2026-03-24 00:12:00', type: 'Teltonika RUT240' },
+    tbGatewayOffline: { name: 'Gateway-GK-10234', active: false, lastActivity: '4 hours ago', lastConnect: '2026-03-23 21:38:00', type: 'Teltonika RUT240' },
+    intesisUnits: [
+        { name: 'Bar AC Unit 1', power: 'On', mode: 'Cool', setpoint: 16, roomTemp: 22.4, deviceId: 'int-001' },
+        { name: 'Bar AC Unit 2', power: 'Off', mode: 'Auto', setpoint: 21, roomTemp: 22.1, deviceId: 'int-002' },
+        { name: 'Dining AC', power: 'On', mode: 'Cool', setpoint: 14, roomTemp: 18.3, deviceId: 'int-003' },
+    ],
+};
+
+// ============================================================================
+// State
+// ============================================================================
+
+let currentView = 'landing'; // 'landing' | 'triage' | 'pocket-changes'
+let currentFlow = null;
+let chatMessages = [];
+let selectedSite = null;
+let callerName = '';
+let ticketId = '';
+let triageSummary = [];
+let flowStartTime = null;
+
+// ============================================================================
+// Rendering
+// ============================================================================
+
+function render() {
+    const c = document.getElementById('viewContainer');
+    if (currentView === 'landing') renderLanding(c);
+    else if (currentView === 'triage') renderTriage(c);
+    else if (currentView === 'pocket-changes') renderPocketChangesView(c);
+    updateClock();
+    updateNav();
+}
+
+function updateNav() {
+    document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+    if (currentView === 'landing') document.getElementById('navHome').classList.add('active');
+}
+
+function updateClock() {
+    document.getElementById('clock').textContent = new Date().toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'}) + ' — Out of Hours';
+}
+
+// ============================================================================
+// Landing Page
+// ============================================================================
+
+function renderLanding(c) {
+    document.getElementById('pageTitle').textContent = 'OOH Triage';
+    const siteName = selectedSite ? selectedSite.name.split('::').pop() : '';
+    c.innerHTML = `
+        <div class="context-bar">
+            <div class="ctx-field">
+                <label>Caller Name</label>
+                <input type="text" id="callerInput" placeholder="e.g. John from The Red Lion" value="${esc(callerName)}" onchange="callerName=this.value">
+            </div>
+            <div class="ctx-field wide">
+                <label>Site</label>
+                <select id="siteSelect" onchange="selectSite(this.value)" style="padding:8px 10px;border:1px solid var(--border);border-radius:var(--radius-sm);font-size:13px;font-family:inherit;background:var(--bg)">
+                    <option value="">-- Select site --</option>
+                    ${SITES.map(s => `<option value="${s.value}" ${selectedSite?.value===s.value?'selected':''}>${s.name.split('::').pop()}</option>`).join('')}
+                </select>
+            </div>
+            <div class="ctx-field">
+                <label>Zendesk Ticket #</label>
+                <input type="text" id="ticketInput" placeholder="e.g. 28500" value="${esc(ticketId)}" onchange="ticketId=this.value">
+            </div>
+        </div>
+
+        ${selectedSite ? `
+        <div style="margin-bottom:20px;padding:10px 14px;background:var(--success-bg);border:1px solid rgba(34,197,94,0.2);border-radius:var(--radius);font-size:13px;display:flex;align-items:center;gap:8px">
+            <span class="material-icons-outlined" style="font-size:18px;color:var(--success)">check_circle</span>
+            <strong>${esc(siteName)}</strong> — Site ${selectedSite.siteNo}
+            ${selectedSite.name.includes('Greene King') ? ' — Greene King' : selectedSite.name.includes('McDonalds') ? ' — McDonalds' : ''}
+        </div>
+        ` : `
+        <div style="margin-bottom:20px;padding:10px 14px;background:var(--warning-bg);border:1px solid rgba(245,158,11,0.2);border-radius:var(--radius);font-size:13px;display:flex;align-items:center;gap:8px">
+            <span class="material-icons-outlined" style="font-size:18px;color:var(--warning)">info</span>
+            Select a site above to begin triage. Flows need a site to look up devices and readings.
+        </div>
+        `}
+
+        <div class="entry-section">
+            <div class="entry-title"><span class="material-icons-outlined">devices</span> By Equipment Type</div>
+            <div class="entry-grid">
+                <div class="entry-card" onclick="startFlow('heating-too-cold')">
+                    <span class="material-icons-outlined">thermostat</span>
+                    <span>Heating</span>
+                </div>
+                <div class="entry-card" onclick="startFlow('fryers-not-on')">
+                    <span class="material-icons-outlined">restaurant</span>
+                    <span>Kitchen Equipment</span>
+                    <span class="card-badge">2 flows</span>
+                </div>
+                <div class="entry-card" onclick="startFlow('gateway-offline')">
+                    <span class="material-icons-outlined">router</span>
+                    <span>Gateway / Connectivity</span>
+                </div>
+                <div class="entry-card disabled">
+                    <span class="material-icons-outlined">ac_unit</span>
+                    <span>Air Conditioning</span>
+                    <span class="card-badge" style="background:var(--text-sec)">Coming soon</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="entry-section">
+            <div class="entry-title"><span class="material-icons-outlined">help_outline</span> By Problem</div>
+            <div class="entry-grid">
+                <div class="entry-card" onclick="startFlow('its-freezing')">
+                    <span class="material-icons-outlined">ac_unit</span>
+                    <span>It's freezing / too cold</span>
+                </div>
+                <div class="entry-card" onclick="startFlow('hot-water')">
+                    <span class="material-icons-outlined">water_drop</span>
+                    <span>No hot water</span>
+                </div>
+                <div class="entry-card" onclick="startFlow('scope-check')">
+                    <span class="material-icons-outlined">verified</span>
+                    <span>Is this our equipment?</span>
+                </div>
+                <div class="entry-card" onclick="startFlow('contractor-escalation')">
+                    <span class="material-icons-outlined">engineering</span>
+                    <span>Something else / Escalate</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="entry-section">
+            <div class="entry-title"><span class="material-icons-outlined">monitor_heart</span> Service Status</div>
+            <div class="service-grid">
+                <div class="service-chip"><span class="material-icons-outlined">router</span> ThingsBoard <span class="status-dot green"></span></div>
+                <div class="service-chip"><span class="material-icons-outlined">power</span> Tuya <span class="status-dot green"></span></div>
+                <div class="service-chip"><span class="material-icons-outlined">thermostat</span> Salus <span class="status-dot green"></span></div>
+                <div class="service-chip"><span class="material-icons-outlined">ac_unit</span> Intesis <span class="status-dot amber"></span></div>
+                <div class="service-chip"><span class="material-icons-outlined">timer</span> Pocket Changes <span class="status-dot green"></span></div>
+            </div>
+        </div>
+    `;
+}
+
+function selectSite(val) {
+    selectedSite = SITES.find(s => s.value === val) || null;
+    render();
+}
+
+// ============================================================================
+// Triage Engine
+// ============================================================================
+
+function startFlow(flowId) {
+    if (!selectedSite && flowId !== 'scope-check' && flowId !== 'contractor-escalation') {
+        showToast('Select a site first', 'warning');
+        return;
+    }
+    currentView = 'triage';
+    currentFlow = flowId;
+    chatMessages = [];
+    triageSummary = [];
+    flowStartTime = new Date();
+    FLOWS[flowId]();
+    render();
+}
+
+function addBot(text, icon) { chatMessages.push({ role:'bot', text, icon: icon||'smart_toy', time: now() }); }
+function addAgent(text) { chatMessages.push({ role:'agent', text, icon:'person', time: now() }); }
+function addSystem(text, icon) { chatMessages.push({ role:'system', text, icon: icon||'info', time: now() }); }
+function addError(text) { chatMessages.push({ role:'error', text, icon:'error', time: now() }); }
+function addEscalation(text, severity) { chatMessages.push({ role:'escalation', text, icon:'warning', time: now(), severity }); }
+function addResolution(text) { chatMessages.push({ role:'resolution', text, icon:'check_circle', time: now() }); }
+function addActions(actions) { chatMessages.push({ role:'actions', actions }); }
+function addDataCard(html) { chatMessages.push({ role:'data', html }); }
+
+function now() { return new Date().toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'}); }
+function esc(s) { return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+function siteName() { return selectedSite ? selectedSite.name.split('::').pop() : 'Unknown Site'; }
+
+// ============================================================================
+// Flow Definitions (all 8 flows with fake data)
+// ============================================================================
+
+const FLOWS = {
+
+// --- Flow 1: Heating Too Cold ---
+'heating-too-cold': function() {
+    addSystem('Starting: <strong>Heating Too Cold</strong>', 'play_arrow');
+    addBot("Let's check the heating system at <strong>" + siteName() + "</strong>. Connecting to Salus...");
+    setTimeout(() => {
+        addSystem('Connected to Salus — 4 zones found', 'sync');
+        addBot("Here are the current heating zones. I can see <strong>Bar Area</strong> and <strong>Dining Room</strong> are both well below setpoint.");
+        addActions([
+            { label: 'Boost Bar Area (+3°C for 2 hours)', fn: 'heatingBoostBar' },
+            { label: 'Boost Dining Room (+3°C for 2 hours)', fn: 'heatingBoostDining' },
+            { label: 'Boost ALL cold zones', fn: 'heatingBoostAll' },
+            { label: 'Zones look normal — escalate', fn: 'heatingEscNormal', cls:'secondary' },
+            { label: 'Equipment offline — escalate', fn: 'heatingEscOffline', cls:'danger' },
+        ]);
+        render();
+    }, 800);
+},
+
+heatingBoostBar: function() {
+    addAgent('Boost Bar Area (+3°C for 2 hours)');
+    addBot("<strong>Confirm:</strong> This will increase the Bar Area setpoint from <strong>18.0°C → 21.0°C</strong> for 2 hours, then auto-revert.\n\nCurrent temp: <strong>14.2°C</strong> (3.8° below setpoint)");
+    addActions([
+        { label: '✓ Apply Boost', fn: 'heatingBoostConfirm', cls:'success' },
+        { label: 'Cancel — go back', fn: 'heating-too-cold', cls:'secondary' },
+    ]);
+    render();
+},
+
+heatingBoostDining: function() {
+    addAgent('Boost Dining Room (+3°C for 2 hours)');
+    addBot("<strong>Confirm:</strong> This will increase the Dining Room setpoint from <strong>18.0°C → 21.0°C</strong> for 2 hours, then auto-revert.\n\nCurrent temp: <strong>13.5°C</strong> (4.5° below setpoint)");
+    addActions([
+        { label: '✓ Apply Boost', fn: 'heatingBoostConfirm', cls:'success' },
+        { label: 'Cancel — go back', fn: 'heating-too-cold', cls:'secondary' },
+    ]);
+    render();
+},
+
+heatingBoostAll: function() {
+    addAgent('Boost ALL cold zones');
+    addBot("<strong>Confirm:</strong> This will boost <strong>2 zones</strong>:\n• Bar Area: 18.0°C → 21.0°C\n• Dining Room: 18.0°C → 21.0°C\n\nBoth will auto-revert in 2 hours.");
+    addActions([
+        { label: '✓ Apply Both Boosts', fn: 'heatingBoostConfirm', cls:'success' },
+        { label: 'Cancel — go back', fn: 'heating-too-cold', cls:'secondary' },
+    ]);
+    render();
+},
+
+heatingBoostConfirm: function() {
+    addSystem('Setpoint change sent to Salus...', 'sync');
+    setTimeout(() => {
+        addSystem('Pocket change registered — auto-revert at ' + revertTime(), 'timer');
+        addResolution("<strong>Boost applied.</strong> The setpoint has been increased and will auto-revert in 2 hours.\n\nAdvise the caller it may take 15-30 minutes for the building to warm up.");
+        triageSummary.push('Applied +3°C heating boost at ' + siteName());
+        triageSummary.push('Auto-reverts at ' + revertTime());
+        addActions([
+            { label: 'Post Summary to Zendesk', fn: 'postSummary', cls:'success' },
+            { label: 'Start New Triage', fn: 'backToLanding', cls:'secondary' },
+        ]);
+        render();
+    }, 600);
+},
+
+heatingEscNormal: function() {
+    addAgent('Zones look normal — escalate');
+    addEscalation("<strong>Engineer Required</strong>\n\nZone readings appear normal but customer reports the building is cold. This needs on-site investigation — possible sensor issue or poor insulation.", 'medium');
+    triageSummary.push('Escalated: zones reading normal but customer reports cold');
+    addActions([
+        { label: 'Create Zendesk Ticket & Escalate', fn: 'postSummary', cls:'success' },
+        { label: 'Go back', fn: 'heating-too-cold', cls:'secondary' },
+    ]);
+    render();
+},
+
+heatingEscOffline: function() {
+    addAgent('Equipment offline — escalate');
+    addEscalation("<strong>Equipment Offline</strong>\n\nHeating controller showing offline in Salus. Could indicate power issue, connectivity loss, or hardware failure.", 'high');
+    triageSummary.push('Escalated: heating controller offline at ' + siteName());
+    addActions([
+        { label: 'Create Zendesk Ticket & Escalate', fn: 'postSummary', cls:'success' },
+        { label: 'Go back', fn: 'heating-too-cold', cls:'secondary' },
+    ]);
+    render();
+},
+
+// --- Flow 2: Fryers Not On ---
+'fryers-not-on': function() {
+    addSystem('Starting: <strong>Fryers Not Turning On</strong>', 'play_arrow');
+    addBot("Let's check the smart switch controlling the fryers at <strong>" + siteName() + "</strong>.");
+    setTimeout(() => {
+        addSystem('Connected to Tuya — device found', 'sync');
+        addBot("The fryer switch is currently <strong style='color:var(--danger)'>OFF</strong>.\n\nLast state change: 01:42 AM (turned off by schedule).");
+        addActions([
+            { label: 'Turn on the fryers', fn: 'fryersTurnOn' },
+            { label: 'Check the schedule first', fn: 'fryersCheckSchedule', cls:'secondary' },
+            { label: 'Escalate to IoT team', fn: 'fryersEscalate', cls:'danger' },
+        ]);
+        render();
+    }, 800);
+},
+
+fryersTurnOn: function() {
+    addAgent('Turn on the fryers');
+    addBot("<strong>Confirm:</strong> This will remotely switch ON the fryer bank at <strong>" + siteName() + "</strong>.\n\nPlease confirm the customer is aware and staff are present in the kitchen.");
+    addActions([
+        { label: '✓ Confirm — Turn On', fn: 'fryersTurnOnConfirm', cls:'success' },
+        { label: 'Cancel — go back', fn: 'fryers-not-on', cls:'secondary' },
+    ]);
+    render();
+},
+
+fryersTurnOnConfirm: function() {
+    addSystem('Sending switch command to Tuya...', 'sync');
+    setTimeout(() => {
+        addSystem('Switch state: ON ✓', 'check_circle');
+        addResolution("<strong>Fryers switched on.</strong>\n\nAsk the customer to confirm the fryers are warming up — this may take 5-10 minutes. If they don't come on, the issue is likely physical (element, thermostat, or gas).");
+        triageSummary.push('Remotely switched on fryers at ' + siteName());
+        addActions([
+            { label: 'Post Summary to Zendesk', fn: 'postSummary', cls:'success' },
+            { label: 'Start New Triage', fn: 'backToLanding', cls:'secondary' },
+        ]);
+        render();
+    }, 600);
+},
+
+fryersCheckSchedule: function() {
+    addAgent('Check the schedule first');
+    addSystem('Loading Tuya schedules...', 'sync');
+    setTimeout(() => {
+        addBot("Here's the schedule for this device. The <strong>Morning On</strong> schedule is set for 05:30 Mon-Fri — the fryers turned off at 22:00 last night as scheduled.");
+        addActions([
+            { label: 'Turn on now (ahead of schedule)', fn: 'fryersTurnOn' },
+            { label: 'Schedule looks wrong — escalate', fn: 'fryersEscSchedule', cls:'danger' },
+            { label: 'Schedule is fine — must be early start', fn: 'fryersTurnOn' },
+        ]);
+        render();
+    }, 600);
+},
+
+fryersEscSchedule: function() {
+    addAgent('Schedule looks wrong — escalate');
+    addEscalation("<strong>Schedule Adjustment Needed</strong>\n\nThe fryer schedule may not match the site's opening hours. IoT team to review and update.", 'medium');
+    triageSummary.push('Escalated: fryer schedule mismatch at ' + siteName());
+    addActions([{ label: 'Create Zendesk Ticket & Escalate', fn: 'postSummary', cls:'success' }, { label: 'Go back', fn: 'fryers-not-on', cls:'secondary' }]);
+    render();
+},
+
+fryersEscalate: function() {
+    addAgent('Escalate to IoT team');
+    addEscalation("<strong>Smart switch and schedules appear normal</strong> but fryers won't come on. Likely a physical equipment fault — element, thermostat, or gas supply.", 'medium');
+    triageSummary.push('Escalated: fryers not responding despite switch ON at ' + siteName());
+    addActions([{ label: 'Create Zendesk Ticket & Escalate', fn: 'postSummary', cls:'success' }]);
+    render();
+},
+
+// --- Flow 3: Equipment Turning Off ---
+'equipment-turning-off': function() {
+    addSystem('Starting: <strong>Equipment Turning Off Unexpectedly</strong>', 'play_arrow');
+    addBot("The customer reports equipment keeps turning off at <strong>" + siteName() + "</strong>. Let's check the schedules.");
+    setTimeout(() => {
+        addSystem('Connected to Tuya — schedules loaded', 'sync');
+        addBot("Here are the current schedules. Does one of these appear to be causing the unwanted shutdowns?");
+        addActions([
+            { label: 'Yes — schedule is turning off at wrong time', fn: 'eqOffScheduleBad' },
+            { label: 'No — schedules look correct', fn: 'eqOffScheduleOk', cls:'secondary' },
+            { label: 'No schedules at all — equipment may be faulty', fn: 'eqOffNoSchedule', cls:'danger' },
+        ]);
+        render();
+    }, 800);
+},
+
+eqOffScheduleBad: function() {
+    addAgent('Schedule is turning off at wrong time');
+    addEscalation("<strong>Schedule Adjustment Needed</strong>\n\nA schedule is switching equipment off during operating hours. IoT team to review and correct the timer.", 'medium');
+    triageSummary.push('Escalated: schedule conflict causing unwanted shutdowns at ' + siteName());
+    addActions([{ label: 'Create Zendesk Ticket & Escalate', fn: 'postSummary', cls:'success' }, { label: 'Go back', fn: 'equipment-turning-off', cls:'secondary' }]);
+    render();
+},
+
+eqOffScheduleOk: function() {
+    addAgent('Schedules look correct');
+    addEscalation("<strong>Investigation Required</strong>\n\nSchedules are correctly configured. Equipment shutdown may be caused by power fluctuations, overload trips, or hardware fault.", 'medium');
+    triageSummary.push('Escalated: equipment shutting down despite correct schedules at ' + siteName());
+    addActions([{ label: 'Create Zendesk Ticket & Escalate', fn: 'postSummary', cls:'success' }]);
+    render();
+},
+
+eqOffNoSchedule: function() {
+    addAgent('No schedules — equipment may be faulty');
+    addEscalation("<strong>No Schedules Found</strong>\n\nNo automated schedules configured for this device. If equipment is turning off, it's likely a physical fault or manual intervention.", 'high');
+    triageSummary.push('Escalated: no schedules found, possible equipment fault at ' + siteName());
+    addActions([{ label: 'Create Zendesk Ticket & Escalate', fn: 'postSummary', cls:'success' }]);
+    render();
+},
+
+// --- Flow 4: Scope Check ---
+'scope-check': function() {
+    addSystem('Starting: <strong>Scope Check — Is This Our Equipment?</strong>', 'play_arrow');
+    addBot("Let's check if this site is managed by the IoT team. Enter the site number or select from the list.");
+    if (selectedSite) {
+        setTimeout(() => {
+            addSystem('Searching ThingsBoard for site ' + selectedSite.siteNo + '...', 'sync');
+            setTimeout(() => {
+                addSystem('Site found — loading device inventory', 'check_circle');
+                addBot("<strong>Site confirmed as IoT-managed.</strong>\n\n<strong>" + siteName() + "</strong> — " + FAKE_DATA.tbSiteDevices.length + " devices registered.");
+                addActions([
+                    { label: 'Done — site is ours', fn: 'scopeConfirmed' },
+                    { label: 'Start a triage flow for this site', fn: 'backToLanding', cls:'secondary' },
+                ]);
+                render();
+            }, 600);
+        }, 400);
+    } else {
+        addActions([{ label: 'Go back and select a site', fn: 'backToLanding', cls:'secondary' }]);
+    }
+},
+
+scopeConfirmed: function() {
+    addResolution("<strong>Site confirmed as IoT-managed.</strong>\n\nAdvise the caller that the IoT team manages equipment at this site. If they have a specific issue, start a triage flow.");
+    triageSummary.push('Scope check: site ' + (selectedSite?.siteNo||'') + ' confirmed as IoT-managed, ' + FAKE_DATA.tbSiteDevices.length + ' devices');
+    addActions([{ label: 'Post Summary to Zendesk', fn: 'postSummary', cls:'success' }, { label: 'Start New Triage', fn: 'backToLanding', cls:'secondary' }]);
+    render();
+},
+
+// --- Flow 5: Gateway Offline ---
+'gateway-offline': function() {
+    addSystem('Starting: <strong>Gateway Offline</strong>', 'play_arrow');
+    addBot("A gateway is reported offline at <strong>" + siteName() + "</strong>. Checking ThingsBoard...");
+    setTimeout(() => {
+        const gw = FAKE_DATA.tbGatewayOffline;
+        addSystem('Gateway status retrieved', 'sync');
+        addBot("<strong style='color:var(--danger)'>Gateway confirmed OFFLINE</strong>\n\n• Device: " + gw.name + "\n• Type: " + gw.type + "\n• Last seen: " + gw.lastActivity + "\n• Last connected: " + gw.lastConnect);
+        addActions([
+            { label: 'Ask site to check fuse board / power', fn: 'gwFuseScript' },
+            { label: 'Site confirms power is fine', fn: 'gwPowerFine', cls:'secondary' },
+            { label: 'Cannot contact site', fn: 'gwNoContact', cls:'danger' },
+        ]);
+        render();
+    }, 800);
+},
+
+gwFuseScript: function() {
+    addAgent('Ask site to check fuse board / power');
+    addBot("<strong>Read to caller:</strong>\n\n<em>\"Can you check the fuse board and look for any tripped switches? The IoT gateway is usually plugged into a standard socket near the router or in a cupboard. It's a small black or white box — about the size of a deck of cards — with some LED lights on the front. Can you see if the power light is on?\"</em>");
+    addActions([
+        { label: 'Fuse was tripped — they\'ve reset it', fn: 'gwFuseReset' },
+        { label: 'Power looks fine — still not responding', fn: 'gwPowerFine', cls:'secondary' },
+        { label: 'They can\'t find the gateway', fn: 'gwCantFind', cls:'secondary' },
+    ]);
+    render();
+},
+
+gwFuseReset: function() {
+    addAgent('Fuse was tripped — reset');
+    addBot("Good — the fuse has been reset. The gateway typically takes <strong>2-5 minutes</strong> to reconnect. Let's wait and recheck.");
+    addSystem('Waiting 2 minutes then rechecking...', 'hourglass_empty');
+    setTimeout(() => {
+        addSystem('Rechecking gateway status...', 'sync');
+        setTimeout(() => {
+            addSystem('Gateway is back ONLINE ✓', 'check_circle');
+            addResolution("<strong>Gateway recovered!</strong>\n\nThe gateway reconnected after the fuse reset. All devices at the site should come back online within a few minutes.");
+            triageSummary.push('Gateway at ' + siteName() + ' was offline — fuse reset resolved');
+            addActions([{ label: 'Post Summary to Zendesk', fn: 'postSummary', cls:'success' }, { label: 'Start New Triage', fn: 'backToLanding', cls:'secondary' }]);
+            render();
+        }, 800);
+    }, 1200);
+},
+
+gwPowerFine: function() {
+    addAgent('Power is fine — still offline');
+    addEscalation("<strong>Engineer Required</strong>\n\nGateway offline despite power being confirmed OK. Could be:\n• Router/internet issue at site\n• Gateway hardware failure\n• SIM connectivity issue (if cellular gateway)\n\nIoT team to investigate remotely or arrange site visit.", 'high');
+    triageSummary.push('Escalated: gateway offline at ' + siteName() + ', power confirmed OK');
+    addActions([{ label: 'Create Zendesk Ticket & Escalate', fn: 'postSummary', cls:'success' }, { label: 'Go back', fn: 'gateway-offline', cls:'secondary' }]);
+    render();
+},
+
+gwCantFind: function() {
+    addAgent("They can't find the gateway");
+    addEscalation("<strong>Engineer Required</strong>\n\nSite staff unable to locate the gateway device. IoT team to provide location details or arrange a site visit.", 'medium');
+    triageSummary.push('Escalated: gateway offline, staff cannot locate device at ' + siteName());
+    addActions([{ label: 'Create Zendesk Ticket & Escalate', fn: 'postSummary', cls:'success' }]);
+    render();
+},
+
+gwNoContact: function() {
+    addAgent('Cannot contact site');
+    addEscalation("<strong>Cannot Contact Site</strong>\n\nUnable to reach anyone at the site for troubleshooting. IoT team to follow up during business hours.\n\nNote: if this is a critical site (e.g. food storage), consider P1 escalation.", 'medium');
+    triageSummary.push('Escalated: gateway offline, cannot contact site ' + siteName());
+    addActions([
+        { label: 'Log as P3 (next business day)', fn: 'postSummary', cls:'success' },
+        { label: 'Escalate as P1 (critical)', fn: 'gwNoContactP1', cls:'danger' },
+    ]);
+    render();
+},
+
+gwNoContactP1: function() {
+    addAgent('Escalate as P1 — critical');
+    addEscalation("<strong>P1 Critical Escalation</strong>\n\nGateway offline, site unreachable. On-call IoT engineer will be notified via SMS and email.", 'critical');
+    triageSummary.push('P1 CRITICAL: gateway offline, site unreachable at ' + siteName());
+    addActions([{ label: 'Send P1 Notification & Create Ticket', fn: 'postSummary', cls:'success' }]);
+    render();
+},
+
+// --- Flow 6: It's Freezing (multi-service routing) ---
+'its-freezing': function() {
+    addSystem('Starting: <strong>It\'s Freezing — What\'s Cold?</strong>', 'play_arrow');
+    addBot("The customer at <strong>" + siteName() + "</strong> is reporting it's too cold. Let's narrow down the issue.");
+    addActions([
+        { label: 'The building / room is cold (heating)', fn: 'freezingHeating' },
+        { label: 'No hot water', fn: 'hot-water' },
+        { label: 'AC is blowing cold air', fn: 'freezingAC' },
+        { label: 'Not sure — general complaint', fn: 'freezingGeneral', cls:'secondary' },
+    ]);
+},
+
+freezingHeating: function() {
+    addAgent('Building is cold — heating issue');
+    addSystem('Redirecting to Heating Too Cold flow...', 'subdirectory_arrow_right');
+    FLOWS['heating-too-cold']();
+    render();
+},
+
+freezingAC: function() {
+    addAgent('AC is blowing cold air');
+    addBot("Checking AC Cloud (Intesis) for <strong>" + siteName() + "</strong>...");
+    setTimeout(() => {
+        addSystem('Connected to Intesis — 3 units found', 'sync');
+        addBot("I can see <strong>Dining AC</strong> is set to <strong>Cool at 14°C</strong> — that's likely the problem. Room temp is 18.3°C so it's actively cooling.\n\n<strong>Bar AC Unit 1</strong> is also cooling at 16°C.");
+        addActions([
+            { label: 'Switch Dining AC to Heat mode', fn: 'freezingACFix' },
+            { label: 'Turn off all cooling', fn: 'freezingACOff' },
+            { label: 'AC looks correct — escalate', fn: 'freezingACEsc', cls:'secondary' },
+        ]);
+        render();
+    }, 800);
+},
+
+freezingACFix: function() {
+    addAgent('Switch Dining AC to Heat mode');
+    addEscalation("<strong>AC Mode Change Requested</strong>\n\nDining AC is currently cooling to 14°C — needs switching to Heat or Auto mode. IoT team to action to ensure correct configuration and prevent HVAC conflict.", 'medium');
+    triageSummary.push('Escalated: AC set to Cool 14°C causing cold at ' + siteName() + ', needs mode change');
+    addActions([{ label: 'Create Zendesk Ticket & Escalate', fn: 'postSummary', cls:'success' }]);
+    render();
+},
+
+freezingACOff: function() {
+    addAgent('Turn off all cooling');
+    addEscalation("<strong>AC Shutdown Requested</strong>\n\nAll AC units to be turned off — they're cooling the building when it should be warm. IoT team to review and adjust.", 'medium');
+    triageSummary.push('Escalated: all AC cooling to be disabled at ' + siteName());
+    addActions([{ label: 'Create Zendesk Ticket & Escalate', fn: 'postSummary', cls:'success' }]);
+    render();
+},
+
+freezingACEsc: function() {
+    addAgent('AC looks correct — escalate');
+    addEscalation("<strong>Investigation Required</strong>\n\nAC readings appear correct. Cold issue may be from heating system, building fabric, or external factors.", 'medium');
+    triageSummary.push('Escalated: AC normal, cold issue from other source at ' + siteName());
+    addActions([{ label: 'Create Zendesk Ticket & Escalate', fn: 'postSummary', cls:'success' }]);
+    render();
+},
+
+freezingGeneral: function() {
+    addAgent('Not sure — general cold complaint');
+    addBot("Let's narrow it down. Where is the customer experiencing the cold?");
+    addActions([
+        { label: 'Main dining / bar area', fn: 'freezingHeating' },
+        { label: 'Kitchen', fn: 'freezingHeating' },
+        { label: 'Specific room with AC unit', fn: 'freezingAC' },
+        { label: 'Everywhere — whole building', fn: 'freezingHeating' },
+    ]);
+    render();
+},
+
+// --- Flow 7: No Hot Water ---
+'hot-water': function() {
+    addSystem('Starting: <strong>No Hot Water</strong>', 'play_arrow');
+    addBot("Customer at <strong>" + siteName() + "</strong> reports no hot water. This is typically a DHW (domestic hot water) issue.");
+    addBot("Hot water systems vary significantly by site. Let's gather some information.");
+    addActions([
+        { label: 'No hot water at all (taps, sinks)', fn: 'hwNone' },
+        { label: 'Hot water intermittent (comes and goes)', fn: 'hwIntermittent' },
+        { label: 'Water not hot enough', fn: 'hwNotHotEnough', cls:'secondary' },
+    ]);
+},
+
+hwNone: function() {
+    addAgent('No hot water at all');
+    addBot("Complete loss of hot water usually indicates:\n• Boiler fault or lockout\n• Gas supply issue\n• Immersion heater failure\n\nThis generally requires on-site investigation.");
+    addActions([
+        { label: 'Check if boiler is showing on ThingsBoard', fn: 'hwCheckTB' },
+        { label: 'Escalate directly — likely needs engineer', fn: 'hwEscalate', cls:'danger' },
+    ]);
+    render();
+},
+
+hwIntermittent: function() {
+    addAgent('Hot water intermittent');
+    addBot("Intermittent hot water could be:\n• DHW schedule not covering enough hours\n• Tank not large enough for demand\n• Mixing valve issue\n\nLet's check if there's a schedule controlling the DHW.");
+    addActions([
+        { label: 'Check if boiler is showing on ThingsBoard', fn: 'hwCheckTB' },
+        { label: 'Escalate — needs investigation', fn: 'hwEscalate', cls:'danger' },
+    ]);
+    render();
+},
+
+hwNotHotEnough: function() {
+    addAgent('Water not hot enough');
+    addBot("Water not reaching temperature could be:\n• Setpoint too low\n• Boiler short-cycling\n• Scale buildup in heat exchanger\n\nThis typically needs an engineer but let's check what we can see remotely.");
+    addActions([
+        { label: 'Check if boiler is showing on ThingsBoard', fn: 'hwCheckTB' },
+        { label: 'Escalate — needs engineer', fn: 'hwEscalate', cls:'danger' },
+    ]);
+    render();
+},
+
+hwCheckTB: function() {
+    addAgent('Check ThingsBoard');
+    addSystem('Searching ThingsBoard for DHW/boiler devices...', 'sync');
+    setTimeout(() => {
+        addBot("I can see a <strong>Boiler Controller</strong> at this site but DHW-specific telemetry isn't available through the current integration. The boiler controller is <strong>online</strong> (last seen 5 min ago).\n\nThis issue needs IoT team investigation to check DHW settings and schedules.");
+        addActions([
+            { label: 'Escalate to IoT team', fn: 'hwEscalate' },
+        ]);
+        render();
+    }, 800);
+},
+
+hwEscalate: function() {
+    addEscalation("<strong>Hot Water Issue — Engineer Required</strong>\n\nDHW investigation needed at " + siteName() + ". Boiler controller is online but hot water issue requires on-site or detailed remote investigation by IoT team.", 'medium');
+    triageSummary.push('Escalated: hot water issue at ' + siteName());
+    addActions([{ label: 'Create Zendesk Ticket & Escalate', fn: 'postSummary', cls:'success' }, { label: 'Go back', fn: 'hot-water', cls:'secondary' }]);
+    render();
+},
+
+// --- Flow 8: Contractor Escalation ---
+'contractor-escalation': function() {
+    addSystem('Starting: <strong>Escalation Workflow</strong>', 'play_arrow');
+    addBot("This issue needs escalating. How urgent is it?");
+    addActions([
+        { label: 'P1 — Critical (site cannot operate)', fn: 'escP1', cls:'danger' },
+        { label: 'P2 — Important (degraded service)', fn: 'escP2' },
+        { label: 'P3 — Non-urgent (next business day)', fn: 'escP3', cls:'secondary' },
+    ]);
+},
+
+escP1: function() {
+    addAgent('P1 — Critical');
+    addBot("P1 Critical escalation. What's the issue?");
+    addActions([
+        { label: 'Complete loss of heating (site open)', fn: 'escP1Detail' },
+        { label: 'Food safety — fridges/freezers down', fn: 'escP1Detail' },
+        { label: 'Fire alarm / safety system fault', fn: 'escP1Detail' },
+        { label: 'Other critical issue', fn: 'escP1Detail' },
+    ]);
+    render();
+},
+
+escP1Detail: function() {
+    addEscalation("<strong>P1 — CRITICAL ESCALATION</strong>\n\nOn-call IoT engineer will be notified immediately:\n• <strong>SMS</strong> to on-call mobile\n• <strong>Email</strong> to iot@airedale-group.co.uk\n\n<strong>45-minute response target.</strong> If no response, auto-routes to backup engineer.", 'critical');
+    addBot("<strong>Escalation contacts:</strong>\n• Primary: Sam Day (on-call)\n• Backup: CJ (45-min timeout)\n• Manager: Jonathan Wilkinson (CC'd)");
+    triageSummary.push('P1 CRITICAL escalation at ' + siteName());
+    addActions([
+        { label: 'Send SMS + Email & Create P1 Ticket', fn: 'escP1Send', cls:'danger' },
+        { label: 'Downgrade to P2', fn: 'escP2', cls:'secondary' },
+    ]);
+    render();
+},
+
+escP1Send: function() {
+    addSystem('Sending SMS to on-call...', 'sms');
+    setTimeout(() => {
+        addSystem('SMS sent ✓ — Email sent ✓', 'check_circle');
+        addSystem('P1 ticket created — 45-minute timer started', 'timer');
+        addResolution("<strong>P1 escalation complete.</strong>\n\nThe on-call engineer has been notified. If no acknowledgement within 45 minutes, the backup engineer will be contacted automatically.\n\nAdvise the caller that someone will be in touch shortly.");
+        addActions([{ label: 'Done', fn: 'backToLanding', cls:'success' }]);
+        render();
+    }, 1000);
+},
+
+escP2: function() {
+    addAgent('P2 — Important');
+    addEscalation("<strong>P2 — Important Escalation</strong>\n\nEmail will be sent to IoT team with a <strong>2-hour response target</strong>.\n\nIf no response in 2 hours, auto-routes to manager.", 'high');
+    triageSummary.push('P2 escalation at ' + siteName());
+    addActions([
+        { label: 'Send Email & Create P2 Ticket', fn: 'escP2Send' },
+        { label: 'Upgrade to P1', fn: 'escP1', cls:'danger' },
+        { label: 'Downgrade to P3', fn: 'escP3', cls:'secondary' },
+    ]);
+    render();
+},
+
+escP2Send: function() {
+    addSystem('Email sent to IoT team ✓', 'check_circle');
+    addSystem('P2 ticket created — 2-hour timer started', 'timer');
+    addResolution("<strong>P2 escalation complete.</strong>\n\nThe IoT team has been emailed. 2-hour response target. Advise the caller they'll hear back within 2 hours.");
+    addActions([{ label: 'Done', fn: 'backToLanding', cls:'success' }]);
+    render();
+},
+
+escP3: function() {
+    addAgent('P3 — Non-urgent');
+    addResolution("<strong>P3 — Logged for next business day.</strong>\n\nThis has been logged for the IoT team to pick up tomorrow. No immediate notification sent.\n\nAdvise the caller this will be reviewed on the next working day.");
+    triageSummary.push('P3 logged for next business day at ' + siteName());
+    addActions([
+        { label: 'Create P3 Ticket', fn: 'postSummary', cls:'success' },
+        { label: 'Actually, this is more urgent', fn: 'contractor-escalation', cls:'secondary' },
+    ]);
+    render();
+},
+
+}; // end FLOWS
+
+// ============================================================================
+// Shared Actions
+// ============================================================================
+
+function postSummary() {
+    const dur = flowStartTime ? Math.round((new Date() - flowStartTime) / 60000) : 0;
+    const flowNames = { 'heating-too-cold':'Heating Too Cold', 'fryers-not-on':'Fryers Not On', 'equipment-turning-off':'Equipment Turning Off', 'scope-check':'Scope Check', 'gateway-offline':'Gateway Offline', 'its-freezing':"It's Freezing", 'hot-water':'No Hot Water', 'contractor-escalation':'Escalation' };
+    const summary = [
+        '=== OOH Triage Summary ===',
+        'Flow: ' + (flowNames[currentFlow] || currentFlow),
+        'Site: ' + siteName() + (selectedSite ? ' (' + selectedSite.siteNo + ')' : ''),
+        'Caller: ' + (callerName || 'Not provided'),
+        'Ticket: #' + (ticketId || 'N/A'),
+        'Duration: ' + dur + ' min',
+        'Agent: OOH Handler',
+        '',
+        ...triageSummary,
+    ].join('\n');
+
+    addSystem('Triage summary posted to Zendesk ticket #' + (ticketId || '28501') + ' ✓', 'check_circle');
+    showToast('Summary posted to Zendesk', 'check_circle');
+    addActions([{ label: 'Start New Triage', fn: 'backToLanding', cls:'success' }]);
+    render();
+}
+
+function backToLanding() {
+    showLanding();
+}
+
+function showLanding() {
+    currentView = 'landing';
+    currentFlow = null;
+    chatMessages = [];
+    render();
+}
+
+function revertTime() {
+    const d = new Date(Date.now() + 2*60*60*1000);
+    return d.toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'});
+}
+
+function showToast(msg, icon) {
+    const t = document.getElementById('toast');
+    document.getElementById('toastMsg').textContent = msg;
+    document.getElementById('toastIcon').textContent = icon || 'check_circle';
+    t.classList.add('show');
+    setTimeout(() => t.classList.remove('show'), 3000);
+}
+
+// ============================================================================
+// Triage Renderer
+// ============================================================================
+
+function renderTriage(c) {
+    const flowNames = { 'heating-too-cold':'Heating Too Cold', 'fryers-not-on':'Fryers Not On', 'equipment-turning-off':'Equipment Turning Off', 'scope-check':'Scope Check', 'gateway-offline':'Gateway Offline', 'its-freezing':"It's Freezing", 'hot-water':'No Hot Water', 'contractor-escalation':'Escalation' };
+    const flowIcons = { 'heating-too-cold':'thermostat', 'fryers-not-on':'restaurant', 'equipment-turning-off':'power_off', 'scope-check':'verified', 'gateway-offline':'router', 'its-freezing':'ac_unit', 'hot-water':'water_drop', 'contractor-escalation':'engineering' };
+
+    document.getElementById('pageTitle').textContent = flowNames[currentFlow] || 'Triage';
+
+    let chatHtml = chatMessages.map((m,i) => {
+        if (m.role === 'actions') {
+            return '<div class="actions">' + m.actions.map(a =>
+                '<button class="action-btn ' + (a.cls||'') + '" onclick="FLOWS[\'' + a.fn + '\']()">' +
+                (a.icon ? '<span class="material-icons-outlined">' + a.icon + '</span>' : '') +
+                a.label + '</button>'
+            ).join('') + '</div>';
+        }
+        if (m.role === 'data') return m.html;
+        const cls = 'msg msg-' + m.role;
+        return '<div class="' + cls + '">' +
+            '<div class="msg-header"><span class="material-icons-outlined">' + m.icon + '</span> ' + m.time +
+            (m.severity ? ' <span class="severity ' + m.severity + '">' + m.severity.toUpperCase() + '</span>' : '') +
+            '</div>' +
+            '<div class="msg-text">' + m.text + '</div></div>';
+    }).join('');
+
+    // Build sidebar data card based on flow
+    let sidebarHtml = buildSidebarForFlow();
+
+    c.innerHTML = `
+        <div class="triage-layout">
+            <div class="triage-chat">
+                <div class="triage-header">
+                    <button class="action-btn secondary" onclick="showLanding()">
+                        <span class="material-icons-outlined">close</span> End
+                    </button>
+                    <div class="triage-flow-name">
+                        <span class="material-icons-outlined">${flowIcons[currentFlow]||'chat'}</span>
+                        ${flowNames[currentFlow]||'Triage'}
+                    </div>
+                    <div style="width:80px"></div>
+                </div>
+                <div class="chat-area" id="chatArea">${chatHtml}</div>
+            </div>
+            <div class="triage-sidebar">${sidebarHtml}</div>
+        </div>
+    `;
+
+    const chat = document.getElementById('chatArea');
+    if (chat) chat.scrollTop = chat.scrollHeight;
+}
+
+function buildSidebarForFlow() {
+    let cards = '';
+
+    // Data card based on flow type
+    if (currentFlow === 'heating-too-cold' || currentFlow === 'its-freezing') {
+        const zones = FAKE_DATA.salusZones;
+        cards += '<div class="data-card"><h4><span class="material-icons-outlined" style="font-size:16px">thermostat</span> Heating Zones</h4>';
+        cards += '<table class="data-table"><tr><th>Zone</th><th>Current</th><th>Setpoint</th><th>Status</th></tr>';
+        zones.forEach(z => {
+            const cold = z.currentTemp < z.setpoint - 2;
+            cards += '<tr class="' + (cold?'highlight':'') + '"><td>' + z.zone + '</td><td><strong>' + z.currentTemp + '°C</strong></td><td>' + z.setpoint + '°C</td><td><span class="status-dot ' + (z.status==='heating'?'amber':z.status==='idle'?'green':'red') + '"></span>' + z.status + '</td></tr>';
+        });
+        cards += '</table></div>';
+    }
+
+    if (currentFlow === 'fryers-not-on' || currentFlow === 'equipment-turning-off') {
+        const dev = FAKE_DATA.tuyaFryerOff;
+        cards += '<div class="data-card"><h4><span class="material-icons-outlined" style="font-size:16px">power</span> Device Status</h4>';
+        cards += '<table class="data-table"><tr><th>Device</th><th>State</th><th>Last Update</th></tr>';
+        cards += '<tr><td>' + dev.name + '</td><td><strong style="color:' + (dev.switchState?'var(--success)':'var(--danger)') + '">' + (dev.switchState?'ON':'OFF') + '</strong></td><td>' + dev.lastUpdate + '</td></tr>';
+        cards += '</table></div>';
+
+        // Schedules
+        cards += '<div class="data-card"><h4><span class="material-icons-outlined" style="font-size:16px">schedule</span> Schedules</h4>';
+        cards += '<table class="data-table"><tr><th>Name</th><th>Time</th><th>Action</th><th>Days</th></tr>';
+        FAKE_DATA.tuyaSchedules.forEach(s => {
+            cards += '<tr><td>' + s.name + '</td><td>' + s.time + '</td><td>' + s.action + '</td><td>' + s.repeat + '</td></tr>';
+        });
+        cards += '</table></div>';
+    }
+
+    if (currentFlow === 'scope-check') {
+        cards += '<div class="data-card"><h4><span class="material-icons-outlined" style="font-size:16px">devices</span> Device Inventory</h4>';
+        cards += '<table class="data-table"><tr><th>Device</th><th>Type</th><th>Status</th><th>Last Seen</th></tr>';
+        FAKE_DATA.tbSiteDevices.forEach(d => {
+            cards += '<tr><td>' + d.name + '</td><td>' + d.type + '</td><td><span class="status-dot ' + (d.active?'green':'red') + '"></span>' + (d.active?'Online':'Offline') + '</td><td>' + d.lastSeen + '</td></tr>';
+        });
+        cards += '</table></div>';
+    }
+
+    if (currentFlow === 'gateway-offline') {
+        const gw = FAKE_DATA.tbGatewayOffline;
+        cards += '<div class="data-card"><h4><span class="material-icons-outlined" style="font-size:16px">router</span> Gateway</h4>';
+        cards += '<div class="temp-row">';
+        cards += '<div class="temp-item"><label>Status</label><strong style="color:var(--danger)">OFFLINE</strong></div>';
+        cards += '<div class="temp-item"><label>Last Seen</label><strong>' + gw.lastActivity + '</strong></div>';
+        cards += '</div>';
+        cards += '<table class="data-table"><tr><th>Field</th><th>Value</th></tr>';
+        cards += '<tr><td>Device</td><td>' + gw.name + '</td></tr>';
+        cards += '<tr><td>Type</td><td>' + gw.type + '</td></tr>';
+        cards += '<tr><td>Last Connect</td><td>' + gw.lastConnect + '</td></tr>';
+        cards += '</table></div>';
+    }
+
+    // Pocket change card (if heating boost was applied)
+    if (triageSummary.some(s => s.includes('boost'))) {
+        cards += '<div class="pocket-card"><h4><span class="material-icons-outlined" style="font-size:14px">timer</span> Active Pocket Change</h4>';
+        cards += '<div class="pocket-countdown">1h 58m remaining</div>';
+        cards += '<div style="font-size:12px;margin-top:6px">+3°C boost at ' + siteName() + '<br>Reverts at ' + revertTime() + '</div></div>';
+    }
+
+    // Context card
+    cards += '<div class="ctx-card"><h4>Session Context</h4>';
+    if (callerName) cards += '<div class="ctx-row"><span>Caller</span><span>' + esc(callerName) + '</span></div>';
+    if (selectedSite) {
+        cards += '<div class="ctx-row"><span>Site</span><span>' + siteName() + '</span></div>';
+        cards += '<div class="ctx-row"><span>Site #</span><span>' + selectedSite.siteNo + '</span></div>';
+        const client = selectedSite.name.split('::')[0];
+        cards += '<div class="ctx-row"><span>Client</span><span>' + client + '</span></div>';
+    }
+    if (ticketId) cards += '<div class="ctx-row"><span>Ticket</span><span>#' + esc(ticketId) + '</span></div>';
+    cards += '</div>';
+
+    return cards;
+}
+
+// ============================================================================
+// Pocket Changes View
+// ============================================================================
+
+function showPocketChanges() {
+    currentView = 'pocket-changes';
+    currentFlow = null;
+    render();
+}
+
+function renderPocketChangesView(c) {
+    document.getElementById('pageTitle').textContent = 'Pocket Changes';
+    c.innerHTML = `
+        <div style="max-width:800px">
+            <h2 style="display:flex;align-items:center;gap:8px;font-size:18px;margin-bottom:16px">
+                <span class="material-icons-outlined">timer</span> Pocket Changes
+            </h2>
+            <h3 style="font-size:14px;color:var(--text-sec);margin-bottom:10px">Active (1)</h3>
+            <div class="data-card" style="border-left:3px solid var(--warning);margin-bottom:12px">
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+                    <strong>+3°C heating boost at 10234 - The Red Lion</strong>
+                    <span style="font-size:18px;font-weight:700;color:#92400e">1h 42m</span>
+                </div>
+                <div style="font-size:12px;color:var(--text-sec);margin-bottom:8px">
+                    Service: Salus | Zone: Bar Area | Reason: Customer reported too cold | Agent: OOH Handler
+                </div>
+                <div style="display:flex;gap:8px">
+                    <button class="action-btn secondary" onclick="showToast('Revert cancelled','check_circle')">Cancel Revert</button>
+                    <button class="action-btn secondary" onclick="showToast('Extended by 60 min','check_circle')">Extend +60 min</button>
+                </div>
+            </div>
+
+            <h3 style="font-size:14px;color:var(--text-sec);margin:24px 0 10px">History (3)</h3>
+            <div class="data-card" style="border-left:3px solid var(--success);margin-bottom:8px;opacity:0.7">
+                <div style="display:flex;justify-content:space-between"><strong>Fryer switch ON at 10567 - The White Hart</strong><span class="severity medium" style="background:var(--success-bg);color:var(--success)">REVERTED</span></div>
+                <div style="font-size:12px;color:var(--text-sec)">23 Mar 2026, 02:15 — Service: Tuya — Auto-reverted at 04:15</div>
+            </div>
+            <div class="data-card" style="border-left:3px solid var(--success);margin-bottom:8px;opacity:0.7">
+                <div style="display:flex;justify-content:space-between"><strong>+2°C boost at 11002 - The George & Dragon</strong><span class="severity medium" style="background:var(--success-bg);color:var(--success)">REVERTED</span></div>
+                <div style="font-size:12px;color:var(--text-sec)">22 Mar 2026, 23:40 — Service: Salus — Auto-reverted at 01:40</div>
+            </div>
+            <div class="data-card" style="border-left:3px solid var(--danger);margin-bottom:8px;opacity:0.7">
+                <div style="display:flex;justify-content:space-between"><strong>AC mode change at 12100 - The Stag</strong><span class="severity critical">FAILED</span></div>
+                <div style="font-size:12px;color:var(--text-sec)">21 Mar 2026, 01:55 — Service: Intesis — P1 review ticket #28490 created</div>
+            </div>
+        </div>
+    `;
+}
+
+// ============================================================================
+// Init
+// ============================================================================
+
+render();
+setInterval(updateClock, 30000);
+</script>
+</body>
+</html>

@@ -1,0 +1,544 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>OOH Dashboard — Data Dictionary</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/icon?family=Material+Icons+Outlined" rel="stylesheet">
+<style>
+:root{--primary:#594AE2;--primary-light:#EEF2FF;--success:#10B981;--warning:#F59E0B;--danger:#EF4444;--info:#3B82F6;--surface:#fff;--bg:#F1F5F9;--border:#E2E8F0;--text:#1E293B;--text2:#64748B;--text3:#94A3B8}
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:'Inter',sans-serif;font-size:14px;line-height:1.6;color:var(--text);background:var(--bg)}
+.top-bar{background:linear-gradient(135deg,#7C3AED,var(--primary));color:#fff;padding:16px 32px;display:flex;justify-content:space-between;align-items:center;position:sticky;top:0;z-index:100;box-shadow:0 2px 8px rgba(0,0,0,.15)}
+.top-bar h1{font-size:18px;font-weight:700}.top-bar .sub{font-size:12px;opacity:.8;margin-top:2px}
+.top-bar-actions{display:flex;gap:8px;align-items:center}
+.save-status{font-size:11px;opacity:.7;display:flex;align-items:center;gap:4px}
+.save-status .material-icons-outlined{font-size:14px}
+.btn-dl{display:inline-flex;align-items:center;gap:6px;padding:8px 16px;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;border:2px solid rgba(255,255,255,.4);background:rgba(255,255,255,.15);color:#fff;font-family:inherit;transition:all .15s}
+.btn-dl:hover{background:rgba(255,255,255,.25)}
+
+.container{max-width:1100px;margin:0 auto;padding:24px 32px 80px}
+
+/* NAV */
+.nav{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:16px 20px;margin-bottom:24px;position:sticky;top:72px;z-index:50;box-shadow:0 1px 3px rgba(0,0,0,.05)}
+.nav-title{font-size:11px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px}
+.nav-links{display:flex;flex-wrap:wrap;gap:6px}
+.nav-links a{font-size:12px;font-weight:500;color:var(--primary);text-decoration:none;padding:4px 10px;border-radius:6px;background:var(--primary-light);transition:all .15s}
+.nav-links a:hover{background:var(--primary);color:#fff}
+
+/* SECTIONS */
+.section{background:var(--surface);border:1px solid var(--border);border-radius:12px;margin-bottom:20px;overflow:hidden}
+.section-head{padding:16px 20px;background:var(--bg);border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;cursor:pointer}
+.section-head h2{font-size:15px;font-weight:700;display:flex;align-items:center;gap:8px}
+.section-head h2 .material-icons-outlined{font-size:20px;color:var(--primary)}
+.section-head .badge{font-size:10px;font-weight:600;padding:2px 8px;border-radius:4px;text-transform:uppercase}
+.section-body{padding:20px}
+
+/* TABLES */
+table{width:100%;border-collapse:collapse;font-size:13px;margin-bottom:16px}
+th{text-align:left;padding:8px 12px;background:var(--bg);border-bottom:2px solid var(--border);font-size:11px;font-weight:600;color:var(--text2);text-transform:uppercase;letter-spacing:.03em}
+td{padding:8px 12px;border-bottom:1px solid var(--border);vertical-align:top}
+tr:last-child td{border-bottom:none}
+tr:hover td{background:#FAFBFC}
+td strong{color:var(--text)}
+td code{background:var(--bg);padding:1px 6px;border-radius:4px;font-size:12px;font-family:'Courier New',monospace;color:var(--primary)}
+
+/* SOURCE BADGES */
+.src{display:inline-flex;align-items:center;gap:3px;padding:2px 8px;border-radius:4px;font-size:10px;font-weight:700;text-transform:uppercase}
+.src-zd{background:#D1FAE5;color:#065F46}
+.src-tb{background:#FEF3C7;color:#92400E}
+.src-sms{background:#DBEAFE;color:#1E40AF}
+.src-app{background:#F3F4F6;color:#374151}
+.src-new{background:#FEE2E2;color:#991B1B}
+.src-write{background:#EDE9FE;color:#5B21B6}
+
+/* COMMENT BOXES */
+.comment-box{margin-top:8px;position:relative}
+.comment-box textarea{width:100%;padding:8px 12px;border:1px solid var(--border);border-radius:8px;font-size:12px;font-family:inherit;resize:vertical;min-height:32px;background:#FFFBEB;transition:border-color .15s;line-height:1.5}
+.comment-box textarea:focus{outline:none;border-color:var(--warning);box-shadow:0 0 0 3px rgba(245,158,11,.1)}
+.comment-box textarea::placeholder{color:var(--text3);font-style:italic}
+.comment-box textarea:not(:placeholder-shown){border-color:var(--warning);background:#FFFEF5}
+.comment-label{font-size:10px;font-weight:600;color:var(--warning);text-transform:uppercase;letter-spacing:.03em;margin-bottom:3px;display:flex;align-items:center;gap:4px}
+.comment-label .material-icons-outlined{font-size:13px}
+
+/* INVESTIGATION BOXES */
+.investigate{background:#FEF2F2;border:1px solid #FECACA;border-radius:8px;padding:12px 16px;margin:12px 0;font-size:13px}
+.investigate h4{font-size:12px;font-weight:700;color:var(--danger);margin-bottom:6px;display:flex;align-items:center;gap:6px}
+.investigate h4 .material-icons-outlined{font-size:16px}
+.investigate ul{margin:0;padding-left:20px}
+.investigate li{margin-bottom:4px}
+
+/* SUB HEADERS */
+.sub-head{font-size:13px;font-weight:700;color:var(--text);margin:16px 0 8px;padding-bottom:6px;border-bottom:1px solid var(--border)}
+
+/* PRIORITY INDICATORS */
+.pri-crit{color:var(--danger);font-weight:600}
+.pri-high{color:var(--warning);font-weight:600}
+.pri-med{color:var(--info);font-weight:600}
+
+/* NOTES */
+.note{font-size:12px;color:var(--text2);margin:4px 0;line-height:1.5}
+.note strong{color:var(--text)}
+
+/* Responsive */
+@media(max-width:800px){.container{padding:16px}.section-body{padding:12px}table{font-size:12px}th,td{padding:6px 8px}}
+</style>
+</head>
+<body>
+
+<div class="top-bar">
+    <div>
+        <h1>OOH Dashboard — Data Dictionary</h1>
+        <div class="sub">Zendesk Integration / OOH Dashboard — 21 March 2026</div>
+    </div>
+    <div class="top-bar-actions">
+        <div class="save-status" id="save-status"><span class="material-icons-outlined">cloud_done</span> All changes saved</div>
+        <button class="btn-dl" onclick="downloadHTML()"><span class="material-icons-outlined" style="font-size:16px">download</span> Download</button>
+    </div>
+</div>
+
+<div class="container">
+
+<!-- NAV -->
+<div class="nav">
+    <div class="nav-title">Jump to section</div>
+    <div class="nav-links">
+        <a href="#s-key">Source Key</a>
+        <a href="#s-intake">1. Intake Form</a>
+        <a href="#s-ticket">2. Ticket Data</a>
+        <a href="#s-comments">3. Comments & Timeline</a>
+        <a href="#s-site">4. Site Data</a>
+        <a href="#s-devices">5. Device Data</a>
+        <a href="#s-control">6. Control Actions</a>
+        <a href="#s-escalation">7. Escalation</a>
+        <a href="#s-callbacks">8. Callbacks</a>
+        <a href="#s-notices">9. Shift Notices</a>
+        <a href="#s-config">10. App Config</a>
+        <a href="#s-triage">11. Triage Conversation Map</a>
+        <a href="#s-summary">12. Investigation Summary</a>
+    </div>
+</div>
+
+<!-- SOURCE KEY -->
+<div class="section" id="s-key">
+    <div class="section-head"><h2><span class="material-icons-outlined">key</span> Source System Key</h2></div>
+    <div class="section-body">
+        <table>
+            <tr><th>Code</th><th>System</th><th>Status</th><th style="width:40%">Your Notes</th></tr>
+            <tr><td><span class="src src-zd">ZD</span></td><td>Zendesk API (existing integration)</td><td>Available now</td><td><div class="comment-box"><textarea placeholder="Add notes..." data-key="key-zd"></textarea></div></td></tr>
+            <tr><td><span class="src src-tb">TB</span></td><td>ThingsBoard / Lighthouse</td><td>Requires investigation</td><td><div class="comment-box"><textarea placeholder="Add notes..." data-key="key-tb"></textarea></div></td></tr>
+            <tr><td><span class="src src-sms">SMS</span></td><td>SMS Gateway (TBC)</td><td>Not yet selected</td><td><div class="comment-box"><textarea placeholder="Add notes..." data-key="key-sms"></textarea></div></td></tr>
+            <tr><td><span class="src src-app">APP</span></td><td>Dashboard app state / config files</td><td>Available now</td><td><div class="comment-box"><textarea placeholder="Add notes..." data-key="key-app"></textarea></div></td></tr>
+            <tr><td><span class="src src-new">NEW</span></td><td>Doesn't exist yet — needs building</td><td>Needs design</td><td><div class="comment-box"><textarea placeholder="Add notes..." data-key="key-new"></textarea></div></td></tr>
+        </table>
+    </div>
+</div>
+
+<!-- 1. INTAKE -->
+<div class="section" id="s-intake">
+    <div class="section-head"><h2><span class="material-icons-outlined">edit_note</span> 1. Intake Form (Call Logging)</h2><span class="src src-zd">Mostly ZD</span></div>
+    <div class="section-body">
+        <p class="note">Captured by the OOH agent at the start of each call.</p>
+        <table>
+            <tr><th>Field</th><th>Req?</th><th>Source</th><th>Zendesk Field ID</th><th>Notes</th><th style="width:25%">Your Notes</th></tr>
+            <tr><td><strong>Site</strong></td><td>Yes</td><td><span class="src src-zd">ZD</span></td><td><code>11405878329244</code></td><td>Dropdown, ~290 options. Format: <code>brand::subBrand::siteName</code></td><td><div class="comment-box"><textarea placeholder="Add notes..." data-key="intake-site"></textarea></div></td></tr>
+            <tr><td><strong>Caller Name</strong></td><td>Yes</td><td><span class="src src-zd">ZD</span></td><td>Ticket <code>requester_id</code> → user</td><td>Requester = person who raised ticket. New callers = new Zendesk user.</td><td><div class="comment-box"><textarea placeholder="Add notes..." data-key="intake-caller"></textarea></div></td></tr>
+            <tr><td><strong>Caller Role</strong></td><td>No</td><td><span class="src src-new">NEW</span></td><td>—</td><td>Not in Zendesk. Options: GM, AGM, Chef, Staff, Contractor, Other.</td><td><div class="comment-box"><textarea placeholder="New field or notes only?" data-key="intake-role"></textarea></div></td></tr>
+            <tr><td><strong>Contact Phone</strong></td><td>Yes</td><td><span class="src src-zd">ZD</span></td><td>User <code>phone</code> field</td><td>On Zendesk user record.</td><td><div class="comment-box"><textarea placeholder="Add notes..." data-key="intake-phone"></textarea></div></td></tr>
+            <tr><td><strong>Contact Email</strong></td><td>No</td><td><span class="src src-zd">ZD</span></td><td>User <code>email</code> field</td><td>On Zendesk user record.</td><td><div class="comment-box"><textarea placeholder="Add notes..." data-key="intake-email"></textarea></div></td></tr>
+            <tr><td><strong>Alternative Contact</strong></td><td>No</td><td><span class="src src-new">NEW</span></td><td>—</td><td>Not in Zendesk. Internal note or new custom field.</td><td><div class="comment-box"><textarea placeholder="New field or notes only?" data-key="intake-alt"></textarea></div></td></tr>
+            <tr><td><strong>Urgency / Priority</strong></td><td>Yes</td><td><span class="src src-zd">ZD</span></td><td>Ticket <code>priority</code></td><td>Native field. Trade Critical=urgent, Comfort=high, H&S=urgent, Advisory=normal.</td><td><div class="comment-box"><textarea placeholder="Add notes..." data-key="intake-pri"></textarea></div></td></tr>
+        </table>
+        <div class="investigate"><h4><span class="material-icons-outlined">search</span> Investigation needed</h4><ul><li><strong>Caller Role</strong> — new Zendesk custom field, or captured in ticket notes only?</li><li><strong>Alternative Contact</strong> — same decision</li></ul></div>
+        <div class="comment-box"><div class="comment-label"><span class="material-icons-outlined">comment</span> Section notes</div><textarea placeholder="Your overall notes on the intake form..." data-key="intake-general" style="min-height:60px"></textarea></div>
+    </div>
+</div>
+
+<!-- 2. TICKET DATA -->
+<div class="section" id="s-ticket">
+    <div class="section-head"><h2><span class="material-icons-outlined">confirmation_number</span> 2. Ticket Data</h2><span class="src src-zd">ZD</span></div>
+    <div class="section-body">
+        <table>
+            <tr><th>Field</th><th>Source</th><th>Zendesk Field ID</th><th>Notes</th><th style="width:25%">Your Notes</th></tr>
+            <tr><td><strong>Ticket ID</strong></td><td><span class="src src-zd">ZD</span></td><td><code>id</code></td><td>Auto-generated</td><td><div class="comment-box"><textarea placeholder="Add notes..." data-key="tkt-id"></textarea></div></td></tr>
+            <tr><td><strong>Subject</strong></td><td><span class="src src-zd">ZD</span></td><td><code>subject</code></td><td>Auto-populated / editable</td><td><div class="comment-box"><textarea placeholder="Add notes..." data-key="tkt-subj"></textarea></div></td></tr>
+            <tr><td><strong>Status (system)</strong></td><td><span class="src src-zd">ZD</span></td><td><code>status</code></td><td>new, open, pending, hold, solved, closed</td><td><div class="comment-box"><textarea placeholder="Add notes..." data-key="tkt-status"></textarea></div></td></tr>
+            <tr><td><strong>Status (25-step custom)</strong></td><td><span class="src src-zd">ZD</span></td><td><code>custom_status_id</code></td><td>See status map below</td><td><div class="comment-box"><textarea placeholder="Add notes..." data-key="tkt-cstatus"></textarea></div></td></tr>
+            <tr><td><strong>Priority</strong></td><td><span class="src src-zd">ZD</span></td><td><code>priority</code></td><td>urgent, high, normal, low</td><td><div class="comment-box"><textarea placeholder="Add notes..." data-key="tkt-pri"></textarea></div></td></tr>
+            <tr><td><strong>Assigned Agent</strong></td><td><span class="src src-zd">ZD</span></td><td><code>assignee_id</code></td><td>OOH agents won't own tickets</td><td><div class="comment-box"><textarea placeholder="Add notes..." data-key="tkt-assign"></textarea></div></td></tr>
+            <tr><td><strong>Organization</strong></td><td><span class="src src-zd">ZD</span></td><td><code>organization_id</code></td><td>Greene King, McDonalds, etc.</td><td><div class="comment-box"><textarea placeholder="Add notes..." data-key="tkt-org"></textarea></div></td></tr>
+            <tr><td><strong>Equipment L1</strong></td><td><span class="src src-zd">ZD</span></td><td><code>25999250599964</code></td><td>Tagger (read-only via API)</td><td><div class="comment-box"><textarea placeholder="Add notes..." data-key="tkt-l1"></textarea></div></td></tr>
+            <tr><td><strong>Equipment L2</strong></td><td><span class="src src-zd">ZD</span></td><td><code>25999054084252</code></td><td>Pipe-separated text. Stores all categorisation.</td><td><div class="comment-box"><textarea placeholder="Add notes..." data-key="tkt-l2"></textarea></div></td></tr>
+            <tr><td><strong>Problem Indication</strong></td><td><span class="src src-zd">ZD</span></td><td><code>26210220997660</code></td><td>Auto-set by triage (Device Offline, Customer Reported, etc.)</td><td><div class="comment-box"><textarea placeholder="Add notes..." data-key="tkt-prob"></textarea></div></td></tr>
+            <tr><td><strong>Follow-up Date</strong></td><td><span class="src src-zd">ZD</span></td><td><code>26074112194076</code></td><td>For callback scheduling</td><td><div class="comment-box"><textarea placeholder="Add notes..." data-key="tkt-fup"></textarea></div></td></tr>
+            <tr><td><strong>Site (resolution)</strong></td><td><span class="src src-zd">ZD</span></td><td><code>11405878329244</code></td><td>Required for resolution</td><td><div class="comment-box"><textarea placeholder="Add notes..." data-key="tkt-site"></textarea></div></td></tr>
+            <tr><td><strong>Root Cause</strong></td><td><span class="src src-zd">ZD</span></td><td><code>25999085692060</code></td><td>Set by IoT team, not OOH</td><td><div class="comment-box"><textarea placeholder="Add notes..." data-key="tkt-rc"></textarea></div></td></tr>
+            <tr><td><strong>Root Cause Sub</strong></td><td><span class="src src-zd">ZD</span></td><td><code>25999091554204</code></td><td>Set by IoT team, not OOH</td><td><div class="comment-box"><textarea placeholder="Add notes..." data-key="tkt-rcsub"></textarea></div></td></tr>
+        </table>
+
+        <div class="sub-head">Custom Status IDs (OOH relevant)</div>
+        <table>
+            <tr><th>ID</th><th>Name</th><th>When used by OOH</th><th style="width:25%">Your Notes</th></tr>
+            <tr><td><code>25999053375260</code></td><td>Triage</td><td>Ticket created from call</td><td><div class="comment-box"><textarea placeholder="Add notes..." data-key="cs-triage"></textarea></div></td></tr>
+            <tr><td><code>25999053444508</code></td><td>Investigating</td><td>Triage in progress</td><td><div class="comment-box"><textarea placeholder="Add notes..." data-key="cs-inv"></textarea></div></td></tr>
+            <tr><td><code>25999056203932</code></td><td>Awaiting Remote Fix</td><td>Pocket change being applied</td><td><div class="comment-box"><textarea placeholder="Add notes..." data-key="cs-remote"></textarea></div></td></tr>
+            <tr><td><code>25999081452188</code></td><td>Awaiting Customer Action</td><td>Site checking fuse board etc.</td><td><div class="comment-box"><textarea placeholder="Add notes..." data-key="cs-cust"></textarea></div></td></tr>
+            <tr><td><code>25999056432284</code></td><td>Escalated to EM</td><td>Sent to escalation manager</td><td><div class="comment-box"><textarea placeholder="Add notes..." data-key="cs-esc"></textarea></div></td></tr>
+            <tr><td><code>25999081650076</code></td><td>Sent to Repairs Admin</td><td>Routed to GK Repairs</td><td><div class="comment-box"><textarea placeholder="Add notes..." data-key="cs-rep"></textarea></div></td></tr>
+            <tr><td><code>25999081709724</code></td><td>Sent to Network</td><td>Routed to IoT / Network Engineers</td><td><div class="comment-box"><textarea placeholder="Add notes..." data-key="cs-net"></textarea></div></td></tr>
+            <tr><td><code>25999082641308</code></td><td>Resolved</td><td>Triage completed, resolved by OOH</td><td><div class="comment-box"><textarea placeholder="Add notes..." data-key="cs-res"></textarea></div></td></tr>
+        </table>
+        <div class="comment-box"><div class="comment-label"><span class="material-icons-outlined">comment</span> Section notes</div><textarea placeholder="Your overall notes on ticket data..." data-key="ticket-general" style="min-height:60px"></textarea></div>
+    </div>
+</div>
+
+<!-- 3. COMMENTS -->
+<div class="section" id="s-comments">
+    <div class="section-head"><h2><span class="material-icons-outlined">chat_bubble_outline</span> 3. Comments & Timeline</h2><span class="src src-zd">ZD</span></div>
+    <div class="section-body">
+        <table>
+            <tr><th>Field</th><th>Source</th><th>Notes</th><th style="width:25%">Your Notes</th></tr>
+            <tr><td><strong>Comment Text</strong></td><td><span class="src src-zd">ZD</span></td><td><code>/tickets/{id}/comments.json</code></td><td><div class="comment-box"><textarea placeholder="Add notes..." data-key="cmt-text"></textarea></div></td></tr>
+            <tr><td><strong>Comment Author</strong></td><td><span class="src src-zd">ZD</span></td><td><code>author_id</code> → user lookup</td><td><div class="comment-box"><textarea placeholder="Add notes..." data-key="cmt-author"></textarea></div></td></tr>
+            <tr><td><strong>Timestamp</strong></td><td><span class="src src-zd">ZD</span></td><td><code>created_at</code> ISO 8601</td><td><div class="comment-box"><textarea placeholder="Add notes..." data-key="cmt-time"></textarea></div></td></tr>
+            <tr><td><strong>Visibility</strong></td><td><span class="src src-zd">ZD</span></td><td><code>public</code> boolean (true=public, false=internal)</td><td><div class="comment-box"><textarea placeholder="Add notes..." data-key="cmt-vis"></textarea></div></td></tr>
+            <tr><td><strong>Activity Code</strong></td><td><span class="src src-zd">ZD</span></td><td>Detected from comment body. CC, CE, ACS, ACM, RFX, ESC, etc.</td><td><div class="comment-box"><textarea placeholder="Add notes..." data-key="cmt-act"></textarea></div></td></tr>
+            <tr><td><strong>Attachments</strong></td><td><span class="src src-zd">ZD</span></td><td><code>attachments[]</code> on each comment</td><td><div class="comment-box"><textarea placeholder="Add notes..." data-key="cmt-attach"></textarea></div></td></tr>
+            <tr><td><strong>Audit Trail</strong></td><td><span class="src src-zd">ZD</span></td><td><code>/tickets/{id}/audits.json</code> — field changes, status transitions</td><td><div class="comment-box"><textarea placeholder="Add notes..." data-key="cmt-audit"></textarea></div></td></tr>
+        </table>
+
+        <div class="sub-head">OOH-specific auto-generated comments (NEW)</div>
+        <table>
+            <tr><th>Type</th><th>Source</th><th>Content</th><th style="width:25%">Your Notes</th></tr>
+            <tr><td><strong>Triage Notes</strong></td><td><span class="src src-new">NEW</span></td><td>Auto-generated from chat: issue category, device checked, data snapshot, action taken</td><td><div class="comment-box"><textarea placeholder="Add notes..." data-key="cmt-triage"></textarea></div></td></tr>
+            <tr><td><strong>Override Reason</strong></td><td><span class="src src-new">NEW</span></td><td>Free text from agent — why site requested override. Audit trail.</td><td><div class="comment-box"><textarea placeholder="Add notes..." data-key="cmt-reason"></textarea></div></td></tr>
+            <tr><td><strong>Escalation Context</strong></td><td><span class="src src-new">NEW</span></td><td>Auto: reason, contractor details, triage steps already taken</td><td><div class="comment-box"><textarea placeholder="Add notes..." data-key="cmt-escctx"></textarea></div></td></tr>
+            <tr><td><strong>Resolution Summary</strong></td><td><span class="src src-new">NEW</span></td><td>Auto: what changed, revert time, review ticket ref</td><td><div class="comment-box"><textarea placeholder="Add notes..." data-key="cmt-resolve"></textarea></div></td></tr>
+        </table>
+        <div class="comment-box"><div class="comment-label"><span class="material-icons-outlined">comment</span> Section notes</div><textarea placeholder="Your notes on comments/timeline..." data-key="comments-general" style="min-height:60px"></textarea></div>
+    </div>
+</div>
+
+<!-- 4. SITE DATA -->
+<div class="section" id="s-site">
+    <div class="section-head"><h2><span class="material-icons-outlined">location_on</span> 4. Site Data</h2></div>
+    <div class="section-body">
+        <table>
+            <tr><th>Field</th><th>Source</th><th>Zendesk Field ID</th><th>Notes</th><th style="width:25%">Your Notes</th></tr>
+            <tr><td><strong>Site Name</strong></td><td><span class="src src-zd">ZD</span></td><td>Part of <code>11405878329244</code></td><td>Extracted from dropdown option via <code>parseSiteName()</code></td><td><div class="comment-box"><textarea placeholder="Add notes..." data-key="site-name"></textarea></div></td></tr>
+            <tr><td><strong>House ID</strong></td><td><span class="src src-zd">ZD</span></td><td>Part of <code>11405878329244</code></td><td>Embedded in option value</td><td><div class="comment-box"><textarea placeholder="Add notes..." data-key="site-id"></textarea></div></td></tr>
+            <tr><td><strong>Client / Brand</strong></td><td><span class="src src-zd">ZD</span></td><td>Part of <code>11405878329244</code></td><td>First segment of <code>::</code> delimited name</td><td><div class="comment-box"><textarea placeholder="Add notes..." data-key="site-brand"></textarea></div></td></tr>
+            <tr><td><strong>Site Address</strong></td><td><span class="src src-tb">TB?</span></td><td>—</td><td>Not in Zendesk. ThingsBoard? Commissioning data?</td><td><div class="comment-box"><textarea placeholder="Where is this held?" data-key="site-addr"></textarea></div></td></tr>
+            <tr><td><strong>Site Postcode</strong></td><td><span class="src src-tb">TB?</span></td><td>—</td><td>Not in Zendesk. ThingsBoard entity attribute?</td><td><div class="comment-box"><textarea placeholder="Where is this held?" data-key="site-pc"></textarea></div></td></tr>
+            <tr><td><strong>Repeat Caller Count</strong></td><td><span class="src src-zd">ZD</span></td><td>Computed</td><td>Count tickets for site in last 30 days via search API</td><td><div class="comment-box"><textarea placeholder="Add notes..." data-key="site-repeat"></textarea></div></td></tr>
+        </table>
+        <div class="investigate"><h4><span class="material-icons-outlined">search</span> Investigation needed</h4><ul><li><strong>Site Address / Postcode</strong> — where is this held? ThingsBoard entity? Separate spreadsheet? Commissioning reports?</li></ul></div>
+        <div class="comment-box"><div class="comment-label"><span class="material-icons-outlined">comment</span> Section notes</div><textarea placeholder="Your notes on site data..." data-key="site-general" style="min-height:60px"></textarea></div>
+    </div>
+</div>
+
+<!-- 5. DEVICE DATA -->
+<div class="section" id="s-devices">
+    <div class="section-head"><h2><span class="material-icons-outlined">sensors</span> 5. Device Data (Site Panel & Triage)</h2><span class="src src-tb">ALL TB</span></div>
+    <div class="section-body">
+        <p class="note"><strong>None of this is in Zendesk.</strong> All device/telemetry data requires ThingsBoard or the underlying control platform.</p>
+        <table>
+            <tr><th>Field</th><th>Source</th><th>Purpose in UI</th><th>Investigation Question</th><th style="width:22%">Your Notes</th></tr>
+            <tr><td><strong>Asset Inventory</strong></td><td><span class="src src-tb">TB</span></td><td>Device hierarchy in sidebar</td><td>Entity structure? How do sites map to device groups?</td><td><div class="comment-box"><textarea placeholder="What did you find?" data-key="dev-inventory"></textarea></div></td></tr>
+            <tr><td><strong>Device Online/Offline</strong></td><td><span class="src src-tb">TB</span></td><td>Green/red status dots</td><td>Device <code>active</code> attribute or last telemetry timestamp?</td><td><div class="comment-box"><textarea placeholder="What did you find?" data-key="dev-status"></textarea></div></td></tr>
+            <tr><td><strong>Device Last Seen</strong></td><td><span class="src src-tb">TB</span></td><td>"Offline since 18 Feb"</td><td><code>lastActivityTime</code> on device entity?</td><td><div class="comment-box"><textarea placeholder="What did you find?" data-key="dev-lastseen"></textarea></div></td></tr>
+            <tr><td><strong>Current Temperature</strong></td><td><span class="src src-tb">TB</span></td><td>Live reading (17.4°C)</td><td>Telemetry key name? <code>temperature</code>?</td><td><div class="comment-box"><textarea placeholder="Exact key name?" data-key="dev-temp"></textarea></div></td></tr>
+            <tr><td><strong>Setpoint Temperature</strong></td><td><span class="src src-tb">TB</span></td><td>Target (21°C)</td><td>Attribute or telemetry? On which entity?</td><td><div class="comment-box"><textarea placeholder="Exact key name?" data-key="dev-setpoint"></textarea></div></td></tr>
+            <tr><td><strong>Heating Active</strong></td><td><span class="src src-tb">TB</span></td><td>"Active" / "Inactive"</td><td>Valve state? Heat demand signal?</td><td><div class="comment-box"><textarea placeholder="How is this derived?" data-key="dev-heatactive"></textarea></div></td></tr>
+            <tr><td><strong>Flow Temperature</strong></td><td><span class="src src-tb">TB</span></td><td>Boiler output (48°C)</td><td>Which sensor entity? Key name?</td><td><div class="comment-box"><textarea placeholder="Exact key name?" data-key="dev-flow"></textarea></div></td></tr>
+            <tr><td><strong>Power State (On/Off)</strong></td><td><span class="src src-tb">TB</span></td><td>Equipment on/off</td><td>Tuya switch state or power consumption?</td><td><div class="comment-box"><textarea placeholder="How is on/off determined?" data-key="dev-power"></textarea></div></td></tr>
+            <tr><td><strong>Schedule</strong></td><td><span class="src src-tb">TB?</span></td><td>Schedule grid (Mon-Sun)</td><td>Where stored? ThingsBoard? Tuya cloud? Device firmware?</td><td><div class="comment-box"><textarea placeholder="Where are schedules?" data-key="dev-sched"></textarea></div></td></tr>
+            <tr><td><strong>Gateway Status</strong></td><td><span class="src src-tb">TB</span></td><td>"IoT Gateway: Online"</td><td>Gateway device entity active status</td><td><div class="comment-box"><textarea placeholder="What did you find?" data-key="dev-gw"></textarea></div></td></tr>
+            <tr><td><strong>WiFi / Connectivity</strong></td><td><span class="src src-tb">TB</span></td><td>"GK WiFi: OK"</td><td>Inferred from gateway? Separate monitoring?</td><td><div class="comment-box"><textarea placeholder="How is this determined?" data-key="dev-wifi"></textarea></div></td></tr>
+            <tr><td><strong>Energy Consumption</strong></td><td><span class="src src-tb">TB</span></td><td>"Energy: Live"</td><td>Power Pause current sensor telemetry</td><td><div class="comment-box"><textarea placeholder="What did you find?" data-key="dev-energy"></textarea></div></td></tr>
+            <tr><td><strong>Device Type/Category</strong></td><td><span class="src src-tb">TB</span></td><td>Filtering into PP/Heating/Monitor/Network</td><td>How does TB distinguish device types?</td><td><div class="comment-box"><textarea placeholder="What did you find?" data-key="dev-type"></textarea></div></td></tr>
+            <tr><td><strong>Device Relationships</strong></td><td><span class="src src-tb">TB</span></td><td>Extractor → gas interlock warning</td><td>TB device relations? Or config-based?</td><td><div class="comment-box"><textarea placeholder="How are relationships modelled?" data-key="dev-rel"></textarea></div></td></tr>
+        </table>
+        <div class="comment-box"><div class="comment-label"><span class="material-icons-outlined">comment</span> Section notes</div><textarea placeholder="Your overall notes on device data investigation..." data-key="devices-general" style="min-height:80px"></textarea></div>
+    </div>
+</div>
+
+<!-- 6. CONTROL ACTIONS -->
+<div class="section" id="s-control">
+    <div class="section-head"><h2><span class="material-icons-outlined">tune</span> 6. Control Actions (Pocket Changes)</h2><span class="src src-new">NEW</span></div>
+    <div class="section-body">
+        <p class="note"><strong>None of this exists yet.</strong> These require integration with the control platform (which may not be ThingsBoard directly).</p>
+        <table>
+            <tr><th>Action</th><th>Target</th><th>Source</th><th>Investigation Question</th><th style="width:22%">Your Notes</th></tr>
+            <tr><td><strong>Set Heating Setpoint</strong></td><td>Salus controller</td><td><span class="src src-tb">TB→?</span></td><td>Does TB send RPC? Or via Salus API directly?</td><td><div class="comment-box"><textarea placeholder="What's the control path?" data-key="ctrl-setpoint"></textarea></div></td></tr>
+            <tr><td><strong>Equipment Override (On)</strong></td><td>Tongou / Tuya device</td><td><span class="src src-tb">TB→Tuya?</span></td><td>TB controls via Tuya Cloud? Or direct Tuya API?</td><td><div class="comment-box"><textarea placeholder="What's the control path?" data-key="ctrl-on"></textarea></div></td></tr>
+            <tr><td><strong>Equipment Override (Off)</strong></td><td>Tongou / Tuya device</td><td><span class="src src-tb">TB→Tuya?</span></td><td>Same as above</td><td><div class="comment-box"><textarea placeholder="What's the control path?" data-key="ctrl-off"></textarea></div></td></tr>
+            <tr><td><strong>DHW Override</strong></td><td>DHW valve controller</td><td><span class="src src-tb">TB→?</span></td><td>What controls the DHW valve?</td><td><div class="comment-box"><textarea placeholder="What's the control path?" data-key="ctrl-dhw"></textarea></div></td></tr>
+            <tr><td><strong>Schedule Temp Change</strong></td><td>Device schedule</td><td><span class="src src-tb">TB→?</span></td><td>Where are schedules stored? API writable?</td><td><div class="comment-box"><textarea placeholder="What's the control path?" data-key="ctrl-sched"></textarea></div></td></tr>
+            <tr><td><strong>Auto-Revert</strong></td><td>Timer mechanism</td><td><span class="src src-new">NEW</span></td><td>TB rule chain? Dashboard cron? Tuya timer?</td><td><div class="comment-box"><textarea placeholder="How to implement safely?" data-key="ctrl-revert"></textarea></div></td></tr>
+        </table>
+        <div class="investigate"><h4><span class="material-icons-outlined">search</span> Critical questions</h4><ul>
+            <li><strong>What does ThingsBoard actually control?</strong> Read-only aggregator, or sends commands?</li>
+            <li><strong>Tuya API</strong> — can Tongou devices be controlled via Tuya Cloud independently?</li>
+            <li><strong>Salus API</strong> — do heating controllers have their own API?</li>
+            <li><strong>Auto-revert</strong> — safest way to implement time-limited changes?</li>
+            <li><strong>Audit logging</strong> — are API changes logged in ThingsBoard automatically?</li>
+        </ul></div>
+        <div class="comment-box"><div class="comment-label"><span class="material-icons-outlined">comment</span> Section notes</div><textarea placeholder="Your overall notes on control actions..." data-key="control-general" style="min-height:80px"></textarea></div>
+    </div>
+</div>
+
+<!-- 7. ESCALATION -->
+<div class="section" id="s-escalation">
+    <div class="section-head"><h2><span class="material-icons-outlined">priority_high</span> 7. Escalation Workflow</h2></div>
+    <div class="section-body">
+        <table>
+            <tr><th>Field</th><th>Source</th><th>Notes</th><th style="width:25%">Your Notes</th></tr>
+            <tr><td><strong>Escalation Reason</strong></td><td><span class="src src-new">NEW</span></td><td>Agent selects: Contractor on site, Equipment fault, Safety, Triage didn't resolve</td><td><div class="comment-box"><textarea placeholder="Add notes..." data-key="esc-reason"></textarea></div></td></tr>
+            <tr><td><strong>Contractor Details</strong></td><td><span class="src src-new">NEW</span></td><td>Name, phone, company — dynamic when reason = contractor</td><td><div class="comment-box"><textarea placeholder="Add notes..." data-key="esc-contractor"></textarea></div></td></tr>
+            <tr><td><strong>Escalation Manager</strong></td><td><span class="src src-app">APP</span></td><td>From <code>escalation-rules.json</code> — currently Sam Day</td><td><div class="comment-box"><textarea placeholder="Add notes..." data-key="esc-mgr"></textarea></div></td></tr>
+            <tr><td><strong>SMS Notification</strong></td><td><span class="src src-sms">SMS</span></td><td>Send ticket link + summary to mobile</td><td><div class="comment-box"><textarea placeholder="Which SMS provider?" data-key="esc-sms"></textarea></div></td></tr>
+            <tr><td><strong>45-min Timeout</strong></td><td><span class="src src-new">NEW</span></td><td>Auto-route if no response</td><td><div class="comment-box"><textarea placeholder="How to implement?" data-key="esc-timeout"></textarea></div></td></tr>
+            <tr><td><strong>Routing Contacts</strong></td><td><span class="src src-app">APP</span></td><td>GK Repairs, Network Engineers, SCC, Flowrite</td><td><div class="comment-box"><textarea placeholder="Populate contacts..." data-key="esc-contacts"></textarea></div></td></tr>
+            <tr><td><strong>Escalation Status</strong></td><td><span class="src src-zd">ZD</span></td><td><code>custom_status_id</code> = <code>25999056432284</code> (Escalated to EM)</td><td><div class="comment-box"><textarea placeholder="Add notes..." data-key="esc-status"></textarea></div></td></tr>
+        </table>
+        <div class="sub-head">Missing routing contacts (need populating)</div>
+        <table>
+            <tr><th>Team</th><th>Purpose</th><th style="width:40%">Contact Details (fill in)</th></tr>
+            <tr><td>GK Repairs Admin</td><td>Boiler, plumbing, electrical</td><td><div class="comment-box"><textarea placeholder="Phone / email..." data-key="route-gk"></textarea></div></td></tr>
+            <tr><td>Network Engineers</td><td>Lighthouse hardware, firmware</td><td><div class="comment-box"><textarea placeholder="Phone / email..." data-key="route-network"></textarea></div></td></tr>
+            <tr><td>SCC</td><td>Kitchen equipment contractors</td><td><div class="comment-box"><textarea placeholder="Phone / email..." data-key="route-scc"></textarea></div></td></tr>
+            <tr><td>Flowrite</td><td>Refrigeration contractors</td><td><div class="comment-box"><textarea placeholder="Phone / email..." data-key="route-flowrite"></textarea></div></td></tr>
+        </table>
+        <div class="comment-box"><div class="comment-label"><span class="material-icons-outlined">comment</span> Section notes</div><textarea placeholder="Your notes on escalation workflow..." data-key="escalation-general" style="min-height:60px"></textarea></div>
+    </div>
+</div>
+
+<!-- 8. CALLBACKS -->
+<div class="section" id="s-callbacks">
+    <div class="section-head"><h2><span class="material-icons-outlined">phone_callback</span> 8. Callback Tracking</h2></div>
+    <div class="section-body">
+        <table>
+            <tr><th>Field</th><th>Source</th><th>Notes</th><th style="width:25%">Your Notes</th></tr>
+            <tr><td><strong>Callback Site</strong></td><td><span class="src src-zd">ZD</span></td><td>From ticket site field</td><td><div class="comment-box"><textarea placeholder="Add notes..." data-key="cb-site"></textarea></div></td></tr>
+            <tr><td><strong>Callback Reason</strong></td><td><span class="src src-zd">ZD</span></td><td>From ticket subject/comment</td><td><div class="comment-box"><textarea placeholder="Add notes..." data-key="cb-reason"></textarea></div></td></tr>
+            <tr><td><strong>Callback Contact</strong></td><td><span class="src src-zd">ZD</span></td><td>Requester phone</td><td><div class="comment-box"><textarea placeholder="Add notes..." data-key="cb-contact"></textarea></div></td></tr>
+            <tr><td><strong>Callback Due</strong></td><td><span class="src src-zd">ZD</span></td><td>Follow-up Date field <code>26074112194076</code></td><td><div class="comment-box"><textarea placeholder="Add notes..." data-key="cb-due"></textarea></div></td></tr>
+            <tr><td><strong>Callback Status</strong></td><td><span class="src src-new">NEW</span></td><td>Not in Zendesk. Tag-based (<code>callback_due</code>/<code>callback_complete</code>) or follow-up date presence.</td><td><div class="comment-box"><textarea placeholder="How to track?" data-key="cb-status"></textarea></div></td></tr>
+        </table>
+        <div class="comment-box"><div class="comment-label"><span class="material-icons-outlined">comment</span> Section notes</div><textarea placeholder="Your notes on callbacks..." data-key="callbacks-general" style="min-height:60px"></textarea></div>
+    </div>
+</div>
+
+<!-- 9. NOTICES -->
+<div class="section" id="s-notices">
+    <div class="section-head"><h2><span class="material-icons-outlined">campaign</span> 9. Shift Notices</h2><span class="src src-new">ALL NEW</span></div>
+    <div class="section-body">
+        <table>
+            <tr><th>Field</th><th>Source</th><th>Notes</th><th style="width:25%">Your Notes</th></tr>
+            <tr><td><strong>Notice Title</strong></td><td><span class="src src-new">NEW</span></td><td>Not in Zendesk</td><td><div class="comment-box"><textarea placeholder="Storage option?" data-key="not-title"></textarea></div></td></tr>
+            <tr><td><strong>Notice Body</strong></td><td><span class="src src-new">NEW</span></td><td>—</td><td><div class="comment-box"><textarea placeholder="Add notes..." data-key="not-body"></textarea></div></td></tr>
+            <tr><td><strong>Notice Author</strong></td><td><span class="src src-new">NEW</span></td><td>IoT team member</td><td><div class="comment-box"><textarea placeholder="Add notes..." data-key="not-author"></textarea></div></td></tr>
+            <tr><td><strong>Notice Expiry</strong></td><td><span class="src src-new">NEW</span></td><td>Auto-hide date</td><td><div class="comment-box"><textarea placeholder="Add notes..." data-key="not-expiry"></textarea></div></td></tr>
+            <tr><td><strong>Notice Type</strong></td><td><span class="src src-new">NEW</span></td><td>Warning, New, Info</td><td><div class="comment-box"><textarea placeholder="Add notes..." data-key="not-type"></textarea></div></td></tr>
+        </table>
+        <p class="note"><strong>Storage options:</strong> JSON file (<code>data/shift-notices.json</code>), Zendesk custom object, or dashboard API endpoint.</p>
+        <div class="comment-box"><div class="comment-label"><span class="material-icons-outlined">comment</span> Section notes</div><textarea placeholder="Your notes on shift notices..." data-key="notices-general" style="min-height:60px"></textarea></div>
+    </div>
+</div>
+
+<!-- 10. CONFIG -->
+<div class="section" id="s-config">
+    <div class="section-head"><h2><span class="material-icons-outlined">settings</span> 10. Application Config</h2><span class="src src-app">APP</span></div>
+    <div class="section-body">
+        <table>
+            <tr><th>Data</th><th>Source</th><th>File</th><th style="width:25%">Your Notes</th></tr>
+            <tr><td><strong>Team Members</strong></td><td><span class="src src-app">APP</span></td><td><code>data/team.json</code></td><td><div class="comment-box"><textarea placeholder="Add notes..." data-key="cfg-team"></textarea></div></td></tr>
+            <tr><td><strong>SLA Targets</strong></td><td><span class="src src-app">APP</span></td><td><code>data/escalation-rules.json</code></td><td><div class="comment-box"><textarea placeholder="Add notes..." data-key="cfg-sla"></textarea></div></td></tr>
+            <tr><td><strong>Portfolio Clients</strong></td><td><span class="src src-app">APP</span></td><td><code>data/portfolio.json</code></td><td><div class="comment-box"><textarea placeholder="Add notes..." data-key="cfg-portfolio"></textarea></div></td></tr>
+            <tr><td><strong>Escalation Routing</strong></td><td><span class="src src-app">APP</span></td><td><code>data/escalation-rules.json</code></td><td><div class="comment-box"><textarea placeholder="Add notes..." data-key="cfg-routing"></textarea></div></td></tr>
+        </table>
+        <div class="comment-box"><div class="comment-label"><span class="material-icons-outlined">comment</span> Section notes</div><textarea placeholder="Your notes on config..." data-key="config-general" style="min-height:60px"></textarea></div>
+    </div>
+</div>
+
+<!-- 11. TRIAGE MAP -->
+<div class="section" id="s-triage">
+    <div class="section-head"><h2><span class="material-icons-outlined">support_agent</span> 11. Triage Conversation Map — Data Per Step</h2></div>
+    <div class="section-body">
+        <p class="note">Every triage state mapped to the data the bot needs. <span class="src src-zd">ZD</span> = available now. <span class="src src-tb">TB</span> = needs investigation. <span class="src src-write">WRITE</span> = changes a system.</p>
+
+        <div class="sub-head">11.1 Heating Path</div>
+        <table>
+            <tr><th>State</th><th>Bot Needs</th><th>Source</th><th>R/W</th><th style="width:20%">Your Notes</th></tr>
+            <tr><td><code>heat_type</code></td><td>Count of heating zones at site</td><td><span class="src src-tb">TB</span></td><td>Read</td><td><div class="comment-box"><textarea placeholder="" data-key="tri-heat-type"></textarea></div></td></tr>
+            <tr><td><code>heat_cold_zone</code></td><td>Zone names (Restaurant, Bar, Accom)</td><td><span class="src src-tb">TB</span></td><td>Read</td><td><div class="comment-box"><textarea placeholder="" data-key="tri-heat-zone"></textarea></div></td></tr>
+            <tr><td><code>heat_cold_check_*</code></td><td>Current temp, setpoint, heating active, flow temp</td><td><span class="src src-tb">TB</span></td><td>Read</td><td><div class="comment-box"><textarea placeholder="" data-key="tri-heat-check"></textarea></div></td></tr>
+            <tr><td></td><td>Allowable setpoint range (guardrails)</td><td><span class="src src-tb">TB</span> or <span class="src src-app">APP</span></td><td>Read</td><td><div class="comment-box"><textarea placeholder="" data-key="tri-heat-guard"></textarea></div></td></tr>
+            <tr><td><code>heat_cold_check_accom</code></td><td>BDM approval threshold per zone</td><td><span class="src src-tb">TB</span> or <span class="src src-app">APP</span></td><td>Read</td><td><div class="comment-box"><textarea placeholder="" data-key="tri-heat-bdm"></textarea></div></td></tr>
+            <tr><td><code>heat_cold_check_all</code></td><td>Gateway online/offline + all zone temps</td><td><span class="src src-tb">TB</span></td><td>Read</td><td><div class="comment-box"><textarea placeholder="" data-key="tri-heat-gw"></textarea></div></td></tr>
+            <tr><td>Apply boost</td><td>Write setpoint to heating controller</td><td><span class="src src-write">WRITE</span> <span class="src src-tb">TB→?</span></td><td>Write</td><td><div class="comment-box"><textarea placeholder="" data-key="tri-heat-write"></textarea></div></td></tr>
+            <tr><td><code>heat_done</code></td><td>Create P1 review ticket + auto-revert timer</td><td><span class="src src-zd">ZD</span> + <span class="src src-new">NEW</span></td><td>Write</td><td><div class="comment-box"><textarea placeholder="" data-key="tri-heat-done"></textarea></div></td></tr>
+        </table>
+
+        <div class="sub-head">11.2 Kitchen Equipment Path</div>
+        <table>
+            <tr><th>State</th><th>Bot Needs</th><th>Source</th><th>R/W</th><th style="width:20%">Your Notes</th></tr>
+            <tr><td><code>kit_which</code></td><td>Kitchen device inventory at site</td><td><span class="src src-tb">TB</span></td><td>Read</td><td><div class="comment-box"><textarea placeholder="" data-key="tri-kit-which"></textarea></div></td></tr>
+            <tr><td><code>kit_fryer</code> etc.</td><td>Device power state (on/off), Power Pause status, schedule end time</td><td><span class="src src-tb">TB</span></td><td>Read</td><td><div class="comment-box"><textarea placeholder="" data-key="tri-kit-status"></textarea></div></td></tr>
+            <tr><td></td><td>Device connection history (when did it go offline?)</td><td><span class="src src-tb">TB</span></td><td>Read</td><td><div class="comment-box"><textarea placeholder="" data-key="tri-kit-hist"></textarea></div></td></tr>
+            <tr><td></td><td>Gas interlock relationships (extractors)</td><td><span class="src src-tb">TB</span> or <span class="src src-app">APP</span></td><td>Read</td><td><div class="comment-box"><textarea placeholder="" data-key="tri-kit-interlock"></textarea></div></td></tr>
+            <tr><td>Apply override</td><td>Turn on Power Pause device</td><td><span class="src src-write">WRITE</span> <span class="src src-tb">TB→Tuya?</span></td><td>Write</td><td><div class="comment-box"><textarea placeholder="" data-key="tri-kit-write"></textarea></div></td></tr>
+        </table>
+
+        <div class="sub-head">11.3 Lighting Path</div>
+        <table>
+            <tr><th>State</th><th>Bot Needs</th><th>Source</th><th>R/W</th><th style="width:20%">Your Notes</th></tr>
+            <tr><td><code>light_which</code></td><td>External lighting devices at site</td><td><span class="src src-tb">TB</span></td><td>Read</td><td><div class="comment-box"><textarea placeholder="" data-key="tri-light-which"></textarea></div></td></tr>
+            <tr><td><code>light_carpark</code> etc.</td><td>Tongou device status, schedule, last seen</td><td><span class="src src-tb">TB</span></td><td>Read</td><td><div class="comment-box"><textarea placeholder="" data-key="tri-light-status"></textarea></div></td></tr>
+            <tr><td><code>light_festoon</code></td><td>Manual override availability at site</td><td><span class="src src-tb">TB</span> or <span class="src src-app">APP</span></td><td>Read</td><td><div class="comment-box"><textarea placeholder="" data-key="tri-light-manual"></textarea></div></td></tr>
+            <tr><td>Turn on lights</td><td>Switch Tongou device on</td><td><span class="src src-write">WRITE</span> <span class="src src-tb">TB→Tuya?</span></td><td>Write</td><td><div class="comment-box"><textarea placeholder="" data-key="tri-light-write"></textarea></div></td></tr>
+        </table>
+
+        <div class="sub-head">11.4 Hot Water Path</div>
+        <table>
+            <tr><th>State</th><th>Bot Needs</th><th>Source</th><th>R/W</th><th style="width:20%">Your Notes</th></tr>
+            <tr><td><code>hw_check</code></td><td>DHW temp, setpoint, valve state</td><td><span class="src src-tb">TB</span></td><td>Read</td><td><div class="comment-box"><textarea placeholder="" data-key="tri-hw-check"></textarea></div></td></tr>
+            <tr><td><code>hw_too_hot</code></td><td>Lower DHW setpoint</td><td><span class="src src-write">WRITE</span> <span class="src src-tb">TB→?</span></td><td>Write</td><td><div class="comment-box"><textarea placeholder="" data-key="tri-hw-write"></textarea></div></td></tr>
+            <tr><td><code>hw_intermittent</code></td><td>Force DHW valve open</td><td><span class="src src-write">WRITE</span> <span class="src src-tb">TB→?</span></td><td>Write</td><td><div class="comment-box"><textarea placeholder="" data-key="tri-hw-valve"></textarea></div></td></tr>
+        </table>
+
+        <div class="sub-head">11.5 Scope / "Something Else" Path</div>
+        <table>
+            <tr><th>State</th><th>Bot Needs</th><th>Source</th><th>R/W</th><th style="width:20%">Your Notes</th></tr>
+            <tr><td><code>other_scope</code></td><td>Static list of non-LH items</td><td><span class="src src-app">APP</span></td><td>Read</td><td><div class="comment-box"><textarea placeholder="" data-key="tri-other-scope"></textarea></div></td></tr>
+            <tr><td><code>other_electrical</code></td><td>All device statuses at site (find offline one)</td><td><span class="src src-tb">TB</span></td><td>Read</td><td><div class="comment-box"><textarea placeholder="" data-key="tri-other-elec"></textarea></div></td></tr>
+            <tr><td><code>other_unknown</code></td><td>Complete device inventory for scope list</td><td><span class="src src-tb">TB</span></td><td>Read</td><td><div class="comment-box"><textarea placeholder="" data-key="tri-other-full"></textarea></div></td></tr>
+        </table>
+
+        <div class="sub-head">11.6 Escalation & Resolution (all paths)</div>
+        <table>
+            <tr><th>Action</th><th>Data Required</th><th>Source</th><th>R/W</th><th style="width:20%">Your Notes</th></tr>
+            <tr><td>Update ticket status</td><td>Write <code>custom_status_id</code></td><td><span class="src src-zd">ZD</span></td><td>Write</td><td><div class="comment-box"><textarea placeholder="" data-key="tri-esc-status"></textarea></div></td></tr>
+            <tr><td>Add triage notes</td><td>Create internal comment</td><td><span class="src src-zd">ZD</span></td><td>Write</td><td><div class="comment-box"><textarea placeholder="" data-key="tri-esc-comment"></textarea></div></td></tr>
+            <tr><td>Send escalation SMS</td><td>Manager phone + ticket link</td><td><span class="src src-sms">SMS</span></td><td>Write</td><td><div class="comment-box"><textarea placeholder="" data-key="tri-esc-sms"></textarea></div></td></tr>
+            <tr><td>Create P1 review ticket</td><td>New ticket with reference</td><td><span class="src src-zd">ZD</span></td><td>Write</td><td><div class="comment-box"><textarea placeholder="" data-key="tri-res-review"></textarea></div></td></tr>
+            <tr><td>Start auto-revert timer</td><td>Scheduler mechanism</td><td><span class="src src-new">NEW</span></td><td>Write</td><td><div class="comment-box"><textarea placeholder="" data-key="tri-res-timer"></textarea></div></td></tr>
+        </table>
+
+        <div class="comment-box"><div class="comment-label"><span class="material-icons-outlined">comment</span> Triage section notes</div><textarea placeholder="Your overall notes on triage data requirements..." data-key="triage-general" style="min-height:80px"></textarea></div>
+    </div>
+</div>
+
+<!-- 12. SUMMARY -->
+<div class="section" id="s-summary">
+    <div class="section-head"><h2><span class="material-icons-outlined">checklist</span> 12. Investigation Summary</h2></div>
+    <div class="section-body">
+        <div class="sub-head">ThingsBoard — READ (13 data points)</div>
+        <table>
+            <tr><th>#</th><th>Data Point</th><th>Priority</th><th>Blocks</th><th style="width:22%">Status / Notes</th></tr>
+            <tr><td>1</td><td>Site → device list</td><td><span class="pri-crit">Critical</span></td><td>All paths</td><td><div class="comment-box"><textarea placeholder="Found? API endpoint?" data-key="inv-1"></textarea></div></td></tr>
+            <tr><td>2</td><td>Device online/offline</td><td><span class="pri-crit">Critical</span></td><td>All paths</td><td><div class="comment-box"><textarea placeholder="Found? How?" data-key="inv-2"></textarea></div></td></tr>
+            <tr><td>3</td><td>Device last seen</td><td><span class="pri-crit">Critical</span></td><td>Offline triage</td><td><div class="comment-box"><textarea placeholder="Found? Attribute name?" data-key="inv-3"></textarea></div></td></tr>
+            <tr><td>4</td><td>Current temperature</td><td><span class="pri-crit">Critical</span></td><td>Heating triage</td><td><div class="comment-box"><textarea placeholder="Telemetry key?" data-key="inv-4"></textarea></div></td></tr>
+            <tr><td>5</td><td>Setpoint temperature</td><td><span class="pri-crit">Critical</span></td><td>Heating triage</td><td><div class="comment-box"><textarea placeholder="Telemetry key?" data-key="inv-5"></textarea></div></td></tr>
+            <tr><td>6</td><td>Heating active signal</td><td><span class="pri-crit">Critical</span></td><td>Heating triage</td><td><div class="comment-box"><textarea placeholder="How derived?" data-key="inv-6"></textarea></div></td></tr>
+            <tr><td>7</td><td>Flow temperature</td><td><span class="pri-high">High</span></td><td>Condenser diagnosis</td><td><div class="comment-box"><textarea placeholder="Telemetry key?" data-key="inv-7"></textarea></div></td></tr>
+            <tr><td>8</td><td>Power state (on/off)</td><td><span class="pri-crit">Critical</span></td><td>Kitchen + lighting</td><td><div class="comment-box"><textarea placeholder="How determined?" data-key="inv-8"></textarea></div></td></tr>
+            <tr><td>9</td><td>Device schedule</td><td><span class="pri-high">High</span></td><td>Schedule-based triage</td><td><div class="comment-box"><textarea placeholder="Where stored?" data-key="inv-9"></textarea></div></td></tr>
+            <tr><td>10</td><td>DHW temp + setpoint + valve</td><td><span class="pri-high">High</span></td><td>Hot water triage</td><td><div class="comment-box"><textarea placeholder="Telemetry keys?" data-key="inv-10"></textarea></div></td></tr>
+            <tr><td>11</td><td>Gateway status</td><td><span class="pri-crit">Critical</span></td><td>Escalation path</td><td><div class="comment-box"><textarea placeholder="Found?" data-key="inv-11"></textarea></div></td></tr>
+            <tr><td>12</td><td>Device type/category</td><td><span class="pri-high">High</span></td><td>Hierarchy filtering</td><td><div class="comment-box"><textarea placeholder="How categorised?" data-key="inv-12"></textarea></div></td></tr>
+            <tr><td>13</td><td>Device relationships</td><td><span class="pri-med">Medium</span></td><td>Interlock warning</td><td><div class="comment-box"><textarea placeholder="How modelled?" data-key="inv-13"></textarea></div></td></tr>
+        </table>
+
+        <div class="sub-head">ThingsBoard — WRITE (4 actions)</div>
+        <table>
+            <tr><th>#</th><th>Action</th><th>Priority</th><th>Blocks</th><th style="width:22%">Status / Notes</th></tr>
+            <tr><td>14</td><td>Set heating setpoint</td><td><span class="pri-crit">Critical</span></td><td>Heating boost/lower</td><td><div class="comment-box"><textarea placeholder="Control path?" data-key="inv-14"></textarea></div></td></tr>
+            <tr><td>15</td><td>Turn on/off Power Pause</td><td><span class="pri-crit">Critical</span></td><td>Kitchen + lighting override</td><td><div class="comment-box"><textarea placeholder="Control path?" data-key="inv-15"></textarea></div></td></tr>
+            <tr><td>16</td><td>Override DHW valve</td><td><span class="pri-high">High</span></td><td>Hot water override</td><td><div class="comment-box"><textarea placeholder="Control path?" data-key="inv-16"></textarea></div></td></tr>
+            <tr><td>17</td><td>Auto-revert mechanism</td><td><span class="pri-crit">Critical</span></td><td>All pocket changes</td><td><div class="comment-box"><textarea placeholder="Implementation approach?" data-key="inv-17"></textarea></div></td></tr>
+        </table>
+
+        <div class="sub-head">New Systems (3 capabilities)</div>
+        <table>
+            <tr><th>#</th><th>Capability</th><th>Options</th><th style="width:30%">Decision / Notes</th></tr>
+            <tr><td>18</td><td>SMS send</td><td>Twilio, Azure Comms, MessageBird</td><td><div class="comment-box"><textarea placeholder="Which provider?" data-key="inv-18"></textarea></div></td></tr>
+            <tr><td>19</td><td>Timer/scheduler</td><td>Server cron, TB rule chain, scheduled task</td><td><div class="comment-box"><textarea placeholder="Which approach?" data-key="inv-19"></textarea></div></td></tr>
+            <tr><td>20</td><td>Shift notices storage</td><td>JSON file, dashboard API, ZD custom object</td><td><div class="comment-box"><textarea placeholder="Which approach?" data-key="inv-20"></textarea></div></td></tr>
+        </table>
+
+        <div class="comment-box" style="margin-top:20px"><div class="comment-label"><span class="material-icons-outlined">comment</span> Overall investigation notes</div><textarea placeholder="Your master notes across the whole investigation..." data-key="summary-general" style="min-height:100px"></textarea></div>
+    </div>
+</div>
+
+</div><!-- /container -->
+
+<script>
+// ==========================================
+// AUTO-SAVE TO LOCAL STORAGE
+// ==========================================
+const STORAGE_KEY = 'ooh-data-dict-comments';
+
+function loadComments() {
+    const saved = localStorage.getItem(STORAGE_KEY);
+    if (!saved) return;
+    try {
+        const data = JSON.parse(saved);
+        document.querySelectorAll('textarea[data-key]').forEach(ta => {
+            if (data[ta.dataset.key]) {
+                ta.value = data[ta.dataset.key];
+            }
+        });
+    } catch(e) { console.error('Failed to load saved comments:', e); }
+}
+
+function saveComments() {
+    const data = {};
+    document.querySelectorAll('textarea[data-key]').forEach(ta => {
+        if (ta.value.trim()) data[ta.dataset.key] = ta.value;
+    });
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+    const st = document.getElementById('save-status');
+    st.innerHTML = '<span class="material-icons-outlined">cloud_done</span> Saved just now';
+    setTimeout(() => { st.innerHTML = '<span class="material-icons-outlined">cloud_done</span> All changes saved'; }, 2000);
+}
+
+// Auto-save on every keystroke (debounced)
+let saveTimer;
+document.addEventListener('input', e => {
+    if (e.target.matches('textarea[data-key]')) {
+        clearTimeout(saveTimer);
+        const st = document.getElementById('save-status');
+        st.innerHTML = '<span class="material-icons-outlined">edit</span> Typing...';
+        saveTimer = setTimeout(saveComments, 800);
+    }
+});
+
+// Load on page load
+document.addEventListener('DOMContentLoaded', loadComments);
+
+// ==========================================
+// DOWNLOAD AS HTML (with comments baked in)
+// ==========================================
+function downloadHTML() {
+    // Bake current textarea values into the HTML
+    document.querySelectorAll('textarea[data-key]').forEach(ta => {
+        ta.setAttribute('value', ta.value); // doesn't work for textarea
+        ta.textContent = ta.value; // this does
+    });
+
+    const html = '<!DOCTYPE html>\n' + document.documentElement.outerHTML;
+    const blob = new Blob([html], { type: 'text/html' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'OOH_DATA_DICTIONARY_' + new Date().toISOString().slice(0,10) + '.html';
+    a.click();
+    URL.revokeObjectURL(url);
+}
+</script>
+</body>
+</html>

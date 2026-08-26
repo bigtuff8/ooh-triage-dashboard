@@ -1,0 +1,482 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>OOH Dashboard — Discovery & Go-Live Shaping Proposal</title>
+<style>
+  :root{
+    --bg:#f4f6f9; --panel:#ffffff; --ink:#16202e; --muted:#5c6b80; --line:#e2e8f0;
+    --green:#19895b; --green-d:#0f6a45; --blue:#2563eb; --amber:#c77700; --red:#d64545;
+    --slate:#334155; --chip:#eef2f7;
+    --good-bg:#e7f6ee; --warn-bg:#fdf3e2; --bad-bg:#fdecec; --blue-bg:#e8f0fe;
+    --shadow:0 1px 3px rgba(16,32,50,.06),0 8px 24px rgba(16,32,50,.06);
+  }
+  *{box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{margin:0;background:var(--bg);color:var(--ink);
+    font:15px/1.6 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif}
+  .wrap{max-width:1060px;margin:0 auto;padding:0 22px 160px}
+  header.top{background:linear-gradient(135deg,#0f6a45,#19895b 55%,#23a06b);color:#fff;
+    padding:38px 0 30px;margin-bottom:10px;box-shadow:var(--shadow)}
+  header .wrap{padding-bottom:0}
+  .kicker{font-weight:700;letter-spacing:.16em;text-transform:uppercase;font-size:11.5px;opacity:.85}
+  h1{font-size:29px;margin:9px 0 8px;line-height:1.15}
+  header p{margin:0;max-width:780px;opacity:.95}
+  .meta{display:flex;gap:20px;flex-wrap:wrap;margin-top:18px;font-size:13px;opacity:.92}
+  .meta b{font-weight:700}
+  h2{font-size:20px;margin:40px 0 2px;display:flex;align-items:center;gap:11px;scroll-margin-top:16px}
+  h2 .n{display:inline-flex;width:30px;height:30px;border-radius:8px;background:var(--green);
+    color:#fff;align-items:center;justify-content:center;font-size:14px;font-weight:800;flex:none}
+  .lead{color:var(--muted);margin:6px 0 14px}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:13px;padding:20px 22px;margin:14px 0;box-shadow:var(--shadow)}
+  .card h3{margin:0 0 10px;font-size:16px}
+  .card h3:not(:first-child){margin-top:20px}
+  p{margin:9px 0}
+  ul,ol{margin:9px 0;padding-left:22px}
+  li{margin:5px 0}
+  code{background:var(--chip);border:1px solid var(--line);border-radius:5px;padding:1px 6px;font-size:12.5px;
+    font-family:"SF Mono",Consolas,Menlo,monospace;color:var(--slate)}
+  table{width:100%;border-collapse:collapse;margin:8px 0;font-size:13.5px}
+  th,td{text-align:left;padding:9px 11px;border-bottom:1px solid var(--line);vertical-align:top}
+  th{color:var(--muted);font-weight:700;font-size:11.5px;text-transform:uppercase;letter-spacing:.04em;background:#fafbfc}
+  tr:last-child td{border-bottom:none}
+  .tag{display:inline-block;padding:2px 9px;border-radius:999px;font-size:11px;font-weight:800;white-space:nowrap}
+  .t-done{background:var(--good-bg);color:var(--green-d)}
+  .t-build{background:var(--blue-bg);color:var(--blue)}
+  .t-gate{background:var(--warn-bg);color:var(--amber)}
+  .t-dec{background:#efe9fb;color:#6d3fd4}
+  .t-block{background:var(--bad-bg);color:var(--red)}
+  .callout{border-left:4px solid var(--amber);background:var(--warn-bg);border-radius:0 10px 10px 0;padding:14px 18px;margin:14px 0}
+  .callout.good{border-color:var(--green);background:var(--good-bg)}
+  .callout.info{border-color:var(--blue);background:var(--blue-bg)}
+  .callout b{color:var(--ink)}
+  .grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px;margin:12px 0}
+  .grid .col{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:16px 18px;box-shadow:var(--shadow)}
+  .col h4{margin:0 0 4px;font-size:14px;display:flex;align-items:center;gap:8px}
+  .col .cnt{font-size:26px;font-weight:800;line-height:1}
+  .col.buildable{border-top:3px solid var(--blue)}
+  .col.gated{border-top:3px solid var(--amber)}
+  .col.decision{border-top:3px solid #6d3fd4}
+  .col ul{padding-left:18px;font-size:13px;color:var(--slate);margin-top:8px}
+  /* flow diagram */
+  .flow{display:flex;flex-wrap:wrap;gap:10px;align-items:stretch;margin:14px 0}
+  .node{flex:1 1 150px;min-width:140px;border:1.5px solid var(--line);border-radius:11px;padding:12px 14px;background:#fff;position:relative}
+  .node .lbl{font-weight:700;font-size:13.5px}
+  .node .sub{font-size:11.5px;color:var(--muted);margin-top:3px}
+  .node.app{border-color:var(--green);background:var(--good-bg)}
+  .node.ext{border-color:var(--blue);background:#f2f7ff}
+  .node.plat{border-color:var(--amber);background:#fffaf0}
+  .legend{display:flex;gap:16px;flex-wrap:wrap;font-size:12px;color:var(--muted);margin-top:6px}
+  .legend span{display:inline-flex;align-items:center;gap:6px}
+  .dot{width:11px;height:11px;border-radius:3px;display:inline-block}
+  /* review controls */
+  .review{margin-top:16px;border-top:1px dashed var(--line);padding-top:14px}
+  .review .rlabel{font-size:12px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px}
+  .verdicts{display:flex;gap:8px;flex-wrap:wrap}
+  .verdicts label{cursor:pointer;border:1.5px solid var(--line);border-radius:9px;padding:7px 14px;font-size:13px;font-weight:600;
+    display:inline-flex;align-items:center;gap:7px;background:#fff;transition:.12s}
+  .verdicts input{accY:auto;margin:0}
+  .verdicts label:hover{border-color:#c5d0de}
+  .verdicts label.v-app.on{background:var(--good-bg);border-color:var(--green);color:var(--green-d)}
+  .verdicts label.v-amd.on{background:var(--warn-bg);border-color:var(--amber);color:var(--amber)}
+  .verdicts label.v-rej.on{background:var(--bad-bg);border-color:var(--red);color:var(--red)}
+  textarea.cmt{width:100%;margin-top:10px;border:1.5px solid var(--line);border-radius:9px;padding:9px 11px;
+    font:inherit;font-size:13.5px;resize:vertical;min-height:44px}
+  textarea.cmt:focus,select:focus,input[type=text]:focus{outline:none;border-color:var(--green)}
+  select,input[type=text]{border:1.5px solid var(--line);border-radius:9px;padding:8px 10px;font:inherit;font-size:13.5px;background:#fff}
+  .qa{display:flex;gap:10px;align-items:flex-start;margin:12px 0;padding:12px 14px;border:1px solid var(--line);border-radius:10px;background:#fff}
+  .qa .qid{font-weight:800;color:var(--green-d);font-size:13px;flex:none;width:52px}
+  .decision-box{background:#faf7ff;border:1px solid #e6dcfb;border-radius:11px;padding:16px 18px;margin:12px 0}
+  .decision-box h4{margin:0 0 6px;font-size:15px}
+  .opts{display:flex;flex-direction:column;gap:7px;margin-top:8px}
+  .opts label{display:flex;gap:9px;align-items:flex-start;cursor:pointer;font-size:13.5px}
+  .toc{position:sticky;top:0;z-index:20;background:rgba(244,246,249,.95);backdrop-filter:blur(6px);
+    border-bottom:1px solid var(--line);padding:9px 0;margin-bottom:8px;overflow-x:auto;white-space:nowrap}
+  .toc a{color:var(--slate);text-decoration:none;font-size:12.5px;font-weight:600;margin-right:16px}
+  .toc a:hover{color:var(--green-d)}
+  /* submit bar */
+  .bar{position:fixed;bottom:0;left:0;right:0;background:#fff;border-top:1px solid var(--line);
+    box-shadow:0 -4px 20px rgba(16,32,50,.08);padding:12px 0;z-index:40}
+  .bar .wrap{padding-bottom:0;display:flex;gap:14px;align-items:center;flex-wrap:wrap}
+  .btn{border:none;border-radius:10px;padding:11px 20px;font:inherit;font-weight:700;cursor:pointer;font-size:14px}
+  .btn.primary{background:var(--green);color:#fff}
+  .btn.primary:hover{background:var(--green-d)}
+  .btn.ghost{background:var(--chip);color:var(--slate)}
+  .status{font-size:13px;color:var(--muted)}
+  .status b{color:var(--green-d)}
+  dialog{border:none;border-radius:14px;padding:0;max-width:780px;width:92%;box-shadow:0 20px 60px rgba(0,0,0,.3)}
+  dialog::backdrop{background:rgba(16,32,50,.55)}
+  .dlg-h{padding:18px 22px;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;align-items:center}
+  .dlg-h h3{margin:0;font-size:17px}
+  .dlg-b{padding:18px 22px}
+  #jsonOut{width:100%;min-height:280px;font-family:"SF Mono",Consolas,monospace;font-size:12px;border:1px solid var(--line);border-radius:9px;padding:12px}
+  .small{font-size:12.5px;color:var(--muted)}
+  @media(max-width:720px){.grid{grid-template-columns:1fr}.flow{flex-direction:column}}
+</style>
+</head>
+<body>
+<header class="top">
+  <div class="wrap">
+    <div class="kicker">Discovery Gate · Build Harness · Airedale</div>
+    <h1>OOH Dashboard — Go-Live Shaping Proposal</h1>
+    <p>The Out-of-Hours Triage Dashboard is <b>built and tested</b>. Spencer has stood up the entire production platform. This is the map of what exists, what he delivered, the gap that remains, and a route to live that keeps moving while Spencer is away.</p>
+    <div class="meta">
+      <span><b>Project:</b> IOT OOH Dash (SD-586)</span>
+      <span><b>App:</b> ooh-triage-dashboard v1.1.0</span>
+      <span><b>Prepared:</b> 2026-07-27</span>
+      <span><b>Status:</b> Awaiting your review</span>
+    </div>
+  </div>
+</header>
+
+<nav class="toc"><div class="wrap">
+  <a href="#sum">Summary</a>
+  <a href="#map">Landscape</a>
+  <a href="#built">What we built</a>
+  <a href="#got">Asked vs got</a>
+  <a href="#delta">The delta</a>
+  <a href="#xproduct">Standalone?</a>
+  <a href="#gaps">Gaps &amp; blockers</a>
+  <a href="#road">Route to live</a>
+  <a href="#decisions">Your decisions</a>
+  <a href="#oq">Open questions</a>
+  <a href="#risk">Risks</a>
+</div></nav>
+
+<div class="wrap">
+
+<!-- 1. EXECUTIVE SUMMARY -->
+<h2 id="sum"><span class="n">1</span> Executive summary</h2>
+<div class="card" data-review="executive-summary">
+  <p>The <b>OOH Triage Dashboard</b> — the self-service console that lets the answering service resolve out-of-hours IoT site issues without waking the IoT team — is <b>finished and tested</b> (v1.1.0, 41 Playwright tests passing) on branch <code>feature/live-build-v1</code>.</p>
+  <p>On <b>22 July</b> Spencer replied "<b>you're unblocked</b>": he has provisioned the <b>entire production platform</b> and there is a live placeholder at <a href="https://ooh.airedale-group.io" target="_blank">ooh.airedale-group.io</a> right now. The moment we build the image and switch the tag, that URL becomes the app.</p>
+  <div class="callout info">
+    <b>The one twist that matters.</b> Spencer built prod to a <b>more secure model</b> than the app was originally coded for — workload identity &amp; Key Vault instead of keys, a <b>public (no-secret) B2C client</b>, and richer role claims. So before we can deploy, a defined set of <b>app-side code changes</b> must land. <b>The good news: almost all of that is buildable now, without Spencer.</b>
+    </div>
+  <p><b>Critical path to a safe, write-locked canary:</b> make the app-side changes → get the one genuinely-blocking credential (scoped ThingsBoard write cred, needed just to boot) → build image → deploy → watch the placeholder flip. Two small decisions from you (SMS gateway, P1 deep-link) are needed shortly after, not to go live.</p>
+  <p><b>What I recommend you approve today:</b> that I proceed immediately with all the buildable-now engineering (§7 Phase 1) so the app is deploy-ready and the only thing we're waiting on is Spencer's return for the last credential + ingress.</p>
+</div>
+
+<!-- 2. LANDSCAPE -->
+<h2 id="map"><span class="n">2</span> Landscape — how it all wires together</h2>
+<p class="lead">One production environment, no staging. The OOH app is a sibling pod beside the IoT Hub in the <code>iot-services</code> namespace.</p>
+<div class="card" data-review="landscape">
+  <div class="flow">
+    <div class="node ext"><div class="lbl">Answering-service handler</div><div class="sub">2am call → browser, B2C SSO</div></div>
+    <div class="node app"><div class="lbl">OOH Dashboard ★</div><div class="sub">Node/Express · ooh.airedale-group.io · /healthz · replicas:1</div></div>
+    <div class="node ext"><div class="lbl">Zendesk</div><div class="sub">Ticket source + outcome tickets (Jonathan's API token)</div></div>
+  </div>
+  <div class="flow">
+    <div class="node plat"><div class="lbl">B2C · Techhub-Production</div><div class="sub">Public PKCE client · extension_Role claim</div></div>
+    <div class="node ext"><div class="lbl">integration-bridge</div><div class="sub">In-cluster device READ API (N-1, free via co-location)</div></div>
+    <div class="node ext"><div class="lbl">ThingsBoard</div><div class="sub">Read status + scoped WRITE on SD-492 *Desired path</div></div>
+  </div>
+  <div class="flow">
+    <div class="node plat"><div class="lbl">Cosmos · ooh-dashboard DB</div><div class="sub">Holds/audit/config/SMS · AAD RBAC (no key)</div></div>
+    <div class="node ext"><div class="lbl">IoT Support Dashboard (SD-330)</div><div class="sub">P1 deep-link target · reads OOH holds store</div></div>
+    <div class="node ext"><div class="lbl">SMS gateway (P1 escalation)</div><div class="sub">log-only until Q-F decision</div></div>
+  </div>
+  <div class="legend">
+    <span><span class="dot" style="background:var(--green)"></span> The app (ours)</span>
+    <span><span class="dot" style="background:var(--amber)"></span> Platform Spencer provisioned</span>
+    <span><span class="dot" style="background:var(--blue)"></span> External systems it talks to</span>
+  </div>
+</div>
+
+<!-- 3. WHAT WE BUILT -->
+<h2 id="built"><span class="n">3</span> What we've already built</h2>
+<div class="card" data-review="what-we-built">
+  <p>The app is a complete, authenticated product for OOH call handlers — not a prototype. Highlights from v1.0.0 → v1.1.0:</p>
+  <table>
+    <tr><th>Capability</th><th>What it does</th></tr>
+    <tr><td><b>Guided call handling</b></td><td>Confirmed-site workspace, live device board, smart issue entry (type the caller's words → suggested flow), 8 category tiles, multi-issue calls, "Tonight" shift view.</td></tr>
+    <tr><td><b>Device control</b> (write-locked)</td><td>Heating setpoint up/down, Salus frost-hold off, hot-water boost — all via the single SD-492 ThingsBoard <code>*Desired</code> shared-attribute path. Truth-first sync: "Applied" only when the device echoes back.</td></tr>
+    <tr><td><b>Safety rails</b></td><td>Blocking site-confirmation gate, server-side capability/value guardrails, durable timed overrides that revert exactly once, runtime kill-switch with mandatory reason, deploy-time <code>WRITES_DISABLED</code> lock.</td></tr>
+    <tr><td><b>Everything on a ticket</b></td><td>Every outcome writes an <code>ooh</code>-tagged Zendesk ticket with real operator identity + a full timestamped <code>[TRG]</code> transcript; auto-reconciles &amp; merges the originating Talk call ticket (recording attached).</td></tr>
+    <tr><td><b>P1 escalation</b></td><td>System-decided P1s dispatch an SMS (log-only for now) with a deep-link to the ticket in the IoT Support dashboard, with ack tracking for the SLA.</td></tr>
+    <tr><td><b>Auth &amp; ops</b></td><td>B2C OIDC (PKCE), fail-secure production startup, server-side role enforcement, multi-stage Dockerfile + K8s manifests, <code>/healthz</code>, alerting, operator runbook.</td></tr>
+  </table>
+  <p class="small">Quality (Airedale weighted): UX 9 · Brand 9 · Craft 7.5 · Functionality 7 · Originality 8 → <b>8.4</b>. Test phase PASS (1 rework cycle).</p>
+</div>
+
+<!-- 4. ASKED VS GOT -->
+<h2 id="got"><span class="n">4</span> What we asked for vs what Spencer delivered</h2>
+<p class="lead">On 14 July we sent Spencer 8 blockers (Section A). On 22 July he came back with everything stood up — but built to a securer pattern than we'd assumed.</p>
+<div class="card" data-review="asked-vs-got">
+  <table>
+    <tr><th>#</th><th>We asked for</th><th>Spencer delivered</th><th>State</th></tr>
+    <tr><td>SR-2</td><td>Deploy home + pipeline + namespace + Secret</td><td>Namespace <code>iot-services</code> + SA <code>sa-ooh-dashboard</code> (WI). <b>No pipeline</b> — we deploy ourselves with infra-group creds.</td><td><span class="tag t-done">DONE*</span></td></tr>
+    <tr><td>N-4</td><td>Hostname / ingress + <code>APP_ORIGIN</code></td><td>DNS <code>ooh.airedale-group.io</code> → prod ingress live; TLS cert issued; placeholder serving. Ingress <i>resource</i> pending until deploy exists.</td><td><span class="tag t-done">DONE</span></td></tr>
+    <tr><td>SR-1</td><td>B2C OIDC + OOH role + handler accounts</td><td>Callback registered on shared <b>public</b> Techhub-Production client; issuer + client-id given; role model defined. Handler <b>accounts</b> + claim authoring pending.</td><td><span class="tag t-gate">PARTIAL</span></td></tr>
+    <tr><td>N-3</td><td>Cosmos <b>key</b> scoped to DB</td><td>Cosmos DB <code>ooh-dashboard</code> + <b>AAD RBAC scoped to the DB — no key</b> (securer than asked).</td><td><span class="tag t-done">DONE</span></td></tr>
+    <tr><td>N-1</td><td>Integration-bridge read API</td><td><code>BRIDGE_BASE_URL</code> cluster-internal; free via co-location. Read contract/auth to confirm.</td><td><span class="tag t-done">DONE*</span></td></tr>
+    <tr><td>SR-3</td><td>Scoped ThingsBoard write credential</td><td>TB service creds provisioned in Key Vault; <b>scoped write cred + bench proof still being finalised</b>.</td><td><span class="tag t-block">PENDING</span></td></tr>
+    <tr><td>—</td><td><code>SESSION_SECRET</code></td><td>Generated + set.</td><td><span class="tag t-done">DONE</span></td></tr>
+    <tr><td>—</td><td><code>IOT_DASH_BASE_URL</code></td><td>Set to <code>https://zendesk-uat.airedale-api.co.uk</code>.</td><td><span class="tag t-done">DONE</span></td></tr>
+  </table>
+  <p class="small">* "DONE*" = provisioned, with a small confirm-on-first-use item (deploy mechanism / bridge read contract).</p>
+</div>
+
+<!-- 5. THE DELTA -->
+<h2 id="delta"><span class="n">5</span> The delta — the app-side changes to deploy</h2>
+<p class="lead">Because prod is built securer than the app assumed, these code/manifest changes are the real remaining engineering. All are small, well-understood, and <b>buildable now</b>.</p>
+<div class="card" data-review="the-delta">
+  <table>
+    <tr><th>Area</th><th>Prod expects</th><th>App today</th><th>Change</th></tr>
+    <tr><td>OIDC client</td><td>Public, no secret</td><td>Confidential (<code>discovery(issuer,id,secret)</code>; secret required)</td><td>Public client (<code>token_endpoint_auth_method:'none'</code>); drop <code>OIDC_CLIENT_SECRET</code> requirement. PKCE already implemented.</td></tr>
+    <tr><td>Roles</td><td><code>extension_Role</code> = <code>AreaClaim[]</code> (1500=handler, 1400=iot)</td><td>Flat-string match → would 403 every user</td><td>Parse the claim array, key on <code>claimArea</code> int; roleMap <code>{"1500":"handler","1400":"iot"}</code>.</td></tr>
+    <tr><td>Cosmos</td><td>AAD RBAC, no key</td><td><code>new CosmosClient({endpoint,key})</code></td><td>Add <code>@azure/identity</code>; use <code>DefaultAzureCredential</code>; drop <code>COSMOS_KEY</code>.</td></tr>
+    <tr><td>ServiceAccount</td><td><code>sa-ooh-dashboard</code></td><td>manifest says <code>ooh-dashboard</code></td><td>Rename in <code>deployment.yaml</code>.</td></tr>
+    <tr><td>Registry</td><td><code>apitechhub.azurecr.io</code></td><td><code>REGISTRY_PLACEHOLDER</code></td><td>Set real registry + <code>DEPLOYMENT_ENVIRONMENT</code>.</td></tr>
+    <tr><td>Secret source</td><td>See OQ-1 (KV-via-WI vs K8s secret)</td><td><code>envFrom ooh-dashboard-secrets</code></td><td>Reconcile per OQ-1 before writing the manifest.</td></tr>
+  </table>
+  <div class="callout good"><b>All six are code we own.</b> None require Spencer. They're testable locally (fixture/dev mode + config-validation + Playwright) before we ever touch prod.</div>
+</div>
+
+<!-- 5B. CROSS-PRODUCT -->
+<h2 id="xproduct"><span class="n">🛡</span> Cross-product: is this standalone from the IoT Support Dashboard?</h2>
+<p class="lead">Verdict: <b>the deploy needs no code change to the IoT Support Dashboard and cannot break it.</b> The consumer (SD-330) was deliberately built and frozen as a degradation-safe reader and is already deployed (v1.49.1) — its integration assessment's own conclusion: "the coupling degrades safely in every enumerated state. There are <b>no BREAKS</b>." It is not yet 100% independent <i>end-to-end</i>: a short, closeable list of runtime/infra touchpoints remains.</p>
+<div class="card" data-review="cross-product">
+  <table>
+    <tr><th>Touchpoint</th><th>Direction</th><th>Consumer change?</th><th>Status</th></tr>
+    <tr><td>Deep-link <code>/?ticket=</code> landing</td><td>OOH → dash</td><td>None — already built &amp; deployed (v1.49.0)</td><td><span class="tag t-done">CLOSED</span></td></tr>
+    <tr><td><code>ooh</code> tickets + <code>[TRG]</code> oversight parse</td><td>dash reads</td><td>None — producer conforms; assumption <b>verified live</b> (below)</td><td><span class="tag t-done">VERIFIED</span></td></tr>
+    <tr><td>Holds mirror / failed-revert strip</td><td>dash reads OOH Cosmos</td><td>Infra only — SD-330 needs a Cosmos <b>read grant</b> on <code>ooh-dashboard</code> (OQ-6)</td><td><span class="tag t-gate">OPEN ①</span></td></tr>
+    <tr><td>P1 deep-link vs basic-auth ingress</td><td>mobile</td><td>Only if you pick "exempt at ingress" (see D-2)</td><td><span class="tag t-dec">YOUR CALL ②</span></td></tr>
+    <tr><td>P1-claim ack → SLA metric (IM-02)</td><td>dash → OOH</td><td>Future consumer change; deferred, not go-live</td><td><span class="tag t-gate">DEFERRED</span></td></tr>
+  </table>
+  <div class="callout good"><b>✓ Live-verified 2026-07-27.</b> The highest-leverage assumption — that Zendesk returns the internal <code>[TRG]</code> first comment as the search-result <code>description</code> the consumer parses — was confirmed against live Zendesk: a marked test ticket was created, the full anchors-first body came back <b>untruncated</b> in the search result (and the "IoT Dashboard — Push New Tickets" webhook fired), then the ticket was deleted. The frozen-consumer promise holds on this axis.</div>
+  <p class="small">All producer-side contract gaps (create-as-<code>new</code>, transcript, recording, categorisation, requester) were the producer's job and were closed in v1.1.0. <b>Net remaining: one real infra dependency (① Cosmos read grant — Spencer), one conditional touchpoint (② = your D-2 call), one deferred metric.</b></p>
+</div>
+
+<!-- 6. GAPS -->
+<h2 id="gaps"><span class="n">6</span> Gaps &amp; blockers — honestly sorted</h2>
+<p class="lead">The single most important framing for keeping momentum in Spencer's absence: <b>what can we do now</b>, vs <b>what genuinely waits</b>, vs <b>what needs a word from you</b>.</p>
+<div class="grid" data-review="gaps">
+  <div class="col buildable">
+    <h4>🔧 Buildable now <span class="tag t-build">no Spencer</span></h4>
+    <div class="cnt" style="color:var(--blue)">5</div>
+    <ul>
+      <li>All 6 app-side code/manifest changes (§5)</li>
+      <li>Update <code>validateConfig()</code> to the new model</li>
+      <li>Re-run + extend the Playwright suite</li>
+      <li>Provide Jonathan's existing Zendesk credentials + API key (the dashboard already runs on these — unchanged this release; no machine account)</li>
+      <li>Write the exact build+deploy command runbook for you to execute</li>
+    </ul>
+  </div>
+  <div class="col gated">
+    <h4>⏳ Genuinely gated <span class="tag t-gate">Spencer / platform</span></h4>
+    <div class="cnt" style="color:var(--amber)">4</div>
+    <ul>
+      <li><b>Scoped TB write cred (SR-3)</b> — needed just to <i>boot</i> the canary (validated at startup even when writes are locked). Critical path.</li>
+      <li>B2C handler accounts + claim authoring (SR-1) — but IoT-team login is testable now (they already carry claim 1400)</li>
+      <li>Ingress resource + cert-manager TLS (after deploy)</li>
+      <li>Loading creds into the secret / Key Vault</li>
+    </ul>
+  </div>
+  <div class="col decision">
+    <h4>🧭 Needs your decision <span class="tag t-dec">Section B</span></h4>
+    <div class="cnt" style="color:#6d3fd4">2</div>
+    <ul>
+      <li>SMS gateway (Q-F): Twilio or alternative + on-duty escalation number</li>
+      <li>P1 deep-link resolution behind the basic-auth ingress</li>
+    </ul>
+    <p class="small" style="margin-top:8px">Neither blocks the write-locked canary — SMS stays log-only until you say.</p>
+  </div>
+</div>
+<div class="callout"><b>The one real blocker — confirmed by direct Azure check (2026-07-27):</b> it is <b>not</b> the code and <b>not</b> the ingress (<code>ooh.airedale-group.io</code> serves a live TLS placeholder now). It is <b>Azure RBAC access to the Techhub environment</b>. James's identity (<code>JamesBrown@airedale-group.co.uk</code>, tenant <code>002bfc30</code>) holds <b>zero role assignments</b> there — Key Vault reads return <code>ForbiddenByRbac</code>, <code>apitechhub</code> and the <code>iot-services</code> cluster aren't visible, and there's no rights to self-grant. So the deploy waits on Spencer granting three roles (see OQ-4) or running his own 4-command deploy. Everything else — code changes, image build, Zendesk cred, manifest, exact commands — we make 100% ready now, so go-live is <b>minutes</b> once access exists.</div>
+
+<!-- 7. ROADMAP -->
+<h2 id="road"><span class="n">7</span> Route to live</h2>
+<div class="card" data-review="roadmap">
+  <h3>Phase 1 — Deploy-ready (now, in Spencer's absence) <span class="tag t-build">us</span></h3>
+  <ol>
+    <li>Land the 6 app-side changes (§5) on a fresh branch off <code>feature/live-build-v1</code>.</li>
+    <li>Update <code>validateConfig()</code>; add/adjust Playwright coverage for public-client + <code>AreaClaim[]</code> parsing + Cosmos-credential path.</li>
+    <li>Provide Jonathan's existing Zendesk credentials + API key for hand-over into the secret (no new account — the whole dashboard already operates on these; not changing this release).</li>
+    <li>Produce the exact <code>az acr build</code> + <code>kubectl set image</code> runbook (Claude can't run Azure CLI; you execute).</li>
+    <li>Resolve OQ-1 (secret mechanism) from the handover docs / a note to Spencer.</li>
+  </ol>
+  <h3>Phase 2 — Canary deploy <span class="tag t-gate">needs SR-3 cred + ingress</span></h3>
+  <ol>
+    <li>Spencer (on return) loads TB write cred + Zendesk creds into the secret/KV; adds the ingress resource.</li>
+    <li>You build the image + switch the tag → placeholder flips to the app (<code>WRITES_DISABLED=true</code>, <code>SMS_PROVIDER=log</code>).</li>
+    <li>Run the canary matrix: SSO login (IoT-team account first), device board reads, capture-and-escalate, ticket write + <code>[TRG]</code> transcript, first live reconciliation. <b>Your go/no-go #2.</b></li>
+  </ol>
+  <h3>Phase 3 — Open device writes + live SMS <span class="tag t-dec">go/no-go #3 &amp; #4</span></h3>
+  <ol>
+    <li>SR-3 bench proof + assurance → flip <code>WRITES_DISABLED</code> off (go/no-go #3).</li>
+    <li>SMS gateway decision (Q-F) applied → switch <code>SMS_PROVIDER</code> to the real gateway (go/no-go #4).</li>
+  </ol>
+  <h3>Phase 4 — Control-path roadmap <span class="tag t-gate">bridge capacity, Spencer</span></h3>
+  <p class="small">Extends OOH self-serve coverage (today ~12% fully / ~30% partial of 83 real incidents). Spencer's reframe: boiler #1 is largely Salus (control already works); kitchen/lighting/fans collapse into one epic (SD-515) over Tuya devices already in TB; schedules = SD-477; non-IT500 hot water needs scoping. All extend the same SD-492 contract → the app picks them up with no rework.</p>
+</div>
+
+<!-- 8. DECISIONS -->
+<h2 id="decisions"><span class="n">8</span> Decisions I need from you</h2>
+<p class="lead">These are the Section B calls. They don't block the canary, but capturing them now lets me tee everything up.</p>
+
+<div class="decision-box" data-decision="sms-gateway">
+  <h4>D-1 · SMS gateway for P1 escalation</h4>
+  <p class="small">Which provider should the P1 text use? Stays log-only until you flip it live (go/no-go #4).</p>
+  <div class="opts">
+    <label><input type="radio" name="dec_sms" value="twilio"> <span><b>Twilio</b> — well-supported, provider already stubbed in the app.</span></label>
+    <label><input type="radio" name="dec_sms" value="alternative"> <span><b>An alternative</b> (name it in the note) — e.g. an existing Airedale SMS account.</span></label>
+    <label><input type="radio" name="dec_sms" value="defer"> <span><b>Defer</b> — decide later; keep log-only for the canary.</span></label>
+  </div>
+  <p class="small" style="margin-top:10px">On-duty escalation number (optional now):</p>
+  <input type="text" id="dec_onduty" placeholder="e.g. +44 7… (on-duty escalation manager)" style="width:100%;max-width:360px">
+</div>
+
+<div class="decision-box" data-decision="p1-deeplink">
+  <h4>D-2 · P1 deep-link vs basic-auth ingress</h4>
+  <p class="small">On a P1, the app texts the on-duty manager a link that opens <i>that ticket</i> in the IoT Support dashboard (<code>…/?ticket=12345</code>) — which sits behind an authenticated ingress. At 2am on a phone, either they're already signed in (opens) or they hit a login wall. How should it resolve? <b>This is the only decision that could touch the IoT Support dashboard</b> — so it decides whether any cross-product coupling remains.</p>
+  <div class="opts">
+    <label><input type="radio" name="dec_p1" value="exempt"> <span><b>A · Exempt the <code>/?ticket=</code> path at the ingress</b> — one tap opens the ticket. Best UX; a small security carve-out Spencer configures on the consumer's ingress. <i>(Requires a consumer-side change.)</i></span></label>
+    <label><input type="radio" name="dec_p1" value="text-artefact"> <span><b>B · SMS text is the primary artefact</b> (recommended for canary) — the text carries site + issue + ticket #; the link is a bonus if signed in. Zero consumer change; OOH stays fully standalone.</span></label>
+    <label><input type="radio" name="dec_p1" value="defer"> <span><b>C · Defer</b> — SMS is log-only for the canary anyway; revisit at live-SMS cutover (go/no-go #4) with Spencer back.</span></label>
+  </div>
+</div>
+
+<div class="decision-box" data-decision="proceed" style="background:#f0f8f3;border-color:#cfe9db">
+  <h4>D-3 · Authorise Phase 1 now?</h4>
+  <p class="small">The core ask: shall I proceed immediately with all the buildable-now engineering (§7 Phase 1) so the app is deploy-ready — leaving only <b>one RBAC grant from Spencer</b> (or his own 4-command deploy) between us and live (see OQ-4)?</p>
+  <div class="opts">
+    <label><input type="radio" name="dec_proceed" value="yes"> <span><b>Yes — proceed with Phase 1</b> (app-side changes, tests, Zendesk creds, deploy runbook).</span></label>
+    <label><input type="radio" name="dec_proceed" value="yes-except"> <span><b>Yes, but hold on one thing</b> (say which in the note).</span></label>
+    <label><input type="radio" name="dec_proceed" value="wait"> <span><b>Wait</b> — let's talk before any code changes.</span></label>
+  </div>
+</div>
+
+<!-- 9. OPEN QUESTIONS -->
+<h2 id="oq"><span class="n">9</span> Open questions</h2>
+<div class="card" data-review="open-questions">
+  <div class="qa"><div class="qid">OQ-1</div><div><b>Secret-delivery mechanism</b> <span class="small">(owner: Spencer / resolvable from docs)</span><br>Spencer's email says "read TB/Zendesk secrets from Key Vault via workload identity, drop the envFrom secret." His implementation doc §6 says only Cosmos moves to WI now and <b>TB + Zendesk stay in the K8s secret</b> (<code>ooh-dashboard-secrets</code>), with KV as later hardening. The impl doc is the later, authoritative spec. <b>I'll build to the impl doc (Cosmos=WI, TB/Zendesk=secret) unless you say otherwise</b> — flagging so we don't write the manifest twice.</div></div>
+  <div class="qa"><div class="qid">OQ-2</div><div><b>Bridge read contract</b> <span class="small">(owner: confirm on first use)</span><br>Confirm the integration-bridge <code>/api/devices</code> read shape and whether a sibling pod needs any auth. Low risk (co-located), but validate at canary.</div></div>
+  <div class="qa"><div class="qid">OQ-3</div><div><b>B2C policy name</b> <span class="small">(owner: Spencer)</span><br>Issuer uses the <code>B2C_1_KnowledgeBaseSignIn</code> user flow — Spencer flagged "confirm exact prod policy name if it has changed." Verify at first login.</div></div>
+  <div class="qa"><div class="qid">OQ-4</div><div><b>Azure access to deploy — CONFIRMED gap (checked 2026-07-27)</b> <span class="small">(owner: Spencer / Techhub admin)</span><br>Direct read-only check: James's identity (object id <code>ec79d06a-ae24-4012-80c4-a83eeaca4041</code>, tenant <code>002bfc30</code>) has <b>no RBAC on the Techhub subscription</b> — Key Vault reads are <code>ForbiddenByRbac</code> ("Assignment: not found"), and <code>apitechhub</code> / <code>iot-services</code> aren't visible; James also can't self-grant. <b>The ask for Spencer:</b> grant that object id three roles — <b>Key Vault Secrets Officer</b> on <code>airedale-kv-uat</code> + <code>-prod</code>, <b>AcrPush</b> on <code>apitechhub</code>, <b>AKS RBAC Writer</b> (+ Cluster User) on <code>iot-services</code> — then James self-deploys. Alternative: Spencer runs his own <code>az acr build</code> + <code>kubectl set image</code> on return. This is the single remaining thing between "deploy-ready" and "live."</div></div>
+  <div class="qa"><div class="qid">OQ-5</div><div><b>SD-479 Schedule Hub onboarding</b> <span class="small">(owner: James)</span><br>Spencer's separate 22 Jul email points at an <code>ONBOARDING.md</code> for the Schedule Hub programming onboarding. Adjacent to OOH (schedules = SD-477 in the roadmap). In scope for this workstream, or tracked separately?</div></div>
+  <div class="qa"><div class="qid">OQ-6</div><div><b>Cosmos read grant for the IoT Support dashboard</b> <span class="small">(owner: Spencer / James can verify)</span><br>SD-330's failed-revert strip reads the OOH <code>OohOverrides</code> container. Under the new no-key model it needs an RBAC <b>read</b> grant on <code>dbs/ooh-dashboard</code>. Spencer's impl doc flags it "still needs." Only effect if missing: the strip stays empty (safe, but a monitoring blind spot). <b>The one genuine outstanding cross-product infra dependency</b> — parked for Spencer's return; you can verify in Azure sooner if you want.</div></div>
+</div>
+
+<!-- 10. RISKS -->
+<h2 id="risk"><span class="n">10</span> Risks &amp; how we hold them</h2>
+<div class="card" data-review="risks">
+  <table>
+    <tr><th>Risk</th><th>Likelihood / impact</th><th>Mitigation</th></tr>
+    <tr><td>No staging — canary is in prod</td><td>Med / High</td><td>Write-locked (<code>WRITES_DISABLED</code>) + SMS log-only, both in git manifest. Reads-only + capture-and-escalate until go/no-go #3.</td></tr>
+    <tr><td>Auth 403s everyone if <code>mapRole</code> not fixed</td><td>High if missed / High</td><td>Explicitly in the delta (§5); covered by a new Playwright test on the <code>AreaClaim[]</code> path.</td></tr>
+    <tr><td>SR-3 cred delays the whole canary</td><td>Med / Med</td><td>Everything else made ready in advance; probe a read-only/placeholder TB write cred to boot; escalate the single ask to Spencer for his return.</td></tr>
+    <tr><td>Secret-mechanism ambiguity → manifest rework</td><td>Low / Low</td><td>OQ-1 resolved before the manifest is written.</td></tr>
+    <tr><td>Single replica = session loss on restart</td><td>Low / Low</td><td>Known + documented; reverts are already multi-replica-safe; shared session store is a backlog item, not a go-live blocker.</td></tr>
+  </table>
+</div>
+
+<!-- overall -->
+<h2><span class="n">✓</span> Overall verdict</h2>
+<div class="card" data-review="overall">
+  <p class="rlabel" style="font-size:12px;font-weight:700;color:var(--muted);text-transform:uppercase">Your headline call on this proposal</p>
+  <div class="verdicts" data-for="overall">
+    <label class="v-app"><input type="radio" name="v_overall" value="approve"> Approve — proceed</label>
+    <label class="v-amd"><input type="radio" name="v_overall" value="amend"> Approve with amendments</label>
+    <label class="v-rej"><input type="radio" name="v_overall" value="reject"> Rework</label>
+  </div>
+  <textarea class="cmt" data-for="overall" placeholder="Any overall steer, priorities, or constraints…"></textarea>
+</div>
+
+</div><!-- /wrap -->
+
+<div class="bar"><div class="wrap">
+  <button class="btn primary" onclick="generate()">Generate my response ▸</button>
+  <button class="btn ghost" onclick="document.querySelectorAll('input[type=radio]').forEach(r=>r.checked=false);document.querySelectorAll('textarea,input[type=text]').forEach(t=>t.value='');syncUI();">Reset</button>
+  <span class="status" id="status">Mark each section, make the §8 decisions, then generate — it copies a JSON summary to your clipboard for me.</span>
+</div></div>
+
+<dialog id="dlg">
+  <div class="dlg-h"><h3>Your response — copied to clipboard</h3><button class="btn ghost" onclick="document.getElementById('dlg').close()">Close</button></div>
+  <div class="dlg-b">
+    <p class="small">Paste this straight back into the chat. (It's also on your clipboard.)</p>
+    <textarea id="jsonOut" readonly></textarea>
+    <div style="margin-top:12px;display:flex;gap:10px">
+      <button class="btn primary" onclick="copyJson()">Copy again</button>
+      <span class="status" id="copyStatus"></span>
+    </div>
+  </div>
+</dialog>
+
+<script>
+  // section titles for readability in the export
+  const SECTION_TITLES = {
+    'executive-summary':'1 Executive summary','landscape':'2 Landscape','what-we-built':'3 What we built',
+    'asked-vs-got':'4 Asked vs got','the-delta':'5 The delta','cross-product':'Cross-product / standalone','gaps':'6 Gaps & blockers',
+    'roadmap':'7 Route to live','open-questions':'9 Open questions','risks':'10 Risks','overall':'Overall verdict'
+  };
+  // inject per-section review controls into every [data-review] card that isn't 'overall'
+  document.querySelectorAll('[data-review]').forEach(card=>{
+    const key = card.getAttribute('data-review');
+    if(key==='overall') return;
+    const div = document.createElement('div');
+    div.className='review';
+    div.innerHTML = `<div class="rlabel">Your view on this section</div>
+      <div class="verdicts" data-for="${key}">
+        <label class="v-app"><input type="radio" name="v_${key}" value="approve"> Looks right</label>
+        <label class="v-amd"><input type="radio" name="v_${key}" value="amend"> Amend</label>
+        <label class="v-rej"><input type="radio" name="v_${key}" value="reject"> Wrong / rethink</label>
+      </div>
+      <textarea class="cmt" data-for="${key}" placeholder="Optional comment on §${(SECTION_TITLES[key]||key)}…"></textarea>`;
+    card.appendChild(div);
+  });
+
+  function syncUI(){
+    document.querySelectorAll('.verdicts label').forEach(l=>{
+      const inp=l.querySelector('input'); l.classList.toggle('on', inp && inp.checked);
+    });
+  }
+  document.addEventListener('change', syncUI);
+  syncUI();
+
+  function collect(){
+    const out = {
+      artefact:'OOH Dashboard — Discovery & Go-Live Shaping Proposal',
+      project:'IOT OOH Dash (SD-586)',
+      respondedAt:new Date().toISOString(),
+      sections:{}, decisions:{}
+    };
+    // section verdicts
+    Object.keys(SECTION_TITLES).forEach(key=>{
+      const v = document.querySelector(`input[name="v_${key}"]:checked`);
+      const c = document.querySelector(`textarea[data-for="${key}"]`);
+      if(v || (c && c.value.trim())){
+        out.sections[key] = { title:SECTION_TITLES[key], verdict:v?v.value:null, comment:c?c.value.trim():'' };
+      }
+    });
+    // decisions
+    const sms = document.querySelector('input[name="dec_sms"]:checked');
+    out.decisions.smsGateway = sms ? sms.value : null;
+    out.decisions.onDutyNumber = document.getElementById('dec_onduty').value.trim() || null;
+    const p1 = document.querySelector('input[name="dec_p1"]:checked');
+    out.decisions.p1DeepLink = p1 ? p1.value : null;
+    const proceed = document.querySelector('input[name="dec_proceed"]:checked');
+    out.decisions.proceedPhase1 = proceed ? proceed.value : null;
+    return out;
+  }
+
+  function generate(){
+    const data = collect();
+    const json = JSON.stringify(data, null, 2);
+    document.getElementById('jsonOut').value = json;
+    document.getElementById('dlg').showModal();
+    copyToClipboard(json,'copyStatus');
+    const n = Object.keys(data.sections).length;
+    document.getElementById('status').innerHTML = `<b>Response generated</b> — ${n} section(s) marked, decisions captured. Paste it back to me.`;
+  }
+  function copyJson(){ copyToClipboard(document.getElementById('jsonOut').value,'copyStatus'); }
+  function copyToClipboard(text, statusId){
+    const s = statusId?document.getElementById(statusId):null;
+    navigator.clipboard.writeText(text).then(()=>{ if(s) s.textContent='✓ Copied to clipboard'; })
+      .catch(()=>{ if(s) s.textContent='Select all + copy manually'; });
+  }
+</script>
+</body>
+</html>
