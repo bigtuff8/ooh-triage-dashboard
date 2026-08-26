@@ -6,3 +6,4 @@ playwright-report/
 screenshots/
 *.log
 data/store/
+backups/
