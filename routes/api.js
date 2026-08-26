@@ -50,7 +50,8 @@ router.get('/sites/search', wrap(async (req, res) => {
     let results;
     try {
         results = await bridge.searchSites(req.query.q);
-    } catch {
+    } catch (e) {
+        console.error('[BRIDGE] sites/search failed:', (e && e.stack) || e);
         return res.status(503).json({ error: 'Device inventory unavailable — degraded mode', degraded: true });
     }
     // Duplicate house IDs are surfaced, not hidden — the resolution gate rejects them
