@@ -49,6 +49,8 @@ function mapBridgeDevice(raw) {
 async function fetchLiveSites() {
     if (liveCache.sites && Date.now() - liveCache.at < LIVE_CACHE_TTL) return liveCache.sites;
     const res = await axios.get(`${config.bridge.baseUrl}/api/devices`, { timeout: config.bridge.timeoutMs });
+    // TEMP DIAGNOSTIC (OOHDASH-66): capture real /api/devices field names — REMOVE in follow-up mapping build
+    console.log('[BRIDGE] raw /api/devices sample:', JSON.stringify(res.data).slice(0, 2000));
     // Provisional: expect a per-site grouping keyed by siteNo; adapt here once confirmed
     const rawSites = res.data.sites || res.data;
     const sites = rawSites.map(s => ({
@@ -96,7 +98,7 @@ export async function searchSites(query) {
     const q = String(query || '').trim().toLowerCase();
     if (!q) return [];
     const sites = await getSites();
-    return sites.filter(s => s.siteNo.startsWith(q) || s.siteName.toLowerCase().includes(q)).slice(0, 12);
+    return sites.filter(s => String(s.siteNo ?? '').startsWith(q) || String(s.siteName ?? '').toLowerCase().includes(q)).slice(0, 12);
 }
 
 /**
