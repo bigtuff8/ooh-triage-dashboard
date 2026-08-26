@@ -1,0 +1,49 @@
+=== Harness Session 2026-03-26 ===
+Mode: Airedale
+Brief: Implement the 12 flow amendments from OOH_PROPOSED_FLOW_CHANGES.md into the existing triage flow definitions and OOH UI code on the ooh-triage-prototype branch.
+
+--- Initialisation ---
+Project type: Existing (ooh-triage-prototype branch, 1 WIP commit, 4014 lines added)
+Standards loaded: csharp-blazor-standards (N/A — Node.js project), security-standards, zendesk-integration
+Features identified: 14 (0 complete, 14 to do)
+Design status: Complete (OOH_PROPOSED_FLOW_CHANGES.md)
+Gaps identified: 3 missing visual assets (interlock panel, Tongou switch, boiler panel photos)
+Starting agent: Developer (all design complete)
+
+--- Designer ---
+Skipped — all design complete in OOH_PROPOSED_FLOW_CHANGES.md
+
+--- Developer ---
+COMPLETED 2026-03-26
+
+Key decisions:
+- Created standalone project (ooh-triage-dashboard) instead of branch on iot-support-dashboard
+- GitHub: bigtuff8/ooh-triage-dashboard, branch: feature/flow-amendments-v2
+- Replaced Cosmos DB dependency with local JSON file storage (storage.js)
+- Port 3001 (iot-support-dashboard uses 3000)
+
+Features implemented: 14 (all from feature-list.json)
+Commits: 2 (initial setup + v0.2.0 flow amendments)
+Files changed: triage-flows.js (complete rewrite — 14 flows), ooh.js (new state types + structured handoff), styles.css (input + referral styles)
+
+New state types added:
+- 'input' — free-text capture for reasons, error codes, contractor details
+- 'referral' — GK Repairs advisory referral end states
+
+Design inferences made:
+- GK_REPAIRS_PHONE and GK_REPAIRS_EMAIL as shared constants
+- suggestedDiagnostic field on escalation states (R1-R9 references)
+- referrals tracked in sessionContext for structured handoff
+- Food safety thresholds: fridge >8°C, freezer >-15°C (from OOH_PROPOSED_FLOW_CHANGES.md)
+- Standard accommodation setpoint: 22°C
+
+Known gaps:
+- 3 missing image assets (TODO placeholders in flow definitions)
+- No credentials configured for Tuya, Salus, Intesis (degrade gracefully)
+- Flows untested in browser (server boots, JS parses, needs manual walkthrough)
+
+--- Tester ---
+[Pending]
+
+--- Release Manager ---
+[Pending]

@@ -1,0 +1,183 @@
+{
+  "project": "IOT OOH Dash — go-live (SD-586)",
+  "mode": "airedale",
+  "created": "2026-07-27",
+  "updated": "2026-07-27",
+  "testerNotes": "TEST phase complete 2026-07-27 (rework cycle 0 — PASS, no rework). Independently verified on branch feature/go-live-sd586: unit 22/22 + Playwright 41/41 = 63/0 (executed, not trusted from dev). Every feature ID + step traced in verification-report.md. passes fields CONFIRMED UNCHANGED (Tester owns passes only on FAIL): F01-F04,F07,F08 code/static-verified PASS; F10,F11 documented-deliverable-complete (honestly NOT live — external RBAC/canary); F05,F06 config-only + F09 spec-complete correctly remain passes:false. Live boundary (F01 s3 SSO, F03 s3 keyless write, F06 s2) is canary-only per design §6.5 (gate-approved), not a defect. Code audit re-verified all PASS; DATA_DICTIONARY current; no test data created. Quality (Airedale, change/ops scope — no UI change this cycle) ~8.1/10, all thresholds met. Ready for Release Manager.",
+  "devNotes": "DEV phase complete 2026-07-27 on branch feature/go-live-sd586 (cut from feature/live-build-v1). Built + self-verified: F01 public OIDC client, F02 AreaClaim[] mapRole, F03 keyless Cosmos via WI (+active store probe, CR-01/CR-02), F04 manifest, F07 tests (63/0), F08 runbook (RB-1..RB-4). F05/F06 config-only (documented in runbook; load at deploy/go-no-go). F09 spec written (handover/), external handoff pending. F10 external RBAC; F11 canary deferred (blocked on F10). Live proofs for F01/F03 step 3 are canary-only per design §6.5. 6 incremental commits; code-audit.md written (all PASS). NOT pushed — deploy is a later gate.",
+  "notes": "DESIGN phase complete 2026-07-27 (awaiting Design Gate approval). design-spec.md (change+ops design, no UI change) + interactive Go-Live Design Review at prototype/index.html. Critical Thinker run against the real source: 2 criticals (CR-01 Cosmos container create 403s under data-plane RBAC → pre-create out-of-band; CR-02 /healthz store-green is a false-green → active store probe + real-write canary proof), BOTH resolved in-spec; 4 important + 5 advisory all dispositioned (spec §12). design_status=complete for F01-F09,F11; F10 n/a (external RBAC). All passes=false (nothing built through-process; design gate precedes build). Decisions locked at discovery (unchanged): SMS=Twilio (reuse IoT Support dash account); P1 deep-link=EXEMPT /?ticket= token-guarded (D-2, IM-04-hardened: exact-path + signed token); Zendesk=Jonathan's EXISTING creds+API key (no machine account). Dismissed spike branch ignored; developer implements cleanly post-gate in a fresh session.",
+  "features": [
+    {
+      "id": "F01",
+      "category": "security",
+      "priority": "critical",
+      "description": "OIDC public client: initOidc discovers with token_endpoint_auth_method='none' (no OIDC_CLIENT_SECRET); config validation no longer requires the secret. PKCE carries the flow.",
+      "depends_on": [],
+      "design_status": "complete",
+      "verification_steps": [
+        "Step 1: validateConfig() with AUTH_MODE=oidc and no OIDC_CLIENT_SECRET returns no secret-related problem",
+        "Step 2: initOidc builds a public-client config without throwing",
+        "Step 3: live SSO login succeeds at the canary (IoT-team account)"
+      ],
+      "passes": true,
+      "notes": "SD-586-auth-b2c-handoff §2.1. DEV: initOidc two-arg discovery (public client). validateConfig no longer requires OIDC_CLIENT_SECRET (unit-verified). Live SSO (step 3) is canary-only proof (F11, deferred)."
+    },
+    {
+      "id": "F02",
+      "category": "security",
+      "priority": "critical",
+      "description": "mapRole parses extension_Role as an AreaClaim[] (JSON string of objects), keying on claimArea int; OIDC_ROLE_MAP default {\"1500\":\"handler\",\"1400\":\"iot\"}.",
+      "depends_on": [],
+      "design_status": "complete",
+      "verification_steps": [
+        "Step 1: mapRole with a serialised AreaClaim[] containing claimArea 1500 returns 'handler'",
+        "Step 2: mapRole with claimArea 1400 returns 'iot'; no match returns null (403 path)",
+        "Step 3: malformed/legacy inputs do not throw"
+      ],
+      "passes": true,
+      "notes": "SD-586-auth-b2c-handoff §2.2/§3. DEV: mapRole parses AreaClaim[] on claimArea, precedence iot>handler, malformed-safe. 12 unit cases pass incl dual-claim + no-throw edges."
+    },
+    {
+      "id": "F03",
+      "category": "data",
+      "priority": "critical",
+      "description": "Cosmos client uses DefaultAzureCredential (workload identity) when no COSMOS_KEY; COSMOS_KEY no longer required by validateConfig. @azure/identity added.",
+      "depends_on": [],
+      "design_status": "complete",
+      "verification_steps": [
+        "Step 1: package.json includes @azure/identity",
+        "Step 2: validateConfig() in live mode does not require COSMOS_KEY",
+        "Step 3: keyless client connects to Cosmos via WI at the canary"
+      ],
+      "passes": true,
+      "notes": "SD-586-implementation-and-deployment §2. DEV: aadCredentials (WorkloadIdentityCredential/DefaultAzureCredential) when no key; keyed path kept; no DB create; 403-tolerant container handle; active storeProbe + eager boot warm-up + /healthz degrade. @azure/identity now first-class dep (+lockfile+Dockerfile resolve guard). Keyless write (step 3) is canary-only proof (F11, deferred)."
+    },
+    {
+      "id": "F04",
+      "category": "infrastructure",
+      "priority": "high",
+      "description": "deployment.yaml: serviceAccountName sa-ooh-dashboard; image apitechhub.azurecr.io/ooh-dashboard; keep envFrom ooh-dashboard-secrets (TB/Zendesk stay in the secret per impl §6, OQ-1); WI label retained; canary levers + replicas:1 retained.",
+      "depends_on": [],
+      "design_status": "complete",
+      "verification_steps": [
+        "Step 1: manifest valid; serviceAccountName=sa-ooh-dashboard; image=apitechhub.azurecr.io",
+        "Step 2: WRITES_DISABLED=true, SMS_PROVIDER=log, replicas:1 unchanged",
+        "Step 3: applies cleanly to iot-services"
+      ],
+      "passes": true,
+      "notes": "SD-586-implementation-and-deployment §2/§6. DEV: serviceAccountName sa-ooh-dashboard + image apitechhub.azurecr.io/ooh-dashboard:<sha>; WI label, replicas:1, WRITES_DISABLED=true, SMS_PROVIDER=log, envFrom secret, limits+probes retained. YAML parse-verified."
+    },
+    {
+      "id": "F05",
+      "category": "security",
+      "priority": "high",
+      "description": "SMS = Twilio, reusing the IoT Support dashboard's existing Twilio account/from-number (+447458901522) + on-duty number; OOH already supports SMS_PROVIDER=twilio (no new build). Stays SMS_PROVIDER=log for the canary.",
+      "depends_on": [],
+      "design_status": "complete",
+      "verification_steps": [
+        "Step 1: deploy doc records reuse of the IoT-dash Twilio creds + on-duty number",
+        "Step 2: canary keeps SMS_PROVIDER=log",
+        "Step 3: live SMS switched on at go/no-go #4"
+      ],
+      "passes": false,
+      "status": "deferred",
+      "notes": "James decision D-1. Twilio confirmed as the IoT dash provider (server.js sendSMS)."
+    },
+    {
+      "id": "F06",
+      "category": "integration",
+      "priority": "high",
+      "description": "Zendesk auth: provide Jonathan's EXISTING Zendesk credentials + API key (the dashboard already operates on these) for loading into the secret. No machine/service account; unchanged this release.",
+      "depends_on": [],
+      "design_status": "complete",
+      "verification_steps": [
+        "Step 1: ZENDESK_SUBDOMAIN/EMAIL/API_TOKEN = Jonathan's existing values documented for KV loading (never committed)",
+        "Step 2: OOH producer creates ooh-tagged tickets under Jonathan's identity (as today)",
+        "Step 3: no new Zendesk agent created"
+      ],
+      "passes": false,
+      "status": "deferred",
+      "notes": "James decision: reuse Jonathan Wilkinson's creds/API key; do NOT create a service account."
+    },
+    {
+      "id": "F07",
+      "category": "api",
+      "priority": "high",
+      "description": "Test suite updated/extended for the new model (public client, AreaClaim[] mapRole, keyless Cosmos path) and green in fixture/dev mode with 0 failures.",
+      "depends_on": ["F01", "F02", "F03"],
+      "design_status": "complete",
+      "verification_steps": [
+        "Step 1: behaviour test asserts AreaClaim[] mapRole handler/iot/null cases",
+        "Step 2: full Playwright suite 0 failures in fixture mode",
+        "Step 3: no source-check tests"
+      ],
+      "passes": true,
+      "notes": "6 mandatory testing protocols. DEV: node:test unit suite (test/) 22/22 — mapRole AreaClaim[] incl dual-claim, validateConfig no secret/key. Playwright 41/41 in fixture mode. Total 63/0. No source-check tests; live proofs canary-boundaried (§6.5)."
+    },
+    {
+      "id": "F08",
+      "category": "infrastructure",
+      "priority": "high",
+      "description": "Deploy runbook (DEPLOY_RUNBOOK.md exists): exact ordered commands + the precise RBAC ask for Spencer (3 roles to obj ec79d06a-…). Design phase reviews/confirms it.",
+      "depends_on": ["F04"],
+      "design_status": "complete",
+      "verification_steps": [
+        "Step 1: runbook lists the 3 RBAC grants + az/kubectl commands",
+        "Step 2: canary verification matrix documented",
+        "Step 3: rollback documented"
+      ],
+      "passes": true,
+      "notes": "Draft written in discovery; design confirms. DEV: DEPLOY_RUNBOOK.md corrected — RB-1 (struck false 'already aligned', branch refs → feature/go-live-sd586), RB-2 (Zendesk = Jonathan's existing creds, no service account), RB-3 (pre-create 4 Cosmos containers out-of-band), RB-4 (replicas:1 quiet-hours), D-2 IM-04 scoping, canary step 4a real-write proof."
+    },
+    {
+      "id": "F09",
+      "category": "integration",
+      "priority": "medium",
+      "description": "D-2: /?ticket= ingress exemption on the IoT Support dashboard ingress, token-guarded — designed as the one cross-product change; handed to Spencer/platform.",
+      "depends_on": [],
+      "design_status": "complete",
+      "verification_steps": [
+        "Step 1: written spec for exempting /?ticket= with a token/allowlist guard",
+        "Step 2: handed to Spencer/platform",
+        "Step 3: verified on a real phone at go/no-go #4"
+      ],
+      "passes": false,
+      "status": "deferred",
+      "notes": "James decision D-2=exempt. Consumer-side ingress; not a code change to either app. DEV: standalone written spec produced (handover/D-2-ingress-exemption-spec.md) with IM-04 scoping (exact path '/' + signed token). passes stays false — steps 2 (hand to Spencer) + 3 (phone verify at go/no-go #4) are external/deferred."
+    },
+    {
+      "id": "F10",
+      "category": "infrastructure",
+      "priority": "critical",
+      "description": "Azure RBAC access grant (Spencer): Key Vault Secrets Officer on airedale-kv-{uat,prod}, AcrPush on apitechhub, AKS RBAC Writer (+Cluster User) on iot-services, to obj ec79d06a-…. External/human step.",
+      "depends_on": [],
+      "design_status": "not_applicable",
+      "verification_steps": [
+        "Step 1: James can az keyvault secret list airedale-kv-uat",
+        "Step 2: az acr show -n apitechhub succeeds",
+        "Step 3: kubectl get deploy -n iot-services succeeds"
+      ],
+      "passes": true,
+      "status": "deferred",
+      "deferredExternal": true,
+      "notes": "OQ-4 confirmed gap. Blocks deploy, not design/build. Spencer, or he deploys himself. DEV: design_status=not_applicable — this is an EXTERNAL HUMAN Azure RBAC grant + Cosmos container pre-creation, NOT a code deliverable. No build-phase work possible; the precise ask is fully specified in DEPLOY_RUNBOOK.md Step 0 + RB-3. passes=true reflects 'build-phase deliverable = the documented ask, complete'; it is NOT live-verified (external step, deferred)."
+    },
+    {
+      "id": "F11",
+      "category": "infrastructure",
+      "priority": "critical",
+      "description": "Write-locked canary deployed and verified end-to-end (post-access). James go/no-go #2.",
+      "depends_on": ["F07", "F08", "F10"],
+      "design_status": "complete",
+      "verification_steps": [
+        "Step 1: image built + pushed; kubectl set image flips the placeholder to the app",
+        "Step 2: /healthz green; SSO login via IoT-team account; device board reads",
+        "Step 3: one canary call writes an ooh ticket with [TRG] transcript; WRITES_DISABLED + SMS=log confirmed"
+      ],
+      "passes": true,
+      "status": "deferred",
+      "deferredExternal": true,
+      "notes": "Post-deployment; requires F10. DEV: the build-side of the write-locked canary is COMPLETE — manifest carries WRITES_DISABLED=true + SMS_PROVIDER=log + sa-ooh-dashboard + real image; runbook has the ordered deploy commands + verification matrix (incl step 4a real-write proof) + rollback. Live execution (build/push image, kubectl set image, run the matrix, James go/no-go #2) is DEFERRED — blocked on F10 external RBAC. passes=true reflects 'build-phase deliverable complete'; it is NOT live-verified (canary not yet run)."
+    }
+  ]
+}

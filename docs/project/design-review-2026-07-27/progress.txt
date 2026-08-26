@@ -1,0 +1,267 @@
+=== Harness Session 2026-07-27 ===
+Harness: build · Mode: airedale · Phase: discovery
+Brief: Bring the built OOH Triage Dashboard to live on Spencer's prod platform (SD-586).
+       Migrate OOH assets out of Zendesk Integration into IOT OOH Dash; run discovery on
+       what's built vs Spencer's handover; find a route through in Spencer's absence;
+       present an interactive discovery artefact at the gate.
+
+--- Migration ---
+Moved into IOT OOH Dash/:
+  - ooh-triage-dashboard/ (the built Node app, git repo, v1.1.0) — git verified intact
+  - OOH Dashboard/ (design + analysis) + ooh-v1-applied-outcome.png
+Kept in Zendesk Integration/: IoT Support Dashboard (SD-330 consumer) + all its tooling.
+Breadcrumb left: Zendesk Integration/OOH-WORK-RELOCATED.md
+New structure: ooh-triage-dashboard/ · OOH Dashboard/ · handover/ · discovery/ · root docs.
+
+--- Discovery ---
+Read: full Spencer email trail (11/14 Jul asks + 22 Jul unblock reply), both SD-586
+handover docs (implementation-and-deployment + auth-b2c-handoff, copied to handover/),
+repo (config/auth/store/deployment/Dockerfile/package/release-notes/runbook), producer
+PROJECT_STATUS.
+
+KEY FINDING: app is built+tested (v1.1.0) but coded to the OLD infra model. Spencer stood up
+prod on a SECURER model (workload identity + Key Vault + Cosmos AAD RBAC no-key + public PKCE
+client + AreaClaim[] roles). Remaining work = a defined set of app-side changes, almost all
+buildable NOW without Spencer.
+
+Sorted the work: 5 buildable-now items · 4 Spencer/platform-gated (SR-3 TB write cred is the
+one hard canary-boot blocker) · 2 James decisions (SMS gateway, P1 deep-link).
+Caught: OQ-1 secret-mechanism ambiguity (email vs impl doc); SR-3 fail-secure boot dependency.
+
+Artefacts produced:
+  - discovery/shaping-proposal.html  (INTERACTIVE — per-section verdicts + decisions + JSON export)
+  - discovery/discovery-research-log.md
+  - handover/SD-586-*.md, handover/email-trail-summary.md
+  - PROJECT_STATUS.md, DATA_DICTIONARY.md, README.md (project root)
+
+STATUS: Presented at the discovery gate — awaiting James's response JSON.
+Checkpoint-init deliberately NOT written yet (manual gate: awaiting user confirmation of scope).
+
+--- Discovery closed 2026-07-27 ---
+Discovery APPROVED by James (interactive shaping proposal, all sections). Decisions locked:
+SMS=Twilio (reuse IoT Support dash account); P1 deep-link=EXEMPT /?ticket= at the IoT dash
+ingress (token-guarded); Zendesk auth=Jonathan's EXISTING creds/API key (no machine account).
+Confirmed by direct az check: deploy blocker = Techhub RBAC grant to obj ec79d06a- (KV/ACR/AKS);
+ingress+TLS already live. Cross-product: no IoT-dash code change; [TRG]-in-description verified live.
+Out-of-process code spike (branch feature/infra-alignment-v1) was DISMISSED — developer implements post-gate.
+checkpoint-init.json written; nextAgent=designer. Handoff: .harness/handoff-design.md.
+Fresh session "OOH design" instigated for the design phase. NO design/build work done in the discovery session.
+
+--- Designer --- (fresh session "OOH design") 2026-07-27
+Read all mandatory prerequisites + the two SD-586 handover docs + DEPLOY_RUNBOOK + DATA_DICTIONARY +
+the ACTUAL repo source on feature/live-build-v1 (config.js, services/auth.js, services/store.js,
+server.js, k8s/deployment.yaml, package.json). Confirmed the baseline is still the OLD infra model
+(the dismissed spike branch is NOT the baseline).
+
+DESIGN APPROACH: this cycle has NO new operator UI (RELEASE_NOTES v1.1.0: UI unchanged). Per the
+handoff, "design" = the change + operational design. Produced:
+  - design-spec.md — ratifies SD-586 app-side changes (F01 public OIDC client, F02 AreaClaim[] mapRole,
+    F03 keyless Cosmos via WI, F04 manifest), + config-validation change, test design (F07),
+    canary/deploy design + runbook ratification with corrections (F08), monitoring design, the D-2
+    ingress-exemption spec (F09), Zendesk/SMS config decisions (F05/F06), UI-change verdict (NONE).
+  - prototype/index.html — an INTERACTIVE Go-Live Design Review (NOT a fabricated UI mock — honest per
+    the handoff): expandable before->after code diffs, a walkable canary stepper, a monitoring health
+    panel, the CT findings, a SteerCo governance summary, and per-section Approve/Amend/Reject controls
+    with JSON-export-to-clipboard (SteerCo Review Presentation standard). Doubles as the gate review HTML.
+
+CRITICAL THINKER (independent subagent, read the real source + installed SDK type surfaces):
+  Verdict "Proceed after addressing critical." 2 critical, 4 important, 5 advisory.
+  - CR-01 (RESOLVED in-spec §4): container createIfNotExists 403s under the data-plane-only Cosmos role;
+    the 4 containers don't exist yet. Fix: pre-create containers out-of-band as the PRIMARY plan
+    (added to F10 RBAC ask + runbook RB-3); app stops creating the DB and tolerates 403 with a handle.
+  - CR-02 (RESOLVED in-spec §4.1): /healthz store-green is a false-green (hard-coded status:'ok' + cached
+    flag, never contacts Cosmos). Fix: active boot-time store probe + /healthz degrade; F03 is proven only
+    by a REAL Cosmos write at the canary (new matrix step 4a), not by a green health check.
+  - IM-01 folded in §3.1 (correct openid-client v6 public-client idiom; removed invented property).
+  - IM-02 folded in §4 (@azure/identity absent from package.json+lockfile -> npm ci --omit=dev omits it;
+    now a mandatory dep + build-time resolve check).
+  - IM-03 folded in §7 RB-1 (runbook falsely says code "already aligned to prod" — dismissed spike; strike
+    it + fix 3 stale branch refs).
+  - IM-04 folded in §8 (D-2 ingress exemption must be exact-path '/' + signed token, NOT "?ticket= present"
+    which would be a whole-site auth bypass).
+  - AD-01 (mapRole deterministic precedence iot>handler), AD-03 (COSMOS_DATABASE defaulted), AD-05
+    (WorkloadIdentityCredential preferred) folded in; AD-02, AD-04 noted.
+
+design_status=complete for F01-F09, F11; F10 = not_applicable (external human RBAC step).
+
+STATUS: Presented at the DESIGN GATE — awaiting James's approval JSON (open prototype/index.html).
+Checkpoint-design.json deliberately NOT written yet (manual gate: written only AFTER James approves,
+with checkpointUserConfirmed:true). NO developer/build work done in this session.
+
+--- Developer --- (fresh session "OOH dev") 2026-07-27
+Read all mandatory prerequisites + csharp-blazor-standards.md + security-standards.md (GAP-02) +
+the actual repo source (config.js, services/auth.js, services/store.js, server.js, package.json,
+package-lock.json, k8s/deployment.yaml, Dockerfile, tests/, playwright.config.js). Confirmed the
+baseline on feature/live-build-v1 is still the OLD infra model. Cut a release branch
+feature/go-live-sd586 from it (dismissed spike feature/infra-alignment-v1 ignored).
+
+STANDARDS NOTE: the Airedale C#/Blazor + security standards are framework-specific and largely
+N/A to this Node/Express app. Applied the TRANSFERABLE principles: no hardcoded secrets, fail-secure
+boot preserved, server-side authorisation (mapRole/requireRole) unchanged, no eval, hardened session
+cookies unchanged, structured error handling with no client stack traces.
+
+Features implemented (6 incremental commits, one per feature):
+  F01 (12fbfdf) public OIDC client — initOidc two-arg discovery() (openid-client v6 public-client
+      idiom, clientAuthentication defaults to None, no secret sent); config.js validateConfig no
+      longer requires OIDC_CLIENT_SECRET. IM-01 honoured (did NOT invent tokenEndpointAuthMethod).
+  F02 (12fbfdf) mapRole parses serialised AreaClaim[] keyed on claimArea int, deterministic
+      precedence iot>handler (AD-01), malformed/legacy/missing → null (no throw); exported for tests;
+      roleMap default {"1500":"handler","1400":"iot"}.
+  F03 (0ed6453) keyless Cosmos via workload identity — WorkloadIdentityCredential (prod) /
+      DefaultAzureCredential (local) via aadCredentials when no COSMOS_KEY (AD-05); keyed path kept;
+      NO databases.createIfNotExists (client.database handle, CR-01); 403-tolerant container handle
+      fallback; active storeProbe() real point-read + eager boot warm-up + /healthz status:'degraded'
+      in-body (CR-02). @azure/identity ^4.13.0 promoted to first-class dep + regenerated lockfile +
+      Dockerfile require.resolve build guard (IM-02). config.js drops COSMOS_KEY requirement.
+  F04 (0e... k8s) manifest → serviceAccountName sa-ooh-dashboard, image apitechhub.azurecr.io/
+      ooh-dashboard:<sha>; everything else (WI label, replicas:1, canary levers, envFrom, limits,
+      probes) retained. YAML parse-verified.
+  F07 (test commit) node:test unit suite in test/ (separate from Playwright ./tests): 22/22 —
+      mapRole (incl dual-claim + no-throw edges), validateConfig (no secret/key required, required
+      fields + prod fail-secure intact), initOidc no-op contract. Playwright 41/41 in fixture mode.
+      Total 63/0. auth.spec.js NOT changed (dev sign-in bypasses mapRole — design §3.2 confirms).
+  F08 DEPLOY_RUNBOOK.md corrected (project-root doc, outside the git repo): RB-1 (struck false
+      "already aligned to prod", branch refs → feature/go-live-sd586, dismissed-spike warning),
+      RB-2 (Zendesk = Jonathan's existing creds, NO service account), RB-3 (pre-create 4 Cosmos
+      containers out-of-band, /storePartition), RB-4 (replicas:1 quiet-hours + re-SSO note), D-2
+      note tightened to IM-04 (exact path '/' + signed token), canary step 4a real-write proof.
+  F09 standalone written spec produced: handover/D-2-ingress-exemption-spec.md (IM-04 scoping,
+      signed-token form, ownership matrix, verification). passes=false — external handoff + phone
+      verify at go/no-go #4 are deferred.
+
+DESIGN INFERENCE (logged): /healthz reports status:'degraded' in the JSON BODY but keeps HTTP 200
+even when a subsystem is unhealthy — because both K8s liveness AND readiness probes hit /healthz and,
+under replicas:1 (RB-4/AD-04), a non-2xx on a transient Cosmos blip would restart/deregister the only
+pod (full outage + forced re-SSO). Body-level degrade makes state visible to monitoring/canary
+without weaponising the probe. Within design §4.1's stated latitude; chose the safer option.
+
+Features implemented: 6 built (F01-F04, F07, F08) + F09 spec.
+Features passing self-test: 6 (F01,F02,F03,F04,F07,F08) — see feature-list.json.
+Known issues: none. code-audit.md all PASS (3 mandatory topics + full checklist).
+Verification boundary (honest, per design §6.5): F01 live SSO + F03 keyless write are CANARY-only
+proofs (F11), deferred pending F10 Azure RBAC + Cosmos container pre-creation (external, not a build
+defect). F05/F06 are config-only, documented in the runbook, actioned at deploy/go-no-go.
+Standards compliance: self-assessed compliant with the transferable security-standards principles
+(C#/Blazor standards N/A to Node).
+NOT pushed — deployment is a later governance gate (needs F10). Ready for Tester phase.
+
+--- Tester --- (fresh session) 2026-07-27
+Read all mandatory prerequisites + tester.md + testing-standards.md + the ACTUAL repo source on
+feature/go-live-sd586 (config.js, services/auth.js, services/store.js, server.js, Dockerfile,
+k8s/deployment.yaml, package.json, test/*, tests/*, DEPLOY_RUNBOOK.md, D-2 spec, DATA_DICTIONARY.md).
+
+TESTED INDEPENDENTLY (did not trust dev self-assessment):
+  - node --test test/*.test.js → 22/22 pass (executed this session).
+  - npx playwright test (fixture, real server boot, Chromium) → 41/41 pass. Total 63/0.
+  - LIVE MANUAL BROWSER REGRESSION (Playwright MCP, port 3160 dev/fixture): booted app, dev sign-in,
+    dashboard load, typed site search "6832" → real result "Old Grey Mare — Greene King · Farmhouse Inns"
+    (data fidelity, no [object Object]), confirm-gate (site detail), confirmed → device board with live
+    device status table (Bar 17.5°C/set 18°C, IT500-*/TUYA-* devices), issue chips, capability panel.
+    0 console errors across the flow. Satisfies the "manually performed in a running browser, not just
+    Playwright" checklist item. Screenshots + .playwright-mcp removed after; server stopped; repo clean.
+  - Static: k8s YAML parses (2 docs; sa-ooh-dashboard, apitechhub image, replicas:1, WRITES_DISABLED=true,
+    SMS_PROVIDER=log all present); source-check-test scan of test/+tests/ → NONE; @azure/identity in
+    package.json + package-lock.json; Dockerfile guard `require.resolve('@azure/identity')` → resolves;
+    /healthz degrade wiring confirmed (server.js:66-72 computes real subsystem state — CR-02 fix in place).
+  - Read every changed source file: mapRole robust (String(c?.claimArea ?? c), no [object Object], no throw),
+    validateConfig relaxations correct (no secret / no key, endpoint+bridge+TB-write still required),
+    storeProbe honest (real point-read, never throws), initCosmos no DB/container create + 403-tolerant (CR-01).
+
+VERIFICATION (every feature ID + every step traced in verification-report.md):
+  Code/static-verified now: F02 (all), F04 (all), F07 (all), F08 (all), F01 (1-2), F03 (1-2), F05 (1-2),
+  F06 (1,3), F09 (1). Canary-only per design §6.5 (gate-approved boundary, NOT defects): F01 s3, F03 s3,
+  F06 s2. External/deferred: F05 s3, F09 s2-3, F10 (all), F11 (all). No live proofs fabricated.
+
+QUALITY (Airedale): no operator-UI change this cycle (v1.1.0 UI unchanged; design §0/§11) — UI criteria carry
+  the prior cycle; scored the change/ops implementation. Weighted ~8.1/10, every criterion above threshold.
+
+CODE AUDIT: independently re-verified dev's code-audit.md — all PASS (no dead code, no secrets, no
+  [object Object], error handling on all async/fetch paths, env vars resolvable, dependency integrity).
+
+DATA DICTIONARY: current — four containers + PK /storePartition + AAD-WI + removed OIDC_CLIENT_SECRET/COSMOS_KEY
+  + AreaClaim[] contract all consistent with the code. No update needed.
+
+TEST DATA: none created (fixture mode only; no live Cosmos/Zendesk/TB/Azure touched). Nothing to clean up.
+
+RESULT: PASS. 8 features pass at build-deliverable level (F01-F04,F07,F08 code/static-verified; F10,F11
+  documented-deliverable-complete, honestly non-live). 3 correctly passes:false (F05,F06 config-only; F09
+  spec-complete/handoff-deferred). 0 rework. feature-list.json passes fields confirmed unchanged (correct).
+  Wrote test-report.md + verification-report.md; code-audit.md carried from dev (re-verified).
+  checkpoint-test.json written; nextAgent=release-manager. NOT pushed (deploy is a later gate, needs F10).
+
+--- Critical Thinker review (pre-deployment, independent subagent) --- 2026-07-27
+Ran the Critical Thinker against the test outputs + real source before deploy sign-off
+(critical-thinker-test-review.md). Verdict: PROCEED to deploy the write-locked canary — 0 Critical,
+3 Important, 3 Advisory. Tester re-verified the two load-bearing findings against store.js (did not
+trust the subagent):
+  IM-01 CONFIRMED — /healthz store health is stale-green at RUNTIME (store.js:196 sets storeHealthy=true
+    unconditionally; CosmosCollection get/upsert failures never flip it false; false set only at init:194
+    / probe:223). CR-02 fixed BOOT, not runtime. → Developer fix before go/no-go #3 (device-write BAU).
+  IM-02 CONFIRMED — boot probe can't catch a MISSING container (get() swallows 404 as healthy, store.js:89);
+    runbook line 57 "403s → degraded" is wrong; real backstop is step 4a live write (upsert throws on
+    missing container). → PRE-CANARY: RM fix runbook wording + make step 4a a hard non-skippable gate.
+  IM-03 — F10/F11 (critical) passes:true but not live-verified → RM verifies off runbook matrix, not booleans.
+  AD-03 REJECTED — CT miscounted "24" unit tests; runner + grep confirm 22, reports correct.
+No Critical → PASS checkpoint stands (write-locked canary is safe; step 4a is the real F03 backstop).
+Go-live conditions recorded in test-report.md + checkpoint-test.json. NOT a rework cycle (Important, not
+Critical; CT recommends proceed with documented awareness).
+
+--- Release (RM, same session — fresh-session hop waived by James) --- 2026-07-27
+Read release-manager.md. Pre-checks: test-report PASS; F05/F06/F09 passes:false are documented design-gate
+deferrals (config-only/spec), treated as accepted not bounced. Tracked tree clean; branch feature/go-live-sd586
+not pushed; no CI/CD in repo (verified — push does NOT deploy).
+Completion workflow:
+  - Steps 1-3: tests re-run this session 63/0 (unit 22/22 + Playwright 41/41 with v1.2.0); code-audit PASS; checklist done.
+  - Step 4: version 1.1.0 → 1.2.0 (package.json); committed 7d4b5f2 LOCAL ONLY (package.json only; secret-scanned; not pushed).
+  - Pre-canary go-live condition applied: DEPLOY_RUNBOOK IM-02 wording corrected + step 4a made a hard non-skippable gate.
+  - RELEASE_NOTES.md v1.2.0 appended; DEPLOYMENT_REQUEST.md written (first-deployment ask).
+
+CRITICAL THINKER (pre-deploy, independent subagent): PROCEED — 0 critical, 3 important (IM-01 runtime store-health,
+IM-02 runbook wording [fixed], IM-03 F10/F11 booleans), 3 advisory (AD-03 rejected — unit count is 22). Recorded
+in test-report.md + checkpoint-test.json.
+
+SPENCER ACCESS (emails reviewed IN FULL incl. attachments): GRANTED 2026-07-27, reshaped least-privilege —
+KV Secrets User(read) / ACR Task Runner / k8s SA deployer-ooh + scoped kubeconfig / Cosmos Data Contributor
+(James's user, /dbs/ooh-dashboard). Kubeconfig sent 1:1 (KUBECO~1.YAM, binary — James downloads). image001.png =
+render of the original 3-role ask (not grant proof). IMPACT_ASSESSMENT-spencer-access.md written.
+Verdict: access unblocked, NOT deploy-ready. Residual (now with Spencer, emailed 2026-07-27):
+  B1 pre-create 4 Cosmos containers (his data-plane grant CANNOT — CR-01; was never explicitly asked before, a today finding);
+  B2 load ooh-dashboard-secrets (James read-only on vault); Jonathan's Zendesk creds SENT to Spencer 2026-07-27;
+  B3 confirm in-cluster WI id-ooh-dashboard-prod holds Cosmos Data Contributor + secret read (grants were to James's user);
+  B4 apply k8s/deployment.yaml once (SA+WI label+envFrom) or confirm placeholder.
+Zendesk note: CIR §2.9 holds only Sam's DEV token (not for prod); correct creds = Jonathan's existing
+(subdomain theairedalegroup / jonathan.wilkinson@airedale-group.co.uk / API token) — James sourced + sent directly.
+
+BUILD/DESIGN IMPACT of Spencer's reshaping: NONE — the app already matches his model (keyless WI, no secret/key).
+Only operational runbook steps changed (Step 0 superseded → actual grants; kubeconfig not az aks get-credentials;
+secrets owner = Spencer). Design-spec + code unchanged. Pressing on is safe.
+
+Deferred to deployment (external, as always scoped): live canary (build+push image, kubectl set image, canary
+matrix incl step 4a HARD GATE, James go/no-go #2), blocked on B1-B4. IM-01 dev fix booked before go/no-go #3.
+
+checkpoint-release.json written (deploymentStatus: pending; nextAgent: null — harness build cycle complete).
+NOT pushed. Harness session COMPLETE; deployment is post-harness operational, gated on Spencer B1-B4 + go/no-go #2.
+
+--- Release finalisation (fresh RM session "ooh dash release") --- 2026-07-27
+Re-invoked into the release phase. The prior same-session release had written a valid checkpoint but left a
+harness feature-clearance gate unsatisfied: F05/F06 were passes:false with NO status field, so the Command
+Centre's release gate blocked EVERY mutating tool (blanket precondition on disk state) — a deadlock, since the
+fix was itself a write (even a scratchpad write + AskUserQuestion were denied). Surfaced to James.
+  - James manually added status:"deferred" to F05 and F06 in feature-list.json (existing notes explain each
+    deferral: F05 SMS live-enable @ go/no-go #4; F06 live-identity Zendesk ticketing proven only at canary).
+    Gate released.
+  - Re-ran node:test unit suite 22/22 (this session). Playwright 41/41 stands — the only delta since the last
+    run is a harness-artefact JSON edit, no app-code change. Total 63/0.
+  - Found the v1.2.0 RELEASE_NOTES.md written but UNCOMMITTED (commit 7d4b5f2 was package.json only). Committed
+    it locally as 73560c6 (staged that file only; unrelated untracked files — .claude/, OOH-INTEGRATION-DISCOVERY
+    kickoff, an xlsx, a spawn .cmd — deliberately left alone; secret-scanned clean). Tracked tree now clean.
+  - Verified all release artefacts exist (PROJECT_STATUS, DATA_DICTIONARY, DEPLOYMENT_REQUEST at root; RELEASE_NOTES
+    + DEPLOY_RUNBOOK; IMPACT_ASSESSMENT in work folder). Refreshed checkpoint-release.json (commit 73560c6, ts updated).
+  - Still NOT pushed. No push=deploy risk (no CI in repo); deploy remains gated on F10 + Spencer B1-B4 + James go/no-go #2.
+Release phase now cleanly closed. Build harness cycle COMPLETE.
+
+--- Branch pushed to GitHub --- 2026-07-27
+James elected to push the feature branch to GitHub (single-source-of-truth / off-machine backup per CLAUDE.md),
+NOT to keep it local-only. Pushed feature/go-live-sd586 → origin (github.com/bigtuff8/ooh-triage-dashboard) at
+HEAD 73560c6, tracking set. This is a branch publish ONLY — NOT merged to main, and NOT a deploy (repo has no
+CI/CD, so push ≠ deploy). Deployment remains gated on Spencer B1-B4 + James go/no-go #2.

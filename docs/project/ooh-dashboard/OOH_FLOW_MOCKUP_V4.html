@@ -1,0 +1,1397 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>OOH Triage Flows — Mockup v4</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/icon?family=Material+Icons+Outlined" rel="stylesheet">
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Inter',sans-serif;background:#f1f5f9;color:#1e293b}
+:root{--pri:#3b82f6;--pri-bg:rgba(59,130,246,.06);--ok:#22c55e;--ok-bg:rgba(34,197,94,.06);--warn:#f59e0b;--warn-bg:rgba(245,158,11,.06);--err:#ef4444;--err-bg:rgba(239,68,68,.06);--txt:#1e293b;--txt2:#64748b;--surf:#fff;--bdr:#e2e8f0;--bg:#f8fafc;--r:10px;--rs:6px}
+.app{display:flex;height:100vh}
+.sb{width:260px;background:var(--surf);border-right:1px solid var(--bdr);display:flex;flex-direction:column;flex-shrink:0;overflow-y:auto}
+.sb-hdr{padding:20px 16px 12px;border-bottom:1px solid var(--bdr)}
+.sb-hdr h2{font-size:16px;display:flex;align-items:center;gap:8px}
+.sb-hdr p{font-size:11px;color:var(--txt2);margin-top:4px}
+.ns{padding:12px 8px 4px}
+.nl{font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.5px;color:var(--txt2);padding:0 8px 6px}
+.ni{display:flex;align-items:center;gap:10px;padding:8px 12px;border-radius:var(--rs);cursor:pointer;font-size:13px;font-weight:500;color:var(--txt);transition:all .12s}
+.ni:hover{background:var(--bg)}.ni.act{background:var(--pri-bg);color:var(--pri)}
+.ni .material-icons-outlined{font-size:18px}
+.nb{margin-left:auto;font-size:10px;padding:2px 7px;border-radius:10px;background:var(--pri);color:#fff;font-weight:600}
+.mn{flex:1;display:flex;flex-direction:column;overflow:hidden}
+.tb{padding:14px 24px;background:var(--surf);border-bottom:1px solid var(--bdr);display:flex;align-items:center;justify-content:space-between}
+.tb h1{font-size:18px}.tb-r{display:flex;align-items:center;gap:12px;font-size:12px;color:var(--txt2)}
+.ct{flex:1;overflow-y:auto;padding:20px 24px}
+.form-section{background:var(--surf);border:1px solid var(--bdr);border-radius:var(--r);padding:20px;margin-bottom:20px}
+.form-section h3{font-size:15px;font-weight:600;margin-bottom:16px;display:flex;align-items:center;gap:8px}
+.form-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.fg{display:flex;flex-direction:column;gap:4px}
+.fg.full{grid-column:1/-1}
+.fg label{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.4px;color:var(--txt2)}
+.fg label .req{color:var(--err)}
+.fg input,.fg select,.fg textarea{padding:9px 11px;border:1px solid var(--bdr);border-radius:var(--rs);font-size:13px;font-family:inherit;background:var(--bg)}
+.fg input:focus,.fg select:focus,.fg textarea:focus{outline:none;border-color:var(--pri)}
+.fg textarea{resize:vertical;min-height:60px}
+.fg .help{font-size:11px;color:var(--txt2);margin-top:2px}
+.entry-section{margin-bottom:24px}
+.entry-title{display:flex;align-items:center;gap:8px;font-size:14px;font-weight:600;margin-bottom:12px}
+.egrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:10px}
+.ecard{display:flex;flex-direction:column;align-items:center;gap:8px;padding:20px 16px;background:var(--surf);border:1px solid var(--bdr);border-radius:var(--r);cursor:pointer;text-align:center;transition:all .15s;position:relative}
+.ecard:hover{border-color:var(--pri);box-shadow:0 2px 8px rgba(0,0,0,.06);transform:translateY(-1px)}
+.ecard .material-icons-outlined{font-size:28px;color:var(--pri)}
+.ecard span:last-of-type{font-size:13px;font-weight:500}
+.search-box{position:relative;margin-bottom:20px}
+.search-box input{width:100%;padding:12px 12px 12px 40px;border:1px solid var(--bdr);border-radius:var(--r);font-size:14px;font-family:inherit;background:var(--surf)}
+.search-box input:focus{outline:none;border-color:var(--pri);box-shadow:0 0 0 3px rgba(59,130,246,.1)}
+.search-box .material-icons-outlined{position:absolute;left:12px;top:50%;transform:translateY(-50%);color:var(--txt2);font-size:20px}
+.search-suggestions{position:absolute;top:100%;left:0;right:0;background:var(--surf);border:1px solid var(--bdr);border-radius:var(--rs);box-shadow:0 8px 24px rgba(0,0,0,.1);margin-top:4px;z-index:10;display:none;max-height:240px;overflow-y:auto}
+.search-suggestions.show{display:block}
+.ss-item{padding:10px 14px;cursor:pointer;display:flex;align-items:center;gap:10px;font-size:13px;border-bottom:1px solid rgba(0,0,0,.04)}
+.ss-item:hover{background:var(--pri-bg)}
+.ss-item .material-icons-outlined{font-size:18px;color:var(--pri)}
+.tl{display:flex;gap:16px;height:calc(100vh - 160px)}
+.tc{flex:1;display:flex;flex-direction:column;min-width:0}
+.ts{width:340px;flex-shrink:0;display:flex;flex-direction:column;gap:12px;overflow-y:auto}
+.th{display:flex;align-items:center;justify-content:space-between;padding:10px 14px;background:var(--surf);border:1px solid var(--bdr);border-radius:var(--r);margin-bottom:8px}
+.tfn{display:flex;align-items:center;gap:6px;font-weight:600;font-size:14px}
+.ca{flex:1;overflow-y:auto;display:flex;flex-direction:column;gap:8px;padding:4px}
+.msg{padding:12px 14px;border-radius:var(--r);border-left:3px solid var(--pri);background:var(--surf);font-size:13px;line-height:1.6}
+.msg-bot{border-left-color:var(--pri)}.msg-agent{border-left-color:var(--ok);background:var(--ok-bg)}
+.msg-sys{border-left-color:var(--txt2);background:var(--bg);font-size:12px}
+.msg-esc{border-left-color:var(--warn);background:var(--warn-bg)}
+.msg-res{border-left-color:var(--ok);background:var(--ok-bg)}
+.msg-script{border-left-color:#8b5cf6;background:rgba(139,92,246,.06)}
+.msg-rules{border-left-color:#8b5cf6;background:rgba(139,92,246,.04);font-size:12px}
+.mh{display:flex;align-items:center;gap:6px;margin-bottom:6px;font-size:12px;color:var(--txt2)}
+.mh .material-icons-outlined{font-size:16px}
+.mt{color:var(--txt)}.mt strong{font-weight:600}
+.acts{display:flex;flex-wrap:wrap;gap:6px;padding:4px 0}
+.ab{display:inline-flex;align-items:center;gap:6px;padding:9px 16px;background:var(--surf);border:1px solid var(--pri);border-radius:var(--rs);color:var(--pri);font-size:13px;font-weight:500;cursor:pointer;transition:all .12s;font-family:inherit}
+.ab:hover{background:var(--pri);color:#fff}
+.ab.err{border-color:var(--err);color:var(--err)}.ab.err:hover{background:var(--err);color:#fff}
+.ab.ok{border-color:var(--ok);color:var(--ok)}.ab.ok:hover{background:var(--ok);color:#fff}
+.ab.sec{border-color:var(--bdr);color:var(--txt2)}.ab.sec:hover{background:var(--bg);color:var(--txt)}
+.ab .material-icons-outlined{font-size:16px}
+.dc{padding:14px;background:var(--surf);border:1px solid var(--bdr);border-radius:var(--r);font-size:13px}
+.dc h4{margin:0 0 10px;font-size:13px;font-weight:600;display:flex;align-items:center;gap:6px}
+.dt{width:100%;border-collapse:collapse}
+.dt th{text-align:left;font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.3px;color:var(--txt2);padding:6px 8px;border-bottom:1px solid var(--bdr)}
+.dt td{padding:8px;border-bottom:1px solid rgba(0,0,0,.04);font-size:12px}
+.dt tr:last-child td{border-bottom:none}.dt tr.hl{background:var(--pri-bg)}
+.sd{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:4px}
+.sd.g{background:var(--ok)}.sd.r{background:var(--err)}.sd.a{background:var(--warn)}
+.cc{padding:14px;background:var(--surf);border:1px solid var(--bdr);border-radius:var(--r)}
+.cc h4{margin:0 0 8px;font-size:13px;font-weight:600}
+.cr{display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid var(--bdr);font-size:12px}
+.cr:last-child{border-bottom:none}.cr span:first-child{color:var(--txt2)}
+.pc{padding:12px;background:var(--warn-bg);border:1px solid rgba(245,158,11,.2);border-radius:var(--r)}
+.pc h4{margin:0 0 6px;font-size:12px;font-weight:600;color:#92400e;display:flex;align-items:center;gap:4px}
+.sev{display:inline-flex;align-items:center;gap:4px;padding:3px 8px;border-radius:4px;font-size:11px;font-weight:600}
+.sev.crit{background:var(--err-bg);color:var(--err)}.sev.high{background:var(--warn-bg);color:#92400e}
+.sev.med{background:var(--pri-bg);color:var(--pri)}
+.toast{position:fixed;bottom:20px;right:20px;background:#1e293b;color:#fff;padding:12px 20px;border-radius:var(--rs);font-size:13px;display:flex;align-items:center;gap:8px;transform:translateY(80px);opacity:0;transition:all .3s;z-index:999}
+.toast.show{transform:translateY(0);opacity:1}.toast .material-icons-outlined{font-size:18px}
+.steps{display:flex;align-items:center;gap:0;margin-bottom:20px;flex-wrap:wrap}
+.step{display:flex;align-items:center;gap:6px;padding:8px 16px;font-size:12px;font-weight:500;color:var(--txt2);position:relative}
+.step.active{color:var(--pri);font-weight:600}.step.done{color:var(--ok)}
+.step::after{content:'>';margin-left:12px;font-size:16px;color:var(--bdr)}.step:last-child::after{display:none}
+.step .material-icons-outlined{font-size:16px}
+.detail-capture{background:var(--bg);border:1px solid var(--bdr);border-radius:var(--rs);padding:12px;margin:8px 0}
+.detail-capture label{font-size:11px;font-weight:600;color:var(--txt2);display:block;margin-bottom:4px}
+.detail-capture textarea,.detail-capture select,.detail-capture input{width:100%;padding:8px;border:1px solid var(--bdr);border-radius:var(--rs);font-size:13px;font-family:inherit;margin-bottom:8px}
+.rules-box{background:rgba(139,92,246,.06);border:1px solid rgba(139,92,246,.15);border-radius:var(--rs);padding:12px;margin:6px 0;font-size:12px;line-height:1.6}
+.rules-box strong{color:#7c3aed}
+
+/* === MODAL === */
+.modal-backdrop{position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(15,23,42,.65);z-index:1000;display:flex;align-items:center;justify-content:center;opacity:0;pointer-events:none;transition:opacity .25s}
+.modal-backdrop.open{opacity:1;pointer-events:all}
+.modal{background:var(--surf);border-radius:12px;width:720px;max-width:92vw;max-height:88vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,.25);transform:translateY(20px);transition:transform .25s}
+.modal-backdrop.open .modal{transform:translateY(0)}
+.modal-hdr{display:flex;align-items:center;justify-content:space-between;padding:18px 24px;border-bottom:1px solid var(--bdr);position:sticky;top:0;background:var(--surf);z-index:2;border-radius:12px 12px 0 0}
+.modal-hdr h2{font-size:16px;display:flex;align-items:center;gap:8px}
+.modal-body{padding:20px 24px}
+.modal-section{margin-bottom:20px}
+.modal-section h4{font-size:13px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:var(--txt2);margin-bottom:10px;display:flex;align-items:center;gap:6px;border-bottom:1px solid var(--bdr);padding-bottom:6px}
+.modal-kv{display:flex;justify-content:space-between;padding:4px 0;font-size:12px;border-bottom:1px solid rgba(0,0,0,.04)}
+.modal-kv span:first-child{color:var(--txt2);min-width:120px}
+.modal-log{max-height:220px;overflow-y:auto;border:1px solid var(--bdr);border-radius:var(--rs);padding:8px}
+.modal-log-item{padding:4px 8px;font-size:11px;line-height:1.5;border-bottom:1px solid rgba(0,0,0,.03)}
+.modal-log-item:last-child{border-bottom:none}
+.modal-log-item .log-time{color:var(--txt2);margin-right:6px;font-weight:600}
+.modal-log-item .log-role{font-weight:600;margin-right:4px}
+.modal-log-item .log-role.bot{color:var(--pri)}
+.modal-log-item .log-role.agent{color:var(--ok)}
+.modal-log-item .log-role.sys{color:var(--txt2)}
+.modal-log-item .log-role.esc{color:var(--warn)}
+.modal-ftr{display:flex;gap:8px;justify-content:flex-end;padding:16px 24px;border-top:1px solid var(--bdr);position:sticky;bottom:0;background:var(--surf);border-radius:0 0 12px 12px}
+
+::-webkit-scrollbar{width:6px}::-webkit-scrollbar-track{background:transparent}::-webkit-scrollbar-thumb{background:#cbd5e1;border-radius:3px}
+@media(max-width:900px){.sb{display:none}.tl{flex-direction:column;height:auto}.ts{width:100%}.form-grid{grid-template-columns:1fr}.egrid{grid-template-columns:repeat(2,1fr)}.modal{width:98vw}}
+</style>
+</head>
+<body>
+<div class="app">
+<aside class="sb">
+    <div class="sb-hdr"><h2><span class="material-icons-outlined" style="color:var(--pri)">support_agent</span> OOH Triage</h2><p>Out-of-hours call handler</p></div>
+    <div class="ns"><div class="nl">Triage</div><div class="ni act" onclick="goHome()" id="navHome"><span class="material-icons-outlined">home</span> New Call</div></div>
+    <div class="ns"><div class="nl">Monitor</div><div class="ni" onclick="showPocket()"><span class="material-icons-outlined">timer</span> Active Overrides <span class="nb">1</span></div></div>
+    <div style="margin-top:auto;padding:12px 16px;font-size:11px;color:var(--txt2);border-top:1px solid var(--bdr)">OOH Mockup v4 — 24 Mar 2026</div>
+</aside>
+<div class="mn">
+    <div class="tb"><h1 id="pT">New Call</h1><div class="tb-r"><span class="material-icons-outlined" style="font-size:16px">schedule</span><span id="clk"></span></div></div>
+    <div class="ct" id="vc"></div>
+</div>
+</div>
+<div class="toast" id="toast"><span class="material-icons-outlined" id="tI">check_circle</span><span id="tM"></span></div>
+<div class="modal-backdrop" id="escModal">
+    <div class="modal">
+        <div class="modal-hdr"><h2 id="escModalTitle">Escalation Review</h2><button class="ab sec" onclick="closeEscModal()" style="padding:6px 10px"><span class="material-icons-outlined">close</span></button></div>
+        <div class="modal-body" id="escModalBody"></div>
+        <div class="modal-ftr">
+            <button class="ab sec" onclick="editAndGoBack()"><span class="material-icons-outlined">edit</span> Edit & Go Back</button>
+            <button class="ab ok" onclick="submitEscalation()"><span class="material-icons-outlined">send</span> Submit Escalation</button>
+        </div>
+    </div>
+</div>
+<script>
+// === DATA ===
+const SITES=[
+{v:'gk_fi_10234',name:'Greene King::Farmhouse Inns::10234 - The Red Lion, Leeds',no:'10234',hours:'11:00-23:00',client:'Greene King',brand:'Farmhouse Inns'},
+{v:'gk_fi_10567',name:'Greene King::Farmhouse Inns::10567 - The White Hart, York',no:'10567',hours:'11:00-23:30',client:'Greene King',brand:'Farmhouse Inns'},
+{v:'gk_fg_11002',name:'Greene King::Flaming Grill::11002 - The George & Dragon, Bradford',no:'11002',hours:'11:00-23:00',client:'Greene King',brand:'Flaming Grill'},
+{v:'gk_cb_12100',name:'Greene King::Chef & Brewer::12100 - The Stag, Harrogate',no:'12100',hours:'10:00-23:30',client:'Greene King',brand:'Chef & Brewer'},
+{v:'mcd_20001',name:'McDonalds::20001 - Leeds City Centre',no:'20001',hours:'06:00-01:00',client:'McDonalds',brand:''},
+];
+const ZONES=[
+{zone:'Bar',temp:14.2,sp:18,mode:'Auto',id:'s1',st:'heating',on:true},
+{zone:'Kitchen',temp:19.8,sp:20,mode:'Auto',id:'s2',st:'idle',on:true},
+{zone:'Dining',temp:13.5,sp:18,mode:'Auto',id:'s3',st:'heating',on:true},
+{zone:'Accommodation',temp:16.1,sp:18,mode:'Auto',id:'s4',st:'heating',on:true},
+{zone:'Cellar',temp:11.2,sp:12,mode:'Auto',id:'s5',st:'idle',on:true},
+];
+const SCHEDS=[
+{name:'Morning On',time:'05:30',act:'ON',on:true,days:'Mon-Fri'},
+{name:'Evening Off',time:'22:00',act:'OFF',on:true,days:'Mon-Fri'},
+{name:'Weekend On',time:'07:00',act:'ON',on:true,days:'Sat-Sun'},
+{name:'Weekend Off',time:'20:00',act:'OFF',on:true,days:'Sat-Sun'},
+];
+const INTESIS_UNITS=[
+{name:'Bar AC Unit 1',power:'On',mode:'Cool',setpoint:16,roomTemp:22.4,id:'int-001'},
+{name:'Bar AC Unit 2',power:'Off',mode:'Auto',setpoint:21,roomTemp:22.1,id:'int-002'},
+{name:'Dining AC',power:'On',mode:'Cool',setpoint:14,roomTemp:18.3,id:'int-003'},
+];
+const EQUIPMENT_TYPES=[
+{label:'Heating & Hot Water',icon:'thermostat',subs:['Too cold / heating not working','No hot water','Water not hot enough','Heating won\'t turn off']},
+{label:'Kitchen Equipment',icon:'restaurant',subs:['Fryers not turning on','Ovens/grills not working','Equipment keeps turning off','Equipment making unusual noise']},
+{label:'Refrigeration',icon:'kitchen',subs:['Fridge/freezer alarm going off','Fridge/freezer temperature too high','Fridge/freezer not turning on','Beer cellar too warm']},
+{label:'Air Conditioning',icon:'ac_unit',subs:['AC blowing cold when should be warm','AC blowing warm when should be cool','AC not turning on','AC won\'t turn off']},
+{label:'Controls & Displays',icon:'settings_remote',subs:['Thermostat blank / unresponsive','Display showing error code','Control panel not responding','Other']},
+];
+const PROBLEMS=[
+{label:"It's too cold in here",icon:'ac_unit',fl:'tooCold',kw:['cold','freezing','heating','warm','temperature','chilly']},
+{label:"It's too hot in here",icon:'whatshot',fl:'tooHot',kw:['hot','warm','overheating','boiling','sweltering']},
+{label:'No hot water',icon:'water_drop',fl:'noHotWater',kw:['hot water','water','shower','tap','dhw','boiler']},
+{label:'Kitchen equipment not working',icon:'restaurant',fl:'kitchenEquip',kw:['fryer','oven','kitchen','grill','equipment','cook','food']},
+{label:'Fridge or freezer problem',icon:'kitchen',fl:'fridgeIssue',kw:['fridge','freezer','alarm','cold room','walk-in','temperature','beer','cellar']},
+{label:'Equipment won\'t turn on',icon:'power_off',fl:'wontTurnOn',kw:['turn on','power','switch','won\'t start','not working','dead']},
+{label:'Equipment keeps turning off',icon:'power_settings_new',fl:'keepsTurningOff',kw:['turning off','keeps going off','switching off','cuts out','trips']},
+{label:'Display showing error / controls not working',icon:'settings_remote',fl:'controlsIssue',kw:['display','error','thermostat','blank','code','control','panel','screen']},
+{label:'Something else',icon:'contact_support',fl:'somethingElse',kw:[]},
+];
+
+// === STATE ===
+let view='landing',flow=null,msgs=[],site=null,caller={},summary=[],fs=null;
+let actionsTaken=[];
+let dataSnapshots=[];
+let escalationData=null;
+let agentNotes='';
+
+// === CORE ===
+function render(){const c=document.getElementById('vc');({landing:renderLanding,intake:renderIntake,triage:renderTriage,wrapUp:renderWrapUp,pocket:renderPocket}[view]||renderLanding)(c);tick()}
+function tick(){document.getElementById('clk').textContent=new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})+' — Out of Hours'}
+function goHome(){view='landing';flow=null;msgs=[];summary=[];actionsTaken=[];dataSnapshots=[];escalationData=null;agentNotes='';caller={};site=null;render()}
+function newIssue(){view='landing';flow=null;msgs=[];summary=[];actionsTaken=[];dataSnapshots=[];escalationData=null;agentNotes='';render()}
+function esc(s){return(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;')}
+function sn(){return site?site.name.split('::').pop():'Unknown Site'}
+function now(){return new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})}
+function rv(){return new Date(Date.now()+7200000).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})}
+function toast(m,i){const t=document.getElementById('toast');document.getElementById('tM').textContent=m;document.getElementById('tI').textContent=i||'check_circle';t.classList.add('show');setTimeout(()=>t.classList.remove('show'),3000)}
+function isServiceHours(){const h=new Date().getHours();return h>=6&&h<22}
+function closeTime(){return site?site.hours.split('-')[1]:'23:00'}
+
+const FLOW_NAMES={tooCold:'Too Cold',tooHot:'Too Hot',noHotWater:'No Hot Water',kitchenEquip:'Kitchen Equipment',fridgeIssue:'Refrigeration',wontTurnOn:"Won't Turn On",keepsTurningOff:'Keeps Turning Off',controlsIssue:'Controls / Display',somethingElse:'General Issue',heatingStuck:'Heating Won\'t Turn Off',ovensGrills:'Ovens / Grills',acColdWarm:'AC Mode Issue',acWarmCool:'AC Mode Issue',acWontOff:'AC Won\'t Turn Off'};
+const FLOW_ICONS={tooCold:'thermostat',tooHot:'whatshot',noHotWater:'water_drop',kitchenEquip:'restaurant',fridgeIssue:'kitchen',wontTurnOn:'power_off',keepsTurningOff:'power_settings_new',controlsIssue:'settings_remote',somethingElse:'contact_support',heatingStuck:'thermostat',ovensGrills:'restaurant',acColdWarm:'ac_unit',acWarmCool:'ac_unit',acWontOff:'ac_unit'};
+
+// === STEP 1: LANDING ===
+function renderLanding(c){
+    document.getElementById('pT').textContent='New Call';
+    const hasCaller=!!(caller.name&&caller.phone);
+    c.innerHTML=`
+    <div class="steps">
+        <div class="step active"><span class="material-icons-outlined">call</span> New Call</div>
+        <div class="step">Caller Details</div>
+        <div class="step">Triage</div>
+        <div class="step">Wrap Up</div>
+    </div>
+    ${hasCaller?`<div style="margin-bottom:16px;padding:10px 14px;background:var(--pri-bg);border:1px solid rgba(59,130,246,.15);border-radius:var(--r);font-size:13px;display:flex;align-items:center;gap:8px">
+        <span class="material-icons-outlined" style="font-size:18px;color:var(--pri)">person</span>
+        Continuing call with <strong>${esc(caller.name)}</strong> (${esc(caller.phone)}) ${site?' at <strong>'+esc(sn())+'</strong>':''}
+    </div>`:''}
+    <div class="form-section">
+        <h3><span class="material-icons-outlined">location_on</span> Select Site</h3>
+        <div class="form-grid"><div class="fg full">
+            <label>Site <span class="req">*</span></label>
+            <select id="sS" onchange="pickSite(this.value)"><option value="">-- Select site --</option>
+            ${SITES.map(s=>'<option value="'+s.v+'" '+(site?.v===s.v?'selected':'')+'>'+s.name.split('::').pop()+' — '+s.client+'</option>').join('')}</select>
+        </div></div>
+        ${site?'<div style="margin-top:12px;padding:10px 14px;background:var(--ok-bg);border:1px solid rgba(34,197,94,.2);border-radius:var(--r);font-size:13px;display:flex;align-items:center;gap:8px"><span class="material-icons-outlined" style="font-size:18px;color:var(--ok)">check_circle</span><strong>'+esc(sn())+'</strong> — '+site.client+(site.brand?' / '+site.brand:'')+' — Hours: '+site.hours+'</div>':''}
+    </div>
+    ${site?`
+    <div class="search-box"><span class="material-icons-outlined">search</span>
+        <input type="text" id="pS" placeholder="Describe the problem (e.g. 'fryers won't turn on', 'it's freezing')..." oninput="searchP(this.value)" onfocus="searchP(this.value)" autocomplete="off">
+        <div class="search-suggestions" id="sugg"></div>
+    </div>
+    <div class="entry-section">
+        <div class="entry-title"><span class="material-icons-outlined">help_outline</span> Or select the problem</div>
+        <div class="egrid">${PROBLEMS.map(p=>'<div class="ecard" onclick="pickProblem(\''+p.fl+'\')"><span class="material-icons-outlined">'+p.icon+'</span><span>'+p.label+'</span></div>').join('')}</div>
+    </div>
+    <div class="entry-section">
+        <div class="entry-title"><span class="material-icons-outlined">devices</span> Or by equipment type</div>
+        <div class="egrid">${EQUIPMENT_TYPES.map((e,i)=>'<div class="ecard" onclick="pickEquip('+i+')"><span class="material-icons-outlined">'+e.icon+'</span><span>'+e.label+'</span></div>').join('')}</div>
+    </div>`:'<div style="padding:20px;text-align:center;color:var(--txt2)"><span class="material-icons-outlined" style="font-size:40px;display:block;margin-bottom:8px">location_on</span>Select a site to begin</div>'}`;
+}
+function pickSite(v){site=SITES.find(s=>s.v===v)||null;render()}
+function searchP(q){const b=document.getElementById('sugg');if(!q||q.length<2){b.classList.remove('show');return}q=q.toLowerCase();const m=PROBLEMS.filter(p=>p.kw.some(k=>q.includes(k))||p.label.toLowerCase().includes(q));b.innerHTML=m.length?m.map(p=>'<div class="ss-item" onclick="pickProblem(\''+p.fl+'\')"><span class="material-icons-outlined">'+p.icon+'</span>'+p.label+'</div>').join(''):'<div class="ss-item" onclick="pickProblem(\'somethingElse\')"><span class="material-icons-outlined">contact_support</span>No match — describe manually</div>';b.classList.add('show')}
+function pickProblem(f){flow=f;view='intake';render()}
+function pickEquip(i){
+    const e=EQUIPMENT_TYPES[i];
+    document.getElementById('vc').innerHTML='<div class="form-section"><h3><span class="material-icons-outlined">'+e.icon+'</span> '+e.label+' — What\'s the problem?</h3><div style="display:flex;flex-direction:column;gap:8px">'+e.subs.map(s=>'<div class="ecard" style="flex-direction:row;padding:14px 16px;align-items:center" onclick="pickSubProblem(\''+esc(s)+'\')"><span class="material-icons-outlined" style="font-size:20px">arrow_forward</span><span style="font-size:14px">'+s+'</span></div>').join('')+'</div><div style="margin-top:12px"><button class="ab sec" onclick="render()"><span class="material-icons-outlined">arrow_back</span> Back</button></div></div>';
+}
+function pickSubProblem(p){
+    const map={
+        'Too cold':'tooCold','heating not working':'tooCold',
+        'No hot water':'noHotWater','Water not hot enough':'noHotWater',
+        'Heating won\'t turn off':'heatingStuck',
+        'Fryers not turning on':'kitchenEquip',
+        'Ovens/grills not working':'ovensGrills',
+        'keeps turning off':'keepsTurningOff',
+        'unusual noise':'somethingElse',
+        'alarm going off':'fridgeIssue','temperature too high':'fridgeIssue',
+        'not turning on':'wontTurnOn','Beer cellar':'fridgeIssue',
+        'Fridge/freezer not turning on':'wontTurnOnFridge',
+        'blowing cold when should be warm':'acColdWarm',
+        'blowing warm when should be cool':'acWarmCool',
+        'AC not turning on':'wontTurnOn',
+        'AC won\'t turn off':'acWontOff',
+        'Thermostat blank':'controlsIssue','error code':'controlsIssue',
+        'panel not responding':'controlsIssue','Other':'controlsOther'
+    };
+    flow='somethingElse';
+    // Try exact-ish matches first
+    for(const[k,v] of Object.entries(map)){
+        if(p.toLowerCase().includes(k.toLowerCase())){flow=v;break}
+    }
+    // Special: fridge "not turning on" should go to wontTurnOnFridge
+    if(p==='Fridge/freezer not turning on') flow='wontTurnOnFridge';
+    caller.reportedProblem=p;view='intake';render();
+}
+
+// === STEP 2: INTAKE ===
+function renderIntake(c){
+    document.getElementById('pT').textContent='Caller Details';
+    c.innerHTML=`
+    <div class="steps">
+        <div class="step done"><span class="material-icons-outlined">check_circle</span> New Call</div>
+        <div class="step active"><span class="material-icons-outlined">person</span> Caller Details</div>
+        <div class="step">Triage</div>
+        <div class="step">Wrap Up</div>
+    </div>
+    <div class="form-section">
+        <h3><span class="material-icons-outlined">person</span> Caller Information</h3>
+        <div class="form-grid">
+            <div class="fg"><label>Full Name <span class="req">*</span></label><input id="cN" placeholder="e.g. John Smith" value="${esc(caller.name||'')}" onchange="caller.name=this.value"></div>
+            <div class="fg"><label>Role / Position</label><select id="cR" onchange="caller.role=this.value"><option value="">-- Select --</option>${['Manager','Duty Manager','Chef','Bar Staff','Cleaner','Contractor','Other'].map(r=>'<option'+(caller.role===r?' selected':'')+'>'+r+'</option>').join('')}</select></div>
+            <div class="fg"><label>Contact Number <span class="req">*</span></label><input type="tel" id="cP" placeholder="e.g. 07700 900123" value="${esc(caller.phone||'')}" onchange="caller.phone=this.value"></div>
+            <div class="fg"><label>Email Address</label><input type="email" id="cE" placeholder="e.g. john@site.co.uk" value="${esc(caller.email||'')}" onchange="caller.email=this.value"></div>
+            <div class="fg full"><label>Issue Description</label><textarea id="cD" placeholder="Brief description of what the caller is reporting..." onchange="caller.desc=this.value">${esc(caller.desc||caller.reportedProblem||'')}</textarea><span class="help">Included in the triage summary posted to Zendesk</span></div>
+        </div>
+    </div>
+    <div style="display:flex;gap:8px"><button class="ab sec" onclick="view='landing';render()"><span class="material-icons-outlined">arrow_back</span> Back</button>
+    <button class="ab ok" onclick="beginTriage()"><span class="material-icons-outlined">play_arrow</span> Start Triage</button></div>
+    <div style="margin-top:16px;padding:12px;background:var(--bg);border:1px solid var(--bdr);border-radius:var(--r);font-size:12px;color:var(--txt2)"><strong>Note:</strong> Caller details will be saved against <strong>${sn()}</strong> (site ${site?.no}) for future calls.</div>`;
+}
+function beginTriage(){
+    caller.name=document.getElementById('cN').value;caller.phone=document.getElementById('cP').value;caller.email=document.getElementById('cE').value;caller.desc=document.getElementById('cD').value;
+    const r=document.getElementById('cR');caller.role=r.value;
+    if(!caller.name||!caller.phone){toast('Name and phone required','warning');return}
+    view='triage';msgs=[];summary=[];actionsTaken=[];dataSnapshots=[];escalationData=null;agentNotes='';fs=new Date();
+    if(F[flow]){F[flow]()}else{F.somethingElse()}
+    render();
+}
+
+// === CHAT HELPERS ===
+function ab(t,i){msgs.push({r:'bot',t,i:i||'smart_toy',tm:now()})}
+function ag(t){msgs.push({r:'agent',t,i:'person',tm:now()})}
+function as(t,i){msgs.push({r:'sys',t,i:i||'info',tm:now()})}
+function ae(t,s){msgs.push({r:'esc',t,i:'warning',tm:now(),sev:s})}
+function ar(t){msgs.push({r:'res',t,i:'check_circle',tm:now()})}
+function ax(t){msgs.push({r:'script',t,i:'record_voice_over',tm:now()})}
+function aa(a){msgs.push({r:'acts',a})}
+function adc(h){msgs.push({r:'data',h})}
+function aft(prompt,submitFn){msgs.push({r:'ft',prompt:prompt||'Provide details',submitFn:submitFn})}
+function arules(t){msgs.push({r:'rules',t,i:'auto_awesome',tm:now()})}
+
+// Standard ending for all flows — now with closing script + both options
+function endFlow(scriptText){
+    ax(scriptText);
+    aa([{label:'Caller has another issue — new triage',fn:'newIssue'},{label:'No more issues — wrap up call',fn:'goWrap',cls:'ok'}]);
+}
+
+// Show escalation modal instead of directly ending
+function showEscalationModal(flowName,severity,issue,destination,timeframe,scriptAfter){
+    escalationData={flowName,severity,issue,destination,timeframe,scriptAfter};
+    const modal=document.getElementById('escModal');
+    const titleEl=document.getElementById('escModalTitle');
+    const bodyEl=document.getElementById('escModalBody');
+    const sevCls=severity==='crit'?'crit':severity==='high'?'high':'med';
+    titleEl.innerHTML='Escalation Review — '+esc(flowName)+' <span class="sev '+sevCls+'">'+severity.toUpperCase()+'</span>';
+
+    let html='';
+    // Section 1 — Ticket Details
+    html+='<div class="modal-section"><h4><span class="material-icons-outlined" style="font-size:16px">confirmation_number</span> Ticket Details</h4>';
+    html+='<div class="modal-kv"><span>Site</span><span>'+esc(sn())+' ('+esc(site?.no||'')+')</span></div>';
+    html+='<div class="modal-kv"><span>Client</span><span>'+esc(site?.client||'')+''+(site?.brand?' / '+esc(site.brand):'')+'</span></div>';
+    html+='<div class="modal-kv"><span>Caller</span><span>'+esc(caller.name||'')+'</span></div>';
+    html+='<div class="modal-kv"><span>Role</span><span>'+esc(caller.role||'N/A')+'</span></div>';
+    html+='<div class="modal-kv"><span>Phone</span><span>'+esc(caller.phone||'')+'</span></div>';
+    html+='<div class="modal-kv"><span>Email</span><span>'+esc(caller.email||'N/A')+'</span></div>';
+    html+='<div class="modal-kv"><span>Reported Issue</span><span>'+esc(caller.desc||caller.reportedProblem||'')+'</span></div>';
+    html+='</div>';
+
+    // Section 2 — Triage History
+    html+='<div class="modal-section"><h4><span class="material-icons-outlined" style="font-size:16px">chat</span> Triage History</h4>';
+    html+='<div class="modal-log">';
+    msgs.forEach(function(m){
+        if(m.r==='acts'||m.r==='ft'||m.r==='fridge_detail'||m.r==='error_detail'||m.r==='data') return;
+        var roleLabel='System';var roleCls='sys';
+        if(m.r==='bot'){roleLabel='Bot';roleCls='bot'}
+        else if(m.r==='agent'){roleLabel='Agent';roleCls='agent'}
+        else if(m.r==='esc'){roleLabel='Escalation';roleCls='esc'}
+        else if(m.r==='res'){roleLabel='Resolution';roleCls='bot'}
+        else if(m.r==='script'){roleLabel='Script';roleCls='bot'}
+        else if(m.r==='rules'){roleLabel='Rules';roleCls='sys'}
+        var cleanText=(m.t||'').replace(/<[^>]*>/g,'');
+        html+='<div class="modal-log-item"><span class="log-time">'+(m.tm||'')+'</span><span class="log-role '+roleCls+'">'+roleLabel+':</span> '+esc(cleanText)+'</div>';
+    });
+    html+='</div></div>';
+
+    // Section 3 — Data Snapshot
+    if(dataSnapshots.length>0){
+        html+='<div class="modal-section"><h4><span class="material-icons-outlined" style="font-size:16px">analytics</span> Data Snapshot</h4>';
+        dataSnapshots.forEach(function(snap){
+            html+='<div style="margin-bottom:8px"><strong style="font-size:12px">'+esc(snap.label)+'</strong>';
+            html+='<table class="dt" style="margin-top:4px"><tr>';
+            snap.headers.forEach(function(h){html+='<th>'+esc(h)+'</th>'});
+            html+='</tr>';
+            snap.rows.forEach(function(row){
+                html+='<tr>';row.forEach(function(cell){html+='<td>'+esc(String(cell))+'</td>'});html+='</tr>';
+            });
+            html+='</table></div>';
+        });
+        html+='</div>';
+    }
+
+    // Section 4 — Actions Taken
+    if(actionsTaken.length>0){
+        html+='<div class="modal-section"><h4><span class="material-icons-outlined" style="font-size:16px">build</span> Actions Taken</h4>';
+        actionsTaken.forEach(function(a){
+            html+='<div style="padding:4px 0;font-size:12px;border-bottom:1px solid rgba(0,0,0,.04)">'+esc(a)+'</div>';
+        });
+        html+='</div>';
+    }
+
+    // Section 5 — Escalation Details
+    html+='<div class="modal-section"><h4><span class="material-icons-outlined" style="font-size:16px">priority_high</span> Escalation Details</h4>';
+    html+='<div class="modal-kv"><span>Issue</span><span>'+esc(issue)+'</span></div>';
+    html+='<div class="modal-kv"><span>Severity</span><span class="sev '+sevCls+'">'+severity.toUpperCase()+'</span></div>';
+    html+='<div class="modal-kv"><span>Destination</span><span>'+esc(destination)+'</span></div>';
+    html+='<div class="modal-kv"><span>Response Timeframe</span><span>'+esc(timeframe)+'</span></div>';
+    html+='</div>';
+
+    // Section 6 — Additional Notes
+    html+='<div class="modal-section"><h4><span class="material-icons-outlined" style="font-size:16px">edit_note</span> Additional Notes</h4>';
+    html+='<textarea id="escNotes" rows="3" style="width:100%;padding:8px;border:1px solid var(--bdr);border-radius:var(--rs);font-size:13px;font-family:inherit" placeholder="Add any supplementary information before submitting..."></textarea>';
+    html+='</div>';
+
+    bodyEl.innerHTML=html;
+    modal.classList.add('open');
+}
+
+function closeEscModal(){
+    document.getElementById('escModal').classList.remove('open');
+}
+
+function editAndGoBack(){
+    closeEscModal();
+    // Agent goes back to the triage chat — escalation data stays
+}
+
+function submitEscalation(){
+    var notesEl=document.getElementById('escNotes');
+    agentNotes=notesEl?notesEl.value:'';
+    closeEscModal();
+    if(agentNotes){
+        ag('Agent notes: '+agentNotes);
+        summary.push('Agent notes: '+agentNotes);
+    }
+    toast('Escalation submitted','check_circle');
+    // Now show closing script
+    if(escalationData&&escalationData.scriptAfter){
+        endFlow(escalationData.scriptAfter);
+    }else{
+        endFlow('<strong>Read to caller:</strong>\n\n<em>"I\'ve escalated this to the IoT team. Someone will be in contact. Is there anything else I can help with?"</em>');
+    }
+    render();
+}
+
+// Helper: trigger escalation modal for a flow
+function escalateWithModal(flowName,severity,issue,destination,timeframe,scriptAfter){
+    ae('<strong>'+esc(issue)+'</strong>\n\nDestination: '+esc(destination)+'\nTimeframe: '+esc(timeframe),severity);
+    summary.push('Escalated: '+issue+' ('+severity+')');
+    showEscalationModal(flowName,severity,issue,destination,timeframe,scriptAfter);
+}
+
+// === FLOWS ===
+const F={
+
+// --- TOO COLD ---
+tooCold(){
+    as('Starting: <strong>Temperature Issue</strong>','play_arrow');
+    as('Connecting to Salus for '+sn()+'...','sync');
+    setTimeout(function(){
+        const off=ZONES.filter(z=>!z.on),on=ZONES.filter(z=>z.on);
+        if(off.length) ab('<strong style="color:var(--err)">Warning: '+off.length+' zone(s) offline:</strong> '+off.map(z=>z.zone).join(', ')+'. These cannot be controlled remotely.');
+        as(on.length+' zone(s) online','check_circle');
+        dataSnapshots.push({label:'Heating Zones (Salus)',headers:['Zone','Temp','Setpoint','Status'],rows:ZONES.map(z=>[z.zone,z.temp+'C',z.sp+'C',z.st])});
+        ab("Which area is the temperature low?");
+        aa(on.map(z=>({label:z.zone+' — currently '+z.temp+'C (set: '+z.sp+'C)',fn:'_cz_'+z.zone,cls:z.temp<z.sp-2?'':'sec'})));
+        render();
+    },800);
+},
+_cz_Bar(){F._coldZone(ZONES[0])},_cz_Kitchen(){F._coldZone(ZONES[1])},_cz_Dining(){F._coldZone(ZONES[2])},_cz_Accommodation(){F._coldZone(ZONES[3])},_cz_Cellar(){F._coldZone(ZONES[4])},
+_coldZone(z){
+    ag(z.zone+' — '+z.temp+'C');
+    const d=z.sp-z.temp;
+    if(d<=1){ab(z.zone+' is only <strong>'+d.toFixed(1)+'C</strong> below setpoint — it may just need time.');aa([{label:'Boost anyway (+3C, 2 hours)',fn:'_cb_'+z.zone},{label:'No boost needed',fn:'_cmore',cls:'sec'}])}
+    else{
+        ab(z.zone+' is <strong>'+d.toFixed(1)+'C below setpoint</strong>. A boost should help.');
+        if(z.zone!=='Accommodation') ab('<em>Non-accommodation: boost will auto-cancel at 23:30 if still active (site closes '+closeTime()+').</em>');
+        aa([{label:'Boost '+z.zone+' (+3C, 2 hours)',fn:'_cb_'+z.zone,cls:'ok'},{label:'Check another area',fn:'_cmore',cls:'sec'}]);
+    }
+    render();
+},
+_cb_Bar(){F._doBoost(ZONES[0])},_cb_Kitchen(){F._doBoost(ZONES[1])},_cb_Dining(){F._doBoost(ZONES[2])},_cb_Accommodation(){F._doBoost(ZONES[3])},_cb_Cellar(){F._doBoost(ZONES[4])},
+_doBoost(z){
+    ag('Boost '+z.zone);as('Sending setpoint change: '+z.sp+'C -> '+(z.sp+3)+'C...','sync');
+    setTimeout(function(){
+        as('Setpoint updated — Auto-revert at '+rv(),'timer');
+        arules('<strong>Rules Applied:</strong> Boost increases setpoint by 3C for 2 hours. The system will automatically revert to the original setpoint ('+z.sp+'C) at '+rv()+'. Non-accommodation zones also auto-cancel at 23:30 to prevent overnight heating waste.');
+        ar('<strong>'+z.zone+' boosted.</strong> Setpoint increased to '+(z.sp+3)+'C. Auto-reverts in 2 hours.');
+        actionsTaken.push('Boosted '+z.zone+' from '+z.sp+'C to '+(z.sp+3)+'C, reverts '+rv());
+        summary.push('Boosted '+z.zone+' from '+z.sp+'C to '+(z.sp+3)+'C, reverts '+rv());
+        endFlow('<strong>Read to caller:</strong>\n\n<em>"I\'ve increased the heating in the '+z.zone+' for you. It should start to warm up in the next 15-30 minutes. The boost will last for 2 hours and then return to normal automatically. Is there anything else I can help with?"</em>');
+        render();
+    },600);
+},
+_cmore(){ab("Any other areas?");const on=ZONES.filter(z=>z.on);aa([...on.map(z=>({label:z.zone+' — '+z.temp+'C',fn:'_cz_'+z.zone,cls:z.temp<z.sp-2?'':'sec'})),{label:'No — that\'s everything',fn:'goWrap',cls:'ok'}]);render()},
+
+// --- TOO HOT ---
+tooHot(){
+    as('Starting: <strong>Too Hot</strong>','play_arrow');as('Checking heating zones...','sync');
+    setTimeout(function(){
+        dataSnapshots.push({label:'Heating Zones (Salus)',headers:['Zone','Temp','Setpoint','Status'],rows:ZONES.map(z=>[z.zone,z.temp+'C',z.sp+'C',z.st])});
+        ab("Heating zones are all at or below setpoint — heating doesn't appear to be the cause. This is likely an AC or ventilation issue.");
+        // Detail capture before escalation
+        aft('Any additional details about the overheating? (e.g. specific area, how long, any changes today)','_tooHotSubmit');
+        render();
+    },800);
+},
+_tooHotSubmit(){
+    var t=document.getElementById('ftInput')?.value||'';
+    if(t) ag(t);
+    escalateWithModal(
+        'Too Hot','med',
+        'AC / Ventilation Investigation — heating normal at '+sn(),
+        'IoT Support Team',
+        'Between 8am-5pm, or within 4 hours during business hours',
+        '<strong>Read to caller:</strong>\n\n<em>"I\'ve checked the heating and it\'s running normally, so the issue is likely with the air conditioning or ventilation. I\'ll escalate this to the IoT team and someone will be in contact between 8am and 5pm, or within 4 hours during business hours."</em>'
+    );
+    render();
+},
+
+// --- NO HOT WATER ---
+noHotWater(){
+    as('Starting: <strong>Hot Water Issue</strong>','play_arrow');as('Checking ThingsBoard for boiler at '+sn()+'...','sync');
+    setTimeout(function(){
+        as('Boiler controller found — online','check_circle');
+        dataSnapshots.push({label:'Boiler Status (ThingsBoard)',headers:['Device','Status','Last Seen'],rows:[['Boiler Controller','Online','5 min ago'],['DHW Telemetry','Not available','N/A']]});
+        ab("Boiler controller is <strong>online</strong> (last seen 5 min ago), but DHW telemetry isn't available through the current integration. This needs IoT team investigation.");
+        aft('Any additional details? (e.g. is it all taps or specific ones, any error lights on boiler, how long has it been)','_noHotWaterSubmit');
+        render();
+    },800);
+},
+_noHotWaterSubmit(){
+    var t=document.getElementById('ftInput')?.value||'';
+    if(t) ag(t);
+    escalateWithModal(
+        'No Hot Water','med',
+        'Hot Water Issue — boiler online but DHW fault reported at '+sn(),
+        'IoT Support Team',
+        'Between 8am-5pm, or within 4 hours during business hours',
+        '<strong>Read to caller:</strong>\n\n<em>"I can see the boiler system is connected and working, but the hot water controls need specialist attention. I\'ll log this now and someone will be in contact between 8am and 5pm, or within 4 hours during business hours. If you have an immersion heater switch, you could try that as a temporary measure."</em>'
+    );
+    render();
+},
+
+// --- HEATING WON'T TURN OFF (NEW) ---
+heatingStuck(){
+    as('Starting: <strong>Heating Won\'t Turn Off</strong>','play_arrow');
+    as('Connecting to Salus for '+sn()+'...','sync');
+    setTimeout(function(){
+        dataSnapshots.push({label:'Heating Zones (Salus)',headers:['Zone','Temp','Setpoint','Mode','Status'],rows:ZONES.map(z=>[z.zone,z.temp+'C',z.sp+'C',z.mode,z.st])});
+        // Simulate: Bar zone has a stuck heating issue — temp is above setpoint but still heating
+        var stuckZone={zone:'Bar',temp:22.5,sp:18,mode:'Auto',st:'heating'};
+        ab("Zone check complete. <strong style='color:var(--warn)'>Anomaly detected:</strong> The <strong>"+stuckZone.zone+"</strong> zone is at <strong>"+stuckZone.temp+"C</strong> but the setpoint is only <strong>"+stuckZone.sp+"C</strong> — yet the zone status shows <strong>heating</strong>.");
+        ab("This could be:<br>1. <strong>Setpoint issue</strong> — someone changed the setpoint locally on the thermostat<br>2. <strong>Controller stuck</strong> — the valve/relay is stuck open regardless of the setpoint");
+        aa([
+            {label:'Try adjusting setpoint down to '+stuckZone.sp+'C remotely',fn:'_hsAdjust'},
+            {label:'Setpoint is already correct — controller appears stuck',fn:'_hsStuck'},
+        ]);
+        render();
+    },800);
+},
+_hsAdjust(){
+    ag('Try adjusting setpoint');
+    as('Sending setpoint command: set Bar to 18C...','sync');
+    setTimeout(function(){
+        as('Setpoint command sent','check_circle');
+        arules('<strong>Rules Applied:</strong> Remote setpoint adjustment sent to override any local thermostat changes. If the setpoint was changed locally on the wall thermostat, this remote command will correct it. The heating should stop within 5-10 minutes if this was the issue.');
+        ar('<strong>Setpoint reset to 18C.</strong> If the heating was running because of a local setpoint change, it should stop within 5-10 minutes.');
+        actionsTaken.push('Reset Bar setpoint to 18C remotely (was showing heating at 22.5C)');
+        summary.push('Adjusted setpoint: Bar zone reset to 18C — was heating at 22.5C');
+        ab("Monitor for 5-10 minutes. If it doesn't stop, the controller may be stuck and needs IoT investigation.");
+        aa([
+            {label:'Resolved — heating is stopping',fn:'_hsResolved',cls:'ok'},
+            {label:'Still heating — escalate as stuck controller',fn:'_hsStuck',cls:'err'},
+        ]);
+        render();
+    },600);
+},
+_hsResolved(){
+    ag('Resolved');
+    endFlow('<strong>Read to caller:</strong>\n\n<em>"I\'ve corrected the heating setpoint remotely and the heating should be stopping now. It was likely changed on the wall thermostat. The temperature will come down gradually. Is there anything else I can help with?"</em>');
+    render();
+},
+_hsStuck(){
+    ag('Controller stuck');
+    aft('Any additional details? (e.g. how long has it been stuck, any unusual sounds, is there a manual override on the boiler)','_hsStuckSubmit');
+    render();
+},
+_hsStuckSubmit(){
+    var t=document.getElementById('ftInput')?.value||'';
+    if(t) ag(t);
+    escalateWithModal(
+        'Heating Won\'t Turn Off','high',
+        'Heating controller stuck in Bar zone at '+sn()+' — zone at 22.5C, setpoint 18C, still heating',
+        'IoT Support Team',
+        'Within 4 hours during business hours',
+        '<strong>Read to caller:</strong>\n\n<em>"The heating controller in the Bar area appears to be stuck on. I\'ve tried adjusting it remotely but it isn\'t responding to commands. I\'ll escalate this as a priority to the IoT team. In the meantime, if there\'s a manual override or isolation switch for the heating in that area, you could try switching it off. Someone will be in contact within 4 hours during business hours."</em>'
+    );
+    render();
+},
+
+// --- KITCHEN EQUIPMENT (FRYERS) ---
+kitchenEquip(){
+    as('Starting: <strong>Kitchen Equipment (Fryers)</strong>','play_arrow');as('Checking Tuya for device at '+sn()+'...','sync');
+    setTimeout(function(){
+        const online=true;
+        as('Device: Fryer Bank Switch — '+(online?'Connected':'DISCONNECTED'),'check_circle');
+        dataSnapshots.push({label:'Kitchen Equipment (Tuya)',headers:['Device','State','Connected'],rows:[['Fryer Bank Switch','OFF','Yes']]});
+        if(!online){
+            ab("<strong style='color:var(--err)'>Device is DISCONNECTED.</strong> We cannot control this remotely. This is a connectivity issue.");
+            aft('Any additional details about the connectivity issue?','_kDisconnectedSubmit');
+            render();return;
+        }
+        const h=new Date().getHours(),schedOn=SCHEDS.find(s=>s.act==='ON'&&s.on);
+        const shouldBeOn=h>=parseInt(schedOn?.time);
+        ab("The <strong>Fryer Bank Switch</strong> is currently <strong style='color:var(--err)'>OFF</strong>.\n\nSchedule says next ON: <strong>"+schedOn.time+" ("+schedOn.days+")</strong>.");
+        if(shouldBeOn) ab("Based on the schedule, this equipment <strong>should be on now</strong>. It may have failed or been turned off manually.");
+        else ab("Based on the schedule, this equipment is <strong>correctly off</strong> — not due on until "+schedOn.time+".");
+        ab("Why does the caller need this switched on?");
+        aa([
+            {label:'Site opening earlier than usual — need the schedule brought forward for today',fn:'_kearly'},
+            {label:'They need it on now and it should already be on (schedule should have fired)',fn:'_kshouldbeon'},
+            {label:'It was on and turned off unexpectedly during service',fn:'_kunexpected'},
+            {label:'Other reason',fn:'_kother'},
+        ]);
+        render();
+    },800);
+},
+
+_kDisconnectedSubmit(){
+    var t=document.getElementById('ftInput')?.value||'';
+    if(t) ag(t);
+    var p=isServiceHours()?'crit':'high';
+    escalateWithModal(
+        'Kitchen Equipment','high',
+        'Smart switch at '+sn()+' disconnected — cannot control fryers remotely'+(isServiceHours()?' (TRADE AFFECTING)':''),
+        'IoT Support Team',
+        isServiceHours()?'Within 2 hours (P1)':'Between 8am-5pm',
+        '<strong>Read to caller:</strong>\n\n<em>"I\'m sorry, but we can\'t control the equipment remotely at the moment because the controller isn\'t connected. I\'ll escalate this '+(isServiceHours()?'as a priority — someone will be in contact within 2 hours.':'and someone will be in contact between 8am and 5pm.')+'"</em>'
+    );
+    render();
+},
+
+_kearly(){
+    ag('Site opening early — need schedule brought forward');
+    ab("This is a <strong>one-off schedule change</strong>. I'll bring the ON time forward to now for today only. The normal schedule resumes tomorrow.\n\nFryers have a <strong>15-20 minute fire-up time</strong> — they won't be ready immediately.");
+    arules('<strong>Rules Applied:</strong> One-off schedule override. The current day\'s ON schedule will be replaced with an immediate ON command. Tomorrow\'s schedule will fire as normal at '+SCHEDS[0].time+'. This does NOT affect the OFF schedule — the fryers will still switch off at the normal time.');
+    as('Adjusting schedule: ON time moved to now for today...','sync');
+    setTimeout(function(){
+        as('Schedule adjusted — fryers powering on','check_circle');
+        ar('<strong>Fryers now turning on.</strong> One-off schedule change applied. Normal schedule resumes tomorrow.');
+        actionsTaken.push('One-off schedule change: fryers ON brought forward to '+now()+' at '+sn());
+        summary.push('One-off schedule change: fryers ON brought forward at '+sn());
+        endFlow('<strong>Read to caller:</strong>\n\n<em>"I\'ve brought the fryer schedule forward and they\'re turning on now. They\'ll need about 15-20 minutes to reach cooking temperature. The normal schedule will kick in again tomorrow. Is there anything else?"</em>');
+        render();
+    },600);
+},
+
+_kshouldbeon(){
+    ag('Should already be on — schedule may have failed');
+    ab("The schedule should have switched this on but didn't. This could be a schedule fault or the device didn't respond. I'll switch it on manually and flag the schedule for review.");
+    arules('<strong>Rules Applied:</strong> Manual switch-on bypasses the schedule system. The IoT team will be flagged to investigate why the scheduled ON command at '+SCHEDS[0].time+' did not execute. The OFF schedule remains active and will fire as normal.');
+    as('Switching on fryer bank...','sync');
+    setTimeout(function(){
+        as('Switch state: ON','check_circle');
+        as('Schedule review flagged for IoT team','timer');
+        ar('<strong>Fryers switched on.</strong> IoT team flagged to investigate why the schedule didn\'t fire.');
+        actionsTaken.push('Manually switched on fryers (schedule failed to fire), flagged for IoT review');
+        summary.push('Manually switched on fryers (schedule failed to fire), flagged for IoT review');
+        endFlow('<strong>Read to caller:</strong>\n\n<em>"I\'ve turned the fryers on for you — they\'ll need about 15-20 minutes to warm up. I\'ve also flagged that the automatic schedule didn\'t work properly, so the team will look into that. Is there anything else?"</em>');
+        render();
+    },600);
+},
+
+_kunexpected(){
+    ag('Turned off unexpectedly during service');
+    ab("Equipment going off during service is concerning — could be an electrical trip, overload, or control fault.");
+    if(isServiceHours()) ab('<span class="sev crit">SERVICE AFFECTING</span> — during operating hours.');
+    ab("I'll switch it back on, but if it trips again it needs an engineer.");
+    arules('<strong>Rules Applied:</strong> Immediate restart of the smart switch. If the device tripped due to overload or electrical fault, it may trip again. The escalation flags the site for electrical inspection. If it trips a second time, do NOT restart — escalate as P1.');
+    as('Switching on...','sync');
+    setTimeout(function(){
+        as('Switch state: ON — monitoring','check_circle');
+        actionsTaken.push('Restarted fryer bank switch after unexpected shutdown');
+        aft('Any additional details? (e.g. did they hear a bang/trip, how long was it off, has it happened before)','_kunexpectedSubmit');
+        render();
+    },600);
+},
+
+_kunexpectedSubmit(){
+    var t=document.getElementById('ftInput')?.value||'';
+    if(t) ag(t);
+    escalateWithModal(
+        'Kitchen Equipment','high',
+        'Equipment tripping during service at '+sn()+' — fryer bank switched off unexpectedly, remotely restarted',
+        'IoT Support Team',
+        'Within 2 hours during business hours',
+        '<strong>Read to caller:</strong>\n\n<em>"I\'ve turned the fryers back on. If they trip off again, please call us back immediately and we\'ll escalate for an engineer. They should be back up to temperature in about 15-20 minutes. Is there anything else?"</em>'
+    );
+    render();
+},
+
+_kother(){
+    ag('Other reason');
+    aft('Why does the caller need the equipment switched on?','_kOtherSubmit');
+    render();
+},
+
+_kOtherSubmit(){
+    const t=document.getElementById('ftInput')?.value;
+    if(!t){toast('Please enter a reason','warning');return}
+    ag(t);caller.equipReason=t;
+    ab("Noted. I'll switch the equipment on for a <strong>2-hour window</strong> with automatic switch-off, and log the reason.");
+    arules('<strong>Rules Applied:</strong> Timed override — equipment will run for exactly 2 hours then auto-switch off at '+rv()+'. This prevents equipment being left on overnight if the caller forgets. The reason is logged for audit.');
+    as('Switching on fryer bank (2-hour override)...','sync');
+    setTimeout(function(){
+        as('Switch ON — auto-off in 2 hours at '+rv(),'timer');
+        ar('<strong>Equipment on</strong> for 2 hours. Auto-off at '+rv()+'.');
+        actionsTaken.push('Switched on fryers for 2hr override. Reason: '+t);
+        summary.push('Switched on fryers for 2hr override. Reason: '+t);
+        endFlow('<strong>Read to caller:</strong>\n\n<em>"I\'ve turned the equipment on for you. It will switch off automatically in 2 hours. The fryers will need about 15-20 minutes to reach temperature. Is there anything else?"</em>');
+        render();
+    },600);
+},
+
+// --- OVENS / GRILLS (NEW — NOT smart-switch controlled) ---
+ovensGrills(){
+    as('Starting: <strong>Ovens / Grills Issue</strong>','play_arrow');
+    ab("<strong>Important:</strong> Ovens and grills are <strong>not controlled via smart switches</strong> like fryers. They are monitored through ThingsBoard but cannot be remotely switched on or off.");
+    as('Checking ThingsBoard for device status at '+sn()+'...','sync');
+    setTimeout(function(){
+        // Simulate: one device offline
+        var devices=[
+            {name:'Main Oven',status:'Online',lastSeen:'2 min ago'},
+            {name:'Combi Oven',status:'Offline',lastSeen:'4 hours ago'},
+            {name:'Char Grill',status:'Online',lastSeen:'3 min ago'},
+        ];
+        dataSnapshots.push({label:'Oven/Grill Devices (ThingsBoard)',headers:['Device','Status','Last Seen'],rows:devices.map(d=>[d.name,d.status,d.lastSeen])});
+        var offlineDevs=devices.filter(d=>d.status==='Offline');
+        if(offlineDevs.length){
+            ab('<strong style="color:var(--err)">'+offlineDevs.length+' device(s) offline:</strong> '+offlineDevs.map(d=>d.name+' (last seen: '+d.lastSeen+')').join(', ')+'.\n\nOffline devices likely have a physical fault — power issue, tripped breaker, or hardware failure. This requires an engineer.');
+        }else{
+            ab("All oven/grill devices are showing as <strong>online</strong> on ThingsBoard. However, since we can't control these remotely, the fault is likely physical — gas supply, ignition, or mechanical issue.");
+        }
+        ab("This is an <strong>escalation-only flow</strong>. We cannot remotely fix oven or grill issues — an engineer or IoT team investigation is needed.");
+        aft('Capture full details from the caller: which equipment, what happened, any error lights/codes, gas smell, tripped breakers?','_ovensSubmit');
+        render();
+    },800);
+},
+_ovensSubmit(){
+    var t=document.getElementById('ftInput')?.value||'';
+    if(!t){toast('Please capture the details','warning');return}
+    ag(t);
+    escalateWithModal(
+        'Ovens / Grills','high',
+        'Oven/grill fault at '+sn()+' — '+t,
+        'IoT Support Team / Facilities',
+        isServiceHours()?'Within 2 hours (trade affecting)':'Between 8am-5pm, or within 4 hours during business hours',
+        '<strong>Read to caller:</strong>\n\n<em>"Ovens and grills aren\'t something we can control remotely, so I\'ve escalated this to the IoT team for investigation. '+(isServiceHours()?'As this is during service hours, someone will be in contact within 2 hours.':'Someone will be in contact between 8am and 5pm, or within 4 hours during business hours.')+' In the meantime, please check any trip switches or gas isolation valves if safe to do so. Is there anything else?"</em>'
+    );
+    render();
+},
+
+// --- FRIDGE ISSUE ---
+fridgeIssue(){
+    as('Starting: <strong>Refrigeration Issue</strong>','play_arrow');
+    as('Checking ThingsBoard for fridge/freezer sensors at '+sn()+'...','sync');
+    setTimeout(function(){
+        as('Temperature sensors found — data available','check_circle');
+        dataSnapshots.push({label:'Refrigeration Sensors (ThingsBoard)',headers:['Sensor','Temp','Threshold','Status'],rows:[
+            ['Walk-in Fridge','3.2C','5C','OK'],['Walk-in Freezer','-18.5C','-15C','OK'],
+            ['Beer Cellar','11.8C','12C','OK'],['Under-counter Fridge 1','6.8C','5C','ALARM'],
+        ]});
+        ab("Refrigeration monitoring at this site is <strong>alarm-based</strong> — we can see temperatures but cannot remotely control fridge/freezer units.\n\nI need to capture some details to prioritise the escalation correctly.");
+        msgs.push({r:'fridge_detail'});
+        render();
+    },800);
+},
+
+_fridgeSubmit(){
+    const equip=document.getElementById('frEquip')?.value||'Not specified';
+    const impact=document.getElementById('frImpact')?.value||'Not specified';
+    const details=document.getElementById('frDetails')?.value||'';
+    ag('Equipment: '+equip+' | Impact: '+impact);
+    if(details) ag('Details: '+details);
+
+    const isFoodSafety=impact.includes('food')||impact.includes('stock');
+    const sev=isFoodSafety?'high':'med';
+    const timeframe=isFoodSafety?'Within 2 hours':'Between 8am-5pm, or within 4 hours during business hours';
+    escalateWithModal(
+        'Refrigeration',sev,
+        'Refrigeration issue ('+equip+') at '+sn()+' — '+impact+(details?' — '+details:''),
+        'IoT Support Team',
+        timeframe,
+        '<strong>Read to caller:</strong>\n\n<em>"I\'ve logged the details of the '+equip.toLowerCase()+' issue and escalated it to the IoT team. Someone will be in contact '+timeframe.toLowerCase()+'. In the meantime, please keep the doors closed as much as possible'+(isFoodSafety?' and note the temperature on the display if you can see one':'')+'. Is there anything else?"</em>'
+    );
+    render();
+},
+
+// --- WONT TURN ON ---
+wontTurnOn(){
+    as('Starting: <strong>Equipment Won\'t Turn On</strong>','play_arrow');
+    ab("What type of equipment won't turn on?");
+    aa([
+        {label:'Kitchen equipment (fryers)',fn:'kitchenEquip'},
+        {label:'Ovens / grills',fn:'ovensGrills'},
+        {label:'Heating / hot water',fn:'tooCold'},
+        {label:'Air conditioning',fn:'_wontAC'},
+        {label:'Refrigeration',fn:'_wontFridge'},
+        {label:'Other',fn:'_wontOther'},
+    ]);
+},
+
+// Fridge-specific "won't turn on" with correct equipment list
+wontTurnOnFridge(){
+    as('Starting: <strong>Refrigeration Won\'t Turn On</strong>','play_arrow');
+    as('Checking ThingsBoard for fridge/freezer sensors at '+sn()+'...','sync');
+    setTimeout(function(){
+        as('Temperature sensors found — data available','check_circle');
+        dataSnapshots.push({label:'Refrigeration Sensors (ThingsBoard)',headers:['Sensor','Temp','Threshold','Status'],rows:[
+            ['Walk-in Fridge','3.2C','5C','OK'],['Walk-in Freezer','-18.5C','-15C','OK'],
+            ['Beer Cellar','11.8C','12C','OK'],['Under-counter Fridge 1','6.8C','5C','ALARM'],
+        ]});
+        ab("Refrigeration equipment cannot be controlled remotely. I need to capture details to escalate correctly.");
+        msgs.push({r:'fridge_detail'});
+        render();
+    },800);
+},
+
+_wontFridge(){
+    ag('Refrigeration');
+    F.wontTurnOnFridge();
+},
+
+_wontAC(){
+    ag('Air conditioning');
+    as('Checking Intesis for AC units...','sync');
+    setTimeout(function(){
+        dataSnapshots.push({label:'AC Units (Intesis)',headers:['Unit','Power','Mode','Setpoint','Room Temp'],rows:INTESIS_UNITS.map(u=>[u.name,u.power,u.mode,u.setpoint+'C',u.roomTemp+'C'])});
+        aft('Which AC unit is affected, and any additional details?','_wontACSubmit');
+        render();
+    },600);
+},
+_wontACSubmit(){
+    var t=document.getElementById('ftInput')?.value||'';
+    if(t) ag(t);
+    escalateWithModal(
+        'AC Won\'t Turn On','med',
+        'AC unit not turning on at '+sn()+' — could be unit fault, controller issue, or mode setting'+(t?' — '+t:''),
+        'IoT Support Team',
+        'Between 8am-5pm, or within 4 hours during business hours',
+        '<strong>Read to caller:</strong>\n\n<em>"The air conditioning needs specialist attention from the IoT team. I\'ll escalate this and someone will be in contact between 8am and 5pm, or within 4 hours during business hours."</em>'
+    );
+    render();
+},
+
+_wontOther(){
+    ag('Other equipment');
+    aft('Which equipment won\'t turn on, and what\'s the impact?','_wontOtherSubmit');
+    render();
+},
+
+_wontOtherSubmit(){
+    const t=document.getElementById('ftInput')?.value;
+    if(!t){toast('Please describe the equipment','warning');return}
+    ag(t);
+    escalateWithModal(
+        'Equipment Fault','med',
+        'Equipment won\'t turn on at '+sn()+' — '+t,
+        'IoT Support Team',
+        'Between 8am-5pm, or within 4 hours during business hours',
+        '<strong>Read to caller:</strong>\n\n<em>"I\'ve logged the details and escalated to the IoT team. Someone will be in contact between 8am and 5pm, or within 4 hours during business hours. Is there anything else?"</em>'
+    );
+    render();
+},
+
+// --- KEEPS TURNING OFF ---
+keepsTurningOff(){
+    as('Starting: <strong>Equipment Keeps Turning Off</strong>','play_arrow');
+    as('Checking schedules at '+sn()+'...','sync');
+    setTimeout(function(){
+        as('Schedules loaded','check_circle');
+        dataSnapshots.push({label:'Schedules',headers:['Name','Time','Action','Days'],rows:SCHEDS.map(s=>[s.name,s.time,s.act,s.days])});
+        dataSnapshots.push({label:'Kitchen Equipment (Tuya)',headers:['Device','State','Connected'],rows:[['Fryer Bank Switch','OFF','Yes']]});
+        ab("Current schedules are shown in the sidebar. Does one of these match when the equipment is turning off?");
+        aa([
+            {label:'Yes — a schedule is switching off during service',fn:'_toSchedule'},
+            {label:'No — it\'s random, no pattern',fn:'_toRandom'},
+        ]);
+        render();
+    },800);
+},
+
+_toSchedule(){
+    ag('Schedule switching off during service');
+    aft('Any additional details? (e.g. which schedule time matches, what equipment is affected)','_toScheduleSubmit');
+    render();
+},
+_toScheduleSubmit(){
+    var t=document.getElementById('ftInput')?.value||'';
+    if(t) ag(t);
+    escalateWithModal(
+        'Schedule Conflict','med',
+        'A timer is turning off equipment during operating hours at '+sn()+(t?' — '+t:''),
+        'IoT Support Team',
+        'Within 4 hours during business hours',
+        '<strong>Read to caller:</strong>\n\n<em>"I can see there\'s a timer switching your equipment off at the wrong time. I\'ll get the IoT team to adjust it — someone will sort the schedule within 4 hours during business hours. If it turns off again before then, call us back and we can switch it on remotely."</em>'
+    );
+    render();
+},
+
+_toRandom(){
+    ag('Random / no pattern');
+    aft('Any additional details? (e.g. which equipment, how often, any pattern at all)','_toRandomSubmit');
+    render();
+},
+_toRandomSubmit(){
+    var t=document.getElementById('ftInput')?.value||'';
+    if(t) ag(t);
+    escalateWithModal(
+        'Intermittent Shutdown','high',
+        'Equipment turning off randomly at '+sn()+' — not schedule-related, could be electrical, overload, or hardware'+(t?' — '+t:''),
+        'IoT Support Team',
+        'Within 2 hours during business hours',
+        '<strong>Read to caller:</strong>\n\n<em>"This doesn\'t appear to be a schedule issue, so it could be an electrical or equipment fault. I\'ll escalate this as a priority. Someone will be in contact within 2 hours during business hours. If it happens again, call us back."</em>'
+    );
+    render();
+},
+
+// --- AC BLOWING COLD WHEN SHOULD BE WARM (NEW) ---
+acColdWarm(){
+    as('Starting: <strong>AC Blowing Cold (Should Be Warm)</strong>','play_arrow');
+    as('Checking Intesis for AC units at '+sn()+'...','sync');
+    setTimeout(function(){
+        as('Intesis connected — '+INTESIS_UNITS.length+' AC units found','check_circle');
+        dataSnapshots.push({label:'AC Units (Intesis)',headers:['Unit','Power','Mode','Setpoint','Room Temp'],rows:INTESIS_UNITS.map(u=>[u.name,u.power,u.mode,u.setpoint+'C',u.roomTemp+'C'])});
+        // Identify units in Cool mode
+        var coolUnits=INTESIS_UNITS.filter(u=>u.power==='On'&&u.mode==='Cool');
+        if(coolUnits.length){
+            ab('<strong style="color:var(--warn)">Identified '+coolUnits.length+' unit(s) in Cool mode:</strong>');
+            coolUnits.forEach(function(u){
+                ab('&bull; <strong>'+u.name+'</strong> — Mode: <strong style="color:var(--pri)">Cool</strong>, Setpoint: '+u.setpoint+'C, Room: '+u.roomTemp+'C');
+            });
+            ab("These units are actively cooling when the caller expects heating. The mode needs changing to <strong>Heat</strong> or <strong>Auto</strong>.");
+            ab('<strong style="color:var(--err)">OOH agents cannot change AC modes directly</strong> — this is too risky as incorrect mode changes can cause compressor damage or comfort issues across the site. This must be escalated to the IoT team.');
+        }else{
+            ab("No units found in Cool mode. The issue may be intermittent or the AC units may not be the cause.");
+        }
+        aft('Any additional details from the caller? (e.g. which area is affected, when did they notice it)','_acColdWarmSubmit');
+        render();
+    },800);
+},
+_acColdWarmSubmit(){
+    var t=document.getElementById('ftInput')?.value||'';
+    if(t) ag(t);
+    var coolUnits=INTESIS_UNITS.filter(u=>u.power==='On'&&u.mode==='Cool');
+    escalateWithModal(
+        'AC Mode Issue (Cold/Warm)','med',
+        'AC blowing cold when should be warm at '+sn()+' — '+coolUnits.length+' unit(s) in Cool mode identified'+(t?' — '+t:''),
+        'IoT Support Team',
+        'Between 8am-5pm, or within 4 hours during business hours',
+        '<strong>Read to caller:</strong>\n\n<em>"I can see that some of the air conditioning units are set to cooling mode when they should be heating. I can\'t change the AC mode remotely during out-of-hours as it requires specialist configuration, but I\'ve escalated this to the IoT team with all the details. Someone will be in contact between 8am and 5pm, or within 4 hours during business hours. In the meantime, you could try adjusting the wall thermostat if there is one."</em>'
+    );
+    render();
+},
+
+// --- AC BLOWING WARM WHEN SHOULD BE COOL (NEW) ---
+acWarmCool(){
+    as('Starting: <strong>AC Blowing Warm (Should Be Cool)</strong>','play_arrow');
+    as('Checking Intesis for AC units at '+sn()+'...','sync');
+    setTimeout(function(){
+        as('Intesis connected — '+INTESIS_UNITS.length+' AC units found','check_circle');
+        dataSnapshots.push({label:'AC Units (Intesis)',headers:['Unit','Power','Mode','Setpoint','Room Temp'],rows:INTESIS_UNITS.map(u=>[u.name,u.power,u.mode,u.setpoint+'C',u.roomTemp+'C'])});
+        // For this scenario, simulate a unit stuck in Heat mode
+        var heatUnits=INTESIS_UNITS.filter(u=>u.power==='On');
+        ab("AC unit data retrieved. Checking for units in Heat mode when they should be cooling...");
+        // Simulate: none are explicitly in Heat, but Dining AC has low setpoint in Cool — let's say one is in wrong mode
+        ab('<strong style="color:var(--warn)">Potential issue:</strong> All powered-on units are in <strong>Cool</strong> mode. If the AC is blowing warm despite being in Cool mode, this could indicate:<br>1. Refrigerant issue (compressor running but not cooling)<br>2. Dirty filters reducing efficiency<br>3. Unit in defrost cycle<br>4. Mode was recently changed and hasn\'t taken effect');
+        ab('<strong style="color:var(--err)">OOH agents cannot change AC modes directly</strong> — requires IoT team investigation.');
+        aft('Any additional details? (e.g. which area, how long has it been warm, any unusual sounds from the unit)','_acWarmCoolSubmit');
+        render();
+    },800);
+},
+_acWarmCoolSubmit(){
+    var t=document.getElementById('ftInput')?.value||'';
+    if(t) ag(t);
+    escalateWithModal(
+        'AC Mode Issue (Warm/Cool)','med',
+        'AC blowing warm when should be cool at '+sn()+' — may be mode issue, refrigerant, or mechanical fault'+(t?' — '+t:''),
+        'IoT Support Team',
+        'Between 8am-5pm, or within 4 hours during business hours',
+        '<strong>Read to caller:</strong>\n\n<em>"I\'ve checked the AC unit configuration and it appears the units may have a fault preventing proper cooling. I\'ve escalated this to the IoT team with all the diagnostic data. Someone will be in contact between 8am and 5pm, or within 4 hours during business hours. Is there anything else?"</em>'
+    );
+    render();
+},
+
+// --- AC WON'T TURN OFF (NEW) ---
+acWontOff(){
+    as('Starting: <strong>AC Won\'t Turn Off</strong>','play_arrow');
+    as('Checking Intesis for AC units at '+sn()+'...','sync');
+    setTimeout(function(){
+        as('Intesis connected — '+INTESIS_UNITS.length+' AC units found','check_circle');
+        dataSnapshots.push({label:'AC Units (Intesis)',headers:['Unit','Power','Mode','Setpoint','Room Temp'],rows:INTESIS_UNITS.map(u=>[u.name,u.power,u.mode,u.setpoint+'C',u.roomTemp+'C'])});
+        var onUnits=INTESIS_UNITS.filter(u=>u.power==='On');
+        if(onUnits.length){
+            ab('<strong>'+onUnits.length+' AC unit(s) currently ON:</strong>');
+            onUnits.forEach(function(u){
+                ab('&bull; <strong>'+u.name+'</strong> — Mode: '+u.mode+', Setpoint: '+u.setpoint+'C, Room: '+u.roomTemp+'C');
+            });
+            ab("The caller reports these won't turn off. This could be a controller issue, schedule conflict, or the unit is ignoring OFF commands.");
+            ab('<strong style="color:var(--err)">OOH agents cannot power off AC units remotely</strong> — incorrect shutdown during certain modes can damage the compressor. This must be escalated.');
+        }else{
+            ab("All units showing as OFF in Intesis. The caller may be hearing fans running down (normal for 5-10 minutes after shutdown) or the issue is with a unit not on the Intesis system.");
+        }
+        aft('Any additional details? (e.g. which unit/area, how long, is it keeping people awake in accommodation)','_acWontOffSubmit');
+        render();
+    },800);
+},
+_acWontOffSubmit(){
+    var t=document.getElementById('ftInput')?.value||'';
+    if(t) ag(t);
+    var onUnits=INTESIS_UNITS.filter(u=>u.power==='On');
+    var isAccom=t.toLowerCase().includes('accom')||t.toLowerCase().includes('sleep')||t.toLowerCase().includes('awake');
+    escalateWithModal(
+        'AC Won\'t Turn Off',isAccom?'high':'med',
+        'AC won\'t turn off at '+sn()+' — '+onUnits.length+' unit(s) stuck ON'+(isAccom?' (affecting accommodation)':'')+(t?' — '+t:''),
+        'IoT Support Team',
+        isAccom?'Within 2 hours':'Between 8am-5pm, or within 4 hours during business hours',
+        '<strong>Read to caller:</strong>\n\n<em>"I can see the AC units that are still running and I\'ve logged all the details. I can\'t safely turn them off remotely during out-of-hours, but I\'ve escalated to the IoT team. Someone will be in contact '+(isAccom?'within 2 hours given the accommodation impact':'between 8am and 5pm, or within 4 hours during business hours')+'. '+(isAccom?'If there\'s a local isolator switch for the AC in the affected room, you could try that as a temporary measure. ':'')+'Is there anything else?"</em>'
+    );
+    render();
+},
+
+// --- CONTROLS / DISPLAY ISSUE ---
+controlsIssue(){
+    as('Starting: <strong>Controls / Display Issue</strong>','play_arrow');
+    ab("What's happening with the controls?");
+    aa([
+        {label:'Thermostat screen is blank / unresponsive',fn:'_ctThermo'},
+        {label:'Display showing an error code',fn:'_ctError'},
+        {label:'Control panel buttons not responding',fn:'_ctPanel'},
+        {label:'Other control issue',fn:'_ctOther'},
+    ]);
+},
+
+// Controls "Other" (NEW)
+_ctOther(){
+    ag('Other control issue');
+    aft('Describe the control/display issue in detail — which device, what\'s happening, what have they tried?','_ctOtherSubmit');
+    render();
+},
+_ctOtherSubmit(){
+    var t=document.getElementById('ftInput')?.value;
+    if(!t){toast('Please describe the issue','warning');return}
+    ag(t);
+    escalateWithModal(
+        'Controls / Display','med',
+        'Control/display issue at '+sn()+' — '+t,
+        'IoT Support Team',
+        'Between 8am-5pm, or within 4 hours during business hours',
+        '<strong>Read to caller:</strong>\n\n<em>"I\'ve logged the details of the control issue and escalated it to the IoT team. Someone will be in contact between 8am and 5pm, or within 4 hours during business hours. Is there anything else?"</em>'
+    );
+    render();
+},
+
+// Also catch controlsOther from equipment type picker
+controlsOther(){
+    F.controlsIssue();
+},
+
+_ctThermo(){
+    ag('Thermostat blank / unresponsive');
+    as('Checking device connectivity on ThingsBoard...','sync');
+    setTimeout(function(){
+        dataSnapshots.push({label:'Thermostat (ThingsBoard)',headers:['Device','Status','Last Seen'],rows:[['Wall Thermostat','OFFLINE','3 hours ago']]});
+        ab("<strong style='color:var(--err)'>Thermostat is showing as OFFLINE</strong> on the platform. Last seen: 3 hours ago.\n\nThis is likely a power or connectivity issue at the device.");
+        ab("We can try a remote reset of the network gateway to see if it brings the thermostat back. This may briefly disconnect other devices at the site for 1-2 minutes.");
+        aa([
+            {label:'Try remote gateway reset',fn:'_ctReset'},
+            {label:'Don\'t reset — just escalate',fn:'_ctEscThermo',cls:'sec'},
+        ]);
+        render();
+    },600);
+},
+
+_ctReset(){
+    ag('Try remote gateway reset');
+    as('Sending reset command to gateway...','sync');
+    arules('<strong>Rules Applied:</strong> Gateway reset sends a reboot command to the site\'s network controller. All IoT devices at the site will briefly disconnect (1-2 minutes) while the gateway restarts. Devices should auto-reconnect. This resolves ~60% of offline thermostat issues.');
+    setTimeout(function(){
+        as('Gateway restarting — waiting for reconnection...','hourglass_empty');
+        setTimeout(function(){
+            as('Gateway back online — checking thermostat...','sync');
+            setTimeout(function(){
+                as('Thermostat reconnected','check_circle');
+                ar('<strong>Thermostat recovered</strong> after gateway reset. Screen should be active again within a minute.');
+                actionsTaken.push('Gateway reset performed — thermostat recovered');
+                summary.push('Thermostat offline — gateway reset resolved');
+                endFlow('<strong>Read to caller:</strong>\n\n<em>"I\'ve reset the network controller and the thermostat has come back online. The screen should light up within the next minute or so. Is there anything else?"</em>');
+                render();
+            },600);
+        },1200);
+    },600);
+},
+
+_ctEscThermo(){
+    ag('Just escalate');
+    aft('Any additional details? (e.g. is it just the screen or are controls also dead, any recent power outages)','_ctEscThermoSubmit');
+    render();
+},
+_ctEscThermoSubmit(){
+    var t=document.getElementById('ftInput')?.value||'';
+    if(t) ag(t);
+    escalateWithModal(
+        'Thermostat Offline','med',
+        'Thermostat at '+sn()+' offline for 3+ hours — may need physical inspection or replacement'+(t?' — '+t:''),
+        'IoT Support Team',
+        'Between 8am-5pm, or within 4 hours during business hours',
+        '<strong>Read to caller:</strong>\n\n<em>"The thermostat appears to have lost its connection. I\'ll escalate to the IoT team and someone will be in contact between 8am and 5pm, or within 4 hours during business hours."</em>'
+    );
+    render();
+},
+
+_ctError(){
+    ag('Display showing error code');
+    ab("I need to capture the error details to help the team diagnose this.");
+    msgs.push({r:'error_detail'});
+    render();
+},
+
+_ctErrorSubmit(){
+    const equip=document.getElementById('errEquip')?.value||'Not specified';
+    const code=document.getElementById('errCode')?.value||'Not provided';
+    const impact=document.getElementById('errImpact')?.value||'Not specified';
+    ag('Equipment: '+equip+' | Error: '+code+' | Impact: '+impact);
+    const critical=impact.includes('Not working')||impact.includes('cannot');
+    escalateWithModal(
+        'Error Code on Display',critical?'high':'med',
+        'Error code "'+code+'" on '+equip+' at '+sn()+' — Impact: '+impact,
+        'IoT Support Team',
+        critical?'Within 2 hours':'Between 8am-5pm, or within 4 hours during business hours',
+        '<strong>Read to caller:</strong>\n\n<em>"I\'ve logged the error code and the details. The IoT team will investigate and someone will be in contact '+(critical?'within 2 hours':'between 8am and 5pm, or within 4 hours during business hours')+'. Is there anything else?"</em>'
+    );
+    render();
+},
+
+_ctPanel(){
+    ag('Control panel not responding');
+    as('Checking device connectivity...','sync');
+    setTimeout(function(){
+        dataSnapshots.push({label:'Control Panel (ThingsBoard)',headers:['Device','Status','Last Seen'],rows:[['Control Panel','Online','1 min ago']]});
+        ab("The control panel may have frozen or lost its connection. A remote gateway reset might help.");
+        aa([{label:'Try remote gateway reset',fn:'_ctReset'},{label:'Escalate directly',fn:'_ctEscPanel',cls:'sec'}]);
+        render();
+    },600);
+},
+
+_ctEscPanel(){
+    aft('Any additional details about the control panel issue?','_ctEscPanelSubmit');
+    render();
+},
+_ctEscPanelSubmit(){
+    var t=document.getElementById('ftInput')?.value||'';
+    if(t) ag(t);
+    escalateWithModal(
+        'Control Panel Unresponsive','med',
+        'Control panel at '+sn()+' not responding to inputs — may need physical reset or replacement'+(t?' — '+t:''),
+        'IoT Support Team',
+        'Between 8am-5pm, or within 4 hours during business hours',
+        '<strong>Read to caller:</strong>\n\n<em>"The control panel needs attention from the IoT team. I\'ll log this and someone will be in contact between 8am and 5pm, or within 4 hours during business hours."</em>'
+    );
+    render();
+},
+
+// --- SOMETHING ELSE ---
+somethingElse(){
+    as('Starting: <strong>General Issue</strong>','play_arrow');
+    ab("This doesn't match a standard triage flow. Please capture the details below so we can log it accurately.");
+    aft('Describe the issue in detail — what equipment, what\'s happening, and what\'s the impact?','_seSubmit');
+    render();
+},
+
+_seSubmit(){
+    const t=document.getElementById('ftInput')?.value;
+    if(!t){toast('Please describe the issue','warning');return}
+    ag(t);
+    escalateWithModal(
+        'General Issue','med',
+        t,
+        'IoT Support Team',
+        'Between 8am-5pm, or within 4 hours during business hours',
+        '<strong>Read to caller:</strong>\n\n<em>"I\'ve logged the details of your issue and escalated it to the IoT team. Someone will be in contact between 8am and 5pm, or within 4 hours during business hours. Is there anything else?"</em>'
+    );
+    render();
+},
+
+// Aliases
+newIssue(){newIssue()},
+goWrap(){goWrap()},
+}; // end FLOWS
+
+function goWrap(){view='wrapUp';render()}
+
+// === TRIAGE RENDERER ===
+function renderTriage(c){
+    document.getElementById('pT').textContent=FLOW_NAMES[flow]||'Triage';
+
+    let ch=msgs.map(function(m,i){
+        if(m.r==='acts') return '<div class="acts">'+m.a.map(function(a){return '<button class="ab '+(a.cls||'')+'" onclick="F[\''+a.fn+'\']()">'+a.label+'</button>'}).join('')+'</div>';
+        if(m.r==='ft'){
+            // Determine which submit function to call
+            var submitFn=m.submitFn||'_seSubmit';
+            return '<div class="detail-capture"><label>'+(m.prompt||'Provide details')+'</label><textarea id="ftInput" rows="3" placeholder="Type here..."></textarea><button class="ab ok" style="margin-top:4px" onclick="F[\''+submitFn+'\']()"><span class="material-icons-outlined">send</span> Submit</button></div>';
+        }
+        if(m.r==='fridge_detail') return '<div class="detail-capture"><label>Which equipment?</label><select id="frEquip"><option>Walk-in fridge</option><option>Walk-in freezer</option><option>Under-counter fridge</option><option>Under-counter freezer</option><option>Beer cellar cooler</option><option>Display fridge</option><option>Other</option></select><label>What\'s the impact?</label><select id="frImpact"><option>Alarm sounding but equipment still working</option><option>Temperature rising — food stock at risk</option><option>Equipment completely off — food stock at risk</option><option>Minor — no immediate food safety concern</option></select><label>Any other details?</label><textarea id="frDetails" rows="2" placeholder="e.g. current temperature reading, how long it\'s been happening..."></textarea><button class="ab ok" style="margin-top:4px" onclick="F._fridgeSubmit()"><span class="material-icons-outlined">send</span> Submit Details</button></div>';
+        if(m.r==='error_detail') return '<div class="detail-capture"><label>Which equipment is showing the error?</label><select id="errEquip"><option>Heating thermostat</option><option>Boiler controller</option><option>Kitchen equipment display</option><option>Fridge/freezer display</option><option>AC controller</option><option>Other</option></select><label>Error code or message (if visible)</label><input type="text" id="errCode" placeholder="e.g. E04, ERR, flashing red"><label>Impact</label><select id="errImpact"><option>Equipment still working despite error</option><option>Equipment not working — affecting service</option><option>Cannot tell — display is the only issue</option></select><button class="ab ok" style="margin-top:4px" onclick="F._ctErrorSubmit()"><span class="material-icons-outlined">send</span> Submit Details</button></div>';
+        if(m.r==='rules') return '<div class="msg msg-rules"><div class="mh"><span class="material-icons-outlined">auto_awesome</span> '+m.tm+'</div><div class="mt">'+m.t+'</div></div>';
+        var cls={bot:'msg-bot',agent:'msg-agent',sys:'msg-sys',esc:'msg-esc',res:'msg-res',script:'msg-script'}[m.r]||'msg-bot';
+        return '<div class="msg '+cls+'"><div class="mh"><span class="material-icons-outlined">'+m.i+'</span> '+m.tm+(m.sev?' <span class="sev '+m.sev+'">'+m.sev.toUpperCase()+'</span>':'')+'</div><div class="mt">'+m.t+'</div></div>';
+    }).join('');
+
+    c.innerHTML=`
+    <div class="steps"><div class="step done"><span class="material-icons-outlined">check_circle</span> New Call</div><div class="step done"><span class="material-icons-outlined">check_circle</span> Caller Details</div><div class="step active"><span class="material-icons-outlined">chat</span> Triage</div><div class="step">Wrap Up</div></div>
+    <div class="tl"><div class="tc">
+        <div class="th"><button class="ab sec" onclick="goHome()"><span class="material-icons-outlined">close</span> Abort</button><div class="tfn"><span class="material-icons-outlined">${FLOW_ICONS[flow]||'chat'}</span>${FLOW_NAMES[flow]||'Triage'}</div><div style="width:80px"></div></div>
+        <div class="ca" id="chat">${ch}</div>
+    </div><div class="ts">${buildSB()}</div></div>`;
+    var el=document.getElementById('chat');if(el)el.scrollTop=el.scrollHeight;
+}
+
+function buildSB(){
+    let s='';
+    // Heating zones sidebar
+    if(flow==='tooCold'||flow==='tooHot'||flow==='heatingStuck'){
+        s+='<div class="dc"><h4><span class="material-icons-outlined" style="font-size:16px">thermostat</span> Heating Zones</h4><table class="dt"><tr><th>Zone</th><th>Temp</th><th>Set</th><th>Status</th></tr>';
+        ZONES.forEach(function(z){s+='<tr class="'+(z.temp<z.sp-2?'hl':'')+'"><td>'+z.zone+'</td><td><strong>'+z.temp+'C</strong></td><td>'+z.sp+'C</td><td><span class="sd '+(z.st==='heating'?'a':z.st==='idle'?'g':'r')+'"></span>'+z.st+'</td></tr>'});
+        s+='</table></div>';
+    }
+    // Kitchen equipment sidebar
+    if(flow==='kitchenEquip'||flow==='keepsTurningOff'){
+        s+='<div class="dc"><h4><span class="material-icons-outlined" style="font-size:16px">power</span> Device</h4><table class="dt"><tr><th>Device</th><th>State</th><th>Connected</th></tr><tr><td>Fryer Bank Switch</td><td><strong style="color:var(--err)">OFF</strong></td><td><span class="sd g"></span>Yes</td></tr></table></div>';
+        s+='<div class="dc"><h4><span class="material-icons-outlined" style="font-size:16px">schedule</span> Schedules</h4><table class="dt"><tr><th>Name</th><th>Time</th><th>Action</th><th>Days</th></tr>';
+        SCHEDS.forEach(function(sc){s+='<tr><td>'+sc.name+'</td><td>'+sc.time+'</td><td>'+sc.act+'</td><td>'+sc.days+'</td></tr>'});s+='</table></div>';
+    }
+    // AC sidebar
+    if(flow==='acColdWarm'||flow==='acWarmCool'||flow==='acWontOff'){
+        s+='<div class="dc"><h4><span class="material-icons-outlined" style="font-size:16px">ac_unit</span> AC Units (Intesis)</h4><table class="dt"><tr><th>Unit</th><th>Power</th><th>Mode</th><th>Set</th><th>Room</th></tr>';
+        INTESIS_UNITS.forEach(function(u){s+='<tr><td>'+u.name+'</td><td>'+(u.power==='On'?'<span class="sd g"></span>':'<span class="sd r"></span>')+u.power+'</td><td>'+u.mode+'</td><td>'+u.setpoint+'C</td><td>'+u.roomTemp+'C</td></tr>'});
+        s+='</table></div>';
+    }
+    // Ovens/grills sidebar
+    if(flow==='ovensGrills'){
+        s+='<div class="dc"><h4><span class="material-icons-outlined" style="font-size:16px">restaurant</span> Oven/Grill Devices</h4><table class="dt"><tr><th>Device</th><th>Status</th><th>Last Seen</th></tr><tr><td>Main Oven</td><td><span class="sd g"></span>Online</td><td>2 min ago</td></tr><tr><td>Combi Oven</td><td><span class="sd r"></span>Offline</td><td>4 hrs ago</td></tr><tr><td>Char Grill</td><td><span class="sd g"></span>Online</td><td>3 min ago</td></tr></table></div>';
+    }
+    // Fridge sidebar
+    if(flow==='fridgeIssue'||flow==='wontTurnOnFridge'){
+        s+='<div class="dc"><h4><span class="material-icons-outlined" style="font-size:16px">kitchen</span> Refrigeration</h4><table class="dt"><tr><th>Sensor</th><th>Temp</th><th>Limit</th><th>Status</th></tr>';
+        s+='<tr><td>Walk-in Fridge</td><td>3.2C</td><td>5C</td><td><span class="sd g"></span>OK</td></tr>';
+        s+='<tr><td>Walk-in Freezer</td><td>-18.5C</td><td>-15C</td><td><span class="sd g"></span>OK</td></tr>';
+        s+='<tr><td>Beer Cellar</td><td>11.8C</td><td>12C</td><td><span class="sd g"></span>OK</td></tr>';
+        s+='<tr class="hl"><td>U/C Fridge 1</td><td>6.8C</td><td>5C</td><td><span class="sd r"></span>ALARM</td></tr>';
+        s+='</table></div>';
+    }
+    // Active override
+    if(actionsTaken.some(function(x){return x.includes('Boosted')||x.includes('Switched')||x.includes('Reset')})){
+        s+='<div class="pc"><h4><span class="material-icons-outlined" style="font-size:14px">timer</span> Active Override</h4><div style="font-size:18px;font-weight:700;color:#92400e">1h 58m</div><div style="font-size:12px;margin-top:4px">Auto-reverts '+rv()+'</div></div>';
+    }
+    // Call details
+    s+='<div class="cc"><h4>Call Details</h4>';
+    if(caller.name)s+='<div class="cr"><span>Caller</span><span>'+esc(caller.name)+'</span></div>';
+    if(caller.role)s+='<div class="cr"><span>Role</span><span>'+caller.role+'</span></div>';
+    if(caller.phone)s+='<div class="cr"><span>Phone</span><span>'+caller.phone+'</span></div>';
+    if(caller.email)s+='<div class="cr"><span>Email</span><span>'+caller.email+'</span></div>';
+    if(site){s+='<div class="cr"><span>Site</span><span>'+sn()+'</span></div>';s+='<div class="cr"><span>Site #</span><span>'+site.no+'</span></div>';s+='<div class="cr"><span>Client</span><span>'+site.client+'</span></div>';s+='<div class="cr"><span>Hours</span><span>'+site.hours+'</span></div>'}
+    s+='</div>';return s;
+}
+
+// === WRAP UP ===
+function renderWrapUp(c){
+    document.getElementById('pT').textContent='Wrap Up';
+    const dur=fs?Math.round((new Date()-fs)/60000):0;
+
+    // Build comprehensive triage summary
+    var sumText='=== OOH Triage Summary ===\n';
+    sumText+='Flow: '+(FLOW_NAMES[flow]||flow)+'\n';
+    sumText+='Site: '+sn()+' ('+(site?.no||'N/A')+') — '+(site?.client||'')+'\n';
+    sumText+='Caller: '+(caller.name||'N/A')+' ('+(caller.role||'N/A')+') — '+(caller.phone||'N/A')+(caller.email?' — '+caller.email:'')+'\n';
+    sumText+='Duration: '+dur+' min\n';
+    if(caller.desc) sumText+='Description: '+caller.desc+'\n';
+    sumText+='\n';
+
+    // Agent selections
+    var agentMsgs=msgs.filter(function(m){return m.r==='agent'});
+    if(agentMsgs.length){
+        sumText+='--- Agent Selections ---\n';
+        agentMsgs.forEach(function(m){sumText+='['+m.tm+'] '+m.t.replace(/<[^>]*>/g,'')+'\n'});
+        sumText+='\n';
+    }
+
+    // Data snapshots
+    if(dataSnapshots.length){
+        sumText+='--- Data Snapshots ---\n';
+        dataSnapshots.forEach(function(snap){
+            sumText+=snap.label+':\n';
+            sumText+='  '+snap.headers.join(' | ')+'\n';
+            snap.rows.forEach(function(row){sumText+='  '+row.join(' | ')+'\n'});
+            sumText+='\n';
+        });
+    }
+
+    // Actions taken
+    if(actionsTaken.length){
+        sumText+='--- Actions Taken ---\n';
+        actionsTaken.forEach(function(a){sumText+='- '+a+'\n'});
+        sumText+='\n';
+    }
+
+    // Escalation
+    if(escalationData){
+        sumText+='--- Escalation ---\n';
+        sumText+='Issue: '+escalationData.issue+'\n';
+        sumText+='Severity: '+escalationData.severity.toUpperCase()+'\n';
+        sumText+='Destination: '+escalationData.destination+'\n';
+        sumText+='Timeframe: '+escalationData.timeframe+'\n';
+        sumText+='\n';
+    }
+
+    // Agent notes
+    if(agentNotes){
+        sumText+='--- Agent Notes ---\n';
+        sumText+=agentNotes+'\n';
+        sumText+='\n';
+    }
+
+    // Summary actions
+    if(summary.length){
+        sumText+='--- Summary ---\n';
+        summary.forEach(function(s){sumText+=s+'\n'});
+    }
+
+    c.innerHTML=`
+    <div class="steps"><div class="step done"><span class="material-icons-outlined">check_circle</span> New Call</div><div class="step done"><span class="material-icons-outlined">check_circle</span> Caller Details</div><div class="step done"><span class="material-icons-outlined">check_circle</span> Triage</div><div class="step active"><span class="material-icons-outlined">task_alt</span> Wrap Up</div></div>
+    <div class="form-section" style="border-left:3px solid var(--ok)">
+        <h3><span class="material-icons-outlined">record_voice_over</span> Closing Script</h3>
+        <div style="background:rgba(139,92,246,.06);border:1px solid rgba(139,92,246,.15);border-radius:var(--rs);padding:14px;font-size:13px;line-height:1.6;font-style:italic">
+            "Is there anything else you called about today?"<br><br>
+            <em style="font-style:normal;color:var(--txt2)">[If yes -> click 'Another issue' below]</em><br><br>
+            "Thank you for calling, ${esc(caller.name)}. ${summary.some(function(s){return s.includes('Escalated')})?'As I mentioned, the IoT team will be in touch. ':''}Have a good ${new Date().getHours()<12?'morning':new Date().getHours()<18?'afternoon':'evening'}."
+        </div>
+    </div>
+    <div class="form-section">
+        <h3><span class="material-icons-outlined">summarize</span> Triage Summary</h3>
+        <div style="background:var(--bg);border:1px solid var(--bdr);border-radius:var(--rs);padding:14px;font-family:monospace;font-size:11px;line-height:1.6;white-space:pre-wrap">${esc(sumText)}</div>
+    </div>
+    <div style="display:flex;gap:8px">
+        <button class="ab ok" onclick="toast('Summary posted to Zendesk','check_circle')"><span class="material-icons-outlined">note_add</span> Post to Zendesk & Close</button>
+        <button class="ab" onclick="newIssue()"><span class="material-icons-outlined">add_call</span> Caller has another issue</button>
+    </div>`;
+}
+
+// === POCKET ===
+function showPocket(){view='pocket';render()}
+function renderPocket(c){
+    document.getElementById('pT').textContent='Active Overrides';
+    c.innerHTML=`<div style="max-width:800px">
+        <h2 style="display:flex;align-items:center;gap:8px;font-size:18px;margin-bottom:16px"><span class="material-icons-outlined">timer</span> Active Overrides</h2>
+        <h3 style="font-size:14px;color:var(--txt2);margin-bottom:10px">Active (1)</h3>
+        <div class="dc" style="border-left:3px solid var(--warn);margin-bottom:12px">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px"><strong>+3C heating boost — Bar Area</strong><span style="font-size:18px;font-weight:700;color:#92400e">1h 42m</span></div>
+            <div style="font-size:12px;color:var(--txt2);margin-bottom:8px">Site: 10234 - The Red Lion | Salus | Caller: John Smith | ${now()}</div>
+            <div style="display:flex;gap:8px"><button class="ab sec" onclick="toast('Cancelled','check_circle')">Cancel</button><button class="ab sec" onclick="toast('Extended +60min','check_circle')">Extend</button></div>
+        </div>
+        <h3 style="font-size:14px;color:var(--txt2);margin:24px 0 10px">Recent</h3>
+        <div class="dc" style="border-left:3px solid var(--ok);margin-bottom:8px;opacity:.7"><div style="display:flex;justify-content:space-between"><strong>Fryer ON — The White Hart</strong><span class="sev med" style="background:var(--ok-bg);color:var(--ok)">REVERTED</span></div><div style="font-size:12px;color:var(--txt2)">23 Mar, 02:15 — Auto-reverted 04:15</div></div>
+        <div class="dc" style="border-left:3px solid var(--err);margin-bottom:8px;opacity:.7"><div style="display:flex;justify-content:space-between"><strong>AC change — The Stag</strong><span class="sev crit">FAILED</span></div><div style="font-size:12px;color:var(--txt2)">21 Mar, 01:55 — P1 ticket #28490 created</div></div>
+        <div style="margin-top:16px"><button class="ab sec" onclick="goHome()"><span class="material-icons-outlined">arrow_back</span> Back</button></div>
+    </div>`;
+}
+
+render();setInterval(tick,30000);
+</script>
+</body>
+</html>

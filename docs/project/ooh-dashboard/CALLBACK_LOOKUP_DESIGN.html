@@ -1,0 +1,688 @@
+<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Callback Lookup Design</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:Inter,system-ui,sans-serif;background:#f8fafc;color:#1e293b;padding:40px;max-width:1000px;margin:0 auto;line-height:1.7}
+h1{font-size:24px;margin:0 0 8px}
+h2{font-size:18px;margin:32px 0 12px;border-bottom:2px solid #e2e8f0;padding-bottom:8px;color:#0f172a}
+h3{font-size:15px;margin:24px 0 8px;color:#3b82f6}
+h4{font-size:13px;margin:16px 0 6px;color:#64748b;text-transform:uppercase;letter-spacing:.3px}
+p{margin:8px 0;font-size:14px}
+table{width:100%;border-collapse:collapse;margin:12px 0 20px;font-size:13px;background:#fff;border:1px solid #e2e8f0;border-radius:8px;overflow:hidden}
+th{background:#f1f5f9;text-align:left;padding:10px 12px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:#64748b;border-bottom:2px solid #e2e8f0}
+td{padding:8px 12px;border-bottom:1px solid #f1f5f9;vertical-align:top}
+tr:last-child td{border-bottom:none}
+tr:hover{background:#f8fafc}
+code{font-family:"JetBrains Mono",monospace}
+strong{font-weight:600}
+li{margin:4px 0;font-size:14px;margin-left:20px}
+hr{border:none;border-top:1px solid #e2e8f0;margin:24px 0}
+blockquote{border-left:3px solid #3b82f6;padding:8px 16px;margin:12px 0;background:#eff6ff;border-radius:0 6px 6px 0}
+@media(max-width:768px){body{padding:16px}table{font-size:12px}td,th{padding:6px 8px}}
+</style></head><body><h1>Callback/Follow-Up Lookup — Design Specification</h1>
+
+<p><strong>Project:</strong> OOH Triage Dashboard</p>
+<p><strong>Feature:</strong> C9 — Callback/Follow-Up Lookup</p>
+<p><strong>Date:</strong> 28 March 2026</p>
+<p><strong>Author:</strong> James Brown / Digital Delivery (design by Claude Code)</p>
+<p><strong>Status:</strong> Design — awaiting review before build</p>
+<p><strong>Predecessor:</strong> OOH_CAPABILITY_ANALYSIS.md (C9: 4 incidents), OOH_DASHBOARD_DESIGN.md (Section 5.1 callback queue)</p>
+
+<hr>
+
+<h2>1. Purpose</h2>
+
+<p>A caller rings back and says something like: "I called earlier about my heating — someone was supposed to look at it but nothing's happened." The OOH agent needs to find out what is happening with the ticket, understand its current state without reading raw Zendesk comments, and give the caller a clear, honest answer — all within 60 seconds.</p>
+
+<p>This feature gives the agent a structured lookup flow that:</p>
+<li>Finds the site's recent tickets in Zendesk</li>
+<li>Translates ticket status, assignment, and latest activity into a plain English script</li>
+<li>Presents the agent with exactly what to say to the caller</li>
+<li>Offers follow-up actions (add a note, bump priority, re-escalate)</li>
+
+<p><strong>Design philosophy:</strong> The agent should never need to interpret anything. Every piece of information is pre-digested into caller-friendly language. The system does the thinking; the agent reads the script.</p>
+
+<hr>
+
+<h2>2. Use Case Analysis</h2>
+
+<h3>UC-1: Single Active Ticket Found — In Progress</h3>
+<p><strong>Trigger:</strong> Caller says "I called about my heating earlier, what's happening?"</p>
+<p><strong>System finds:</strong> One open/pending ticket for the site, assigned to an IoT team member, last updated 2 hours ago.</p>
+<p><strong>Agent needs:</strong> A script that tells the caller what stage it's at and what happens next.</p>
+<p><strong>Outcome:</strong> Agent reassures caller; optionally adds a follow-up note.</p>
+
+<h3>UC-2: Single Active Ticket Found — Waiting on External Party</h3>
+<p><strong>Trigger:</strong> Caller says "You raised it with the repair company but nobody's come."</p>
+<p><strong>System finds:</strong> One ticket in "Sent to Repairs Admin" or "Awaiting GK Repair" status.</p>
+<p><strong>Agent needs:</strong> A script that explains the ticket has been passed to the relevant contractor, and what the expected timeline is.</p>
+<p><strong>Outcome:</strong> Agent reassures caller or re-escalates if overdue.</p>
+
+<h3>UC-3: Single Active Ticket Found — No Updates Since Creation</h3>
+<p><strong>Trigger:</strong> Caller says "I called hours ago and nobody's done anything."</p>
+<p><strong>System finds:</strong> One ticket created 3+ hours ago, still in Triage or New status, no comments beyond the initial creation.</p>
+<p><strong>Agent needs:</strong> An honest script that acknowledges the delay, plus a mechanism to bump the priority or add an urgent note.</p>
+<p><strong>Outcome:</strong> Agent apologises, bumps priority, reassures caller it will be picked up.</p>
+
+<h3>UC-4: Multiple Active Tickets for Same Site</h3>
+<p><strong>Trigger:</strong> Caller says "We've had a few issues — the heating and the fryers."</p>
+<p><strong>System finds:</strong> Two or more open/pending tickets for the site.</p>
+<p><strong>Agent needs:</strong> A summary of each ticket with enough context to identify which one the caller is asking about, then the detail for the relevant one.</p>
+<p><strong>Outcome:</strong> Agent confirms which issue the caller means, then reads the relevant script.</p>
+
+<h3>UC-5: Ticket Was Resolved — Caller Disagrees</h3>
+<p><strong>Trigger:</strong> Caller says "They said it was fixed but it's still not working."</p>
+<p><strong>System finds:</strong> A recently solved/resolved ticket for the site.</p>
+<p><strong>Agent needs:</strong> A script that acknowledges the previous resolution, asks the caller what's still wrong, and the ability to either reopen or create a new linked ticket.</p>
+<p><strong>Outcome:</strong> Agent reopens the ticket (with a note explaining the caller's report) or creates a fresh ticket referencing the old one.</p>
+
+<h3>UC-6: No Tickets Found for Site</h3>
+<p><strong>Trigger:</strong> Caller says "I called earlier about my lighting."</p>
+<p><strong>System finds:</strong> No tickets for the site in the relevant timeframe.</p>
+<p><strong>Agent needs:</strong> A script that politely explains nothing was found, asks clarifying questions (different site name? different phone number? when did they call?), and the ability to fall back to the normal triage intake flow.</p>
+<p><strong>Outcome:</strong> Agent either locates the ticket via broader search, or starts a fresh triage flow.</p>
+
+<h3>UC-7: Ticket From a Different Shift/Day</h3>
+<p><strong>Trigger:</strong> Caller says "Someone came out yesterday but the problem's back."</p>
+<p><strong>System finds:</strong> A ticket from 1-7 days ago, now resolved.</p>
+<p><strong>Agent needs:</strong> Context from the previous ticket (what was done) and the ability to create a follow-up or reopen.</p>
+<p><strong>Outcome:</strong> Agent creates a new ticket linked to the previous one, flagged as a recurring issue.</p>
+
+<h3>UC-8: Caller Cannot Identify Their Site</h3>
+<p><strong>Trigger:</strong> Caller says "I'm at the pub on the high street" but cannot provide a house ID or exact site name.</p>
+<p><strong>Agent needs:</strong> A search mechanism that tolerates partial/fuzzy matches and shows enough detail (address, postcode) to confirm with the caller.</p>
+<p><strong>Outcome:</strong> Agent confirms site identity, then proceeds with normal lookup.</p>
+
+<h3>UC-9: Escalation Was Auto-Routed (Timeout)</h3>
+<p><strong>Trigger:</strong> Caller says "Nobody called me back after I was promised a callback."</p>
+<p><strong>System finds:</strong> A ticket where the escalation timed out and was auto-routed.</p>
+<p><strong>Agent needs:</strong> A script that explains the request was forwarded to the relevant team, with the exact timestamp, and an action to re-escalate if no response.</p>
+<p><strong>Outcome:</strong> Agent provides transparency, re-escalates if needed.</p>
+
+<h3>UC-10: OOH Pocket Change Was Made — Caller Reporting It Reverted</h3>
+<p><strong>Trigger:</strong> Caller says "You turned my heating up earlier but it's gone cold again."</p>
+<p><strong>System finds:</strong> A ticket with a pocket change that has since auto-reverted (e.g., 4-hour window expired).</p>
+<p><strong>Agent needs:</strong> A script explaining temporary changes and their duration, plus the option to apply another pocket change or escalate for a permanent fix.</p>
+<p><strong>Outcome:</strong> Agent explains the temporary nature, applies another change or escalates.</p>
+
+<hr>
+
+<h2>3. Flow Design — Step by Step</h2>
+
+<h3>3.1 Entry Point</h3>
+
+<p>The Callback Lookup is accessible from two places:</p>
+
+<li><strong>Landing page</strong> — a dedicated "Callback / Follow-Up" card alongside the existing triage flow cards</li>
+<li><strong>During any triage flow</strong> — a "Check existing tickets" link in the data sidebar when a site is already selected</li>
+
+<h3>3.2 Step 1: Site Identification</h3>
+
+<pre style="background:#f1f5f9;padding:12px;border-radius:6px;overflow-x:auto;font-size:12px"><code>
+<p>+----------------------------------------------------------+</p>
+<table><thead><tr><th>CALLBACK / FOLLOW-UP LOOKUP</th></tr></thead><tbody><tr><td>"The caller says they've called before about an issue.</td></tr><tr><td>Let's find their site and check what's happening."</td></tr><tr></tr><tr><td>Search for site:</td></tr><tr><td>[________________________] [Search]</td></tr><tr></tr><tr><td>Search by house ID (e.g. 6360), site name</td></tr><tr><td>(e.g. Mill House), or postcode</td></tr></tbody></table>+----------------------------------------------------------+
+<p></code></pre></p>
+
+<p>This reuses the existing site search component from the landing page. On match, proceed to Step 2.</p>
+
+<p>If <strong>no match</strong>: show "No site found" message with suggestions:</p>
+<li>"Check the spelling — the caller may know it by a different name"</li>
+<li>"Ask for the house ID — it's a 4-digit number, usually on the Lighthouse box"</li>
+<li>"Ask for the postcode and try again"</li>
+<li>If still no match: "Start a fresh call intake instead" (links to normal triage)</li>
+
+<h3>3.3 Step 2: Ticket Search Results</h3>
+
+<p>Once a site is identified, the system queries Zendesk for recent tickets. The agent sees a <strong>ticket summary panel</strong> — NOT raw ticket data.</p>
+
+<pre style="background:#f1f5f9;padding:12px;border-radius:6px;overflow-x:auto;font-size:12px"><code>
+<p>+----------------------------------------------------------+</p>
+<p>|  MILL HOUSE (6360) — Recent Tickets                      |</p>
+<table><thead><tr><th>Showing IoT-related tickets from the last 14 days</th></tr></thead><tbody><tr><td>[!] 1 ACTIVE TICKET</td></tr></tbody></table>|  +------------------------------------------------------+
+<p>|  | #28401 — Heating not working (Zone 3)                |</p>
+<p>|  | Status: Being investigated by the IoT team           |</p>
+<p>|  | Last activity: 2 hours ago — "Checked ThingsBoard,   |</p>
+<p>|  |   zone valve appears stuck. Contractor referral       |</p>
+<p>|  |   being arranged."                                    |</p>
+<p>|  | [View full details]  [Add follow-up note]            |</p>
+<p>|  +------------------------------------------------------+</p>
+<p>|                                                          |</p>
+<p>|  [i] 1 RECENTLY RESOLVED                                |</p>
+<p>|  +------------------------------------------------------+</p>
+<p>|  | #28350 — External lighting not coming on             |</p>
+<p>|  | Resolved: 3 days ago — schedule was corrected        |</p>
+<p>|  | [View details]  [Report issue returned]              |</p>
+<p>|  +------------------------------------------------------+</p>
+<p>|                                                          |</p>
+<table><thead><tr><th>[ ] No other tickets in the last 14 days</th></tr></thead><tbody><tr><td>[Start new triage for this site]</td></tr></tbody></table>+----------------------------------------------------------+
+<p></code></pre></p>
+
+<p><strong>Key design rules for this panel:</strong></p>
+<li>Tickets are grouped: <strong>Active</strong> (open/pending) first, then <strong>Recently Resolved</strong> (solved in last 14 days), then <strong>Closed</strong> (older, collapsed by default)</li>
+<li>Each ticket shows a <strong>translated status</strong> (not the Zendesk status name), a <strong>translated last activity summary</strong>, and available actions</li>
+<li>Maximum of 10 tickets shown; if more exist, show "and X more — refine your search"</li>
+<li>If zero tickets found: show UC-6 flow (see Section 3.5)</li>
+
+<h3>3.4 Step 3: Ticket Detail — The Script Panel</h3>
+
+<p>When the agent clicks "View full details" on a ticket, they see the <strong>Script Panel</strong> — the core of this feature. This is NOT a raw ticket view. It is a pre-generated, caller-friendly summary.</p>
+
+<pre style="background:#f1f5f9;padding:12px;border-radius:6px;overflow-x:auto;font-size:12px"><code>
+<p>+----------------------------------------------------------+</p>
+<table><thead><tr><th>TICKET #28401 — What to Tell the Caller</th></tr></thead><tbody><tr><td>SCRIPT:</td></tr><tr><td>"I can see your issue was reported at 4:15pm today.</td></tr><tr><td>Our IoT team has been looking into it and they've</td></tr><tr><td>identified that a valve in the heating system may be</td></tr><tr><td>stuck. They're arranging for a heating contractor to</td></tr><tr><td>attend. I don't have a specific time for the visit</td></tr><tr><td>yet, but it's been flagged as urgent."</td></tr><tr></tr><tr><td>WHAT YOU CAN OFFER:</td></tr><tr><td>- "I'll add a note to the ticket that you've called</td></tr><tr><td>back so the team knows it's still an issue."</td></tr><tr><td>- "I can mark this as more urgent if the situation</td></tr><tr><td>has got worse — has anything changed?"</td></tr><tr></tr><tr><td>+---------+  +-------------+  +------------------+</td></tr><tr><td>Add note</td><td>Bump priority</td><td>Re-escalate</td></tr><tr><td>+---------+  +-------------+  +------------------+</td></tr><tr></tr><tr><td>TIMELINE:</td></tr><tr><td>16:15  Ticket created — "Heating not working Zone 3"</td></tr><tr><td>16:22  Picked up by Sam Day</td></tr><tr><td>16:45  Update — valve issue identified</td></tr><tr><td>18:30  You are here — caller rang back</td></tr></tbody></table>+----------------------------------------------------------+
+<p></code></pre></p>
+
+<p><strong>The script panel has four sections:</strong></p>
+
+<li><strong>The Script</strong> — A pre-written paragraph the agent can read verbatim to the caller. Generated from ticket status, assignment, last comment, and elapsed time. (See Section 5 for the translation layer.)</li>
+
+<li><strong>What You Can Offer</strong> — One or two bullet points the agent can proactively say. These are contextual: if the ticket is stale, offer to bump priority; if it's actively being worked, offer reassurance; if it's been escalated externally, offer to chase.</li>
+
+<li><strong>Action Buttons</strong> — The follow-up actions available for this ticket (see Section 3.6).</li>
+
+<li><strong>Timeline</strong> — A simplified, translated timeline of the ticket's life. NOT raw Zendesk comments. Each entry is a single line in plain English. Internal technical notes are summarised, not shown verbatim.</li>
+
+<h3>3.5 Zero Tickets Found (UC-6)</h3>
+
+<pre style="background:#f1f5f9;padding:12px;border-radius:6px;overflow-x:auto;font-size:12px"><code>
+<p>+----------------------------------------------------------+</p>
+<table><thead><tr><th>MILL HOUSE (6360) — No Recent Tickets</th></tr></thead><tbody><tr><td>There are no IoT-related tickets for this site in the</td></tr><tr><td>last 14 days.</td></tr><tr></tr><tr><td>WHAT TO ASK THE CALLER:</td></tr><tr><td>- "When did you call? Was it today or a different day?"</td></tr><tr><td>- "Do you know the site's four-digit house number?"</td></tr><tr><td>- "Could the call have been about a different site?"</td></tr><tr></tr><tr><td>[Search wider (last 30 days)]</td></tr><tr><td>[Search by caller phone number]</td></tr><tr><td>[Start fresh triage for this site]</td></tr></tbody></table>+----------------------------------------------------------+
+<p></code></pre></p>
+
+<h3>3.6 Follow-Up Actions</h3>
+
+<p>Each action is a single-click operation with a confirmation step. The agent never writes free-form Zendesk comments — the system composes them.</p>
+
+<h4>Action 1: Add Follow-Up Note</h4>
+<li>Agent clicks "Add note"</li>
+<li>System shows a pre-composed comment: "Caller rang back at [time] asking for an update on this issue. Agent: [name]."</li>
+<li>Agent can optionally add context from a dropdown: "Situation has worsened" / "Caller is frustrated" / "Contractor hasn't arrived" / "Issue has partially improved" / "Caller wants a specific callback time"</li>
+<li>System posts the comment to Zendesk as an internal note (not public)</li>
+<li>Comment is prefixed with <code style="background:#f1f5f9;padding:2px 6px;border-radius:3px;font-size:12px">[OOH CALLBACK]</code> for IoT team visibility</li>
+
+<h4>Action 2: Bump Priority</h4>
+<li>Available when ticket is not already urgent priority</li>
+<li>Agent clicks "Bump priority"</li>
+<li>System shows: "This will raise the priority from [current] to [next level]. The IoT team will see this flagged when they next check."</li>
+<li>Agent confirms</li>
+<li>System updates ticket priority in Zendesk and adds internal note: "[OOH CALLBACK] Priority raised from [old] to [new] — caller reported situation unchanged/worsened at [time]."</li>
+
+<h4>Action 3: Re-Escalate</h4>
+<li>Available when ticket is in an escalation or stale state</li>
+<li>Agent clicks "Re-escalate"</li>
+<li>Enters the existing escalation flow (holding script, CTA, modal, submit) — pre-populated with context from the existing ticket</li>
+<li>Existing ticket is updated with a note linking to the new escalation</li>
+
+<h4>Action 4: Report Issue Returned (for resolved tickets only)</h4>
+<li>Agent clicks "Report issue returned"</li>
+<li>System asks: "Is this the same problem coming back, or a new/different issue?"</li>
+<p>  - <strong>Same problem:</strong> System reopens the original ticket (changes status back to "Investigating"), adds note: "[OOH CALLBACK] Caller reports issue has returned at [time]. Original resolution: [summary]. Reopening for IoT review."</p>
+<p>  - <strong>New/different issue:</strong> System starts a fresh triage flow, pre-populated with the site, and adds a link to the previous ticket in the new ticket's description.</p>
+
+<hr>
+
+<h2>4. Zendesk API Integration Points</h2>
+
+<h3>4.1 Ticket Search by Site</h3>
+
+<p><strong>Endpoint:</strong> <code style="background:#f1f5f9;padding:2px 6px;border-radius:3px;font-size:12px">GET /api/v2/search.json</code></p>
+
+<p><strong>Query construction:</strong></p>
+<pre style="background:#f1f5f9;padding:12px;border-radius:6px;overflow-x:auto;font-size:12px"><code>
+<p>type:ticket custom_field_11405878329244:{site_tag_value} created>{14_days_ago}</p>
+<p></code></pre></p>
+
+<p>The Site field (ID <code style="background:#f1f5f9;padding:2px 6px;border-radius:3px;font-size:12px">11405878329244</code>) is a tagger dropdown. Each site has a tag value (typically the house ID or a slug). The search uses this to find all tickets for the site.</p>
+
+<p><strong>Fallback search</strong> (if site field is not set on older tickets):</p>
+<pre style="background:#f1f5f9;padding:12px;border-radius:6px;overflow-x:auto;font-size:12px"><code>
+<p>type:ticket tags:{house_id} created>{14_days_ago}</p>
+<p></code></pre></p>
+
+<p><strong>Wider search</strong> (UC-6 — 30 days):</p>
+<pre style="background:#f1f5f9;padding:12px;border-radius:6px;overflow-x:auto;font-size:12px"><code>
+<p>type:ticket custom_field_11405878329244:{site_tag_value} created>{30_days_ago}</p>
+<p></code></pre></p>
+
+<p><strong>Response fields needed:</strong></p>
+<li><code style="background:#f1f5f9;padding:2px 6px;border-radius:3px;font-size:12px">id</code>, <code style="background:#f1f5f9;padding:2px 6px;border-radius:3px;font-size:12px">subject</code>, <code style="background:#f1f5f9;padding:2px 6px;border-radius:3px;font-size:12px">status</code>, <code style="background:#f1f5f9;padding:2px 6px;border-radius:3px;font-size:12px">custom_status_id</code>, <code style="background:#f1f5f9;padding:2px 6px;border-radius:3px;font-size:12px">priority</code>, <code style="background:#f1f5f9;padding:2px 6px;border-radius:3px;font-size:12px">assignee_id</code>, <code style="background:#f1f5f9;padding:2px 6px;border-radius:3px;font-size:12px">requester_id</code>, <code style="background:#f1f5f9;padding:2px 6px;border-radius:3px;font-size:12px">created_at</code>, <code style="background:#f1f5f9;padding:2px 6px;border-radius:3px;font-size:12px">updated_at</code>, <code style="background:#f1f5f9;padding:2px 6px;border-radius:3px;font-size:12px">custom_fields</code></li>
+
+<h3>4.2 Ticket Comments (for Timeline & Latest Activity)</h3>
+
+<p><strong>Endpoint:</strong> <code style="background:#f1f5f9;padding:2px 6px;border-radius:3px;font-size:12px">GET /api/v2/tickets/{id}/comments.json</code></p>
+
+<p>Already implemented in <code style="background:#f1f5f9;padding:2px 6px;border-radius:3px;font-size:12px">server.js</code> at line 131.</p>
+
+<p><strong>Response fields needed:</strong></p>
+<li><code style="background:#f1f5f9;padding:2px 6px;border-radius:3px;font-size:12px">id</code>, <code style="background:#f1f5f9;padding:2px 6px;border-radius:3px;font-size:12px">body</code>, <code style="background:#f1f5f9;padding:2px 6px;border-radius:3px;font-size:12px">author_id</code>, <code style="background:#f1f5f9;padding:2px 6px;border-radius:3px;font-size:12px">created_at</code>, <code style="background:#f1f5f9;padding:2px 6px;border-radius:3px;font-size:12px">public</code> (boolean — public vs internal note)</li>
+
+<p><strong>Processing:</strong></p>
+<li>Comments are fetched for each active ticket shown in the results panel</li>
+<li>Only the latest 5 comments are loaded initially (pagination parameter: <code style="background:#f1f5f9;padding:2px 6px;border-radius:3px;font-size:12px">per_page=5&sort_order=desc</code>)</li>
+<li>Comments are passed through the translation layer (Section 5) before display</li>
+
+<h3>4.3 User Lookup (for Assignee Names)</h3>
+
+<p><strong>Endpoint:</strong> <code style="background:#f1f5f9;padding:2px 6px;border-radius:3px;font-size:12px">GET /api/v2/users/{id}.json</code></p>
+
+<p>Needed to translate <code style="background:#f1f5f9;padding:2px 6px;border-radius:3px;font-size:12px">assignee_id</code> into a human name for the script. The server should cache user lookups in memory (the IoT team is only ~5 people).</p>
+
+<p><strong>Known IoT team members</strong> (from CLAUDE.md):</p>
+<table><thead><tr><th>Name</th><th>Role</th></tr></thead><tbody><tr><td>Sam Day</td><td>Team Lead</td></tr><tr><td>Csaba Jakab (CJ)</td><td>Support Manager/Engineer</td></tr><tr><td>Tony Willetts</td><td>Support Manager/Engineer</td></tr><tr><td>Meg Mcsevney</td><td>Admin Support</td></tr></tbody></table>
+<p>These can be hardcoded as a fallback mapping in <code style="background:#f1f5f9;padding:2px 6px;border-radius:3px;font-size:12px">data/team-members.json</code> so the translation layer works even if the Zendesk user API is slow.</p>
+
+<h3>4.4 Ticket Update (for Follow-Up Actions)</h3>
+
+<p><strong>Endpoint:</strong> <code style="background:#f1f5f9;padding:2px 6px;border-radius:3px;font-size:12px">PUT /api/v2/tickets/{id}.json</code></p>
+
+<p>Already implemented in <code style="background:#f1f5f9;padding:2px 6px;border-radius:3px;font-size:12px">server.js</code> at line 101.</p>
+
+<p><strong>Payloads for each action:</strong></p>
+
+<p><strong>Add follow-up note:</strong></p>
+<pre style="background:#f1f5f9;padding:12px;border-radius:6px;overflow-x:auto;font-size:12px"><code>json
+<p>{</p>
+<p>  "ticket": {</p>
+<p>    "comment": {</p>
+<p>      "body": "[OOH CALLBACK] Caller rang back at 18:30 asking for update. Context: Situation has worsened. Agent: Kellie.",</p>
+<p>      "public": false</p>
+<p>    }</p>
+<p>  }</p>
+<p>}</p>
+<p></code></pre></p>
+
+<p><strong>Bump priority:</strong></p>
+<pre style="background:#f1f5f9;padding:12px;border-radius:6px;overflow-x:auto;font-size:12px"><code>json
+<p>{</p>
+<p>  "ticket": {</p>
+<p>    "priority": "high",</p>
+<p>    "comment": {</p>
+<p>      "body": "[OOH CALLBACK] Priority raised from normal to high — caller reported situation worsened at 18:30.",</p>
+<p>      "public": false</p>
+<p>    }</p>
+<p>  }</p>
+<p>}</p>
+<p></code></pre></p>
+
+<p><strong>Reopen resolved ticket:</strong></p>
+<pre style="background:#f1f5f9;padding:12px;border-radius:6px;overflow-x:auto;font-size:12px"><code>json
+<p>{</p>
+<p>  "ticket": {</p>
+<p>    "status": "open",</p>
+<p>    "custom_status_id": 25999053444508,</p>
+<p>    "comment": {</p>
+<p>      "body": "[OOH CALLBACK] Caller reports issue has returned at 18:30. Original resolution: schedule corrected 3 days ago. Reopening for IoT review.",</p>
+<p>      "public": false</p>
+<p>    }</p>
+<p>  }</p>
+<p>}</p>
+<p></code></pre></p>
+
+<h3>4.5 New API Route Needed: Callback Lookup</h3>
+
+<p>The server needs one new composite endpoint that orchestrates the search-and-enrich flow:</p>
+
+<p><strong><code style="background:#f1f5f9;padding:2px 6px;border-radius:3px;font-size:12px">GET /api/zendesk/callback-lookup?site={tag_value}&days=14</code></strong></p>
+
+<p>This endpoint:</p>
+<li>Searches Zendesk for tickets matching the site within the date range</li>
+<li>For each ticket found, fetches the latest 3 comments</li>
+<li>Resolves assignee IDs to names (from cache or API)</li>
+<li>Returns the enriched result set to the frontend</li>
+
+<p>This avoids multiple sequential API calls from the browser and keeps the translation logic server-side where it belongs.</p>
+
+<p><strong>Response shape:</strong></p>
+<pre style="background:#f1f5f9;padding:12px;border-radius:6px;overflow-x:auto;font-size:12px"><code>json
+<p>{</p>
+<p>  "site": { "name": "Mill House", "houseId": "6360" },</p>
+<p>  "tickets": {</p>
+<p>    "active": [</p>
+<p>      {</p>
+<p>        "id": 28401,</p>
+<p>        "subject": "Heating not working (Zone 3)",</p>
+<p>        "status": { "raw": "open", "customStatusId": 25999053444508, "translated": "Being investigated by the IoT team" },</p>
+<p>        "priority": { "raw": "high", "translated": "Flagged as urgent" },</p>
+<p>        "assignee": { "id": 12345, "name": "Sam Day", "role": "Team Lead" },</p>
+<p>        "created": "2026-03-28T16:15:00Z",</p>
+<p>        "updated": "2026-03-28T16:45:00Z",</p>
+<p>        "latestActivity": {</p>
+<p>          "summary": "Checked ThingsBoard, zone valve appears stuck. Contractor referral being arranged.",</p>
+<p>          "translatedSummary": "Our team has identified a valve issue and is arranging a contractor visit.",</p>
+<p>          "timestamp": "2026-03-28T16:45:00Z",</p>
+<p>          "author": "Sam Day"</p>
+<p>        },</p>
+<p>        "timeline": [</p>
+<p>          { "time": "16:15", "event": "Ticket created", "detail": "Heating not working Zone 3" },</p>
+<p>          { "time": "16:22", "event": "Picked up by Sam Day", "detail": null },</p>
+<p>          { "time": "16:45", "event": "Investigation update", "detail": "Valve issue identified, contractor being arranged" }</p>
+<p>        ],</p>
+<p>        "script": "I can see your issue was reported at 4:15pm today. Our IoT team has been looking into it and they've identified that a valve in the heating system may be stuck. They're arranging for a heating contractor to attend. I don't have a specific time for the visit yet, but it's been flagged as urgent.",</p>
+<p>        "offers": [</p>
+<p>          "I'll add a note to the ticket that you've called back so the team knows it's still an issue.",</p>
+<p>          "I can mark this as more urgent if the situation has got worse — has anything changed?"</p>
+<p>        ],</p>
+<p>        "actions": ["addNote", "bumpPriority", "reEscalate"]</p>
+<p>      }</p>
+<p>    ],</p>
+<p>    "resolved": [],</p>
+<p>    "closed": []</p>
+<p>  },</p>
+<p>  "searchDays": 14</p>
+<p>}</p>
+<p></code></pre></p>
+
+<hr>
+
+<h2>5. The Translation Layer</h2>
+
+<p>This is the most critical component of the feature. It converts raw Zendesk data into language a non-technical OOH agent can read to a caller.</p>
+
+<h3>5.1 Status Translation</h3>
+
+<p>Every Zendesk custom status maps to a plain English phrase for the agent AND a separate phrase for the caller.</p>
+
+<table><thead><tr><th>Custom Status ID</th><th>Zendesk Name</th><th>Agent Sees</th><th>Caller Script Phrase</th></tr></thead><tbody><tr><td>11404223315612</td><td>New</td><td>Just received — not yet picked up</td><td>"Your issue has been logged and our team will be picking it up shortly."</td></tr><tr><td>25999053375260</td><td>Triage</td><td>Being assessed by the IoT team</td><td>"Your issue has been received and our team is working out the best way to resolve it."</td></tr><tr><td>25999053444508</td><td>Investigating</td><td>Being actively investigated</td><td>"Our team is actively looking into this right now."</td></tr><tr><td>25999037104284</td><td>Monitoring</td><td>Being monitored — waiting to see if it settles</td><td>"Our team has made some changes and is monitoring the situation to make sure it's resolved."</td></tr><tr><td>25999056203932</td><td>Awaiting Remote Fix</td><td>A remote fix is being applied</td><td>"Our team is applying a fix remotely — this should take effect shortly."</td></tr><tr><td>25999081452188</td><td>Awaiting Customer Action</td><td>Waiting for the site to do something</td><td>"We're waiting for someone on site to [action]. Has that been done?"</td></tr><tr><td>25999056357276</td><td>Follow Up Check</td><td>Scheduled for a follow-up check</td><td>"This is scheduled for a follow-up check by our team."</td></tr><tr><td>25999056432284</td><td>Escalated to EM</td><td>Escalated to the engineering manager</td><td>"This has been escalated to our senior team for action."</td></tr><tr><td>25999081650076</td><td>Sent to Repairs Admin</td><td>Passed to the repair contractor</td><td>"This has been referred to the maintenance contractor. They should be in touch to arrange a visit."</td></tr><tr><td>25999081709724</td><td>Sent to Network</td><td>Passed to the network engineering team</td><td>"This has been referred to our specialist engineering team for investigation."</td></tr><tr><td>25999056633884</td><td>Awaiting GK Repair</td><td>Waiting for GK's repair contractor to attend</td><td>"A repair contractor has been notified. They should be in touch to arrange a visit."</td></tr><tr><td>25999056690332</td><td>Post-Repair LH Check</td><td>Repair done — our team needs to re-check</td><td>"The contractor has been out and our team just needs to do a final check on our system."</td></tr><tr><td>25999067648796</td><td>Escalation Query</td><td>Query raised during escalation</td><td>"There's a query being resolved before this can proceed — our team is on it."</td></tr><tr><td>25999081991196</td><td>Escalation Overdue</td><td>Escalation is overdue — being chased</td><td>"This escalation is being chased — our team is following up."</td></tr><tr><td>25999082641308</td><td>Resolved</td><td>Resolved</td><td>"This was marked as resolved [time ago]. Is it still causing problems?"</td></tr><tr><td>25999068372252</td><td>Done</td><td>Completed and closed</td><td>"This was completed and closed [time ago]."</td></tr><tr><td>25999038553244</td><td>Closed</td><td>Closed</td><td>"This ticket has been closed."</td></tr><tr><td>26381319932188</td><td>Customer Replied</td><td>Caller has replied — being reviewed</td><td>"Your message has been received and our team will review it."</td></tr></tbody></table>
+<p><strong>For statuses in the <code style="background:#f1f5f9;padding:2px 6px;border-radius:3px;font-size:12px">newdemand</code> swimlane</strong> (15-22: Scoping through Benefits Monitoring): these are project/install tickets, not reactive issues. If found:</p>
+<li>Agent sees: "This is a planned project, not a reactive issue"</li>
+<li>Caller script: "This is part of a planned installation or upgrade for your site. For updates on this, you'd need to speak to the project team during office hours."</li>
+
+<h3>5.2 Assignment Translation</h3>
+
+<table><thead><tr><th>Assignee State</th><th>Agent Sees</th><th>Caller Script Phrase</th></tr></thead><tbody><tr><td>Assigned to known team member</td><td>"Assigned to [Name]"</td><td>"One of our team, [first name], is handling this."</td></tr><tr><td>Assigned to unknown user</td><td>"Assigned to an IoT team member"</td><td>"One of our team is handling this."</td></tr><tr><td>Unassigned, status is New/Triage</td><td>"Not yet assigned"</td><td>"Your issue has been logged and will be assigned to someone on the team shortly."</td></tr><tr><td>Unassigned, status is Investigating+</td><td>"Not currently assigned — may need attention"</td><td>"I can see this one doesn't have a specific person assigned at the moment. Let me flag it so someone picks it up."</td></tr></tbody></table>
+<h3>5.3 Time Elapsed Translation</h3>
+
+<p>The script needs to express time in human-friendly terms:</p>
+
+<table><thead><tr><th>Elapsed Time</th><th>Phrase</th></tr></thead><tbody><tr><td>< 30 minutes</td><td>"just now" / "a few minutes ago"</td></tr><tr><td>30 min - 2 hours</td><td>"[N] minutes ago" / "about an hour ago"</td></tr><tr><td>2 - 6 hours</td><td>"a couple of hours ago" / "earlier today"</td></tr><tr><td>6 - 12 hours</td><td>"earlier today"</td></tr><tr><td>12 - 24 hours</td><td>"last night" / "this morning" (context-dependent)</td></tr><tr><td>1 - 2 days</td><td>"yesterday"</td></tr><tr><td>3 - 7 days</td><td>"a few days ago" / "earlier this week"</td></tr><tr><td>7 - 14 days</td><td>"last week" / "about a week ago"</td></tr></tbody></table>
+<h3>5.4 Comment Translation Rules</h3>
+
+<p>Raw Zendesk comments from the IoT team contain technical language. The translation layer applies these rules:</p>
+
+<p><strong>Rule 1: Strip technical references.</strong> Replace platform names with generic terms:</p>
+<li>"ThingsBoard" / "TB" -> "our monitoring system"</li>
+<li>"Tuya" / "Lighthouse" / "LH" -> "our control system"</li>
+<li>"Salus" -> "the thermostat system"</li>
+<li>"Dragino" / "gateway" / "R10a" -> "the site's communication box"</li>
+<li>"Tongou" / "power pause" -> "the power control unit"</li>
+<li>"Contactor" -> "the power control unit"</li>
+
+<p><strong>Rule 2: Summarise, don't echo.</strong> Long technical comments are reduced to one sentence:</p>
+<li>"Checked TB telemetry for zone 3, flow temp showing 22C but setpoint is 24C, zone valve relay not switching. Likely stuck valve — need contractor." -> "A valve issue has been identified and a contractor visit is being arranged."</li>
+
+<p><strong>Rule 3: Extract the actionable outcome.</strong> Every comment is reduced to: what was found + what happens next.</p>
+
+<p><strong>Rule 4: Handle automated/system comments.</strong> Zendesk trigger-generated comments (e.g., "This ticket was auto-assigned to...") are translated to timeline events, not shown as activity.</p>
+
+<p><strong>Rule 5: Pocket change comments.</strong> Comments containing <code style="background:#f1f5f9;padding:2px 6px;border-radius:3px;font-size:12px">[OOH POCKET CHANGE]</code> or <code style="background:#f1f5f9;padding:2px 6px;border-radius:3px;font-size:12px">[TRG]</code> are translated:</p>
+<li>"[OOH POCKET CHANGE] Setpoint raised from 20C to 22C at 18:45" -> "The heating was turned up remotely at 6:45pm."</li>
+<li>"[TRG] Triage completed — site guided to check fuse board" -> "The agent guided the site to check their fuse board."</li>
+
+<p><strong>Implementation approach:</strong> The translation layer will use pattern matching (regex) for known comment formats and a set of keyword-to-plain-English replacement rules. This is NOT AI/LLM-powered at runtime — it is a deterministic rule engine. Comments that cannot be confidently translated get a fallback: "Our team posted an update — the detail is technical. The key point is: [status translation]."</p>
+
+<h3>5.5 Script Generation</h3>
+
+<p>The caller script is assembled from template fragments based on the ticket state:</p>
+
+<pre style="background:#f1f5f9;padding:12px;border-radius:6px;overflow-x:auto;font-size:12px"><code>
+<p>TEMPLATE: callback_active_assigned_recent</p>
+<p>"I can see your issue was reported at {created_time_friendly}.</p>
+<p>{assignee_phrase}</p>
+<p>{latest_activity_translated}</p>
+<p>{next_step_phrase}"</p>
+<p></code></pre></p>
+
+<p><strong>Template selection logic:</strong></p>
+
+<table><thead><tr><th>Condition</th><th>Template</th></tr></thead><tbody><tr><td>Active + assigned + updated < 4hrs</td><td><code style="background:#f1f5f9;padding:2px 6px;border-radius:3px;font-size:12px">callback_active_assigned_recent</code></td></tr><tr><td>Active + assigned + updated > 4hrs</td><td><code style="background:#f1f5f9;padding:2px 6px;border-radius:3px;font-size:12px">callback_active_assigned_stale</code></td></tr><tr><td>Active + unassigned</td><td><code style="background:#f1f5f9;padding:2px 6px;border-radius:3px;font-size:12px">callback_active_unassigned</code></td></tr><tr><td>Active + escalated externally</td><td><code style="background:#f1f5f9;padding:2px 6px;border-radius:3px;font-size:12px">callback_escalated_external</code></td></tr><tr><td>Active + escalation overdue</td><td><code style="background:#f1f5f9;padding:2px 6px;border-radius:3px;font-size:12px">callback_escalation_overdue</code></td></tr><tr><td>Resolved < 7 days ago</td><td><code style="background:#f1f5f9;padding:2px 6px;border-radius:3px;font-size:12px">callback_recently_resolved</code></td></tr><tr><td>Resolved > 7 days ago</td><td><code style="background:#f1f5f9;padding:2px 6px;border-radius:3px;font-size:12px">callback_old_resolved</code></td></tr><tr><td>No tickets found</td><td><code style="background:#f1f5f9;padding:2px 6px;border-radius:3px;font-size:12px">callback_not_found</code></td></tr><tr><td>Pocket change auto-reverted</td><td><code style="background:#f1f5f9;padding:2px 6px;border-radius:3px;font-size:12px">callback_pocket_change_reverted</code></td></tr></tbody></table>
+<h3>5.6 "What You Can Offer" Logic</h3>
+
+<p>The offers shown to the agent depend on ticket state:</p>
+
+<table><thead><tr><th>Ticket State</th><th>Offers</th></tr></thead><tbody><tr><td>Active, recently updated</td><td>"I'll add a note..."</td></tr><tr><td>Active, stale (no update > 4hrs during business hours, > 1hr during OOH)</td><td>"I'll add a note..." + "I can raise the urgency..."</td></tr><tr><td>Active, unassigned</td><td>"I'll flag this for immediate attention..." + "I can raise the urgency..."</td></tr><tr><td>Escalated externally</td><td>"I'll chase this up..."</td></tr><tr><td>Escalation overdue</td><td>"I'll re-escalate this..."</td></tr><tr><td>Resolved, caller disagrees</td><td>"I can reopen this..." + "Or I can log a new issue..."</td></tr><tr><td>Pocket change reverted</td><td>"I can apply the same change again..." + "Or I can escalate for a permanent fix..."</td></tr></tbody></table>
+<hr>
+
+<h2>6. Mock Scripts — What the Agent Actually Says</h2>
+
+<h3>Script 1: Active ticket, being investigated (UC-1)</h3>
+
+<blockquote style="border-left:3px solid #3b82f6;padding:8px 16px;margin:12px 0;background:#eff6ff;font-style:italic;color:#1e40af">"Hi, I can see your issue was reported at about quarter past four today. One of our team, Sam, has been looking into it and it looks like they've found a problem with a valve in the heating system. They're arranging for a heating contractor to come out. I don't have a specific time for the visit yet, but it's been flagged as urgent. I'll add a note to the ticket now that you've called back, so the team knows you're still waiting."</blockquote>
+
+<h3>Script 2: Ticket sent to external contractor (UC-2)</h3>
+
+<blockquote style="border-left:3px solid #3b82f6;padding:8px 16px;margin:12px 0;background:#eff6ff;font-style:italic;color:#1e40af">"I can see this was reported yesterday and it's been referred to the maintenance contractor for a visit. Our records show that went across yesterday evening. I don't have visibility of the contractor's schedule, but they should be in touch with you to arrange a time. Would you like me to flag this as urgent so our team chases it up first thing tomorrow?"</blockquote>
+
+<h3>Script 3: Stale ticket, no progress (UC-3)</h3>
+
+<blockquote style="border-left:3px solid #3b82f6;padding:8px 16px;margin:12px 0;background:#eff6ff;font-style:italic;color:#1e40af">"I can see your issue was reported at about half six this evening. It looks like it hasn't been picked up by the team yet — I'm sorry about that. Let me raise the urgency on this now so it gets attention. I'll also add a note that you've called back. Is the situation the same as when you first called, or has anything changed?"</blockquote>
+
+<h3>Script 4: Resolved but caller says it's back (UC-5)</h3>
+
+<blockquote style="border-left:3px solid #3b82f6;padding:8px 16px;margin:12px 0;background:#eff6ff;font-style:italic;color:#1e40af">"I can see there was an issue with your external lighting that was resolved a few days ago — it looks like the schedule was corrected. Are you saying the same problem has come back? ... OK, let me reopen that ticket and add a note that the problem has returned. Our team will see this flagged first thing and they'll take another look."</blockquote>
+
+<h3>Script 5: No tickets found (UC-6)</h3>
+
+<blockquote style="border-left:3px solid #3b82f6;padding:8px 16px;margin:12px 0;background:#eff6ff;font-style:italic;color:#1e40af">"I've had a look and I can't find a recent ticket for your site. Can I just check a few things with you — do you know the four-digit house number for your site? It's usually on a sticker on the Lighthouse box. ... And when did you call — was it today? ... OK, let me search a bit wider. [If still nothing:] I can't find a matching record, but what I'll do is log a fresh ticket for you now and we'll get it picked up. Can you tell me what the issue is?"</blockquote>
+
+<h3>Script 6: Pocket change reverted (UC-10)</h3>
+
+<blockquote style="border-left:3px solid #3b82f6;padding:8px 16px;margin:12px 0;background:#eff6ff;font-style:italic;color:#1e40af">"I can see that one of our agents turned your heating up to 22 degrees at about quarter to seven earlier this evening. That was a temporary change that lasts for a few hours to give you immediate relief. It will have switched back to the normal setting now. I can apply the same change again for you right now, or if this is an ongoing problem, I can escalate it to our team to look at a permanent adjustment. What would you prefer?"</blockquote>
+
+<h3>Script 7: Multiple tickets (UC-4)</h3>
+
+<blockquote style="border-left:3px solid #3b82f6;padding:8px 16px;margin:12px 0;background:#eff6ff;font-style:italic;color:#1e40af">"I can see there are two open issues for your site at the moment. One is about the heating in Zone 3, reported today — and the other is about your fryers, reported yesterday. Which one are you calling about? ... The fryers? OK, let me pull up the details on that one."</blockquote>
+
+<hr>
+
+<h2>7. Edge Cases and How to Handle Them</h2>
+
+<h3>E-1: Ticket exists but for a different issue than the caller describes</h3>
+<p><strong>Handling:</strong> The ticket summary panel shows the subject line. If the caller describes something different, the agent should confirm: "I can see a ticket about [subject] — is that the one you mean, or is this a different issue?" If different, start fresh triage.</p>
+
+<h3>E-2: Ticket was created by a different caller at the same site</h3>
+<p><strong>Handling:</strong> Not a problem — tickets are looked up by site, not by caller. The agent can see who reported it (requester name) and confirm with the current caller.</p>
+
+<h3>E-3: Site has 10+ tickets in the timeframe (chronic site)</h3>
+<p><strong>Handling:</strong> Show the first 10 sorted by most recent, with active tickets always on top. Show a "This site has [N] tickets in the last 14 days" warning banner. The agent should focus on active tickets and ask the caller to describe which issue they mean.</p>
+
+<h3>E-4: Ticket is in a "newdemand" swimlane status (project, not reactive)</h3>
+<p><strong>Handling:</strong> These are filtered OUT of the callback results by default. They are not OOH-relevant. If the caller specifically asks about a planned installation, the agent sees: "This is part of a planned project — for updates, the caller should contact the project team during office hours."</p>
+
+<h3>E-5: Caller provides a Zendesk ticket number</h3>
+<p><strong>Handling:</strong> If the agent has a ticket number, bypass site search entirely. Provide a "Search by ticket number" input on the callback lookup screen. Direct lookup via <code style="background:#f1f5f9;padding:2px 6px;border-radius:3px;font-size:12px">GET /api/zendesk/tickets/{id}.json</code>.</p>
+
+<h3>E-6: Zendesk API is slow or down</h3>
+<p><strong>Handling:</strong> Show a loading state with "Searching for tickets..." for up to 15 seconds. If timeout: "I'm having trouble pulling up the records at the moment. Let me take your details and I'll make sure someone calls you back." Fall back to manual note-taking mode.</p>
+
+<h3>E-7: Ticket has no comments (only the initial description)</h3>
+<p><strong>Handling:</strong> Latest activity becomes: "No updates yet since the ticket was created." Script adjusts: "Your issue was logged at [time] but I don't have any updates on progress yet. Let me flag this for attention."</p>
+
+<h3>E-8: Caller wants a specific callback time</h3>
+<p><strong>Handling:</strong> The "Add note" action includes a dropdown option "Caller wants a specific callback time." If selected, a time picker appears. The note posted to Zendesk includes: "[OOH CALLBACK] Caller requested callback at [time] on [date]." The follow-up date field (ID <code style="background:#f1f5f9;padding:2px 6px;border-radius:3px;font-size:12px">26074112194076</code>) is updated to the requested date.</p>
+
+<h3>E-9: Weekend ticket — IoT team won't see it until Monday</h3>
+<p><strong>Handling:</strong> The script template detects if the next business day is > 1 day away. Adjusts language: "Our team will pick this up first thing on Monday morning" instead of "first thing tomorrow."</p>
+
+<h3>E-10: Ticket was auto-closed by Zendesk automation</h3>
+<p><strong>Handling:</strong> If ticket is "Closed" (terminal), the reopen action is not available (Zendesk does not allow reopening closed tickets). Instead, "Report issue returned" creates a new ticket with a reference: "Follow-up to #[old_id]."</p>
+
+<hr>
+
+<h2>8. Data Flow Diagram</h2>
+
+<pre style="background:#f1f5f9;padding:12px;border-radius:6px;overflow-x:auto;font-size:12px"><code>
+<p>CALLER</p>
+<p>  |</p>
+<p>  v</p>
+<p>OOH AGENT (browser)</p>
+<p>  |</p>
+<p>  | 1. Agent enters site name/house ID</p>
+<p>  v</p>
+<p>FRONTEND (ooh.js)</p>
+<p>  |</p>
+<p>  | 2. GET /api/zendesk/callback-lookup?site={tag}&days=14</p>
+<p>  v</p>
+<p>SERVER (server.js)</p>
+<p>  |</p>
+<p>  | 3a. GET /api/v2/search.json?query=type:ticket+custom_field_11405878329244:{tag}+created>{date}</p>
+<p>  | 3b. For each ticket: GET /api/v2/tickets/{id}/comments.json?per_page=5&sort_order=desc</p>
+<p>  | 3c. Resolve assignee IDs from cache or GET /api/v2/users/{id}.json</p>
+<p>  |</p>
+<p>  v</p>
+<p>TRANSLATION LAYER (server-side, services/callback-translator.js)</p>
+<p>  |</p>
+<p>  | 4. Apply status translation</p>
+<p>  | 5. Apply comment translation (pattern matching + keyword replacement)</p>
+<p>  | 6. Generate script from template</p>
+<p>  | 7. Determine available actions and offers</p>
+<p>  |</p>
+<p>  v</p>
+<p>ENRICHED RESPONSE -> FRONTEND</p>
+<p>  |</p>
+<p>  | 8. Render ticket summary panel</p>
+<p>  | 9. Render script panel on ticket selection</p>
+<p>  v</p>
+<p>AGENT READS SCRIPT TO CALLER</p>
+<p>  |</p>
+<p>  | 10. Agent takes action (add note / bump priority / re-escalate / reopen)</p>
+<p>  v</p>
+<p>FRONTEND -> SERVER -> ZENDESK API (PUT /tickets/{id}.json)</p>
+<p></code></pre></p>
+
+<hr>
+
+<h2>9. File Structure (Proposed)</h2>
+
+<pre style="background:#f1f5f9;padding:12px;border-radius:6px;overflow-x:auto;font-size:12px"><code>
+<p>ooh-triage-dashboard/</p>
+<p>├── services/</p>
+<p>│   └── callback-translator.js    <- NEW: translation layer (status, comments, scripts)</p>
+<p>├── data/</p>
+<p>│   ├── team-members.json         <- NEW: IoT team member names/roles for assignment translation</p>
+<p>│   ├── status-translations.json  <- NEW: custom_status_id -> plain English mapping</p>
+<p>│   └── script-templates.json     <- NEW: script template fragments</p>
+<p>├── public/</p>
+<p>│   └── js/</p>
+<p>│       └── ooh.js                <- MODIFIED: add callback lookup UI flow</p>
+<p>├── server.js                     <- MODIFIED: add /api/zendesk/callback-lookup route</p>
+<p></code></pre></p>
+
+<hr>
+
+<h2>10. Decisions (Confirmed 2026-03-28)</h2>
+
+<h3>Must-Answer — All Answered</h3>
+
+<li><strong>Comment translation:</strong> Deterministic rule engine for now. LLM-powered summarisation to be explored later as part of broader AI integration initiative (see Section 12).</li>
+
+<li><strong>Reopen vs new ticket:</strong> Always create a <strong>new ticket</strong>, but the flow must include agent selection of the linked/related ticket, and ensure tickets are linked/merged as they push through to the BAU IoT Support Dashboard.</li>
+
+<li><strong>Priority bump levels:</strong> P2+ bumps to P1 with WhatsApp to escalation manager. Already P1 → <strong>automated phone call</strong> to escalation manager (see Section 11: Escalation Manager Alerting).</li>
+
+<li><strong>Callback lookup timeframe:</strong> Default to <strong>7 days</strong>. If 0 results, automatic secondary lookup for <strong>30 days</strong>. Always a new ticket if over 30 days.</li>
+
+<li><strong>Ticket filtering:</strong> Do NOT filter out non-IoT tickets at OOH stage. If unclear or unrelated but there's history, default position = escalate to IoT team (not P1) so they can investigate and merge/cleanse.</li>
+
+<li><strong>Newdemand tickets:</strong> YES — include them. Install/newdemand tickets could be causing disruption. Additional routing layer needed at IoT support level to pass to install team. Need to reference site schedules and engineer contacts (or proxy via scheduling team at greeneking@networkcatering email).</li>
+
+<h3>Nice to Decide — Answered</h3>
+
+<li><strong>Caller phone number search:</strong> Defer to later version.</li>
+
+<li><strong>Repeat caller badge:</strong> Mark it up visually, but personalised script/options for repeat caller scenario deferred to later.</li>
+
+<li><strong>Read-only mode:</strong> Read is fine. Do not change/write in prototype mode.</li>
+
+<li><strong>OOH agent name:</strong> Proper EntraID login to be designed when moving to production. Applies to both OOH Triage and IoT Support Dashboard.</li>
+
+<hr>
+
+<h2>11. Escalation Manager Alerting (New Requirement)</h2>
+
+<p><strong>This applies globally — not just to callback lookup.</strong></p>
+
+<p>When a ticket is bumped to P1 (or is already P1 and being chased):</p>
+
+<h3>Scenario A: Ticket bumped from P2+ to P1</h3>
+<li>WhatsApp message to escalation manager</li>
+<li>Contains: site name, ticket number, brief issue summary, link to IoT Support Dashboard ticket view</li>
+
+<h3>Scenario B: Already P1 and customer is chasing</h3>
+<li><strong>Automated phone call</strong> to escalation manager</li>
+<p>  - Voice message: "A customer is chasing a P1 escalation for [site name]. Ticket number [XXXXX]. [Within SLA / SLA breached — X hours since raised]. This needs your urgent attention as there have been no updates on the ticket."</p>
+<li><strong>Parallel SMS</strong> with same information</li>
+<li><strong>Follow-up WhatsApp</strong> with hyperlink to the OOH Triage UI / specific escalation ticket</li>
+
+<h3>SLA Context</h3>
+<li>P1 SLA: 4 hours</li>
+<li>The automated call should state whether the ticket is within or outside the SLA window</li>
+<li>If outside SLA, the urgency framing should be stronger</li>
+
+<h3>Technical Considerations</h3>
+<li>Automated calls: Twilio Voice API or similar</li>
+<li>WhatsApp: Twilio WhatsApp Business API or Meta Cloud API</li>
+<li>SMS: Twilio SMS</li>
+<li>Escalation manager contact details: stored in config/Cosmos DB</li>
+<li>This is a <strong>production requirement</strong> — not for the prototype, but must be designed now</li>
+
+<hr>
+
+<h2>12. Future: AI/LLM Integration (Strategic Requirement)</h2>
+
+<p><strong>Applies to both OOH Triage Dashboard and IoT Support Dashboard.</strong></p>
+
+<p>Rather than scripting every flow, wording, and rule to an absolute finite degree, explore incorporating LLM/AI logic (potentially via the Claude SDK) to:</p>
+
+<li><strong>Fill gaps in flow coverage</strong> — where a scenario isn't explicitly defined, the LLM provides contextually appropriate guidance to the agent</li>
+<li><strong>Generate dynamic scripts</strong> — rather than rigid templates, the LLM assembles natural scripts from the ticket data, adjusting tone and detail based on context</li>
+<li><strong>Translate technical comments</strong> — convert IoT team internal notes into caller-friendly language without needing exhaustive deterministic mappings</li>
+<li><strong>Suggest next actions</strong> — based on ticket history, device telemetry, and pattern recognition</li>
+<li><strong>Continuous improvement</strong> — the LLM learns from resolved tickets which approaches work, feeding back into flow refinement</li>
+
+<h3>Guardrails</h3>
+<li>Robust review process for any AI-generated output before it reaches a caller</li>
+<li>Human approval for any actions (escalations, priority changes)</li>
+<li>Deterministic rules take precedence where they exist — AI fills the gaps</li>
+<li>Continuous monitoring and refinement of AI suggestions</li>
+
+<h3>Where to Apply</h3>
+<li><strong>OOH Triage:</strong> Comment translation, gap-filling in triage flows, dynamic script generation</li>
+<li><strong>IoT Support Dashboard:</strong> Diagnostic suggestions based on telemetry, automated first-response drafting, pattern detection across sites</li>
+<li><strong>Both:</strong> Reduce dependency on human resource for routine triage and diagnostic steps, especially when ThingsBoard integrations provide the raw data</li>
+
+<h3>Next Steps</h3>
+<li>Evaluate Claude SDK integration patterns for real-time agent assistance</li>
+<li>Design a "confidence threshold" — above X confidence the AI acts autonomously, below it flags for human review</li>
+<li>Prototype with the callback comment translation use case as the first AI feature</li>
+
+<hr>
+
+<h2>13. Additional Design Notes</h2>
+
+<h3>UC-7 (Engineer Visit) — GK Repairs Chargeable Warning</h3>
+<p>All scripts that reference an engineer visit or GK Repairs must include a warning:</p>
+<blockquote style="border-left:3px solid #3b82f6;padding:8px 16px;margin:12px 0;background:#eff6ff;font-style:italic;color:#1e40af">"Please be aware that any engineer visit may be chargeable, as all our work goes through or is registered with GK Repairs Admin."</blockquote>
+
+<p>This applies across all triage flows, not just the callback lookup.</p>
+
+<h3>Newdemand/Install Ticket Routing</h3>
+<p>When a callback lookup surfaces a newdemand ticket:</p>
+<li>The OOH agent should be able to identify it as an install/project ticket (visual badge)</li>
+<li>If the caller reports disruption or issues related to a recent install, the routing should go to the install/scheduling team</li>
+<li>Reference needed: site schedules, engineer contact details, or proxy via scheduling team</li>
+<li>This is a cross-team routing requirement that extends beyond the OOH tool</li>
+
+<hr>
+
+<h2>14. Implementation Estimate (Updated)</h2>
+
+<table><thead><tr><th>Component</th><th>Effort</th><th>Dependency</th></tr></thead><tbody><tr><td><code style="background:#f1f5f9;padding:2px 6px;border-radius:3px;font-size:12px">callback-translator.js</code> — translation layer (deterministic)</td><td>Medium (1-2 sessions)</td><td>status-translations.json, team-members.json</td></tr><tr><td><code style="background:#f1f5f9;padding:2px 6px;border-radius:3px;font-size:12px">server.js</code> — callback-lookup route</td><td>Small (1 session)</td><td>callback-translator.js</td></tr><tr><td><code style="background:#f1f5f9;padding:2px 6px;border-radius:3px;font-size:12px">index.html</code> — callback lookup UI + flow</td><td>Medium (1-2 sessions)</td><td>API route, translation data</td></tr><tr><td><code style="background:#f1f5f9;padding:2px 6px;border-radius:3px;font-size:12px">script-templates.json</code> — script templates</td><td>Small (1 session)</td><td>Status translations finalised</td></tr><tr><td><code style="background:#f1f5f9;padding:2px 6px;border-radius:3px;font-size:12px">data/*.json</code> — reference data files</td><td>Small (< 1 session)</td><td>None</td></tr><tr><td>Ticket linking/merge logic</td><td>Medium (1 session)</td><td>Zendesk API ticket linking</td></tr><tr><td>Escalation manager alerting (design only)</td><td>Medium (1 session)</td><td>Twilio evaluation</td></tr><tr><td>Integration testing</td><td>Medium (1 session)</td><td>All above</td></tr><tr><td><strong>Total</strong></td><td><strong>~7-9 sessions</strong></td></tr></tbody></table>
+<p><strong>Not in scope for prototype (production only):</strong></p>
+<li>Twilio voice/SMS/WhatsApp integration</li>
+<li>EntraID authentication</li>
+<li>LLM-powered comment translation</li>
+<li>Newdemand ticket cross-team routing</li>
+
+<hr>
+
+<p>*Design approved with amendments 2026-03-28. Ready for build.*</p>
+</body></html>

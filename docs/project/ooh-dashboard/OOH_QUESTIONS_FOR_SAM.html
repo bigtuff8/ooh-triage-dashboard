@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>OOH Dashboard — Quick Questions</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:'Inter',sans-serif;font-size:14px;line-height:1.6;color:#1E293B;background:#F1F5F9;padding:24px}
+.page{max-width:720px;margin:0 auto;background:#fff;border-radius:12px;border:1px solid #E2E8F0;box-shadow:0 1px 3px rgba(0,0,0,.05);overflow:hidden}
+.head{background:#1E293B;color:#fff;padding:24px 28px}
+.head h1{font-size:18px;font-weight:700;margin-bottom:4px}
+.head p{font-size:13px;opacity:.7}
+.body{padding:28px}
+.intro{font-size:13px;color:#64748B;margin-bottom:24px;line-height:1.7}
+.intro strong{color:#1E293B}
+
+.q{margin-bottom:20px;border:1px solid #E2E8F0;border-radius:10px;overflow:hidden}
+.q-head{padding:12px 16px;background:#F8FAFC;border-bottom:1px solid #E2E8F0;display:flex;align-items:center;gap:10px}
+.q-num{width:28px;height:28px;border-radius:50%;background:#594AE2;color:#fff;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;flex-shrink:0}
+.q-text{font-size:13px;font-weight:600}
+.q-why{font-size:12px;color:#64748B;margin-top:2px;font-weight:400}
+.q-answer{padding:12px 16px}
+.q-answer textarea{width:100%;padding:10px 12px;border:1px solid #E2E8F0;border-radius:8px;font-size:13px;font-family:inherit;resize:vertical;min-height:50px;transition:border-color .15s}
+.q-answer textarea:focus{outline:none;border-color:#594AE2;box-shadow:0 0 0 3px rgba(89,74,226,.1)}
+.q-answer textarea::placeholder{color:#94A3B8}
+
+.foot{padding:20px 28px;border-top:1px solid #E2E8F0;display:flex;justify-content:space-between;align-items:center}
+.foot-note{font-size:11px;color:#94A3B8}
+.btn{display:inline-flex;align-items:center;gap:6px;padding:10px 20px;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;border:none;font-family:inherit;transition:all .15s}
+.btn-save{background:#594AE2;color:#fff}.btn-save:hover{background:#4338CA}
+.save-msg{font-size:12px;color:#10B981;font-weight:500;display:none}
+</style>
+</head>
+<body>
+<div class="page">
+    <div class="head">
+        <h1>OOH Dashboard — Quick Questions</h1>
+        <p>From James — just need a quick steer on where things live</p>
+    </div>
+    <div class="body">
+        <div class="intro">
+            I'm working on a design for an OOH agent dashboard that would let the call handlers do basic triage and make simple temporary changes (heating boost, turn equipment on) without needing to contact the IoT team out of hours. Before I go any further, I need to understand <strong>what's technically possible</strong> with the systems we have. Don't need detail — just point me in the right direction.
+        </div>
+
+        <div class="q"><div class="q-head"><div class="q-num">1</div><div><div class="q-text">How do I look up what devices are installed at a specific site?</div><div class="q-why">I need to show the OOH agent what Lighthouse controls at a site when they get a call.</div></div></div><div class="q-answer"><textarea placeholder="e.g. ThingsBoard has a customer entity per site, devices are linked to it..." data-key="q1"></textarea></div></div>
+
+        <div class="q"><div class="q-head"><div class="q-num">2</div><div><div class="q-text">Can I see if a device is online or offline, and when it was last seen?</div><div class="q-why">First thing the triage checks — is the gateway/device even connected?</div></div></div><div class="q-answer"><textarea placeholder="e.g. Yes, ThingsBoard shows active/inactive status..." data-key="q2"></textarea></div></div>
+
+        <div class="q"><div class="q-head"><div class="q-num">3</div><div><div class="q-text">Can I read the current temperature and setpoint for a heating zone?</div><div class="q-why">The triage shows the agent "Restaurant is 17°C, target is 21°C, heating is active" so they can tell the site what's happening.</div></div></div><div class="q-answer"><textarea placeholder="e.g. Yes, telemetry key is 'temperature', setpoint is on the Salus device..." data-key="q3"></textarea></div></div>
+
+        <div class="q"><div class="q-head"><div class="q-num">4</div><div><div class="q-text">Can I tell if a Power Pause device (Tongou/Tuya) is switched on or off?</div><div class="q-why">Agent needs to know if the fryers/lights are actually powered before offering to turn them on.</div></div></div><div class="q-answer"><textarea placeholder="e.g. Tuya reports switch state, or you can see power draw..." data-key="q4"></textarea></div></div>
+
+        <div class="q"><div class="q-head"><div class="q-num">5</div><div><div class="q-text">Can I change a heating setpoint remotely via an API?</div><div class="q-why">This is the big one — 26% of OOH calls are "too hot" or "too cold". If the agent can temporarily boost the setpoint by a couple of degrees, that resolves most of them.</div></div></div><div class="q-answer"><textarea placeholder="e.g. Yes, via ThingsBoard RPC to the Salus controller... or No, setpoints are set locally..." data-key="q5"></textarea></div></div>
+
+        <div class="q"><div class="q-head"><div class="q-num">6</div><div><div class="q-text">Can I turn a Tongou/Tuya device on or off remotely via an API?</div><div class="q-why">Second biggest need — 17% of calls are kitchen equipment that's turned off on schedule but the site still needs it. A remote override would fix it.</div></div></div><div class="q-answer"><textarea placeholder="e.g. Yes, Tuya Cloud API can switch devices... or ThingsBoard sends the command..." data-key="q6"></textarea></div></div>
+
+        <div class="q"><div class="q-head"><div class="q-num">7</div><div><div class="q-text">Where are the device schedules stored? Can I read them?</div><div class="q-why">Agent needs to tell the site "your fryers were set to turn off at 21:30" — need to read the schedule to do that.</div></div></div><div class="q-answer"><textarea placeholder="e.g. Schedules are in Tuya, or ThingsBoard attributes, or device firmware..." data-key="q7"></textarea></div></div>
+
+        <div class="q"><div class="q-head"><div class="q-num">8</div><div><div class="q-text">Is there an API for ThingsBoard that I can use? Do I need credentials?</div><div class="q-why">I need to know how to connect — REST API? Auth tokens? Is there a dev/sandbox environment I can test against?</div></div></div><div class="q-answer"><textarea placeholder="e.g. REST API at https://..., speak to Jonathan for credentials..." data-key="q8"></textarea></div></div>
+
+        <div class="q"><div class="q-head"><div class="q-num">9</div><div><div class="q-text">How does the house ID (e.g. "6886") map to a site in ThingsBoard?</div><div class="q-why">Zendesk uses house IDs. I need to know how to look up the same site in ThingsBoard.</div></div></div><div class="q-answer"><textarea placeholder="e.g. House ID is stored as a customer attribute called 'siteCode'..." data-key="q9"></textarea></div></div>
+
+        <div class="q"><div class="q-head"><div class="q-num">10</div><div><div class="q-text">If I make a temporary change, can I auto-revert it after a few hours?</div><div class="q-why">Every OOH change should be temporary. Need a safe way to say "boost for 4 hours then go back to normal".</div></div></div><div class="q-answer"><textarea placeholder="e.g. ThingsBoard rule chains can schedule a revert... or Tuya has timer functions..." data-key="q10"></textarea></div></div>
+
+    </div>
+    <div class="foot">
+        <div><div class="foot-note">Your answers auto-save in the browser. Hit download to send back to me.</div><div class="save-msg" id="save-msg">Saved ✓</div></div>
+        <button class="btn btn-save" onclick="downloadHTML()">Download & Send Back</button>
+    </div>
+</div>
+
+<script>
+const SK='ooh-qs-sam';
+function load(){const s=localStorage.getItem(SK);if(!s)return;try{const d=JSON.parse(s);document.querySelectorAll('textarea[data-key]').forEach(t=>{if(d[t.dataset.key])t.value=d[t.dataset.key]})}catch(e){}}
+function save(){const d={};document.querySelectorAll('textarea[data-key]').forEach(t=>{if(t.value.trim())d[t.dataset.key]=t.value});localStorage.setItem(SK,JSON.stringify(d));const m=document.getElementById('save-msg');m.style.display='block';setTimeout(()=>m.style.display='none',2000)}
+let st;document.addEventListener('input',e=>{if(e.target.matches('textarea[data-key]')){clearTimeout(st);st=setTimeout(save,800)}});
+document.addEventListener('DOMContentLoaded',load);
+function downloadHTML(){document.querySelectorAll('textarea[data-key]').forEach(t=>t.textContent=t.value);const h='<!DOCTYPE html>\n'+document.documentElement.outerHTML;const b=new Blob([h],{type:'text/html'});const a=document.createElement('a');a.href=URL.createObjectURL(b);a.download='OOH_Questions_Answered.html';a.click()}
+</script>
+</body>
+</html>

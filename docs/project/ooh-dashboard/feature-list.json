@@ -1,0 +1,231 @@
+{
+  "project": "OOH Dashboard — Flow Amendments v2",
+  "mode": "airedale",
+  "created": "2026-03-26",
+  "updated": "2026-03-26",
+  "features": [
+    {
+      "id": "F001",
+      "category": "ui",
+      "priority": "critical",
+      "description": "Change 1: kitchenEquip — Add T1 phone-guided steps before T2 system checks (PowerPause sticker check, interlock panel green light, MCB check)",
+      "design_status": "complete",
+      "verification_steps": [
+        "Step 1: Start kitchenEquip flow — first question asks about PowerPause sticker",
+        "Step 2: Selecting NO routes to GK Repairs referral with phone number",
+        "Step 3: Selecting YES proceeds to interlock panel green light check",
+        "Step 4: Green light ON → press button → branches to resolved / appliance fault / contactor fault",
+        "Step 5: Green light OFF → MCB check → branches to reset / hardware fault",
+        "Step 6: No panel visible → proceeds to T2 system checks (existing flow)"
+      ],
+      "passes": false,
+      "notes": "Interlock panel image placeholder needed (MISSING asset)"
+    },
+    {
+      "id": "F002",
+      "category": "ui",
+      "priority": "critical",
+      "description": "Change 2: tooCold — Add T1 with pub/accommodation branch, soft pushback, Salus thermostat visual aids",
+      "design_status": "complete",
+      "verification_steps": [
+        "Step 1: Start tooCold flow — first question asks pub or accommodation",
+        "Step 2: Pub branch pulls live zone data, shows soft pushback if temp at setpoint",
+        "Step 3: Customer insists → boost applied with reason capture",
+        "Step 4: Accommodation branch shows Salus thermostat image, walks through icons",
+        "Step 5: Background rule flags non-standard setpoints in review ticket"
+      ],
+      "passes": false,
+      "notes": "Salus thermostat image available as visual aid"
+    },
+    {
+      "id": "F003",
+      "category": "ui",
+      "priority": "critical",
+      "description": "Change 3: noHotWater — Soft pushback for early calls, pub/accommodation, boiler visual check",
+      "design_status": "complete",
+      "verification_steps": [
+        "Step 1: Start noHotWater flow — asks what time site opens",
+        "Step 2: If calling before expected HW time, soft pushback with reason capture",
+        "Step 3: Asks pub or accommodation",
+        "Step 4: Boiler visual check — error codes / pilot light questions",
+        "Step 5: Boiler fault routes to GK Repairs + IoT Support",
+        "Step 6: Boiler looks fine → proceeds to T2 system checks"
+      ],
+      "passes": false,
+      "notes": "Boiler panel image MISSING"
+    },
+    {
+      "id": "F004",
+      "category": "ui",
+      "priority": "high",
+      "description": "Change 4: keepsTurningOff — Add T1 (interlock light check, single vs multiple, timing pattern)",
+      "design_status": "complete",
+      "verification_steps": [
+        "Step 1: Start keepsTurningOff flow — asks about green light on interlock",
+        "Step 2: Green light stays on → appliance fault → GK Repairs",
+        "Step 3: Asks single vs multiple appliances",
+        "Step 4: Multiple → site power issue referral",
+        "Step 5: Asks if happening at same time daily",
+        "Step 6: Yes → schedule check, Random → device status → escalate"
+      ],
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "F005",
+      "category": "ui",
+      "priority": "high",
+      "description": "Change 5: ovensGrills — Replace 'not remotely controllable' with PowerPause scope check",
+      "design_status": "complete",
+      "verification_steps": [
+        "Step 1: Start ovensGrills flow — asks about PowerPause sticker",
+        "Step 2: YES → routes to kitchenEquip flow",
+        "Step 3: NO → GK Repairs referral with phone number",
+        "Step 4: UNSURE → asks about switch boxes/green light → routes accordingly"
+      ],
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "F006",
+      "category": "ui",
+      "priority": "high",
+      "description": "Change 6: heatingStuck — Add T1 with pub/accommodation branch, Salus standby, stuck valve detection",
+      "design_status": "complete",
+      "verification_steps": [
+        "Step 1: Start heatingStuck flow — asks pub or accommodation",
+        "Step 2: Accommodation → Salus standby instruction (hold OK 3s) with thermostat image",
+        "Step 3: Resolved → still creates review ticket",
+        "Step 4: Pub → radiator check → stuck valve detection → GK Repairs + IoT escalation",
+        "Step 5: System shows heating actively calling → T2 remote setpoint reset"
+      ],
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "F007",
+      "category": "ui",
+      "priority": "high",
+      "description": "Change 7: controlsIssue — Add T1 branching by control type (Salus blank, interlock, boiler error)",
+      "design_status": "complete",
+      "verification_steps": [
+        "Step 1: Start controlsIssue flow — asks which type of control",
+        "Step 2: Salus blank → USB charge + OK hold with thermostat image",
+        "Step 3: Interlock panel → same steps as kitchenEquip T1",
+        "Step 4: Boiler error code → capture code + QR scan → escalate with details"
+      ],
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "F008",
+      "category": "ui",
+      "priority": "medium",
+      "description": "Change 8: fridgeIssue — Add scope clarification (monitoring only), door check, temp thresholds",
+      "design_status": "complete",
+      "verification_steps": [
+        "Step 1: Start fridgeIssue flow — shows monitoring-only scope message",
+        "Step 2: Asks about door left open",
+        "Step 3: Asks temperature reading from unit display",
+        "Step 4: T2 checks ThingsBoard sensor data",
+        "Step 5: Escalation flags food safety concern if temp >8C fridge or >-15C freezer"
+      ],
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "F009",
+      "category": "ui",
+      "priority": "high",
+      "description": "Change 9: NEW externalLighting flow — Tongou switch, MCB, Tuya device status/override",
+      "design_status": "complete",
+      "verification_steps": [
+        "Step 1: externalLighting appears in entry points under Hardware > Lighting",
+        "Step 2: T1 asks about switch box / manual override",
+        "Step 3: MCB/fuse check",
+        "Step 4: T2 checks Tuya device status and schedule",
+        "Step 5: Online + in schedule → override → resolved",
+        "Step 6: Online + out of schedule → override + review ticket",
+        "Step 7: Offline → escalate (connectivity/hardware fault)"
+      ],
+      "passes": false,
+      "notes": "Tongou switch image MISSING"
+    },
+    {
+      "id": "F010",
+      "category": "ui",
+      "priority": "high",
+      "description": "Change 10: wontTurnOn — Add total power failure check before equipment type routing",
+      "design_status": "complete",
+      "verification_steps": [
+        "Step 1: Start wontTurnOn flow — first asks if anything else is working",
+        "Step 2: Nothing working → site power issue → refer to GK Repairs",
+        "Step 3: Other things working → proceeds to equipment type routing"
+      ],
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "F011",
+      "category": "ui",
+      "priority": "critical",
+      "description": "Change 11: Structured handoff — Add T1 checks completed, findings, suggested diagnostic flow, ruled out, non-LH referral fields to triage summary",
+      "design_status": "complete",
+      "verification_steps": [
+        "Step 1: Complete any flow that escalates",
+        "Step 2: Triage summary includes T1 Checks Completed section",
+        "Step 3: Triage summary includes T1 Findings from handler input",
+        "Step 4: Triage summary includes Suggested Diagnostic Flow reference",
+        "Step 5: Triage summary includes What's Been Ruled Out",
+        "Step 6: Triage summary includes Non-LH Referral Made if applicable"
+      ],
+      "passes": false,
+      "notes": "Additive to existing ticket fields, not replacing"
+    },
+    {
+      "id": "F012",
+      "category": "ui",
+      "priority": "high",
+      "description": "Change 12: somethingElse — Add contractor detection and re-routing to known categories before free-text",
+      "design_status": "complete",
+      "verification_steps": [
+        "Step 1: Start somethingElse flow — first asks about contractor on site",
+        "Step 2: Contractor YES → captures details → priority escalation",
+        "Step 3: No contractor → asks what issue is about",
+        "Step 4: Matches known category → routes to that flow",
+        "Step 5: Genuinely unknown → free-text capture → escalate"
+      ],
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "F013",
+      "category": "ui",
+      "priority": "critical",
+      "description": "OOH entry points updated — all new/modified flows accessible from landing page with correct categories",
+      "design_status": "complete",
+      "verification_steps": [
+        "Step 1: Landing page shows Lighting category under Hardware with externalLighting flow",
+        "Step 2: Landing page shows all existing categories updated with new flow IDs",
+        "Step 3: 'Something else / unsure' routes to somethingElse flow (not contractor-escalation)",
+        "Step 4: All problem-based entries present: freezing, hot water, won't turn on, scope check, something else"
+      ],
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "F014",
+      "category": "ui",
+      "priority": "medium",
+      "description": "Escalation terminology consistent across all flows — single route to IoT Support, GK Repairs as advisory referral only",
+      "design_status": "complete",
+      "verification_steps": [
+        "Step 1: All escalation states route to IoT Support (not direct to GK Repairs/SCC/Flowrite)",
+        "Step 2: GK Repairs mentioned as advisory referral with consistent phone number 0345 603 4566",
+        "Step 3: Escalation messages use consistent terminology across all flows"
+      ],
+      "passes": false,
+      "notes": "Design principle: all escalations to IoT Support, agent advises GK Repairs separately"
+    }
+  ]
+}
