@@ -1,0 +1,13 @@
+{
+  "run": "selfgate-ooh-triage-dashboard-docs-live-control-release-shaping",
+  "phase": "discovery",
+  "pr": 6,
+  "approvedBy": [
+    "bigtuff8"
+  ],
+  "reviewComments": [],
+  "mergeCommit": "e41a408b71418f33e3ef39cdc6afdf9452631c7d",
+  "phaseBranch": "docs/live-control-release-shaping",
+  "releaseBranch": "main",
+  "stamp": 1789163414594
+}
