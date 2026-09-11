@@ -1,16 +1,16 @@
 <!-- gate:contract
 SECTION Overview: This is a planning gate, not code. It asks James to approve HOW a group of nine tickets should move through the harness stages (discovery, design, build, test, release) to safely turn on live device control for the internal IoT support team. Nothing here changes code or infra. The single most consequential step is OOHDASH-19 — flipping WRITES_DISABLED to false, which lets the dashboard write to real Salus heating kit at live trading sites.
-SECTION Release scope: Nine Jira tickets (OOHDASH-8, -11, -12, -15, -18, -19, -24, -64, -67) plus one un-owned gap (the bridge inventory read / site-search 503). All nine are confirmed status "To Do" in Jira today. The release act is OOHDASH-19.
+SECTION Release scope: Nine Jira tickets (OOHDASH-8, -11, -12, -15, -18, -19, -24, -64, -67) plus one un-owned gap (the bridge inventory read / site-search 503). All nine are confirmed status "To Do" in Jira today. The release act is OOHDASH-19. The bridge-read gap is now a PREREQUISITE of approving this plan: it must be raised as a new OOHDASH ticket with a named owner (Spencer / IoT platform) before Discovery begins — it is not an open yes/no decision.
 SECTION Stage-entry map: For each ticket, where it first enters the harness lifecycle and why. Some need Discovery (unknowns to prove), some need Design (a decision to make), some go straight to Build, and some sit in an external/ops or writer lane outside the code pipeline.
 SECTION Three lanes: Work runs in three parallel streams — a Code lane (the plumbing and app changes), an External/ops lane (credential rotation, write-cred bench-proof, tester accounts — done by Spencer/ops, tracked as release conditions), and a Writer lane (the man-marking sign-off scripts). They converge at the release preflight for OOHDASH-19.
 SECTION Operator gates: You will be asked to approve at five points — Discovery, Design, Build-PLAN, Test-results, and Release-preflight. Two other checkpoints are automated committee steps with no human.
-SECTION Critical path: The fastest safe order. Security/ops items run throughout; a shared discovery proves the read/bridge health; the cheap safety fix (-12) lands early; design settles -24 and -67; then build/test; then the man-marking accept; then the -19 flip and a supervised shakedown.
+SECTION Critical path: The fastest safe order. Security/ops items run throughout; a shared discovery proves the read/bridge health AND establishes the true count of sign-in-eligible claimArea-1500 accounts; the cheap safety fix (-12, gated on an environment-config audit) lands early; design settles -24 and -67; then build/test; then the man-marking accept; then the -19 flip and a pre-specified supervised shakedown.
 SECTION Backlog playback: A one-glance table of every item in delivery order with a one-word stage.
-SECTION Safety framing: Why -19 is the point of no return, what you have already accepted (-15, -18), and what still stands between here and the flip (-12, -24, and read/bridge health).
+SECTION Safety framing: Why -19 is the point of no return, what you have already accepted (-15, -18), and what still stands between here and the flip (-12, -24, and read/bridge health). Also states a verified fact: WRITES_DISABLED is read once at pod startup and cached, so both the flip AND any emergency re-disable require a manifest edit plus a rolling pod restart — neither is instantaneous.
 DECISION 1: Approve this shaping and stage-entry plan as the basis for the group release.
-DECISION 2: OOHDASH-12 (invert the fail-open default) — fast-track it standalone now as an early safety win, OR batch it into the group Build-PLAN gate.
-DECISION 3: The bridge inventory read gap (site-search 503 / F025 contract) has no clean owner — raise it as a new OOHDASH ticket, yes or no.
-DECISION 4: Control-dispatch authorisation policy — accept that a handler (claimArea 1500) can already control and just document it, OR tighten dispatch to iot-only (which needs iot roles provisioned to all testers and a rework of the exact-match role check).
+DECISION 2: OOHDASH-12 (invert the fail-open default) — fast-track it standalone now as an early safety win, OR batch it into the group Build-PLAN gate. Either way it is gated on an environment-config audit (it is not a "no unknowns" one-liner).
+DECISION 4: Control-dispatch authorisation policy — OPEN, not pre-recommended. It cannot be put to James until Discovery establishes the actual count of sign-in-eligible claimArea-1500 accounts (potentially far more than the 4 testers; every one gains dispatch at the flip). Only then choose: accept handler-can-control and document it, OR tighten dispatch to iot-only (needs iot roles provisioned to all testers and a rework of the exact-match role check).
+NOTE on prerequisites: The bridge inventory read gap is no longer a decision — it is a prerequisite (must be ticketed + owned before Discovery). The supervised shakedown must be fully specified before Release-preflight (named supervisor, isolated/bench test device for first actuation, explicit success criteria, and a re-disable/abort trigger) — not improvised on the day.
 -->
 
 # OOH IoT-Team Live-Control Release — Shaping & Stage-Entry Plan
@@ -49,6 +49,8 @@ This document decides **where each ticket in the group release enters the harnes
 
 **Terminal act:** OOHDASH-19 flips `WRITES_DISABLED=false`. Verified today: `config.js:87` reads `writesDisabled: env('WRITES_DISABLED') === 'true'` and `k8s/deployment.yaml:68` sets `WRITES_DISABLED="true"` in the live AKS deploy. The kill-switch checks this lock **first and synchronously**, before any database read (`services/killswitch.js:32`), so nothing writes to a device while the lock is on.
 
+**Verified read-timing (matters for how fast the flip — and any rollback — takes effect):** `config.js` builds `export const config = {...}` **once at module import**, evaluating `writesDisabled: env('WRITES_DISABLED') === 'true'` a **single time at process start**. The value is therefore **cached at pod startup, not read per request**. Consequence, stated plainly: the OOHDASH-19 flip requires **editing the manifest env AND performing a rolling pod restart** to take effect — it is **not instantaneous**. The exact same is true in reverse: an **emergency re-disable is not instant either** — rollback speed equals the time to roll the pods. This shapes what the Release-preflight and the shakedown abort trigger must expect (see §9).
+
 ---
 
 ## 2. Stage-entry map — where each ticket enters the lifecycle
@@ -61,14 +63,14 @@ Per ticket: does it need **Discovery** (prove an unknown)? **Design** (make a de
 </thead>
 <tbody>
 <tr><td><strong>-64</strong> TB read cred authenticates?</td><td><strong>YES</strong></td><td>cond.</td><td>cond.</td><td>Code</td><td>Current read state is unproven (<code>read=false</code>); design/build only if the cred is actually bad.</td></tr>
-<tr><td><strong>bridge-read gap</strong></td><td><strong>YES</strong></td><td>—</td><td>cond.</td><td>Code + external</td><td>Site search 503s; needs Spencer/platform confirm of the F025 device contract. <strong>Blocks reaching any device at all.</strong></td></tr>
-<tr><td><strong>-67</strong> dispatch authz policy</td><td>—</td><td><strong>YES</strong></td><td>cond.</td><td>Code</td><td>Decision gate. Build only if "iot-only" is chosen. See §5 finding.</td></tr>
+<tr><td><strong>bridge-read gap</strong> <em>(PREREQUISITE)</em></td><td><strong>YES</strong></td><td>—</td><td>cond.</td><td>Code + external</td><td>Site search 503s; needs Spencer/platform confirm of the F025 device contract. <strong>Blocks reaching any device at all.</strong> <strong>Must be ticketed + owned (Spencer / IoT platform) BEFORE Discovery begins — a prerequisite of approving this plan, not an open decision.</strong></td></tr>
+<tr><td><strong>-67</strong> dispatch authz policy</td><td><strong>YES</strong></td><td><strong>YES</strong></td><td>cond.</td><td>Code</td><td>Discovery must first establish the true count of sign-in-eligible claimArea-1500 accounts (see §5); the authz decision is <strong>open</strong> until that number exists. Build only if "iot-only" is chosen.</td></tr>
 <tr><td><strong>-24</strong> /healthz stale-green</td><td>—</td><td><strong>YES</strong></td><td><strong>YES</strong></td><td>Code</td><td>Design the fix approach, then build. Couples with -64 (both are read-health trust).</td></tr>
-<tr><td><strong>-12</strong> invert fail-open default</td><td>—</td><td>—</td><td><strong>YES</strong></td><td>Code</td><td>One-line change. No unknowns, no decision — enters straight at <strong>Build-PLAN</strong>.</td></tr>
+<tr><td><strong>-12</strong> invert fail-open default</td><td>light</td><td>—</td><td><strong>YES</strong></td><td>Code</td><td>Small change, but <strong>NOT "no unknowns"</strong>: inverting the fail-open default silently changes behaviour in any environment that omits <code>WRITES_DISABLED</code>. Gated on an <strong>environment-config audit</strong> (dev / staging / CI + any compose or local <code>.env</code> templates + the k8s manifest) before it lands.</td></tr>
 <tr><td><strong>-15</strong> rotate compromised creds</td><td>—</td><td>—</td><td>—</td><td>External / ops</td><td>Security hard gate. Tracked as a release condition, no code pipeline.</td></tr>
 <tr><td><strong>-18</strong> bench-prove SR-3 write cred</td><td>light</td><td>—</td><td>—</td><td>External / ops + test</td><td>Provisioning + a bench verification. Light discovery on least-privilege scope.</td></tr>
 <tr><td><strong>-8</strong> provision 4 tester accounts</td><td>—</td><td>—</td><td>—</td><td>External / ops</td><td>Code fix already landed (commit <code>d1c177d</code>). Remainder is B2C provisioning + verify.</td></tr>
-<tr><td><strong>-11</strong> man-marking scripts + sign-off</td><td>—</td><td>—</td><td>—</td><td>Writer</td><td>Draft exists; needs the IoT lead to <strong>accept</strong> before the shakedown.</td></tr>
+<tr><td><strong>-11</strong> man-marking scripts + sign-off</td><td>—</td><td>—</td><td>—</td><td>Writer</td><td>Draft exists; needs <strong>defined scenario coverage + explicit pass criteria</strong>, then IoT-lead <strong>accept</strong> — not just a bare sign-off — before the shakedown.</td></tr>
 <tr><td><strong>-19</strong> flip WRITES_DISABLED=false</td><td>—</td><td>—</td><td>—</td><td>Release</td><td>The release act. Gated on everything above + read/bridge health green.</td></tr>
 </tbody>
 </table>
@@ -81,9 +83,13 @@ Per ticket: does it need **Discovery** (prove an unknown)? **Design** (make a de
 
 The work is not one queue. It runs as three streams that converge only at the release preflight.
 
-- **Code lane.** A single shared **Discovery** pass across `-64` + `bridge-read` + "does a control command confirm end-to-end". Then a **Design** pass for `-24` and `-67`. Then per-ticket **Build → Test**. `-12` rides in at **Build-PLAN** needing no discovery or design.
+- **Code lane.** A single shared **Discovery** pass across `-64` + `bridge-read` + "does a control command confirm end-to-end" + **the true count of sign-in-eligible claimArea-1500 accounts** (the -67 authz input, see §5) + **a check that handler-facing live-control UX exists** (see below). Then a **Design** pass for `-24` and `-67`. Then per-ticket **Build → Test**. `-12` rides in at **Build-PLAN** but carries a **light environment-config audit** first (it is not a no-unknowns one-liner).
 - **External / ops lane** (`-15`, `-18`, `-8`). Runs in parallel throughout, owned by Spencer / ops. Tracked as **hard release conditions** rather than harness build tickets.
-- **Writer lane** (`-11`). Runs in parallel. The man-marking sign-off must be **accepted by the IoT lead** before the live shakedown.
+- **Writer lane** (`-11`). Runs in parallel. The man-marking scripts must carry **defined scenario coverage + pass criteria** and then be **accepted by the IoT lead** before the live shakedown.
+
+**Prerequisite before this lane starts:** the **bridge-read gap must already be a ticketed, owned OOHDASH item** (Spencer / IoT platform). It is a condition of approving the plan, not work to be scheduled inside the lane.
+
+**Handler live-control UX (Discovery / Design check).** Because control dispatch is high-stakes and **irreversible** at the device, Discovery/Design must confirm the handler-facing UX already exists — a **pre-dispatch confirmation**, **post-dispatch feedback**, and a **device-non-responsive state** — or capture the gap as a ticket. Related design consideration for `-67` / `-24`: a handler may not realise they hold device-control access once the flag flips, because there is **no in-app signal** that control is now live; whether to add one is a design call, not a silent assumption.
 
 **Convergence:** all three lanes meet at the **Release-preflight** for `-19`.
 
@@ -110,7 +116,7 @@ Five points ask for **your** decision. Two other checkpoints are automated (comm
 
 ---
 
-## 5. Verified finding that changes -67 (read this before deciding §Decision 4)
+## 5. Verified finding on -67 — plus the Discovery task it makes mandatory
 
 **Control dispatch is NOT role-gated to `iot`.** Verified in the current repo:
 
@@ -118,7 +124,9 @@ Five points ask for **your** decision. Two other checkpoints are automated (comm
 - `routes/api.js:346` — the **only** `requireRole('iot')` is on the `/admin` sub-router (kill-switch / config).
 - `services/auth.js:223` — `requireRole` is an **exact-match** check (`op.role !== role`), **not** a rank. So an `iot`-only gate would actively *exclude* a handler, not include them.
 
-**Consequence:** the 4 testers at **handler (claimArea 1500)** can dispatch real control writes **as-is** once `WRITES_DISABLED=false`. They do **not** need the iot(1400) role to control. They need iot only to operate the kill-switch / admin page. This materially shrinks the -8 access work.
+**Consequence:** anyone signed in at **handler (claimArea 1500)** can dispatch real control writes **as-is** once `WRITES_DISABLED=false`. They do **not** need the iot(1400) role to control. They need iot only to operate the kill-switch / admin page.
+
+**Open question this raises — a required Discovery task before Decision 4.** The plan has been treating "handler can control" as if it only touches the 4 named testers. That is **not established**. claimArea 1500 may contain **far more than 4 sign-in-eligible accounts**, and at the flip **every one of them gains dispatch**. Before the -67 authz policy (Decision 4) can be put to James, Discovery **must establish the actual count of sign-in-eligible claimArea-1500 accounts** and who they are. Until that number exists, Decision 4 is **genuinely open** — it is not safe to pre-recommend "accept and document". If the population turns out to be just the testers, "accept" becomes reasonable; if it is a wide group, the iot-only tightening may be required. The finding above only tells us *how* the role check behaves — not *how many people* it currently lets through.
 
 ---
 
@@ -128,16 +136,18 @@ Run the ops/security lane throughout; sequence the code lane behind a single dis
 
 The sequence, top to bottom, is:
 
+0. **Prerequisite (before anything starts):** the **bridge-read gap is raised as a new OOHDASH ticket with a named owner** (Spencer / IoT platform). The plan is not approved without this.
 1. **Throughout (release conditions, running in parallel):** `-15`, `-18` and `-8` — the ops/security lane runs the whole time, not as a blocking first step.
-2. **Discovery** of `-64` + bridge-read + the confirm-loop — this is **Gate 1** (operator).
-3. **`-12` build + test** — land early as the cheap safety win.
-4. **Design** of `-24` and `-67` — this is **Gate 2** (operator).
+2. **Discovery** of `-64` + bridge-read + the confirm-loop + **the sign-in-eligible claimArea-1500 account count** (the -67 input) + **the handler live-control UX check** — this is **Gate 1** (operator).
+3. **`-12` environment-config audit, then build + test** — land early as the cheap safety win, but only after the audit confirms no environment silently loses the lock.
+4. **Design** of `-24` and `-67` — this is **Gate 2** (operator). Decision 4 is only put to James here, once the 1500 count from Discovery is in hand.
 5. **`-24` build + test**, running in parallel with any `-64` / `-67` code — this passes through **Gate 3** (Build-PLAN) and **Gate 4** (Test-results).
-6. **`-11` accept** — the IoT lead signs off the man-marking scripts.
-7. **Release-preflight** — this is **Gate 5** (operator).
-8. **`-19` flip `WRITES_DISABLED=false`** — followed immediately by a supervised shakedown.
+6. **`-11` accept** — the IoT lead accepts the man-marking scripts against **defined scenario coverage + pass criteria**.
+7. **Supervised shakedown specified** — the shakedown plan is written and agreed **before** Release-preflight (see §9 for the required contents).
+8. **Release-preflight** — this is **Gate 5** (operator). Confirms the shakedown spec exists and that the flip's manifest-edit-plus-pod-roll steps (and the matching re-disable/abort path) are understood.
+9. **`-19` flip `WRITES_DISABLED=false`** (manifest edit + rolling pod restart) — followed by the **pre-specified** supervised shakedown.
 
-**Cost / benefit of this ordering:** front-loading the shared discovery avoids three separate investigation passes (saves effort and calendar time). Landing `-12` early buys a safety win — the deploy lock becomes fail-*safe* — for the cost of one one-line change and a test. The main schedule risk sits in the **bridge-read gap**: it depends on Spencer/platform and, until it clears, no device can be reached to control, so it should start today even though it has no owner.
+**Cost / benefit of this ordering:** front-loading the shared discovery avoids separate investigation passes (saves effort and calendar time) and, critically, surfaces the 1500 account count before the authz decision is forced. Landing `-12` early buys a safety win — the deploy lock becomes fail-*safe* — for the cost of a small change plus a light environment-config audit and a test; skipping the audit risks silently disabling the lock in a non-prod environment, which is why it is not treated as a free one-liner. The main schedule risk sits in the **bridge-read gap**: it depends on Spencer/platform and, until it clears, no device can be reached to control — which is exactly why it is now a **ticketed, owned prerequisite** rather than an open question.
 
 ---
 
@@ -151,7 +161,8 @@ The sequence, top to bottom, is:
 <tr><td>1</td><td>OOHDASH-15 rotate compromised creds</td><td>Ops</td></tr>
 <tr><td>2</td><td>OOHDASH-18 bench-prove write cred</td><td>Ops</td></tr>
 <tr><td>3</td><td>OOHDASH-8 provision tester accounts</td><td>Ops</td></tr>
-<tr><td>4</td><td>bridge-read gap</td><td>Discovery</td></tr>
+<tr><td>0</td><td>bridge-read gap — raise + own the ticket</td><td>Prereq</td></tr>
+<tr><td>4</td><td>bridge-read gap + claimArea-1500 account count + handler UX check</td><td>Discovery</td></tr>
 <tr><td>5</td><td>OOHDASH-64 TB read cred</td><td>Discovery</td></tr>
 <tr><td>6</td><td>OOHDASH-12 invert fail-open default</td><td>Build</td></tr>
 <tr><td>7</td><td>OOHDASH-67 dispatch authz policy</td><td>Design</td></tr>
@@ -165,10 +176,14 @@ The sequence, top to bottom, is:
 
 ## 8. Open decisions for James
 
-1. **Approve the shaping** — adopt this stage-entry plan and sequencing as the basis for the group release.
-2. **OOHDASH-12 fast-track?** — land it standalone **now** as an early safety win, *or* batch it into the group Build-PLAN gate.
-3. **Raise the bridge-read gap as a ticket?** — the site-search 503 / F025 contract gap has no clean owner; create a new OOHDASH ticket (owner: Spencer / IoT platform), yes or no.
-4. **Control-dispatch authz policy (-67)** — (a) accept that a handler can already control and just document it (fastest; recommended for this trusted audience), *or* (b) tighten dispatch to iot-only, which needs iot(1400) provisioned to all testers and a rework of the exact-match `requireRole`.
+1. **Approve the shaping** — adopt this stage-entry plan and sequencing as the basis for the group release. Approval is conditional on the two **prerequisites** below being in place.
+2. **OOHDASH-12 fast-track?** — land it standalone **now** as an early safety win, *or* batch it into the group Build-PLAN gate. Either way it is **gated on the environment-config audit** — it is a small change, but **not** a "no unknowns" one-liner (see §2).
+3. **Control-dispatch authz policy (-67) — this decision is OPEN and cannot be taken yet.** It is presented **at Gate 2 (Design)**, not here, because it **depends on a Discovery output**: the actual count of sign-in-eligible claimArea-1500 accounts. Every such account gains dispatch at the flip, and that count is currently unproven. Once it exists, the choice is (a) accept that handlers can already control and document it, *or* (b) tighten dispatch to iot-only, which needs iot(1400) provisioned to all testers and a rework of the exact-match `requireRole`. **Neither option is pre-recommended.**
+
+**Prerequisites (not decisions — these must be true for Decision 1 to hold):**
+
+- **Bridge-read gap must be ticketed + owned.** The site-search 503 / F025 contract gap must be raised as a new OOHDASH ticket with a named owner (Spencer / IoT platform) **before Discovery begins**. It is a condition of approval, not a yes/no question.
+- **Supervised shakedown must be specified before Release-preflight** (see §9) — named supervisor, isolated/bench test device for the first actuation, explicit success criteria, and a re-disable/abort trigger.
 
 ---
 
@@ -177,6 +192,15 @@ The sequence, top to bottom, is:
 **OOHDASH-19 is the single most consequential act in this release.** Flipping `WRITES_DISABLED=false` turns on **live writes to real Salus / heating kit at trading sites** — a wrong actuation is a physical event at a working restaurant, not a screen error. Everything else in the plan exists to make that one flip safe and reversible (kill-switch, scoped credential, man-marking sign-off, trustworthy health).
 
 You have **already accepted** the two security hard gates — **-15** (rotate compromised creds) and **-18** (bench-prove the scoped write cred). What still stands between here and the flip: **-12** (fail-safe default), **-24** (trustworthy health banner), and **read + bridge health proven green**. The audience itself is the man-marker (they see and correct the hardware at source within seconds), which is why the earlier stub-first choreography was relaxed — but the credential, health, and sign-off guardrails stay.
+
+**Rollback is not instantaneous — plan for it.** As established in §1, `WRITES_DISABLED` is read **once at pod startup and cached**. So the flip takes effect only after a **manifest edit plus a rolling pod restart**, and — critically — an **emergency re-disable is equally slow**: to re-lock writes you must edit the manifest back and roll the pods again. There is **no instant off switch at the env level**. Your fast in-incident lever is the **kill-switch admin page** (checked first and synchronously per §1), not the env flag; the env re-disable is the durable backstop that lands at pod-roll speed. Release-preflight must confirm both paths are understood before go.
+
+**The supervised shakedown — must be specified before Release-preflight, not improvised on the day.** The first actuation after the flip is a controlled test, and its plan is a **Release-lane requirement** that must be written and agreed **before** the Release-preflight gate. The spec must name:
+
+- **A supervisor** — a named person who owns the shakedown and can call the abort.
+- **The test device** — an **isolated / bench device for the first actuation, NOT a live trading site**. Only after the bench actuation confirms clean does a live-site test follow.
+- **Explicit success criteria** — what a passing actuation looks like (command dispatched, device confirms, health stays green), written down in advance.
+- **A re-disable / abort trigger** — the named condition that halts the shakedown and the agreed re-disable path, understood to run at **pod-roll speed** (kill-switch first for immediate stop, env re-disable as the durable backstop).
 
 ---
 
