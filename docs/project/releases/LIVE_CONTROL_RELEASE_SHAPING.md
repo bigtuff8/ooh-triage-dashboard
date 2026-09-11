@@ -29,18 +29,23 @@ This document decides **where each ticket in the group release enters the harnes
 
 **The release scope — nine tickets + one gap:**
 
-| Item | Short summary | Jira status (verified) |
-|---|---|---|
-| OOHDASH-8 | Provision 4 IoT-support B2C tester accounts (handler / claimArea 1500) | To Do |
-| OOHDASH-11 | Man-marking scripts + sign-off sheet | To Do |
-| OOHDASH-12 | Invert `WRITES_DISABLED` fail-open → fail-safe default | To Do |
-| OOHDASH-15 | Rotate compromised Lighthouse/Tuya + IoT WiFi credentials | To Do |
-| OOHDASH-18 | Provision + bench-prove SR-3 scoped write credential | To Do |
-| OOHDASH-19 | **Flip `WRITES_DISABLED=false` — the release act** | To Do |
-| OOHDASH-24 | Fix `/healthz` stale-green health flag | To Do |
-| OOHDASH-64 | Confirm ThingsBoard **read** credential actually authenticates | To Do |
-| OOHDASH-67 | Decide + document control-dispatch authorisation policy | To Do |
-| *(gap)* | **Bridge inventory read** — site-search 503 / F025 device contract | *no ticket — see Decision 3* |
+<table>
+<thead>
+<tr><th>Item</th><th>Short summary</th><th>Jira status (verified)</th></tr>
+</thead>
+<tbody>
+<tr><td>OOHDASH-8</td><td>Provision 4 IoT-support B2C tester accounts (handler / claimArea 1500)</td><td>To Do</td></tr>
+<tr><td>OOHDASH-11</td><td>Man-marking scripts + sign-off sheet</td><td>To Do</td></tr>
+<tr><td>OOHDASH-12</td><td>Invert <code>WRITES_DISABLED</code> fail-open &rarr; fail-safe default</td><td>To Do</td></tr>
+<tr><td>OOHDASH-15</td><td>Rotate compromised Lighthouse/Tuya + IoT WiFi credentials</td><td>To Do</td></tr>
+<tr><td>OOHDASH-18</td><td>Provision + bench-prove SR-3 scoped write credential</td><td>To Do</td></tr>
+<tr><td>OOHDASH-19</td><td><strong>Flip <code>WRITES_DISABLED=false</code> — the release act</strong></td><td>To Do</td></tr>
+<tr><td>OOHDASH-24</td><td>Fix <code>/healthz</code> stale-green health flag</td><td>To Do</td></tr>
+<tr><td>OOHDASH-64</td><td>Confirm ThingsBoard <strong>read</strong> credential actually authenticates</td><td>To Do</td></tr>
+<tr><td>OOHDASH-67</td><td>Decide + document control-dispatch authorisation policy</td><td>To Do</td></tr>
+<tr><td><em>(gap)</em></td><td><strong>Bridge inventory read</strong> — site-search 503 / F025 device contract</td><td><em>no ticket — see Decision 3</em></td></tr>
+</tbody>
+</table>
 
 **Terminal act:** OOHDASH-19 flips `WRITES_DISABLED=false`. Verified today: `config.js:87` reads `writesDisabled: env('WRITES_DISABLED') === 'true'` and `k8s/deployment.yaml:68` sets `WRITES_DISABLED="true"` in the live AKS deploy. The kill-switch checks this lock **first and synchronously**, before any database read (`services/killswitch.js:32`), so nothing writes to a device while the lock is on.
 
@@ -50,18 +55,23 @@ This document decides **where each ticket in the group release enters the harnes
 
 Per ticket: does it need **Discovery** (prove an unknown)? **Design** (make a decision)? **Build**? Which lane, and why.
 
-| Ticket | Discovery | Design | Build | Lane | One-line rationale |
-|---|:---:|:---:|:---:|---|---|
-| **-64** TB read cred authenticates? | **YES** | cond. | cond. | Code | Current read state is unproven (`read=false`); design/build only if the cred is actually bad. |
-| **bridge-read gap** | **YES** | — | cond. | Code + external | Site search 503s; needs Spencer/platform confirm of the F025 device contract. **Blocks reaching any device at all.** |
-| **-67** dispatch authz policy | — | **YES** | cond. | Code | Decision gate. Build only if "iot-only" is chosen. See §5 finding. |
-| **-24** /healthz stale-green | — | **YES** | **YES** | Code | Design the fix approach, then build. Couples with -64 (both are read-health trust). |
-| **-12** invert fail-open default | — | — | **YES** | Code | One-line change. No unknowns, no decision — enters straight at **Build-PLAN**. |
-| **-15** rotate compromised creds | — | — | — | External / ops | Security hard gate. Tracked as a release condition, no code pipeline. |
-| **-18** bench-prove SR-3 write cred | light | — | — | External / ops + test | Provisioning + a bench verification. Light discovery on least-privilege scope. |
-| **-8** provision 4 tester accounts | — | — | — | External / ops | Code fix already landed (commit `d1c177d`). Remainder is B2C provisioning + verify. |
-| **-11** man-marking scripts + sign-off | — | — | — | Writer | Draft exists; needs the IoT lead to **accept** before the shakedown. |
-| **-19** flip WRITES_DISABLED=false | — | — | — | Release | The release act. Gated on everything above + read/bridge health green. |
+<table>
+<thead>
+<tr><th>Ticket</th><th>Discovery</th><th>Design</th><th>Build</th><th>Lane</th><th>One-line rationale</th></tr>
+</thead>
+<tbody>
+<tr><td><strong>-64</strong> TB read cred authenticates?</td><td><strong>YES</strong></td><td>cond.</td><td>cond.</td><td>Code</td><td>Current read state is unproven (<code>read=false</code>); design/build only if the cred is actually bad.</td></tr>
+<tr><td><strong>bridge-read gap</strong></td><td><strong>YES</strong></td><td>—</td><td>cond.</td><td>Code + external</td><td>Site search 503s; needs Spencer/platform confirm of the F025 device contract. <strong>Blocks reaching any device at all.</strong></td></tr>
+<tr><td><strong>-67</strong> dispatch authz policy</td><td>—</td><td><strong>YES</strong></td><td>cond.</td><td>Code</td><td>Decision gate. Build only if "iot-only" is chosen. See §5 finding.</td></tr>
+<tr><td><strong>-24</strong> /healthz stale-green</td><td>—</td><td><strong>YES</strong></td><td><strong>YES</strong></td><td>Code</td><td>Design the fix approach, then build. Couples with -64 (both are read-health trust).</td></tr>
+<tr><td><strong>-12</strong> invert fail-open default</td><td>—</td><td>—</td><td><strong>YES</strong></td><td>Code</td><td>One-line change. No unknowns, no decision — enters straight at <strong>Build-PLAN</strong>.</td></tr>
+<tr><td><strong>-15</strong> rotate compromised creds</td><td>—</td><td>—</td><td>—</td><td>External / ops</td><td>Security hard gate. Tracked as a release condition, no code pipeline.</td></tr>
+<tr><td><strong>-18</strong> bench-prove SR-3 write cred</td><td>light</td><td>—</td><td>—</td><td>External / ops + test</td><td>Provisioning + a bench verification. Light discovery on least-privilege scope.</td></tr>
+<tr><td><strong>-8</strong> provision 4 tester accounts</td><td>—</td><td>—</td><td>—</td><td>External / ops</td><td>Code fix already landed (commit <code>d1c177d</code>). Remainder is B2C provisioning + verify.</td></tr>
+<tr><td><strong>-11</strong> man-marking scripts + sign-off</td><td>—</td><td>—</td><td>—</td><td>Writer</td><td>Draft exists; needs the IoT lead to <strong>accept</strong> before the shakedown.</td></tr>
+<tr><td><strong>-19</strong> flip WRITES_DISABLED=false</td><td>—</td><td>—</td><td>—</td><td>Release</td><td>The release act. Gated on everything above + read/bridge health green.</td></tr>
+</tbody>
+</table>
 
 **Reading the "cond." cells:** *conditional* means the stage only runs if an earlier stage says it must — e.g. -64 only needs a build if discovery finds the read credential is genuinely broken.
 
@@ -83,15 +93,20 @@ The work is not one queue. It runs as three streams that converge only at the re
 
 Five points ask for **your** decision. Two other checkpoints are automated (committee / no human).
 
-| # | Gate | Human? | What you approve |
-|---|---|:---:|---|
-| 1 | **Discovery** | **YES — you** | The read/bridge/confirm-loop findings are sound and complete. |
-| 2 | **Design** | **YES — you** | The -24 fix approach and the -67 authz decision. |
-| 3 | **Build-PLAN** | **YES — you** | The build plan (this is where -12 enters). |
-| — | Build-completion | no (committee) | Automated. |
-| — | Test Stage-1 | no (committee) | Automated. |
-| 4 | **Test-results (Stage-2)** | **YES — you** | The test evidence before release. |
-| 5 | **Release-preflight** | **YES — you** | The final go/no-go before the -19 flip. |
+<table>
+<thead>
+<tr><th>#</th><th>Gate</th><th>Human?</th><th>What you approve</th></tr>
+</thead>
+<tbody>
+<tr><td>1</td><td><strong>Discovery</strong></td><td><strong>YES — you</strong></td><td>The read/bridge/confirm-loop findings are sound and complete.</td></tr>
+<tr><td>2</td><td><strong>Design</strong></td><td><strong>YES — you</strong></td><td>The -24 fix approach and the -67 authz decision.</td></tr>
+<tr><td>3</td><td><strong>Build-PLAN</strong></td><td><strong>YES — you</strong></td><td>The build plan (this is where -12 enters).</td></tr>
+<tr><td>—</td><td>Build-completion</td><td>no (committee)</td><td>Automated.</td></tr>
+<tr><td>—</td><td>Test Stage-1</td><td>no (committee)</td><td>Automated.</td></tr>
+<tr><td>4</td><td><strong>Test-results (Stage-2)</strong></td><td><strong>YES — you</strong></td><td>The test evidence before release.</td></tr>
+<tr><td>5</td><td><strong>Release-preflight</strong></td><td><strong>YES — you</strong></td><td>The final go/no-go before the -19 flip.</td></tr>
+</tbody>
+</table>
 
 ---
 
@@ -111,30 +126,16 @@ Five points ask for **your** decision. Two other checkpoints are automated (comm
 
 Run the ops/security lane throughout; sequence the code lane behind a single discovery.
 
-```
--15  ∥  -18  ∥  -8              (run throughout — release conditions)
-        │
-        ▼
-Discovery(-64 + bridge-read + confirm-loop)      ← Gate 1
-        │
-        ▼
--12  build + test               (land early — cheap safety win)
-        │
-        ▼
-Design(-24, -67)                                 ← Gate 2
-        │
-        ▼
--24  build + test   (∥ any -64 / -67 code)       ← Gate 3 Build-PLAN, Gate 4 Test
-        │
-        ▼
--11  accept  (IoT lead sign-off)
-        │
-        ▼
-Release-preflight                                ← Gate 5
-        │
-        ▼
--19  flip WRITES_DISABLED=false  →  supervised shakedown
-```
+The sequence, top to bottom, is:
+
+1. **Throughout (release conditions, running in parallel):** `-15`, `-18` and `-8` — the ops/security lane runs the whole time, not as a blocking first step.
+2. **Discovery** of `-64` + bridge-read + the confirm-loop — this is **Gate 1** (operator).
+3. **`-12` build + test** — land early as the cheap safety win.
+4. **Design** of `-24` and `-67` — this is **Gate 2** (operator).
+5. **`-24` build + test**, running in parallel with any `-64` / `-67` code — this passes through **Gate 3** (Build-PLAN) and **Gate 4** (Test-results).
+6. **`-11` accept** — the IoT lead signs off the man-marking scripts.
+7. **Release-preflight** — this is **Gate 5** (operator).
+8. **`-19` flip `WRITES_DISABLED=false`** — followed immediately by a supervised shakedown.
 
 **Cost / benefit of this ordering:** front-loading the shared discovery avoids three separate investigation passes (saves effort and calendar time). Landing `-12` early buys a safety win — the deploy lock becomes fail-*safe* — for the cost of one one-line change and a test. The main schedule risk sits in the **bridge-read gap**: it depends on Spencer/platform and, until it clears, no device can be reached to control, so it should start today even though it has no owner.
 
@@ -142,18 +143,23 @@ Release-preflight                                ← Gate 5
 
 ## 7. Backlog playback (delivery order)
 
-| Order | Item | One-word stage |
-|---|---|---|
-| 1 | OOHDASH-15 rotate compromised creds | Ops |
-| 2 | OOHDASH-18 bench-prove write cred | Ops |
-| 3 | OOHDASH-8 provision tester accounts | Ops |
-| 4 | bridge-read gap | Discovery |
-| 5 | OOHDASH-64 TB read cred | Discovery |
-| 6 | OOHDASH-12 invert fail-open default | Build |
-| 7 | OOHDASH-67 dispatch authz policy | Design |
-| 8 | OOHDASH-24 /healthz stale-green | Design |
-| 9 | OOHDASH-11 man-marking sign-off | Writer |
-| 10 | OOHDASH-19 flip WRITES_DISABLED=false | Release |
+<table>
+<thead>
+<tr><th>Order</th><th>Item</th><th>One-word stage</th></tr>
+</thead>
+<tbody>
+<tr><td>1</td><td>OOHDASH-15 rotate compromised creds</td><td>Ops</td></tr>
+<tr><td>2</td><td>OOHDASH-18 bench-prove write cred</td><td>Ops</td></tr>
+<tr><td>3</td><td>OOHDASH-8 provision tester accounts</td><td>Ops</td></tr>
+<tr><td>4</td><td>bridge-read gap</td><td>Discovery</td></tr>
+<tr><td>5</td><td>OOHDASH-64 TB read cred</td><td>Discovery</td></tr>
+<tr><td>6</td><td>OOHDASH-12 invert fail-open default</td><td>Build</td></tr>
+<tr><td>7</td><td>OOHDASH-67 dispatch authz policy</td><td>Design</td></tr>
+<tr><td>8</td><td>OOHDASH-24 /healthz stale-green</td><td>Design</td></tr>
+<tr><td>9</td><td>OOHDASH-11 man-marking sign-off</td><td>Writer</td></tr>
+<tr><td>10</td><td>OOHDASH-19 flip WRITES_DISABLED=false</td><td>Release</td></tr>
+</tbody>
+</table>
 
 ---
 
