@@ -1,0 +1,13 @@
+{
+  "run": "selfgate-ooh-triage-dashboard-discovery-control-plumbing",
+  "phase": "discovery",
+  "pr": 7,
+  "approvedBy": [
+    "bigtuff8"
+  ],
+  "reviewComments": [],
+  "mergeCommit": "f20c28af8e673c37ec7de7779e218d86ed530ae3",
+  "phaseBranch": "discovery/control-plumbing",
+  "releaseBranch": "main",
+  "stamp": 1789196778453
+}
