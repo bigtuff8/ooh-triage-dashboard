@@ -1,0 +1,15 @@
+{
+  "run": "selfgate-ooh-triage-dashboard-design-split-lean-24",
+  "phase": "design",
+  "pr": 10,
+  "approvedBy": [
+    "bigtuff8"
+  ],
+  "reviewComments": [
+    "bigtuff8: - The design set: Approve this part\n\n(submitted via the interactive gate review)"
+  ],
+  "mergeCommit": "0a2fb656737aa58cabf617cec0919e27909a96c6",
+  "phaseBranch": "design/split-lean-24",
+  "releaseBranch": "main",
+  "stamp": 1789514520909
+}
