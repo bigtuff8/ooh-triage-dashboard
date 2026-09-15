@@ -49,7 +49,7 @@ Build write-safety before anything a handler could dispatch through, then observ
 
 **Build scope.**
 - services/resolution.js — add consumeConfirmation(token, siteNo, operatorId): the current isConfirmed body (:65-68) plus a synchronous confirmations.delete(token) on the matched path, returning true only after deletion. Update the aspirational module comment (:16) to state dispatch consumes the token. Retain isConfirmed (pure read) ONLY if a verified non-dispatch caller needs it; otherwise remove it so no second replayable path survives — verify callers first.
-- services/control.js — replace resolution.isConfirmed(...) at :49 with resolution.consumeConfirmation(...), keeping it the first gate and ensuring it runs before the first pre-write await and before tb.writeSharedAttribute (:74). On false, throw the existing 409. No change to actionId/audit minting. Token is spent on admission, not on write success.
+- services/control.js — replace resolution.isConfirmed(...) at :49 with resolution.consumeConfirmation(...), keeping it the first gate and ensuring it runs before the first pre-write await and before tb.writeSharedAttribute (:74). On false, throw the existing 409. No change to actionId/audit minting. Token is spent on admission, not on write success. **Atomicity note:** the confirmations.delete(token) MUST run synchronously in the same event-loop tick as the get(), with NO await between check and delete — that is what guarantees exactly-one at replicas:1 under two interleaved dispatches; an intervening await would reopen the double-fire window the concurrency test guards.
 
 **Buildability.** Buildable now. No external blocker.
 
@@ -61,7 +61,7 @@ Build write-safety before anything a handler could dispatch through, then observ
 
 **Build scope.**
 - services/tb-client.js — replace the boolean healthy latch (:28) with a probe-result record plus freshness TTL; add an active read probe reusing getToken() (:29-37); have tbStatus() (:145-153) emit the read tri-state.
-- server.js — update the degraded predicate (:66-70) to map the read tri-state: amber unknown is not green, unhealthy is degraded, unknown surfaced distinctly from unhealthy. Keep HTTP 200 (:63-65).
+- server.js — update the degraded predicate (:66-70) to map the read tri-state: amber unknown is not green, unhealthy is degraded, unknown surfaced distinctly from unhealthy. Keep HTTP 200 (:63-65). **Pin the concrete consumer edit:** server.js:70's current `thingsboard.read === false` boolean predicate MUST be widened so amber/unknown counts as not-green (a Build-doer adding a new tri-state value without updating this consumer would leave amber reading as green).
 - config.js — add healthProbeTtlMs (env-overridable, default ~60000) alongside the existing control timers (:112-116).
 
 **Buildability.** Buildable now. The unblocked ticket. No external blocker.
@@ -73,14 +73,16 @@ Build write-safety before anything a handler could dispatch through, then observ
 ## 4. B0/R0 — site identity at confirm (C9) — SPLIT: name-now, brand/address-later
 
 **Build scope (buildable slice — name now).**
-- services/bridge.js — in fetchLiveSites() (:100-133) replace siteName: g.accountId (:124) with a best-effort name resolved for siteNo via the existing Zendesk site-field option lookup (zendesk.js:53-73), falling back to accountId on miss/error. Enrichment MUST be non-fatal. **Panel MAJOR folded in:** enrich LAZILY at the confirm/resolve step for the single site, NOT eagerly per-site across the whole fetchLiveSites inventory refresh. Keep brand/address undefined (:125-126) and the site shape (:13-14) intact so B2 lights them up with no further change.
-- services/zendesk.js — surface the matched option's human name (not just its tag value) from the site-field option lookup (:66-68). No new external call. **Panel detail folded in:** confirm the Zendesk site-field option genuinely carries a human name, and keep the exactly-one-match safety (a bad/ambiguous match must fall through to the unverified warning, not guess).
+- services/bridge.js — in fetchLiveSites() (:100-133) replace siteName: g.accountId (:124) with a best-effort name resolved for siteNo via the existing Zendesk site-field option lookup (zendesk.js:53-73), falling back to accountId on miss/error. Enrichment MUST be non-fatal. **Enrich EAGERLY in fetchLiveSites** so the name lands in the site record BEFORE search and dispatch read it — this is a deliberate correction of the Design-gate "lazy at confirm" MAJOR, which the Build-PLAN panel found contradicts this item's own test obligation: searchSites filters on siteName (bridge.js:167, so lazy-at-confirm would fail tester test 2 — search by name) and control.dispatch re-fetches via getSitesByNumber (control.js:58) and writes site.siteName into the audit record (control.js:81, so lazy would log the opaque accountId into an irreversible-action audit). The lazy rationale was mis-costed: resolveSiteTag pages the Zendesk options ONCE PER HOUR then serves an in-memory cache (zendesk.js:56), so "eager per-site" is a per-site in-memory filter, not N external calls. If cost is still a concern, memoise per siteNo off that hourly options cache — do NOT defer to confirm. Keep brand/address undefined (:125-126) and the site shape (:13-14) intact so B2 lights them up with no further change.
+- services/zendesk.js — surface the matched option's human name (not just its tag value at :69) from the site-field option lookup (:66-68). No new external call. **HARD pre-build verification (not just a test):** inspect the live Zendesk site-field options and confirm option.name is genuinely human-readable — the entire name-now slice (and clearing tests 1-3 pre-B2) depends on it; if the options are not human-named this slice collapses to still showing an id and must be re-scoped. Ensure the value-only match branch (o.value.includes(siteNo)) still resolves a name from option.name, not the tag value. Keep the exactly-one-match safety (a bad/ambiguous match must fall through to the unverified warning, not guess).
 - public/js/control.js — redesign the confirm-modal target (:96) so site identity is the most prominent element (C9): name largest, house number secondary, device/zone demoted. Add the unverified-name warning and de-emphasised accountId when no name resolves. Mirror identity emphasis in the sync-tracker header (:113).
 - public/js/views.js — guard the resolve/confirm script and site header so missing brand/address renders name-only (no literal "undefined") until B2 (:88-91); same graceful degrade on recents/audit (:145).
 
 **Buildability.** Name slice buildable NOW via Zendesk (no B2). Deferred slice (blocked on B2, owner Spencer/IoT): brand plus full postal address at confirm. Confirm target until B2 is name plus house number, which already ends the gk-6261 defect.
 
-**Test obligation.** Name enrichment lands in live mode (confirm modal shows the pub name, not gk-6261); search-by-name works via the enriched record; unverified-identity guard fires on Zendesk miss and fetchLiveSites() still succeeds; graceful brand/address degrade pre-B2; B2-ready (a record carrying brand/address surfaces them with no code change); fixture mode unchanged.
+**Test obligation.** Name enrichment lands in live mode (confirm modal shows the pub name, not gk-6261); search-by-name works via the enriched record (searchSites matches on the enriched siteName, bridge.js:167 — Tony's test 2); the dispatch audit logs the enriched siteName, not the accountId (control.js:81); unverified-identity guard fires on Zendesk miss and fetchLiveSites() still succeeds; graceful brand/address degrade pre-B2; B2-ready (a record carrying brand/address surfaces them with no code change); fixture mode unchanged.
+
+**Data-protection note.** The Zendesk-sourced site name (and later brand/address) is operational site identity for dispatch safety, not personal data; its appearance in the confirm modal, recents and audit trail is within the existing data-retention scope. No new external sharing is introduced (the lookup already runs in-app).
 
 **Merge gate.** None. Clears tester tests 1 to 3.
 
@@ -148,7 +150,7 @@ Build write-safety before anything a handler could dispatch through, then observ
 
 **Build scope (specified, NOT to be built/committed/merged until R4 clears).**
 - services/auth.js — add a rank-aware requireMinRole(minRole) guard built on ROLE_PRECEDENCE (:175): admit any operator whose role ranks at least as high as minRole, deny unknown/null. Leave the exact-match requireRole (:223) intact for /admin.
-- routes/api.js — gate the dispatch route (:140) with requireMinRole('handler') (admits handler plus iot, denies role-less authenticated users — closes the any-authenticated-user hole). Policy knob: requireMinRole('iot') if Decision 4 goes iot-only (needs iot provisioned to every intended dispatcher — an ops action). Decide whether the status/wait routes (:149,155) inherit the same gate (recommended).
+- routes/api.js — gate the dispatch route (:140) with requireMinRole('handler') (admits handler plus iot, denies role-less authenticated users — closes the any-authenticated-user hole). Policy knob: requireMinRole('iot') if Decision 4 goes iot-only (needs iot provisioned to every intended dispatcher — an ops action). Decide whether the status/wait routes (:149,155) inherit the same gate (recommended). Note: the exact-match requireRole guard is at auth.js:219 (the plan's earlier :223 reference is the surrounding function body — use :219 for the definition).
 
 **Buildability.** BLOCKED — hard-gated on R4 (the true sign-in-eligible population, owner Spencer, UNVERIFIED). Exact-match trap: a naive requireRole('iot') would lock out every handler — the rank-aware guard is mandatory.
 
@@ -163,19 +165,21 @@ Build write-safety before anything a handler could dispatch through, then observ
 - OOHDASH-12 — merge-blocked on the S4 environment-config audit (.env.example line added, k8s comment made load-bearing, Dockerfile confirmed clean, non-live paths documented).
 - OOHDASH-67 — HARD-gated on R4; specified but PARKED, not built/committed/merged.
 - C2 — not closed by building; clears only when replay-plus-concurrency proof is green and the named gate records it (pre-flip). Cross-replica single-use flagged to C5.
-- C1 — Cosmos persistence of in-flight actions DEFERRED; C1 stays OPEN.
+- C1 — Cosmos persistence of in-flight actions DEFERRED; C1 stays OPEN. The restart-hole (a pod roll mid-window silently drops the late-sync watch — fail-safe but the audit stays uncorrected) MUST be surfaced on the C5 pre-flip preflight as a conscious go-live decision, not an inherited gap; item 7's known-gap test documents it.
 - B0/R0 brand+address, R7 hot-water control, B3 90s calibration — deferred slices behind Spencer-owned B2/R7/B3; buildable slices proceed now.
 
 ## Panel findings folded in (line-item map)
 
-- MAJOR (site-identity): lazy per-site enrichment at confirm, not eager across the inventory refresh — item 4 build scope (bridge.js).
-- C5 preflight pins (plan outputs, not built now): replicas:1 invariant (C2/C1 baseline); requireMinRole('handler') lands before/with OOHDASH-19 (item 9); env re-disable is a pod-roll so abort-SLA equals pod-roll time (S6, C5 preflight note); ON-to-OFF "returned to safety-lock" signal (item 8).
+- MAJOR (site-identity) — CORRECTED by the Build-PLAN panel: the Design-gate "enrich lazily at confirm" MAJOR was found to contradict item 4's test obligation (search-by-name and the dispatch audit both read siteName off the eagerly-populated record) and was mis-costed (resolveSiteTag is hourly-cached). Item 4 now specifies EAGER enrichment in fetchLiveSites off the cached options (memoise per siteNo if cost matters), never lazy-at-confirm.
+- C5 preflight pins (plan outputs, not built now): replicas:1 invariant (C2/C1 baseline); requireMinRole('handler') lands before/with OOHDASH-19 (item 9); env re-disable is a pod-roll so abort-SLA equals pod-roll time (S6, C5 preflight note); at replicas:1 that abort pod-roll is a hard cutover with a brief unavailability gap and in-flight-action loss (fail-safe: denies) — confirm the maxUnavailable/surge posture is acceptable for abort timing; ON-to-OFF "returned to safety-lock" signal (item 8), built so item 8's sessionStorage transition scaffold makes it a pure additive follow-on with no rework; assert /healthz.writesDisabled and /me.controlLive derive from the same config truth and cannot diverge across the flip.
 - Build-doer details: ONE interrupt-precedence rule across the three tracker interrupts (control-live ack, then mid-wait prompt, then late-sync banner) — the first-use ack must clear before a confirm step, must not stack on an open confirm modal, and the late-sync banner supersedes a stale mid-wait card (state this single rule at build); durable-note-per-timeout decided lazy (item 7); midWaitPromptMs delivered via /api/me (item 6); Zendesk option human-name plus exactly-one-match safety confirmed (item 4).
 - S9 traceability: each item carries its register IDs and file/line citations so a Build-doer's PR can be traced back to the condition it discharges.
 
 ## S9 traceability line
 
 OOHDASH-12 to S4/C5; C2 to C2/C5(cross-replica); OOHDASH-24 to C3; B0/R0 to B0/R0/C9/B2; OOHDASH-70 to C8/R10/R7; R11/C7 to R11/C7/B3; C6/C1 to C6/C1; R8/S10 to R8/S10/S11; OOHDASH-67 to R4. No row closed by this plan.
+
+**Tester-feedback traceability.** Tony's tests 1 to 3 (site identity) are discharged by item 4 (B0/R0). Test 6 (Lighthouse scope tiles — "not on lighthouse here") is improved by item 5's presence-driven scope tile (monitored-not-adjustable context). Test 5 (device coverage — "no boiler or tuya devices found") is tied to B2 (bridge inventory contract, Spencer-owned) and is NOT closed by any build item here — it is named so it does not silently fall through the split. Tests 10 and 11 (dropped outcome notes; P1/SMS) are separate defects, out of this design/build scope (owned by James's post-design feedback pass).
 
 ---
 
