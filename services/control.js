@@ -45,8 +45,12 @@ let pollTimer = null;
  * Validates and dispatches a control command. Returns the initial action record.
  */
 export async function dispatch({ operator, confirmToken, siteNo, deviceId, command, value, hold, direction }) {
-    // 1. F004 confirmation gate
-    if (!resolution.isConfirmed(confirmToken, siteNo, operator.id)) {
+    // 1. F004 confirmation gate — atomically CONSUME the single-use token (C2). This runs
+    // FIRST, before any pre-write await (killswitch/resolve below) and before the device
+    // write, and the get-then-delete is synchronous with no await between: two interleaved
+    // dispatches with the same token cannot both pass. The token is spent on ADMISSION, so a
+    // retry after a real-but-unacknowledged write is denied — the handler must re-confirm.
+    if (!resolution.consumeConfirmation(confirmToken, siteNo, operator.id)) {
         throw Object.assign(new Error('Site has not been confirmed for this call — confirm the site before sending any change'), { status: 409 });
     }
 
