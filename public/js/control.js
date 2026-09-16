@@ -23,7 +23,7 @@ function ctlMidWaitMs() {
 }
 
 // Phases in which an action has SETTLED — a mid-wait prompt must never fire (or stay) over one.
-const CTL_SETTLED_PHASES = ['done', 'failed', 'rejected', 'timeout'];
+const CTL_SETTLED_PHASES = ['done', 'done-late', 'failed', 'rejected', 'timeout'];
 
 // Arm the one-shot mid-wait timer. Only fires while the action is genuinely still in-flight
 // (phase 'confirm', not settled, prompt not already showing).
@@ -159,8 +159,8 @@ function drawControl() {
     const ph = c.phase;
     const steps = `<div class="syncsteps" data-testid="sync-steps">
    <div class="ss ${ph !== 'sent' ? 'ok' : 'on'}">1. Sent</div>
-   <div class="ss ${ph === 'confirm' ? 'on wait' : ph === 'done' ? 'ok' : ['failed', 'rejected', 'timeout'].includes(ph) ? 'bad' : ''}">2. Device confirming…</div>
-   <div class="ss ${ph === 'done' ? 'ok' : ['failed', 'rejected', 'timeout'].includes(ph) ? 'bad' : ''}">${ph === 'failed' ? '✕ Failed' : ph === 'rejected' ? '✕ Rejected' : ph === 'timeout' ? '⚠ No confirmation' : '3. Applied'}</div></div>`;
+   <div class="ss ${ph === 'confirm' ? 'on wait' : ['done', 'done-late'].includes(ph) ? 'ok' : ['failed', 'rejected', 'timeout'].includes(ph) ? 'bad' : ''}">2. Device confirming…</div>
+   <div class="ss ${['done', 'done-late'].includes(ph) ? 'ok' : ['failed', 'rejected', 'timeout'].includes(ph) ? 'bad' : ''}">${ph === 'failed' ? '✕ Failed' : ph === 'rejected' ? '✕ Rejected' : ph === 'timeout' ? '⚠ No confirmation' : ph === 'done-late' ? '⚠→✅ Applied LATE' : '3. Applied'}</div></div>`;
     let tail = '';
     // R11/C7 mid-wait decision prompt — a one-shot interrupt over the confirm-phase spinner.
     // It replaces the passive "waiting" copy with an active caller-on-hold decision. Only rendered
@@ -172,6 +172,12 @@ function drawControl() {
    <div style="display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap"><button class="btn" data-testid="midwait-hold" onclick="ctlMidWaitHold()">Keep caller on hold</button><button class="btn" data-testid="midwait-stop" onclick="ctlMidWaitStop()">Stop waiting</button><button class="btn primary" data-testid="midwait-escalate" onclick="ctlEscalate()">Escalate</button></div>`;
     } else if (ph === 'sent' || ph === 'confirm') tail = `<p class="small" style="text-align:center" aria-live="polite">Waiting for the device to echo the change back — usually under 30 seconds. <b>“Applied” only means device-confirmed.</b></p>`;
     if (ph === 'done') tail = `<div class="alert ok" data-testid="sync-applied" aria-live="polite">✅ <b>Applied — device confirmed ${ctlValTxt()} at ${new Date(c.action.settledAt).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}.</b>${c.hold !== 'none' ? ` Hold active: reverts at ${holdRevertText(c.hold)}.` : ''}</div><div style="text-align:right"><button class="btn primary" data-testid="sync-done" onclick="ctlFinish()">Done</button></div>`;
+    // C6 applied-LATE — a device that echoed AFTER we told the handler "not applied" (timeout).
+    // Distinct from the plain "Applied" card so the handler is told to go back to the caller. This
+    // is the EPHEMERAL in-session channel (best-effort, lost on restart / once the tracker closes);
+    // the durable cross-shift signal is the Zendesk late-sync ticket note. Interrupt-precedence: the
+    // poller already cleared any stale mid-wait card on settle before this renders.
+    if (ph === 'done-late') tail = `<div class="alert warn" data-testid="sync-applied-late" aria-live="assertive">⚠️→✅ <b>Applied LATE</b> — this change was reported as <b>not applied</b>, but the device has now confirmed ${ctlValTxt()} at ${new Date(c.action.settledAt).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}. <b>Tell the caller it's now done, and check nothing was actioned twice.</b>${c.hold !== 'none' ? ` Hold active: reverts at ${holdRevertText(c.hold)}.` : ''}</div><div style="text-align:right"><button class="btn primary" data-testid="sync-done" onclick="ctlFinish()">Done</button></div>`;
     if (ph === 'failed' || ph === 'rejected') tail = `<div class="alert err" data-testid="sync-failed" aria-live="assertive">❌ <b>The device ${ph === 'rejected' ? 'rejected' : 'refused'} this command</b> (<span class="mono">${ph}</span>). Nothing has changed on site — do not tell the caller it’s done.</div><div style="text-align:right;display:flex;gap:8px;justify-content:flex-end"><button class="btn" onclick="ctlRetry()">Try again</button><button class="btn primary" data-testid="sync-escalate" onclick="ctlEscalate()">Escalate instead</button></div>`;
     if (ph === 'timeout') tail = `<div class="alert warn" data-testid="sync-timeout" aria-live="assertive">⏱️ <b>The device hasn’t confirmed yet.</b>${c.action?.slowEchoDevice ? ' This unit (IT700) can be slow to echo.' : ''} <b>Treat the change as NOT applied.</b> We’ll keep watching in the background and update the ticket if it lands.</div><div style="text-align:right;display:flex;gap:8px;justify-content:flex-end"><button class="btn" data-testid="sync-wait" onclick="ctlWaitMore()">Keep waiting (30s)</button><button class="btn primary" data-testid="sync-escalate" onclick="ctlEscalate()">Escalate</button></div>`;
     const trackerName = ws.site.nameUnverified
@@ -224,7 +230,13 @@ function startCtlPolling() {
         // R11/C7: any settle cancels the pending mid-wait prompt so it can never fire (or linger)
         // over a resolved action. late-sync applied-late (→ 'done') supersedes a stale mid-wait card.
         if (['synced', 'late-synced', 'failed', 'rejected', 'timeout'].includes(action.state)) clearCtlMidWait();
-        if (['synced', 'late-synced'].includes(action.state) && c.phase !== 'done') { c.phase = 'done'; drawControl(); }
+        // C6: split late-synced from a normal synced. A device that echoes AFTER we already told the
+        // handler "not applied" (timeout) settles to a DISTINCT 'done-late' phase with its own
+        // applied-LATE banner — never the plain "Applied" card. This also supersedes any stale
+        // mid-wait card (clearCtlMidWait above already ran). Ephemeral by design: only a handler
+        // still on the tracker sees it; the durable cross-shift signal is the Zendesk ticket note.
+        if (action.state === 'late-synced' && c.phase !== 'done-late') { c.phase = 'done-late'; drawControl(); }
+        else if (action.state === 'synced' && c.phase !== 'done') { c.phase = 'done'; drawControl(); }
         else if (['failed', 'rejected'].includes(action.state) && !['failed', 'rejected'].includes(c.phase)) { c.phase = action.state; drawControl(); }
         else if (action.state === 'timeout' && c.phase !== 'timeout') { c.phase = 'timeout'; drawControl(); }
         if (['synced', 'late-synced', 'failed', 'rejected'].includes(action.state)) clearInterval(ctlPollTimer);

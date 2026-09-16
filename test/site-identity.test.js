@@ -49,8 +49,9 @@ mock.module('../services/zendesk.js', {
             if (String(siteNo) === '4741') throw new Error('zendesk down');
             return NAME_BY_SITE[String(siteNo)] || null;
         },
-        // control.js imports addLateSyncNote from zendesk; keep it inert for the dispatch test.
-        addLateSyncNote: async () => ({ ok: true })
+        // control.js imports addLateSyncNote + createLateSyncTicket from zendesk; keep them inert.
+        addLateSyncNote: async () => ({ ok: true }),
+        createLateSyncTicket: async () => ({ id: 99999, url: '#lazy' })
     }
 });
 

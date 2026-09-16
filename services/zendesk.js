@@ -255,11 +255,43 @@ export async function createOutcomeTicket({ operator, siteNo, siteName, subject,
 }
 
 /**
- * Appends a late-sync annotation after an IT700-style timeout resolved itself (F008).
+ * C6 — posts the actionable cross-shift late-sync update after an IT700-style timeout finally
+ * echoes (F008). This is the DURABLE channel: the ticket note is the only artefact that survives
+ * a pod restart, so it is written as an operator ACTION ITEM for the next handler, not a passive
+ * log line. It states the change was previously reported NOT applied to the caller, has now applied
+ * LATE, names the site/device/value/time, and instructs the next handler to verify with the caller
+ * that the site is now correct (and to check nothing was actioned twice — C2 double-dispatch care).
+ * Carries the `[TRG]` prefix + `#ooh-late-sync` marker so the OOH view can filter these.
  */
 export async function addLateSyncNote(ticketId, action) {
-    const body = `[TRG] Late device confirmation: ${action.attribute} = ${action.value} on ${action.deviceId} synced at ${action.settledAt} (was reported as timed out). Treat the change as applied.`;
+    const at = hhmm(action.settledAt) || action.settledAt;
+    const site = action.siteName ? `${action.siteName} (site ${action.siteNo})` : `site ${action.siteNo}`;
+    const body = [
+        `[TRG] ⚠️→✅ APPLIED LATE — ACTION NEEDED. #ooh-late-sync`,
+        `The change ${action.attribute} = ${action.value} on ${action.deviceId} (${site}) was reported to the caller as NOT applied (device timed out), but the device has now confirmed it — it synced late at ${at}.`,
+        `Next handler: VERIFY WITH THE CALLER that the site is now correct, and check nothing was actioned twice (a second change may have been made after we said this one had not applied).`
+    ].join('\n');
     return addInternalComment(ticketId, body);
+}
+
+/**
+ * C6 — lazily creates a minimal internal Zendesk ticket to CARRY a late-sync note when a
+ * timed-out action echoes late and no outcome/escalation ticket was ever created for it (the
+ * handler simply closed the tracker). Deliberately NOT called for every timeout — only at the
+ * moment a late echo actually needs a durable target — so a benign timeout that never echoes
+ * costs no Zendesk write. Returns { id, url }; tagged `ooh`/`ooh_late_sync` for the OOH view.
+ */
+export async function createLateSyncTicket(action) {
+    return createOutcomeTicket({
+        operator: action.operator || { name: 'OOH' },
+        siteNo: action.siteNo,
+        siteName: action.siteName,
+        subject: `Late device confirmation — ${action.deviceId}`,
+        summary: `Late device confirmation — ${action.attribute} on ${action.deviceId}`,
+        detail: `A control change on ${action.deviceId} timed out at dispatch and was reported to the caller as not applied, then confirmed late — see the [TRG] late-sync note.`,
+        outcomeType: 'late-sync',
+        extraTags: ['ooh_late_sync']
+    });
 }
 
 /**
