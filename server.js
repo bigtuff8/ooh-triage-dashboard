@@ -63,17 +63,30 @@ app.get('/healthz', (req, res) => {
     // keep HTTP 200 even when degraded: both K8s liveness and readiness probes hit /healthz and,
     // with replicas:1 (RB-4/AD-04), a non-2xx on a transient Cosmos blip would restart/deregister
     // the only pod — a full outage plus forced re-SSO. Degrade is surfaced in the body, not the code.
+    //
+    // OOHDASH-24: thingsboard.read is now a TRI-STATE ('unconfigured'/'unknown'/'healthy'/'unhealthy'),
+    // no longer a boolean. Only 'healthy' is green: 'unknown' (amber — configured but not proven this
+    // cycle) and 'unhealthy' (red — active probe failed) BOTH count as not-green so a stale/dead read
+    // cred can never present green. 'unconfigured' is not counted against health (read may be legitimately
+    // absent). The old `read === false` boolean consumer is deliberately WIDENED here — a bare new value
+    // must not leave amber reading as green. tbReadDegraded is surfaced distinctly below.
+    const tbReadState = subsystems.thingsboard?.read;
+    const tbReadDegraded = subsystems.thingsboard?.mode === 'live'
+        && (tbReadState === 'unknown' || tbReadState === 'unhealthy');
     const degraded =
         subsystems.store?.healthy === false ||
         subsystems.bridge?.healthy === false ||
         subsystems.zendesk?.healthy === false ||
-        (subsystems.thingsboard?.mode === 'live' && subsystems.thingsboard?.read === false);
+        tbReadDegraded;
     res.json({
         status: degraded ? 'degraded' : 'ok',
         version: config.appVersion,
         authMode: config.authMode,
         dataMode: config.dataMode,
         writesDisabled: config.writesDisabled, // F005 canary proof — deploy-time device-write lock
+        // OOHDASH-24: surface the read tri-state DISTINCTLY (amber 'unknown' vs red 'unhealthy'),
+        // not just as a degraded roll-up, so a monitor can tell an unproven read from a dead one.
+        thingsboardRead: tbReadState,
         subsystems,
         controlQueue: controlQueueStatus(),
         activeAlerts: alerts.map(a => ({ code: a.code, message: a.message, raisedAt: a.raisedAt, count: a.count }))
