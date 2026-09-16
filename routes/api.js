@@ -40,7 +40,11 @@ router.get('/me', wrap(async (req, res) => {
         notices: await notices.activeNotices(),
         degraded: !bridge.bridgeStatus().healthy,
         version: config.appVersion,
-        dataMode: config.dataMode
+        dataMode: config.dataMode,
+        // R11/C7: panel-pinned client-config delivery path — the client has no other server→client
+        // config channel, so client knobs ride /me. midWaitPromptMs arms the mid-wait decision
+        // prompt (control.js); the R8 controlLive signal will join this object on the same surface.
+        control: { midWaitPromptMs: config.control.midWaitPromptMs }
     });
 }));
 
