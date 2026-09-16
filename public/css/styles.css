@@ -38,6 +38,8 @@ input,select,textarea{font:inherit}
 .topbar .ver{margin-left:auto;color:var(--text-disabled);font-size:12px}
 .banner{padding:8px 24px;font-size:13.5px;font-weight:500;display:flex;align-items:center;gap:10px}
 .banner.kill{background:var(--danger-light);color:#991B1B;border-bottom:1px solid #FECACA}
+/* R8/S10: control-is-live signal — an ENABLED state (green), deliberately distinct from the red .kill block. */
+.banner.live{background:var(--success-light);color:#065F46;border-bottom:1px solid #A7F3D0}
 .banner.notice{background:var(--info-light);color:#1E40AF;border-bottom:1px solid #BFDBFE}
 .content{padding:18px 24px;max-width:1240px;width:100%;margin:0 auto}
 .content.narrow{max-width:760px}
