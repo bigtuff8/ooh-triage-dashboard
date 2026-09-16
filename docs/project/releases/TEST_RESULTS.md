@@ -10,6 +10,8 @@ DECISION test-results-green: All eight buildable items are merged and green (115
 
 **Stage:** Test-results. **Date:** 2026-09-16. **Repo:** main (bigtuff8/ooh-triage-dashboard), app v1.2.0. **Suites:** 115 unit tests (`npm run test:unit`, 14 files) and 41 end-to-end tests (`npx playwright test`, real server in fixture mode) — all green on merged main.
 
+**E2e reliability.** The e2e suite runs single-worker and serial by design (`workers: 1`, `fullyParallel: false`) because the tests share server state (audit log, kill-switch) and bind a fixed port. Run that way it is reliably green — verified across multiple consecutive clean serial runs (41/41 each). A few tests assert on device sync-echo landing within a poll-interval window, which can jitter under machine load; a single Playwright retry is configured as defense-in-depth (the suite passes clean serial runs without it — this is not masking a logic defect). Do NOT run two suite invocations concurrently: they contend on the fixed port and shared store and will interfere (this, not suite flakiness, caused transient failures during panel review).
+
 > **Standing invariants (held throughout).** WRITES_DISABLED stays true; no test enables device control on a live site (the e2e fixture server sets WRITES_DISABLED=false only to exercise the dispatch flow against fixture data, never a live pub). No register row is closed. B1 to B3, R4 and R7 remain OPEN and Spencer-owned. OOHDASH-67 is parked behind R4 — not built or merged.
 
 ## What was built (all merged to main, each independently reviewed SHIP)
