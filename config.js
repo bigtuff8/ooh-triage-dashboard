@@ -115,7 +115,11 @@ export const config = {
     control: {
         syncPollIntervalMs: parseInt(env('SYNC_POLL_INTERVAL_MS', '3000'), 10),
         syncTimeoutMs: parseInt(env('SYNC_TIMEOUT_MS', '90000'), 10),
-        lateSyncWatchMs: parseInt(env('LATE_SYNC_WATCH_MS', '600000'), 10)
+        lateSyncWatchMs: parseInt(env('LATE_SYNC_WATCH_MS', '600000'), 10),
+        // OOHDASH-24: freshness window for the /healthz active read-probe. A probe result older
+        // than this is stale ⇒ the read tri-state can no longer report green off it (amber/unknown
+        // until a fresh probe runs). Env-overridable; default 60s.
+        healthProbeTtlMs: parseInt(env('HEALTH_PROBE_TTL_MS', '60000'), 10)
     },
 
     // Call-ticket reconciliation (F003). Thresholds are the numbers James tunes at the Design Gate

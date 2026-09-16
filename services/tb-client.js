@@ -25,13 +25,19 @@ const ATTRIBUTE_FAMILY = {
 function tbSession(username, password, label) {
     let token = null;
     let expiry = 0;
-    let healthy = false;
+    // OOHDASH-24: an ACTIVE probe-result record replaces the old lazy boolean `healthy` latch.
+    // `checkedAt` is 0 until a probe/read actually runs, so an unexercised-but-configured session
+    // is stale/never-run (amber), never green. `ok` records the LAST outcome (auth/read success vs
+    // 401/transport failure). Any successful auth or request refreshes the record; any failure marks
+    // it not-ok. Freshness is judged against config.control.healthProbeTtlMs at read time.
+    let probe = { ok: false, checkedAt: 0 };
+    function markProbe(ok) { probe = { ok, checkedAt: Date.now() }; }
     async function getToken() {
         if (token && Date.now() < expiry) return token;
         const res = await axios.post(`${config.thingsboard.url}/api/auth/login`, { username, password }, { timeout: 10000 });
         token = res.data.token;
         expiry = Date.now() + 2 * 60 * 60 * 1000;
-        healthy = true;
+        markProbe(true);
         console.log(`[TB] Authenticated (${label})`);
         return token;
     }
@@ -44,15 +50,49 @@ function tbSession(username, password, label) {
                 data,
                 timeout: 15000
             });
-            healthy = true;
+            markProbe(true);
             return res.data;
         } catch (err) {
             if (err.response?.status === 401) { token = null; }
-            healthy = false;
+            markProbe(false);
             throw err;
         }
     }
-    return { request, isHealthy: () => healthy, isConfigured: () => !!(username && password) };
+    /**
+     * OOHDASH-24 — active read probe. A cheap authenticated call (the existing getToken() login)
+     * that positively re-proves the read credential is still live, so a once-good-now-dead cred is
+     * caught on the healthcheck path WITHOUT needing a device read to trigger it. Records outcome +
+     * timestamp; never throws (health must not take down /healthz). No-op when unconfigured.
+     */
+    async function activeReadProbe() {
+        if (!(username && password)) return probe;
+        // Force a FRESH authentication rather than trusting a cached JWT: a cred that has been
+        // revoked server-side still has a locally-cached (unexpired) token, so reusing it would
+        // never detect the death — the stale-green defect this ticket exists to kill. Clearing the
+        // token makes getToken() re-hit /api/auth/login and surfaces a 401 on a dead cred.
+        token = null;
+        expiry = 0;
+        try {
+            await getToken(); // re-authenticates; marks ok + fresh on success
+        } catch {
+            markProbe(false); // 401 / transport ⇒ not-ok + fresh
+        }
+        return probe;
+    }
+    const isConfigured = () => !!(username && password);
+    const isFresh = () => (Date.now() - probe.checkedAt) < config.control.healthProbeTtlMs;
+    return {
+        request,
+        activeReadProbe,
+        isConfigured,
+        // Read tri-state derived from freshness + last outcome. Callers map this to /healthz colours.
+        // Never green off a stale/never-run probe (checkedAt 0 is always stale).
+        readState() {
+            if (!isConfigured()) return 'unconfigured';
+            if (!isFresh()) return 'unknown';      // configured but not proven within the TTL (amber)
+            return probe.ok ? 'healthy' : 'unhealthy';
+        }
+    };
 }
 
 const readSession = tbSession(config.thingsboard.readUsername, config.thingsboard.readPassword, 'read');
@@ -141,13 +181,37 @@ export async function readControlState(device, attribute) {
 
 /**
  * Health signal for /healthz.
+ *
+ * OOHDASH-24: `read` is now a TRI-STATE string (unconfigured / unknown / healthy / unhealthy),
+ * NOT a boolean. `unknown` (amber) means configured-but-not-proven-this-cycle and MUST NOT be
+ * treated as green by any consumer (see server.js degraded predicate). A lazy active probe is
+ * kicked off when the cached read-probe result is stale so a quiet pod still re-proves the cred;
+ * it is fire-and-forget (never throws, never blocks the healthcheck response), so the state
+ * reported here reflects the probe as of the LAST completed cycle — the following probe past the
+ * TTL is what flips a dead-but-once-good cred to `unhealthy`.
  */
 export function tbStatus() {
-    if (config.dataMode === 'fixture') return { mode: 'fixture', read: true, write: true };
+    if (config.dataMode === 'fixture') return { mode: 'fixture', read: 'healthy', write: true };
+    const read = readSession.readState();
+    // Lazily re-arm the probe when stale/never-run so the NEXT /healthz reflects a fresh outcome.
+    // Fire-and-forget: activeReadProbe swallows its own errors, so this cannot reject unhandled.
+    if (read === 'unknown') readSession.activeReadProbe();
     return {
         mode: 'live',
-        read: readSession.isConfigured() && readSession.isHealthy(),
-        write: writeSession.isConfigured() && writeSession.isHealthy(),
+        read,
+        write: writeSession.isConfigured() && writeSession.readState() === 'healthy',
         writeConfigured: writeSession.isConfigured()
     };
+}
+
+/**
+ * OOHDASH-24 — run the active read probe and AWAIT its completion, returning the resulting
+ * read tri-state. This is the deterministic (awaitable) counterpart to the fire-and-forget probe
+ * kicked off inside tbStatus(); a boot warm-up or background timer can call it to positively
+ * re-prove the read credential. No-op-safe in fixture mode.
+ */
+export async function probeReadHealth() {
+    if (config.dataMode === 'fixture') return 'healthy';
+    await readSession.activeReadProbe();
+    return readSession.readState();
 }
