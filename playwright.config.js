@@ -27,6 +27,8 @@ export default defineConfig({
             OOH_STORE_DIR: 'test-results/store-' + PORT,
             SYNC_POLL_INTERVAL_MS: '1000',
             SYNC_TIMEOUT_MS: '6000',
+            MID_WAIT_PROMPT_MS: '3000', // R11/C7: must satisfy 0 < it <= SYNC_TIMEOUT_MS (compressed for e2e)
+            WRITES_DISABLED: 'false', // OOHDASH-12 default is now fail-closed; fixture e2e exercises the dispatch flow, so enable writes here
             RATE_LIMIT_MAX: '100000' // whole suite shares one IP
 
         }

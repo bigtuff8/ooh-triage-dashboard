@@ -67,9 +67,18 @@ test.describe('control & sync', () => {
 
     test('F009 capability gating: boost rejected on a non-DHW device, mode rejected on Salus', async ({ page }) => {
         await confirmSite(page, '6832', 'Old Grey Mare');
-        const token = await page.evaluate(() => state.confirmToken);
-        const results = await page.evaluate(async (confirmToken) => {
+        // C2 (single-use confirm token): each admitted dispatch spends its token — even a
+        // guardrail-rejected (422) one — so mint a FRESH token per raw attempt. The guided UI
+        // never composes an invalid command; this exercises the server-side guardrail directly.
+        const results = await page.evaluate(async () => {
+            const freshToken = async () => {
+                const r = await fetch('/api/sites/6832/confirm', {
+                    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}'
+                });
+                return (await r.json()).confirmToken;
+            };
             const post = async (body) => {
+                const confirmToken = await freshToken();
                 const r = await fetch('/api/control/dispatch', {
                     method: 'POST', headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ confirmToken, siteNo: '6832', ...body })
@@ -81,7 +90,7 @@ test.describe('control & sync', () => {
                 modeOnSalus: await post({ deviceId: 'IT500-BAR-6832', command: 'mode', value: 'Off' }),
                 writeToTuya: await post({ deviceId: 'TUYA-K1-6832', command: 'setpoint', value: 20 })
             };
-        }, token);
+        });
         expect(results.boostOnHeating.status).toBe(422);
         expect(results.boostOnHeating.body.error).toContain('not a boostable');
         expect(results.modeOnSalus.status).toBe(422);
