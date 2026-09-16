@@ -41,9 +41,15 @@ router.get('/me', wrap(async (req, res) => {
         degraded: !bridge.bridgeStatus().healthy,
         version: config.appVersion,
         dataMode: config.dataMode,
+        // R8/S10: derived "control is live" signal for the OOHDASH-19 flip. Computed from
+        // config.writesDisabled (config.js:90) — the SAME deploy-time-lock truth /healthz echoes
+        // (server.js:86) — so operator-facing (controlLive) and probe-facing (writesDisabled)
+        // signals cannot diverge. Because it is `!config.writesDisabled` it is structurally tied
+        // to the true flag and can NEVER be hard-coded to live: flipping the env flips this.
+        controlLive: !config.writesDisabled,
         // R11/C7: panel-pinned client-config delivery path — the client has no other server→client
         // config channel, so client knobs ride /me. midWaitPromptMs arms the mid-wait decision
-        // prompt (control.js); the R8 controlLive signal will join this object on the same surface.
+        // prompt (control.js); the R8 controlLive signal joins this object on the same surface.
         control: { midWaitPromptMs: config.control.midWaitPromptMs }
     });
 }));

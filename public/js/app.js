@@ -36,11 +36,17 @@ function toast(msg) {
 }
 
 /**
- * Blocking reason for writes: kill-switch (F016) or degraded reads (TQ-8) — both
- * fail safe to capture-and-escalate.
+ * Blocking reason for writes: F005 deploy-time lock, kill-switch (F016) or degraded reads
+ * (TQ-8) — all fail safe to capture-and-escalate.
+ *
+ * R8/S10 secondary behaviour: this predicate now ALSO consults ks.writesDisabled (the F005
+ * deploy-time lock echoed on /api/me via killSwitch). Previously the deploy lock produced only
+ * a server-side 423 with NO client block; consulting it here yields a proper client-side block
+ * while control is OFF (canary/pre-flip), so the block is loud in the UI, not just at dispatch.
  */
 function writesDisabled(siteNo) {
     const ks = state.me?.killSwitch;
+    if (ks?.writesDisabled) return 'Device control is disabled at deploy time (safety/canary lock) — changes can’t be sent yet';
     if (ks?.global) return `Device control is switched off globally — ${esc(ks.reason || '')} (${esc(ks.actor || '')})`;
     if (siteNo && ks?.sites?.[siteNo]) return `Device control is switched off for this site — ${esc(ks.sites[siteNo].reason)} (${esc(ks.sites[siteNo].actor)})`;
     if (state.me?.degraded || state.workspace?.degraded) return 'Live device reads are unavailable (degraded mode) — changes can’t be confirmed';
@@ -48,8 +54,57 @@ function writesDisabled(siteNo) {
 }
 
 /* ------------------------ boot / me ------------------------ */
+// R8/S10: keys for the client-side, per-session control-live transition scaffold.
+const CTRL_LIVE_SEEN = 'ooh.controlLive.lastSeen';   // last-observed controlLive: 'true' | 'false'
+const CTRL_LIVE_ACKED = 'ooh.controlLive.acked';     // first-use OFF→ON ack recorded this session
+
+/**
+ * R8/S10: general last-seen-state compare for the deploy-time control-live flag. Reads the
+ * prior observed state from sessionStorage and returns the transition so the caller can act.
+ *
+ * Kept deliberately general (records the raw current value, reports both edges) so the
+ * ON→OFF "returned to safety-lock" signal — DEFERRED to the C5 preflight, NOT built here — is a
+ * pure additive follow-on: it can consume the same offToOn/onToOff result with no rework of this
+ * scaffold. Only the OFF→ON edge acts today.
+ */
+function controlLiveTransition() {
+    let lastSeen = null;
+    try { lastSeen = sessionStorage.getItem(CTRL_LIVE_SEEN); } catch { /* storage may be unavailable */ }
+    const live = !!state.me?.controlLive;
+    // OFF→ON: we previously recorded OFF and are now live (the flip happened this session).
+    const offToOn = lastSeen === 'false' && live;
+    // ON→OFF: previously live, now OFF — DEFERRED to C5 preflight (scaffold only, no action today).
+    const onToOff = lastSeen === 'true' && !live;
+    try { sessionStorage.setItem(CTRL_LIVE_SEEN, live ? 'true' : 'false'); } catch { /* ignore */ }
+    if (!live) { try { sessionStorage.removeItem(CTRL_LIVE_ACKED); } catch { /* ignore */ } }
+    return { lastSeen, live, offToOn, onToOff };
+}
+
+/**
+ * R8/S10: fire the one-time first-use acknowledgement modal on the OFF→ON transition ONLY.
+ * Already-ON-at-load (lastSeen unset + live) shows the banner but NO modal — that handler joined
+ * an already-live shift; the interrupt would be noise. Interrupt-precedence: the ack must not
+ * stack on an open confirm modal (window.ctl in a compose/confirm dispatch) — defer silently in
+ * that case; the persistent live-banner in the shell strip already conveys state.
+ */
+function maybeControlLiveAck() {
+    const t = controlLiveTransition();
+    if (!t.offToOn) return;
+    let acked = null;
+    try { acked = sessionStorage.getItem(CTRL_LIVE_ACKED); } catch { /* ignore */ }
+    if (acked === 'true') return;                 // already acked this session — do not re-fire
+    if (window.ctl) return;                       // never stack on an in-flight confirm/dispatch
+    try { sessionStorage.setItem(CTRL_LIVE_ACKED, 'true'); } catch { /* ignore */ }
+    openModal(`<div data-testid="control-live-ack">
+      <h3 style="margin-bottom:8px">Device control is now LIVE</h3>
+      <p class="small" style="margin-bottom:16px">Changes you send will reach real equipment. Continue with care — confirm the site before every change.</p>
+      <div class="mrow" style="justify-content:flex-end"><button class="btn primary" data-testid="control-live-ack-ok" onclick="closeModal()">I understand</button></div>
+    </div>`);
+}
+
 async function refreshMe() {
     state.me = await api.get('/api/me');
+    maybeControlLiveAck();
 }
 
 async function boot() {
@@ -95,6 +150,7 @@ function render() {
    <span class="ver">v${esc(state.me.version)}${state.me.dataMode === 'fixture' ? ' · fixture data' : ''}</span>
   </div>
   ${kill ? `<div class="banner kill" data-testid="kill-banner">⛔ ${kill} — control actions are disabled; capture &amp; escalate still works.${isIot ? ' <button class="btn link" onclick="go(\'admin\')">Manage</button>' : ''}</div>` : ''}
+  ${state.me.controlLive ? `<div class="banner live" data-testid="control-live-banner">🟢 <b>Device control is LIVE</b> — changes you send will reach real equipment. Confirm the site before every change.</div>` : ''}
   ${notice && (state.view === 'home' || state.view === 'site') ? `<div class="banner notice" data-testid="notice-banner">📣 <b>${esc(notice.OohNoticeTitle)}</b>&nbsp;${esc(notice.OohNoticeBody)}</div>` : ''}
   <div id="view"></div>
  </div>`;
