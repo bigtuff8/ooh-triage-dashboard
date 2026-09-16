@@ -1,7 +1,7 @@
 <!-- gate:contract
 SECTION Blockers first: Two external dependencies sit outside this repo (IoT platform / Spencer). K1: Test 5/6 device coverage is blocked because the integration-bridge only ever emits Salus thermostats and is currently unhealthy — coverage stays parked. K2: enabling the real SMS gateway (now IN SCOPE per D2) carries external preconditions Design must land — the OOHDASH-73 go/no-go sign-off, a confirmed on-duty number, and provider credentials. Read these before the per-item detail.
 SECTION What this is: A forensic current-state discovery for OOHDASH-77 — Tony Willetts' four outstanding Tier-1 tester-feedback items (Tests 5, 6, 10, 11 from the OOHDASH-72 test pack). It frames each problem; it does not design or build. Every finding is traced to a file:line and/or a live-system observation (live /healthz + the nine real outcome tickets Tony raised on 11 Sep, read back firsthand from Zendesk), or marked UNVERIFIED with the exact probe + owner.
-SECTION What we found (plain English): Test 10 is a REAL app defect — when an outcome is tied to a control action the operator's typed note is silently dropped from the ticket; today the write-lock hides it because no control outcome can be produced. Test 11 splits three ways: the P1 route really is narrow (a product call on how wide to open it), no text is actually sent (held to the gateway decision), AND the app currently tells the handler and the ticket that a text "has been sent" when it has not — that last part is a fixable honesty defect. Tests 5 and 6 are the device-coverage gap: the bridge only carries Salus heating, so everything else honestly shows "not on Lighthouse here" — that is an IoT-platform data gap, not an app bug, though a copy/scope-honesty polish is available now.
+SECTION What we found (plain English): Test 10 is a REAL app defect — but not the one first drafted. After gate-panel challenge (CT-1), the reconciled root cause (§1) is that when a handler types the issue into the search box and then clicks a category tile (rather than the "Sounds like" suggestion), their typed words are silently discarded (`views.js:177`) — reproducible today and an exact match for Tony's complaint. A separate, lower-severity control-path note-drop is real but latent under the write-lock. The fix is routing-only; no new note field is needed. Test 11 splits three ways: the P1 route is system-driven and now being widened to the flows that warrant it; a real SMS gateway is being enabled this release; and the app currently tells the handler and the ticket a text "has been sent" when it has not — a fixable honesty defect that (per CT-2) needs an escalate/ticket reorder, not a one-liner. Tests 5 and 6 are the device-coverage gap: the bridge only carries Salus heating, so everything else honestly shows "not on Lighthouse here" — an IoT-platform data gap, not an app bug, with a copy/scope-honesty polish available now.
 SECTION Operator decisions RESOLVED (2026-09-16): James has made the scope calls. D1 (P1 route) = SYSTEM-DRIVEN: no generic "escalate as P1" button; instead audit the flows and auto-invoke P1 on the ones that warrant it — a candidate flow→P1 mapping is in §2a. D2 (SMS) = ENABLE A REAL GATEWAY THIS RELEASE (external preconditions recorded). D3 (Tests 5/6) = PROVISIONAL: ship the in-repo scope-tile copy-honesty pass now, coverage stays parked on the bridge. D4 (Test 10 content) = applied ticket carries the full action trail PLUS the typed note PLUS the hold line.
 SECTION Classification of the four (post-decision): Test 10 = IN-REPO DEFECT (fixable this release). Test 11a (P1 route) = IN-SCOPE this release, SYSTEM-DRIVEN — auto-P1 on warranted flows per the §2a mapping (some rows need James/Sam confirmation). Test 11b = IN-SCOPE this release: the false "SMS sent" claim is an in-repo fix that folds into "dispatchOk must reflect an actual send", and a real gateway is enabled (external preconditions carried by Design). Test 5 = EXTERNAL-BLOCKED (Spencer/IoT, bridge coverage). Test 6 = copy-honesty pass IN-SCOPE now (D3 provisional); coverage parked on the bridge.
 SECTION Requirements suite: The curatable findings/requirements, each separable so you can keep, cut, or defer item by item, each with its outcome and source.
@@ -9,7 +9,8 @@ SECTION Operator decisions (all made): The four decisions James was asked are re
 SECTION Options and risks: The real choices per item with their trade-offs, plus the risk register.
 SECTION Scope for design: Which items are ready to hand to Design now versus parked on the bridge/product decisions, plus the CX and test scope handed on.
 SECTION Next step: The recommended first move and why.
-DECISION Test 10 fix: Confirmed IN-REPO. The applied/escalate control-outcome path drops the operator's typed detail (buildOutcomeTranscript action-branch never pushes it, and /api/outcomes never passes detail to createOutcomeTicket as a fallback). Ready for Design now; live-repro needs writes enabled on a bench device (the write-lock hides it today).
+SECTION Accept-with-conditions register: The independent discovery-gate panel returned PASS-WITH-CONDITIONS. §11 records the nine conditions (CT-1..3, QA-2/3, CX-1..4, D2-risk) as OPEN/TRACKED, each with an owner and the stage it gates. None is closed by acceptance.
+DECISION Test 10 fix (RECONCILED, CT-1): The primary, reproducible defect is the smart-entry drop on the category-tile path (`views.js:177` omits `state.smartEntryText`), which matches Tony's symptom; a secondary control-path synthesised-detail drop is latent under the write-lock. Fix is ROUTING-ONLY — no new handler-note field (D4 corrected). The one open Design question: whether to additionally add an explicit outcome-compose notes field (optional).
 DECISION P1 route (Test 11a) — RESOLVED (D1): SYSTEM-DRIVEN. No generic operator "escalate as P1" button. Auto-invoke P1 on the flows that warrant it; §2a holds the candidate flow→P1 mapping (contractor/fridge/kitchen already P1; heating/fan/lighting/hotwater welfare-safety candidates need James/Sam confirmation). IN-SCOPE this release.
 DECISION SMS (Test 11b/c) — RESOLVED (D2): enable a real gateway THIS release. External preconditions Design carries: OOHDASH-73 go/no-go #4, ESCALATION_ONDUTY_NUMBER confirmed, provider creds. The honesty fix (dispatchOk must reflect an actual send) folds in and ships with it.
 DECISION Tests 5/6 (device coverage) — D3 PROVISIONAL: ship the in-repo scope-tile copy-honesty pass now; substantive coverage stays EXTERNAL-BLOCKED on the bridge emitting non-Salus devices (Spencer/IoT, OOHDASH-75/76). Re-confirm at the gate.
@@ -45,22 +46,48 @@ Neither closes from this repo. Both are IoT-platform-owned.
 
 **Verbatim tester quote:** *"Ticket was raised but it didn't include the actual notes I typed."*
 
-**Classification: `IN-REPO DEFECT (fixable this release)`.** Verification: **code-confirmed**; live-latent under the write-lock.
+**Classification: `IN-REPO DEFECT (fixable this release)` — reconciled after gate-panel review (CT-1).** The panel correctly challenged my first draft: I had conflated two different fields. This section is the end-to-end reconciliation across **all** front-end outcome paths (`public/js/*`), not just control.
 
-**Verified current state.**
-- The `/api/outcomes` handler assembles the ticket body from a **transcript array only** — it passes `summary: subject`, `transcript`, and `callerWords` to `createOutcomeTicket`, but **never passes the typed `detail`** (`routes/api.js:244-252`; the inline comment even says "detail/holdText live in the transcript"). `createOutcomeTicket` accepts a `detail` param but only uses it as a fallback when the transcript is empty (`services/zendesk.js:213,218-219`), which never happens here. So the **only** carrier of the typed note into a ticket is the transcript.
-- The transcript is built by `buildOutcomeTranscript()` (`routes/api.js:212-229`). It has two branches:
-  - **action branch** (when an `actionId` is present, `api.js:214-221`): builds the structured trail — Site selected → Zone → Live read → Dispatched value → Sync → Hold — and **never pushes `detail`**.
-  - **else branch** (no action, `api.js:222-226`): pushes `detail` as a transcript line (`api.js:224 if (detail) steps.push(...)`).
-- Both control-outcome front-end paths post **with an `actionId`**: the applied path `ctlFinish` (`public/js/control.js:326-335`) and the control-failure escalate path `ctlEscalate` (`public/js/control.js:363-372`). Every such outcome therefore takes the action branch and **drops `detail`**.
+### 1.1 End-to-end trace — every handler-typed field, and where it goes
 
-**Live evidence (firsthand).** All **nine** outcome tickets Tony raised on 2026-09-11 (Zendesk IDs 48654–48664) are `capture` / `scope-only` / `escalate-p1` — i.e. **non-control** outcomes — and **every one retained its typed detail line** (e.g. #48658 `Caller reported: Pasta cooker didnt turn on`; #48663 `Contractor Frank - Paddys Electrical on site now: refurb kitchen`). **No control/applied outcome ticket exists in the set** — expected, because `WRITES_DISABLED=true` blocks every dispatch (`openControl` shows the "Control unavailable" modal and returns, `public/js/control.js:52-56`), so the operator can never reach `ctlFinish`/`ctlEscalate` today. The defect is thus **hidden by the write-lock**: the branch that drops the note is exactly the branch that cannot currently run.
+There are exactly five free-text inputs a handler can type into on an outcome path, plus two non-outcome inputs. Every one was traced to the wire:
 
-**Root cause.** Control-linked outcomes route through the action-only branch of `buildOutcomeTranscript`, which omits the typed `detail`; the handler provides no fallback path for `detail`. Non-control outcomes are unaffected (confirmed live).
+<table>
+<thead><tr><th>Typed input (src)</th><th>Maps to</th><th>Reaches the ticket?</th></tr></thead>
+<tbody>
+<tr><td><strong>Smart-entry box</strong> <code>#iq</code> (`views.js:175` → `issueSearch` → <code>state.smartEntryText</code> `flows.js:38`)</td><td><code>freeText</code> → <code>callerWords</code></td><td><strong>DROPPED on the category-tile path</strong> — see §1.2</td></tr>
+<tr><td><code>other</code> textarea <code>#otxt</code> (`flows.js:473`)</td><td><code>f.data.q</code> → <code>detail</code></td><td>Yes (non-control else-branch, `api.js:224`)</td></tr>
+<tr><td><code>contractor</code> inputs <code>#cn</code>/<code>#cw</code> (`flows.js:457-458`)</td><td>interpolated into <code>detail</code> (`flows.js:464`)</td><td>Yes</td></tr>
+<tr><td><code>fan</code> input <code>#fannote</code> (`flows.js:380`)</td><td><code>f.data.note</code> → <code>detail</code></td><td>Yes</td></tr>
+<tr><td>Control compose (stepper/hold) — <strong>no free-text field exists</strong> (`control.js` compose, :137-155)</td><td><code>detail</code> is machine-synthesised (`control.js:332` ctlFinish, `:369` ctlEscalate)</td><td>Synthetic detail DROPPED on control outcomes — see §1.3</td></tr>
+<tr><td>(non-outcome) ticket feedback note <code>#notebody</code> (`views.js:261` → <code>/tickets/:id/notes</code>)</td><td>forwarded body (`zendesk.js:300-303`)</td><td>Yes — separate feature, works</td></tr>
+<tr><td>(non-outcome) Tonight "raise a query" <code>#qtxt</code> (`views.js:388` → <code>/api/query</code>)</td><td>forwarded</td><td>Yes</td></tr>
+</tbody>
+</table>
 
-**Exact fix surface (for Design/Build, not done here).** Per **D4 (RESOLVED)**, an applied-control ticket must carry the **full action trail PLUS the handler's typed note PLUS the hold line**. So the action branch of `buildOutcomeTranscript` (`api.js:214-221`) should append the typed `detail` and the `holdText` as their own transcript line(s), keeping the existing Site/Zone/Live-read/Dispatched/Sync/Hold trail intact. (Alternative (b) — passing `detail` to `createOutcomeTicket`'s fallback at `api.js:244-252` / `zendesk.js:218-219` — would need care so the note is not lost when a trail already exists; A1 is the cleaner route, §7.)
+### 1.2 The verified defect that MATCHES Tony's symptom (primary — reproducible NOW)
 
-**Live-repro probe (owner: Build/QA, needs a bench device).** With `WRITES_DISABLED=false` against a bench Salus, complete an applied outcome carrying a typed note and read the first `[TRG]` comment — the typed detail will be absent from the action-trail transcript.
+**The category tiles silently discard the handler's typed smart-entry text.** Verification: **code-confirmed, reproducible on current code (non-control path).**
+
+- The smart-entry box stores what the handler types in `state.smartEntryText` (`flows.js:38`).
+- The **"Sounds like…" suggestion chip** carries it forward: `startSuggestedFlow` → `startFlow(k, state.smartEntryText)` (`flows.js:51-53`).
+- The **category tiles** do **not**: `views.js:177` renders `onclick="startFlow('${c.k}')"` with **no second argument**, so `startFlow(k, undefined)` sets `f.data.freeText = ''` (`flows.js:56-57`). On outcome it then goes out as `callerWords: f.data.freeText || null` = **null** (`flows.js:123`) — the typed text never reaches the server, and the ticket gets **no `Caller's words:` line**. That is exactly *"didn't include the actual notes I typed."*
+
+**This reconciles the nine tickets.** The tickets that *retained* text did so through a **separate in-flow field** (`detail` from `other`/`contractor`/`fan`), not the smart-entry text — e.g. #48658 "General issue captured / Caller reported: Pasta cooker didnt turn on" has a `Caller reported:` detail line (re-typed inside the `other` flow) but **no `Caller's words:` line**, the tell-tale of a tile entry where the original smart-entry text was dropped. Six of the nine (#48664, 48661, 48660, 48658, 48657, 48663) carry no `Caller's words:` line at all. So my earlier "all 9 retained their detail" was true but about the wrong field: `detail` survived; the **smart-entry `callerWords` did not** on the tile path. **Tony's symptom IS reproducible on current code.**
+
+### 1.3 The secondary defect (control-linked — real but lower-severity, latent under the write-lock)
+
+On any outcome carrying an `actionId`, `buildOutcomeTranscript` takes the **action branch** (`api.js:214-221`) which builds the structured trail (Site → Zone → Live read → Dispatched → Sync → Hold) and **never pushes `detail`/`holdText`**; the `/outcomes` handler also never passes `detail` to `createOutcomeTicket` as a fallback (`api.js:244-252`). But — as the panel noted — on the control path **there is no handler-typed note**: `detail` is machine-synthesised (`control.js:332`, `:369`) and largely duplicates the trail. The only material loss is on the **control-FAILURE** path (`ctlEscalate`, `control.js:369`) where the synthesised *"must be treated as not applied"* line is dropped — though the `failed`/`rejected`/`timeout` Sync line still conveys the failure state. Latent today: `WRITES_DISABLED=true` blocks every dispatch (`control.js:52-56`), so no control outcome can be produced.
+
+### 1.4 Re-scope + D4 correction (KEY DESIGN DECISION)
+
+**T10 is a routing-only fix on two fronts, NOT a new handler-note UI field:**
+1. **Primary:** category tiles must carry `state.smartEntryText` into `startFlow`, exactly as the suggestion chip does (`views.js:177` ↔ `flows.js:52`). Fixes Tony's reported symptom.
+2. **Secondary:** carry the synthesised `detail`+`holdText` line on control-linked outcomes (`api.js:214-221`), material on the control-failure path.
+
+**D4 corrected.** D4 as previously worded ("carry the typed note") presumed a control-path note field that **does not exist**. The accurate D4 is: *applied/failed control tickets carry the full action trail plus the synthesised detail+hold line* — no new input. **Recommendation: routing-only, no new note field.** The KEY Design decision to flag: whether to *additionally* add an explicit "notes for the IoT team" field to the **outcome-compose** step (precedent exists — the post-hoc feedback-note textarea at `views.js:261`). Discovery's recommendation: **not required** to fix Test 10; treat as optional enhancement scope, decided at Design.
+
+**Probes.** Primary is verifiable today: type into smart-entry, click a category tile (not the suggestion), complete any capture outcome, inspect the `[TRG]` — no `Caller's words:` line. Secondary needs `WRITES_DISABLED=false` on a bench device to produce a control outcome.
 
 ---
 
@@ -162,7 +189,8 @@ Each row is separable — keep, cut, or defer independently. "Src" is the ground
 <table>
 <thead><tr><th>ID</th><th>Finding / requirement</th><th>Business outcome</th><th>Class</th><th>Src</th><th>Ver</th></tr></thead>
 <tbody>
-<tr><td>T10</td><td>Carry the operator's typed <code>detail</code> onto <strong>control-linked</strong> outcome tickets (applied + control-failure), which currently drop it</td><td>The ticket records what the handler actually typed; the IoT team sees the operator's note, not just the machine trail</td><td>IN-REPO DEFECT</td><td>§1</td><td>code</td></tr>
+<tr><td>T10a</td><td><strong>Primary (matches Tony):</strong> category tiles must carry the smart-entry text into <code>startFlow</code> (`views.js:177` ↔ `flows.js:52`), so the handler's typed words reach the ticket as <code>callerWords</code></td><td>The ticket includes the notes the handler typed — the reported bug goes away</td><td>IN-REPO DEFECT</td><td>§1.2</td><td>code (reproducible)</td></tr>
+<tr><td>T10b</td><td><strong>Secondary:</strong> carry the synthesised <code>detail</code>+<code>holdText</code> line on control-linked outcomes (`api.js:214-221`), material on the control-failure path. Routing-only, no new field</td><td>Control-failure tickets keep the "treat as not applied" line, not just the Sync trail</td><td>IN-REPO DEFECT (latent)</td><td>§1.3</td><td>code</td></tr>
 <tr><td>T11a</td><td><strong>Extend system-driven auto-P1</strong> to the warranted flows per the §2a mapping (keep the three current ones; add the CONFIRM candidates once signed off). No generic operator button (D1)</td><td>A handler following a warranted flow auto-raises a P1 without a mis-fireable manual button</td><td>IN-SCOPE (system-driven)</td><td>§2a</td><td>code+live</td></tr>
 <tr><td>T11c</td><td><code>dispatchOk</code> must reflect an actual send; stop the card/transcript claiming a text "has been sent" when none was (`flows.js:153`, `api.js:227`, `escalation.js:72-74`)</td><td>The handler and the ticket never assert an escalation SMS that did not happen — trust + audit integrity</td><td>IN-REPO DEFECT (folds into T11b)</td><td>§2c</td><td>code+live</td></tr>
 <tr><td>T11b</td><td><strong>Enable a real SMS gateway this release</strong> (Twilio/chosen provider). External preconditions: OOHDASH-73 go/no-go, <code>ESCALATION_ONDUTY_NUMBER</code> confirmed, provider creds</td><td>The on-duty manager is paged within &lt;1 min of a P1 (OOHDASH-73 outcome)</td><td>IN-SCOPE (external preconditions)</td><td>§2b / K2</td><td>code+live</td></tr>
@@ -184,7 +212,7 @@ All four were put to James; his calls are recorded below. D1/D2 are **RESOLVED**
 <tr><td>D1</td><td>How wide should the P1 route be?</td><td><strong>SYSTEM-DRIVEN, not operator-initiated.</strong> No generic "escalate as P1" button (abuse/error risk). Audit the flows, decide which warrant an automatic P1, and auto-invoke P1 when the handler follows such a flow. See the §2a candidate mapping (CONFIRM rows need James/Sam sign-off).</td><td><strong>RESOLVED</strong></td></tr>
 <tr><td>D2</td><td>Is real SMS in scope this release?</td><td><strong>YES — enable a real gateway this release.</strong> External preconditions Design carries: OOHDASH-73 go/no-go #4, <code>ESCALATION_ONDUTY_NUMBER</code> confirmed, Twilio/chosen-provider creds. T11c folds into "dispatchOk must reflect an actual send".</td><td><strong>RESOLVED</strong></td></tr>
 <tr><td>D3</td><td>Tests 5/6 — park, or UI-honesty pass now?</td><td><strong>Include the in-repo scope-tile copy-honesty pass now (T6b); coverage stays parked on the bridge/B2 (Spencer/IoT).</strong></td><td><strong>PROVISIONAL</strong> — re-confirm at gate</td></tr>
-<tr><td>D4</td><td>What should an applied-control ticket carry?</td><td><strong>Full action trail PLUS the handler's typed note PLUS the hold line.</strong></td><td><strong>PROVISIONAL</strong> — re-confirm at gate</td></tr>
+<tr><td>D4</td><td>What should an applied-control ticket carry?</td><td><strong>CORRECTED after panel review (CT-1):</strong> the control path has no handler-typed note field, so "carry the typed note" presumed an input that does not exist. Accurate scope: applied/failed control tickets carry the full action trail PLUS the synthesised detail+hold line (routing-only, §1.3). Tony's actual symptom is the smart-entry drop (§1.2, T10a). Discovery recommends <strong>no new note field</strong>; whether to add an explicit outcome-compose notes field is the key Design decision.</td><td><strong>PROVISIONAL</strong> — re-confirm at gate</td></tr>
 </tbody>
 </table>
 
@@ -192,12 +220,14 @@ All four were put to James; his calls are recorded below. D1/D2 are **RESOLVED**
 
 ## 7. Options with traceability
 
-**Option set A — Test 10 fix (serves T10).**
+**Option set A — Test 10 fix (serves T10a primary + T10b secondary).**
 <table>
 <thead><tr><th>Option</th><th>Entails</th><th>Cost</th><th>When right</th></tr></thead>
 <tbody>
-<tr><td>A1 — Append detail in the action branch</td><td>Add the typed <code>detail</code> (+ optional <code>holdText</code>) as transcript line(s) in <code>buildOutcomeTranscript</code> action branch (`api.js:214-221`)</td><td>Low</td><td><strong>Recommended</strong> — keeps the structured trail and adds the note; most faithful to the [TRG] contract</td></tr>
-<tr><td>A2 — Pass detail to createOutcomeTicket</td><td>Forward <code>detail</code> in the <code>/outcomes</code> call so the existing fallback carries it (`api.js:244-252`, `zendesk.js:218-219`)</td><td>Low</td><td>Simpler diff, but the fallback only fires when the transcript is otherwise empty — needs care so the note isn't lost when a trail exists</td></tr>
+<tr><td>A0 — Carry smart-entry text on the tile path (T10a)</td><td>Category tiles pass <code>state.smartEntryText</code> into <code>startFlow</code> like the suggestion chip does (`views.js:177` ↔ `flows.js:52`)</td><td>Low (front-end routing)</td><td><strong>Required</strong> — this is the fix for Tony's actual reported symptom (§1.2)</td></tr>
+<tr><td>A1 — Append synthesised detail in the action branch (T10b)</td><td>Add <code>detail</code> (+ <code>holdText</code>) as transcript line(s) in <code>buildOutcomeTranscript</code> action branch (`api.js:214-221`)</td><td>Low</td><td><strong>Recommended for T10b</strong> — keeps the structured trail and preserves the control-failure "not applied" line; no new field</td></tr>
+<tr><td>A2 — Pass detail to createOutcomeTicket (alt to A1)</td><td>Forward <code>detail</code> in the <code>/outcomes</code> call so the existing fallback carries it (`api.js:244-252`, `zendesk.js:218-219`)</td><td>Low</td><td>Simpler diff, but the fallback only fires when the transcript is otherwise empty — needs care so the line isn't lost when a trail exists</td></tr>
+<tr><td>A3 — Explicit outcome-compose notes field (optional)</td><td>Add a real "notes for the IoT team" input to outcome-compose (precedent `views.js:261`)</td><td>Medium (new UI + wire)</td><td><strong>Not required</strong> for Test 10; the KEY Design decision if a first-class handler note is wanted beyond fixing the bug</td></tr>
 </tbody>
 </table>
 
@@ -218,7 +248,9 @@ All four were put to James; his calls are recorded below. D1/D2 are **RESOLVED**
 <thead><tr><th>Risk</th><th>Likelihood</th><th>Impact</th><th>Mitigation</th></tr></thead>
 <tbody>
 <tr><td><strong>False "SMS sent"</strong> — handler/ticket assert an escalation text that never left (log-mode)</td><td>Certain today (verified live, #48663)</td><td>High — a P1 caller believes the manager was paged when they were not; audit is wrong</td><td>T11c / B1 honesty fix, independent of the gateway decision</td></tr>
-<tr><td><strong>Dropped operator note</strong> on control outcomes once writes are enabled</td><td>Certain when the write-lock lifts (verified code)</td><td>Medium-High — the IoT team loses the handler's own words on exactly the highest-stakes (control) tickets</td><td>T10 / A1 before the OOHDASH-19 flip</td></tr>
+<tr><td><strong>Dropped smart-entry note</strong> — handler types the issue, clicks a category tile, the words are discarded (no <code>Caller's words:</code> line)</td><td>Certain on the tile path (verified code, reproducible now)</td><td>Medium-High — the IoT team loses the caller's own words; matches Tony's reported bug</td><td>T10a — category tiles carry <code>state.smartEntryText</code> (`views.js:177`)</td></tr>
+<tr><td>Synthesised detail dropped on control-failure outcomes once writes are enabled</td><td>Certain when the write-lock lifts (verified code)</td><td>Medium — "treat as not applied" line lost, though the Sync trail still shows failure</td><td>T10b / A1 before the OOHDASH-19 flip</td></tr>
+<tr><td><strong>D2 release risk</strong> — OOHDASH-73 go/no-go is a no-go OR <code>ESCALATION_ONDUTY_NUMBER</code> stays unconfirmed at build time</td><td>Medium</td><td>Medium — real SMS cannot ship this release</td><td><strong>No-go fallback:</strong> T11b defers; T11c/B1 (dispatchOk correctness + honest copy) ships decoupled, so the app is truthful in log-mode. Do not block T11c on T11b.</td></tr>
 <tr><td><strong>P1 cannot be raised</strong> for an urgent call no flow pre-covers</td><td>Medium</td><td>Medium-High — a genuinely urgent caller is captured, not escalated</td><td>D1 decision → T11a; interim: contractor/fridge flows still reach P1</td></tr>
 <tr><td><strong>Tests 5/6 re-tested against an unhealthy bridge</strong> read as app faults</td><td>Medium</td><td>Medium — misattributed defects, wasted cycles</td><td>Gate re-test on K1/B2 green; document the bridge lazy-flag artefact</td></tr>
 <tr><td>In-repo T6b copy diverges from eventual device coverage</td><td>Low</td><td>Low</td><td>Keep copy generic; revisit with T5</td></tr>
@@ -230,8 +262,8 @@ All four were put to James; his calls are recorded below. D1/D2 are **RESOLVED**
 ## 9. Scope for design
 
 **Ready to hand to Design NOW (in scope this release):**
-- **T10** — carry the typed note (+ hold line) onto control-linked outcome tickets, keeping the action trail (D4 resolved).
-- **T11a** — extend **system-driven auto-P1** to the warranted flows per the §2a mapping (D1 resolved: no operator button). Design shapes the new in-flow decision points the CONFIRM rows need; the three current P1 flows stay.
+- **T10a (primary)** — category tiles carry the smart-entry text (`views.js:177`), so the handler's typed words reach the ticket (fixes Tony's symptom). **T10b (secondary)** — carry the synthesised detail+hold line on control-linked outcomes. Routing-only; **no new note field required** (§1.4). Key Design decision to settle: whether to add an explicit outcome-compose notes field (optional, precedent `views.js:261`).
+- **T11a** — extend **system-driven auto-P1** to the warranted flows per the §2a mapping (D1 resolved: no operator button). Design shapes the new in-flow decision points the CONFIRM rows need **and the CX-1 audited escape-hatch** so "no button" ≠ "no path"; the three current P1 flows stay.
 - **T11b + T11c** — enable a real SMS gateway **and** make `dispatchOk` reflect an actual send (they ship together). Design carries the external preconditions (OOHDASH-73 go/no-go, `ESCALATION_ONDUTY_NUMBER`, provider creds).
 - **T6b** — in-repo scope-tile copy-honesty pass + earlier hot-water out-of-scope guidance (D3 provisional; ties to register R10 / C8).
 
@@ -241,10 +273,10 @@ All four were put to James; his calls are recorded below. D1/D2 are **RESOLVED**
 - **T5** and **T6a** — parked on **K1 / B2** (bridge device coverage; Spencer/IoT, OOHDASH-75/76). Re-test only when the bridge read is green. (T6b copy pass proceeds independently.)
 
 **CX success criteria handed to Design (for the in-repo items):**
-- **Truthful escalation feedback:** the handler is never told a text was sent unless one was; in log-mode the card reads "logged — not sent" and the P1 is still visibly recorded. "Great looks like…": a handler always knows whether the manager was actually paged.
-- **The handler's own words survive:** whatever the operator types is on the ticket the IoT team reads next day — including on applied-control outcomes. "Great looks like…": no handler discovers their note vanished.
-- **P1 within reach (per D1):** if breadth is widened, escalation is a deliberate, unmissable action from the call in front of the handler — not buried in one flow.
-- **Honest scope:** a handler is told, before composing, what Lighthouse can and cannot do at this site (esp. hot water), rather than meeting a blunt "not on Lighthouse here" after the fact (R10/C8).
+- **Truthful escalation feedback + next action (CX-2):** the handler is never told a text was sent unless one was; in log-mode / on send-failure the card states the **next action** ("not sent — phone the on-duty manager now on …"), not merely "not sent". The P1 stays visibly recorded. "Great looks like…": a handler always knows whether the manager was paged, and exactly what to do if not.
+- **The handler's own words survive, visibly (CX-3):** whatever the handler typed appears on the **confirmation card the handler sees**, not only on the back-office ticket — note retention is a trust criterion, verifiable at the handler's screen. "Great looks like…": no handler discovers their note vanished.
+- **P1 has a path even off-flow (CX-1):** system-driven auto-P1 must not strand a genuine P1 on an uncovered/`other` flow. Design adds an **audited, reason-tagged escape-hatch / confirm-prompt** (not a bare button) so the handler is told when a call was *not* auto-escalated and can escalate with a recorded reason.
+- **Honest scope routes to the alternative (CX-4):** the "not on Lighthouse here" copy must **point the handler to the available action** (manual override, site's own repairs route), not just declare the gap (R10/C8).
 
 **Data scope note:** no new entities. The `detail`/`callerWords`/`holdText` fields already flow from the client (`public/js/control.js:326-335`, `flows.js:120-125`); T10 is a routing fix, not new data. The P1 SMS log entry shape is `OohSmsLog` (`services/escalation.js:56-70`) — note it already avoids persisting the raw number (`escalation.js:64`).
 
@@ -269,4 +301,27 @@ With all four decisions made, the sequence is:
 
 ---
 
-*All line numbers cited against repo `main`, 2026-09-16. Live findings from `/healthz` and Zendesk tickets 48654–48664 (Tony Willetts, 2026-09-11), read firsthand. UNVERIFIED items name the exact probe + owner. This artefact does not invoke reviewers or the next stage — the Orchestrator governs the gate.*
+## 11. Accept-with-conditions register
+
+The independent discovery-gate panel returned **PASS-WITH-CONDITIONS** (both hard-blocking lenses verified the citations as accurate). Each condition below is **OPEN/TRACKED** — none is resolved by this acceptance; each names an owner and the stage it gates. These sit alongside the §0 blockers (K1/K2).
+
+<table>
+<thead><tr><th>#</th><th>Condition</th><th>Raised by</th><th>Gates</th><th>Owner</th><th>Current response</th></tr></thead>
+<tbody>
+<tr><td>CT-1</td><td><strong>T10 problem-vs-symptom reconciliation.</strong> The control-path <code>detail</code> is machine-synthesised (no handler note field); Tony's symptom is on a non-control path. Reconcile end-to-end and re-scope.</td><td>critical-thinker</td><td>Design</td><td>Discovery (this doc)</td><td><strong>RESOLVED in §1.</strong> Primary defect = category tiles drop smart-entry text (`views.js:177`), reproducible, matches Tony. Secondary = control synthesised detail. Routing-only; D4 corrected — no new field required. <em>OPEN until Design accepts the re-scope.</em></td></tr>
+<tr><td>CT-2 / QA-2</td><td><strong>T11c is not a one-line conditional.</strong> The ticket "SMS dispatched" transcript line (`api.js:227`) is built <em>before</em> <code>escalateP1</code> runs (`api.js:255-257`), so <code>dispatchOk</code> does not exist at ticket-build time. The fix needs an escalate/ticket <strong>reorder</strong> or a corrective post-dispatch write, not a conditional. The card fix is trivial (`flows.js:153` already reads <code>res.p1.dispatchOk</code>).</td><td>critical-thinker / QA</td><td>Design / Build</td><td>Design doer</td><td>Noted for Design: sequence the P1 send before the transcript line, or write the sync line after dispatch. <em>OPEN.</em></td></tr>
+<tr><td>CT-3</td><td><strong>Re-confirm the Zendesk evidence.</strong> Ticket IDs 48654–48664 (esp. #48663) must be re-read at the Design/Build gate before being relied on as acceptance evidence (tickets mutate/merge).</td><td>critical-thinker</td><td>Design/Build gate</td><td>Whoever raises the gate</td><td>Re-fetch and spot-check before citing. <em>OPEN.</em></td></tr>
+<tr><td>QA-3</td><td><strong>Freeze-rule test for T10.</strong> Add a test asserting the extra T10 transcript line does NOT perturb the <code>[TRG]</code> outcome-code parse / freeze rule (the consumer parses <code>Outcome:\s*([\w-]+)</code>, `zendesk.js:177-181`).</td><td>QA</td><td>Build</td><td>Build doer</td><td>Test obligation recorded. <em>OPEN.</em></td></tr>
+<tr><td>CX-1</td><td><strong>Auto-P1 escape-hatch.</strong> System-driven P1 (D1) can strand a genuine P1 on an uncovered/`other` flow, and the handler may not realise it wasn't raised. Design must add an audited, reason-tagged escape-hatch / confirm-prompt (not a bare button) so "no button" ≠ "no path".</td><td>customer-experience</td><td>Design</td><td>Design doer</td><td>Carried into §9 CX-1 + §2a cross-cutting note. <em>OPEN.</em></td></tr>
+<tr><td>CX-2</td><td><strong>Escalation copy states the NEXT ACTION.</strong> Log-mode / send-failure copy must say "not sent — phone the on-duty manager now on …", not just "not sent".</td><td>customer-experience</td><td>Design</td><td>Design doer</td><td>Carried into §9 CX-2. <em>OPEN.</em></td></tr>
+<tr><td>CX-3</td><td><strong>Handler-visible note retention.</strong> T10 acceptance bar = the typed note is visible on the confirmation card the handler sees, treated as a trust criterion (not just back-office ticket presence).</td><td>customer-experience</td><td>Design</td><td>Design doer</td><td>Carried into §9 CX-3. <em>OPEN.</em></td></tr>
+<tr><td>CX-4</td><td><strong>Honesty copy routes to the alternative.</strong> T6b "not on Lighthouse here" copy must route the handler to the available alternative action, not just declare the gap.</td><td>customer-experience</td><td>Design</td><td>Design doer</td><td>Carried into §9 CX-4. <em>OPEN.</em></td></tr>
+<tr><td>D2-risk</td><td><strong>SMS no-go fallback.</strong> If OOHDASH-73 go/no-go is a no-go or <code>ESCALATION_ONDUTY_NUMBER</code> is unconfirmed, T11b defers and only T11c/B1 (dispatchOk correctness + honest copy) ships — decoupled.</td><td>orchestrator</td><td>Release-preflight</td><td>James / release</td><td>Recorded in §8 risk register. <em>OPEN.</em></td></tr>
+</tbody>
+</table>
+
+> **Honesty note.** These conditions are carried, not closed. PASS-WITH-CONDITIONS clears Discovery to the gate; the conditions gate the stage each names. CT-1 is resolved *in this document* (the re-scope) but stays OPEN until Design accepts it.
+
+---
+
+*All line numbers cited against repo `main`, 2026-09-16. Live findings from `/healthz` and Zendesk tickets 48654–48664 (Tony Willetts, 2026-09-11), read firsthand. UNVERIFIED items name the exact probe + owner. Gate outcome: PASS-WITH-CONDITIONS (§11), conditions OPEN/TRACKED. This artefact does not invoke reviewers or the next stage — the Orchestrator governs the gate.*
