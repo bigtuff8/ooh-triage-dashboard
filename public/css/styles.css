@@ -120,6 +120,11 @@ table.tbl tr.rowoff td{background:var(--danger-light)}
 .modal .mb{padding:20px}
 .modal .mf{padding:14px 20px;border-top:1px solid var(--border);display:flex;justify-content:flex-end;gap:10px}
 .target{background:var(--surface-variant);border:1px solid var(--border);border-radius:var(--radius-md);padding:10px 14px;margin-bottom:16px;font-size:13.5px}
+/* B0/R0 · C9 — site identity is the most prominent element of the confirm target */
+.target-identity .target-name,.target .target-name{font-size:22px;font-weight:700;line-height:1.2;display:block}
+.target-tech{font-size:12.5px;color:var(--text-disabled);margin-top:4px}
+.target-identity.unverified .target-name{font-size:15px;font-weight:600}
+.muted{color:var(--text-disabled)}
 .stepper{display:flex;align-items:center;gap:14px;justify-content:center;margin:14px 0 6px}
 .stepper button{width:48px;height:48px;border-radius:var(--radius-md);border:1.5px solid var(--border);background:var(--surface);font-size:22px;font-weight:700;color:var(--primary)}
 .stepper button:hover{border-color:var(--primary)}

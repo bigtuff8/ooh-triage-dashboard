@@ -78,6 +78,27 @@ function ctlValTxt(c = window.ctl) {
     return c.mode === 'boost' ? c.val + 'h boost' : c.mode === 'modeoff' ? 'Mode Off' : c.val + '°C';
 }
 
+/**
+ * B0/R0 · C9 — the confirm-modal site-identity block. Site identity is the MOST prominent
+ * element: the recognisable name is the largest/boldest line, the house number is a secondary
+ * chip, and the device/zone are demoted to a technical sub-line. When no human name resolved
+ * (site.nameUnverified) we NEVER present the bare accountId as if it were the site — we show an
+ * explicit "confirm the house number by voice" warning and de-emphasise the raw accountId.
+ */
+function ctlTargetBlock(site, device) {
+    const dev = `<div class="target-tech"><span class="mono">${esc(site.siteNo)}</span> → <span class="mono">${esc(device.deviceId)}</span> · ${esc(device.zone)}</div>`;
+    if (site.nameUnverified) {
+        const raw = site.accountId || site.siteName;
+        return `<div class="target-identity unverified">
+    <div class="alert warn" data-testid="control-unverified">⚠ <b>Site name unverified</b> — confirm the house number by voice before sending.</div>
+    <div class="target-name muted" data-testid="control-target-name">Unrecognised site <span class="mono small">${esc(raw)}</span></div>
+    ${dev}</div>`;
+    }
+    return `<div class="target-identity">
+    <div class="target-name" data-testid="control-target-name">${esc(site.siteName)}</div>
+    ${dev}</div>`;
+}
+
 function drawControl() {
     const c = window.ctl;
     const d = c.device;
@@ -93,7 +114,7 @@ function drawControl() {
         if (c.mode === 'modeoff') body = `<div style="text-align:center;margin:10px 0"><span class="val" style="font-size:34px;font-weight:700">Mode → Off</span></div><p class="guard">Intesis native Off. Current mode: ${esc(d.telemetry?.mode || '—')}.</p>${holdPicker()}`;
         if (c.mode === 'boost') body = `<div class="stepper"><button data-testid="stepper-down" onclick="ctlStep(-1)" ${c.val <= 1 ? 'disabled' : ''}>−</button><span class="val" data-testid="stepper-value">${c.val}h</span><button data-testid="stepper-up" onclick="ctlStep(1)" ${c.val >= 9 ? 'disabled' : ''}>+</button></div><p class="guard">Hot-water boost 1–9 hours (device-native timer — reverts by itself).</p>`;
         openModal(`<div class="mh">${CTL_TITLES[c.mode]}<button class="btn link" onclick="ctlCancel()">✕</button></div><div class="mb">
-   <div class="target" data-testid="control-target">Sending to: <b>${esc(ws.site.siteName)}</b> <span class="mono">${esc(ws.site.siteNo)}</span> → <span class="mono">${esc(d.deviceId)}</span> (${esc(d.zone)})</div>
+   <div class="target" data-testid="control-target">${ctlTargetBlock(ws.site, d)}</div>
    ${c.error ? `<div class="alert err" data-testid="control-error">${esc(c.error)}</div>` : ''}${body}
   </div><div class="mf"><button class="btn" onclick="ctlCancel()">Cancel</button><button class="btn primary" data-testid="control-send" onclick="ctlSend()">Send to device</button></div>`, false);
         return;
@@ -110,7 +131,10 @@ function drawControl() {
     if (ph === 'done') tail = `<div class="alert ok" data-testid="sync-applied" aria-live="polite">✅ <b>Applied — device confirmed ${ctlValTxt()} at ${new Date(c.action.settledAt).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}.</b>${c.hold !== 'none' ? ` Hold active: reverts at ${holdRevertText(c.hold)}.` : ''}</div><div style="text-align:right"><button class="btn primary" data-testid="sync-done" onclick="ctlFinish()">Done</button></div>`;
     if (ph === 'failed' || ph === 'rejected') tail = `<div class="alert err" data-testid="sync-failed" aria-live="assertive">❌ <b>The device ${ph === 'rejected' ? 'rejected' : 'refused'} this command</b> (<span class="mono">${ph}</span>). Nothing has changed on site — do not tell the caller it’s done.</div><div style="text-align:right;display:flex;gap:8px;justify-content:flex-end"><button class="btn" onclick="ctlRetry()">Try again</button><button class="btn primary" data-testid="sync-escalate" onclick="ctlEscalate()">Escalate instead</button></div>`;
     if (ph === 'timeout') tail = `<div class="alert warn" data-testid="sync-timeout" aria-live="assertive">⏱️ <b>The device hasn’t confirmed yet.</b>${c.action?.slowEchoDevice ? ' This unit (IT700) can be slow to echo.' : ''} <b>Treat the change as NOT applied.</b> We’ll keep watching in the background and update the ticket if it lands.</div><div style="text-align:right;display:flex;gap:8px;justify-content:flex-end"><button class="btn" data-testid="sync-wait" onclick="ctlWaitMore()">Keep waiting (30s)</button><button class="btn primary" data-testid="sync-escalate" onclick="ctlEscalate()">Escalate</button></div>`;
-    openModal(`<div class="mh">${CTL_TITLES[c.mode]}</div><div class="mb"><div class="target">${esc(ws.site.siteName)} <span class="mono">${esc(ws.site.siteNo)}</span> → <span class="mono">${esc(d.deviceId)}</span> · ${ctlValTxt()}</div>${steps}${tail}</div>`, false);
+    const trackerName = ws.site.nameUnverified
+        ? `⚠ <span class="muted">Unrecognised site <span class="mono">${esc(ws.site.accountId || ws.site.siteName)}</span></span>`
+        : `<b>${esc(ws.site.siteName)}</b>`;
+    openModal(`<div class="mh">${CTL_TITLES[c.mode]}</div><div class="mb"><div class="target"><span class="target-name">${trackerName}</span> <span class="mono">${esc(ws.site.siteNo)}</span> → <span class="mono">${esc(d.deviceId)}</span> · ${ctlValTxt()}</div>${steps}${tail}</div>`, false);
 }
 
 async function ctlSend() {
