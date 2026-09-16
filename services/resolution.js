@@ -14,7 +14,10 @@ import { randomUUID } from 'crypto';
 import * as bridge from './bridge.js';
 import { addDataQualityFlag } from './notices.js';
 
-// Confirmed-resolution tokens: short-lived, one per confirm, consumed by control dispatch
+// Confirmed-resolution tokens: short-lived, one per confirm. Control dispatch CONSUMES the
+// token exactly once (consumeConfirmation) before any device write, so a confirm authorises a
+// single dispatch and a replay/double-fire is rejected (C2). isConfirmed remains a pure,
+// non-consuming read for the workspace auto-refresh only (never on the dispatch path).
 const confirmations = new Map();
 const CONFIRM_TTL_MS = 4 * 60 * 60 * 1000; // one call, generously
 
@@ -59,11 +62,29 @@ export async function confirmSite(siteNo, operator) {
 }
 
 /**
- * Validates a confirmation token for a dispatch. Returns true only when the token
- * belongs to this operator and this site.
+ * Validates a confirmation token WITHOUT consuming it. Returns true only when the token
+ * belongs to this operator and this site. Read-only: for the workspace auto-refresh
+ * pre-check only — NEVER on the dispatch path (see consumeConfirmation for that).
  */
 export function isConfirmed(token, siteNo, operatorId) {
     pruneConfirmations();
     const c = confirmations.get(token);
     return !!c && c.siteNo === String(siteNo) && c.operatorId === operatorId;
+}
+
+/**
+ * Atomically validates AND consumes a confirmation token for a dispatch (C2 single-use).
+ * On a full match it deletes the token in the SAME synchronous event-loop tick as the get()
+ * — no await in between — then returns true; a second dispatch with the same token finds
+ * nothing and gets false. On no match (unknown/expired token, or wrong site/operator) it
+ * returns false and does NOT delete, so a mismatched attempt cannot spend the legitimate
+ * owner's token. Single-replica atomicity (Node single-threaded, synchronous Map delete) is
+ * the proof baseline at replicas:1; cross-replica single-use is deferred (C5).
+ */
+export function consumeConfirmation(token, siteNo, operatorId) {
+    pruneConfirmations();
+    const c = confirmations.get(token);
+    if (!c || c.siteNo !== String(siteNo) || c.operatorId !== operatorId) return false;
+    confirmations.delete(token);
+    return true;
 }
