@@ -1,0 +1,13 @@
+{
+  "run": "selfgate-ooh-triage-dashboard-build-plan-R1",
+  "phase": "Build-PLAN",
+  "pr": 11,
+  "approvedBy": [
+    "bigtuff8"
+  ],
+  "reviewComments": [],
+  "mergeCommit": "1e44f2f55b876e23e646208c66ab07fd8cb252d3",
+  "phaseBranch": "build-plan/R1",
+  "releaseBranch": "main",
+  "stamp": 1789542364504
+}
