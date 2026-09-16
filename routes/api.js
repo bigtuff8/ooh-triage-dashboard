@@ -102,9 +102,23 @@ function deviceSummary(site) {
     return bits.length ? `On Lighthouse: ${bits.join(' · ')}` : 'No Lighthouse devices found for this site.';
 }
 
-const SCOPE_GROUPS = [
+// A DHW device is CONTROLLABLE only if live inventory carries a device whose
+// registry contract actually exposes a hot-water control command (`hwboost`) —
+// presence-driven, NOT a name-match on `salus-it500-dhw` (which live bridge data
+// never emits, bridge.js:57-67). This keeps R7 open: if a real controllable DHW
+// device ever appears in live inventory the tile flips to `ctl` with no code change.
+export function hasControllableDhw(site) {
+    return site.devices.some(d => (registry.capabilitiesFor(d.deviceType)?.commands || []).includes('hwboost'));
+}
+// A combi carries the DHW demand signal (hotWaterCapable / telemetry.hotWater)
+// but is observed-not-controllable — enough to say "monitored, not adjustable".
+function hasHotWaterSignal(site) {
+    return site.devices.some(d => d.hotWaterCapable || d.telemetry?.hotWater != null);
+}
+
+export const SCOPE_GROUPS = [
     { key: 'heating', label: 'Heating', level: s => s.devices.some(d => d.kind === 'heating' && d.deviceType !== 'boiler-panel') ? 'ctl' : s.devices.some(d => d.kind === 'heating') ? 'mon' : 'none' },
-    { key: 'hotwater', label: 'Hot water', level: s => s.devices.some(d => d.deviceType === 'salus-it500-dhw') ? 'ctl' : 'none' },
+    { key: 'hotwater', label: 'Hot water', level: s => hasControllableDhw(s) ? 'ctl' : hasHotWaterSignal(s) ? 'mon' : 'none' },
     { key: 'kitchen', label: 'Kitchen equipment', level: s => s.devices.some(d => d.kind === 'kitchen') ? 'mon' : 'none' },
     { key: 'lighting', label: 'External lighting', level: s => s.devices.some(d => d.kind === 'lighting') ? 'mon' : 'none' },
     { key: 'fan', label: 'Extractor fans', level: s => s.devices.some(d => d.kind === 'fan') ? 'mon' : 'none' },
