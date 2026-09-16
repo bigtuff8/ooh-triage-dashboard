@@ -150,6 +150,18 @@ Clean up canary tickets (delete/solve+tag `test`) **and any canary store docs**.
 
 ---
 
+## Routine releases — ALWAYS iterate the version (`npm run release`)
+
+Once the app is live, every subsequent release MUST bump the app version so testers/ops can tell what's running. This is enforced by the single release path — do NOT hand-run `set image` for a routine release:
+
+```bash
+npm run release          # patch bump (1.2.0 -> 1.2.1), build, deploy, verify
+npm run release:minor    # minor bump (1.2.0 -> 1.3.0)  — use for a feature release
+npm run release:major    # major bump
+```
+
+`scripts/release.sh` guards (on main, clean, synced), runs `npm version` (bumps `package.json`, commits `vX.Y.Z`, tags it), pushes, builds the ACR image tagged with both the version and the git sha, rolls out with `kubectl set image`, and verifies `/healthz` reports the new version with `writesDisabled:true`. It uses `set image` (never `apply`), so it CANNOT change `WRITES_DISABLED`/`SMS_PROVIDER`/env — the write-flip (OOHDASH-19) remains a separate, deliberate manifest change and is never part of a routine release. Single replica (RB-4) still applies: the roll briefly drops the pod. Rollback ref is printed at the end.
+
 ## Step 5 — Post-canary (separate gates)
 
 - **go/no-go #3 (device writes):** SR-3 bench proof, then set `WRITES_DISABLED=false`.
