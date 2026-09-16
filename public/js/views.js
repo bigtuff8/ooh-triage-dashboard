@@ -3,6 +3,26 @@
  * Lookup, Tonight (shift view), Admin (IoT only). Design spec §3.
  */
 
+/**
+ * B0/R0 — the site sub-line (brand · address). Renders name-only (returns '') when brand/address
+ * are absent (pre-B2, live mode) so identity NEVER degrades to the literal "undefined · undefined".
+ * Once B2 puts brand/address on the record this lights up with no further change.
+ */
+function siteSubline(s) {
+    const parts = [s.brand, s.address].filter(v => v != null && String(v).trim() !== '');
+    return parts.length ? `<div class="sub">${parts.map(p => esc(p)).join(' · ')}</div>` : '';
+}
+
+/**
+ * B0/R0 · C9 — the confirm-gate warning shown when a site's name could not be verified (live
+ * Zendesk miss). Keeps a wrong-site dispatch honest: confirm the house number by voice.
+ */
+function unverifiedNotice(s) {
+    return s.nameUnverified
+        ? `<div class="alert warn" data-testid="confirm-unverified">⚠ <b>Site name unverified</b> — we couldn’t resolve a recognisable name for this house number. Confirm the house number by voice before making any change.</div>`
+        : '';
+}
+
 /* ------------------------ home (§3.1) ------------------------ */
 function vHome() {
     $('#view').innerHTML = `<div class="content narrow">
@@ -86,7 +106,8 @@ function renderConfirmGate() {
     if (!s) { $('#view').innerHTML = '<div class="content narrow"><div class="card"><h2>Loading…</h2></div></div>'; return; }
     $('#view').innerHTML = `<div class="content narrow"><div class="card" style="padding:26px" data-testid="confirm-gate">
    <h2>${esc(s.siteName)} <span class="mono" style="background:var(--surface-variant);padding:2px 10px;border-radius:6px;margin-left:6px">${esc(s.siteNo)}</span></h2>
-   <p class="sub">${esc(s.brand)} · ${esc(s.address)}</p>
+   ${siteSubline(s)}
+   ${unverifiedNotice(s)}
    <p style="margin:10px 0 4px">${esc(s.deviceSummary)}</p>
    <div class="script">“Can I just confirm — you’re calling from <b>${esc(s.siteName)}</b>, site number <b>${esc(s.siteNo)}</b>?”</div>
    <div style="display:flex;gap:10px;margin-top:16px">
@@ -142,7 +163,7 @@ function renderWorkspace() {
     $('#view').innerHTML = `<div class="content"><div class="wsgrid">
   <div>
    <div class="card" style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;padding:14px 18px">
-    <div><h2 style="display:inline">${esc(s.siteName)}</h2> <span class="mono">${esc(s.siteNo)}</span><div class="sub">${esc(s.brand)} · ${esc(s.address)}</div></div>
+    <div><h2 style="display:inline">${esc(s.siteName)}</h2> <span class="mono">${esc(s.siteNo)}</span>${siteSubline(s)}</div>
     ${s.callsLast30Days >= 2 ? `<span class="tag amber" title="OOH tickets in the last 30 days">🔁 ${s.callsLast30Days} calls this month</span>` : ''}
     <button class="btn link" style="margin-left:auto" onclick="endCall()">End call</button>
    </div>

@@ -59,7 +59,7 @@ router.get('/sites/search', wrap(async (req, res) => {
     results.forEach(r => { counts[r.siteNo] = (counts[r.siteNo] || 0) + 1; });
     res.json({
         results: results.map(r => ({
-            siteNo: r.siteNo, siteName: r.siteName, brand: r.brand, duplicate: counts[r.siteNo] > 1
+            siteNo: r.siteNo, siteName: r.siteName, nameUnverified: r.nameUnverified, brand: r.brand, duplicate: counts[r.siteNo] > 1
         }))
     });
 }));
@@ -70,7 +70,7 @@ router.get('/sites/:siteNo/resolve', wrap(async (req, res) => {
         const s = result.site;
         return res.json({
             status: 'resolved',
-            site: { siteNo: s.siteNo, siteName: s.siteName, brand: s.brand, address: s.address, callsLast30Days: s.callsLast30Days, deviceSummary: deviceSummary(s) }
+            site: { siteNo: s.siteNo, siteName: s.siteName, nameUnverified: s.nameUnverified, accountId: s.accountId, brand: s.brand, address: s.address, callsLast30Days: s.callsLast30Days, deviceSummary: deviceSummary(s) }
         });
     }
     res.json(result);
@@ -117,7 +117,7 @@ async function workspacePayload(site) {
     try { tickets = await zendesk.ticketsForSite(site.siteNo); }
     catch (err) { console.error(`[API] Site tickets unavailable: ${err.message}`); }
     return {
-        site: { siteNo: site.siteNo, siteName: site.siteName, brand: site.brand, address: site.address, callsLast30Days: site.callsLast30Days },
+        site: { siteNo: site.siteNo, siteName: site.siteName, nameUnverified: site.nameUnverified, accountId: site.accountId, brand: site.brand, address: site.address, callsLast30Days: site.callsLast30Days },
         devices: site.devices.map(d => ({
             ...stripDemo(d),
             capabilities: registry.capabilitiesFor(d.deviceType)?.commands || [],

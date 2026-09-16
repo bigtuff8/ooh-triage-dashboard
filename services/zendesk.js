@@ -50,25 +50,79 @@ async function zd(method, path, data, params) {
 
 let siteOptionsCache = { at: 0, options: [] };
 
+/**
+ * Ensures the site custom-field options are loaded (paged, 1h cache). Returns the cached
+ * options array. Throws only on a live fetch failure so callers can decide how to degrade.
+ */
+async function loadSiteOptions() {
+    if (Date.now() - siteOptionsCache.at > 60 * 60 * 1000) {
+        const all = [];
+        let url = `/ticket_fields/${config.zendesk.siteFieldId}/options.json?per_page=100`;
+        while (url) {
+            const data = await zd('GET', url);
+            all.push(...(data.custom_field_options || []));
+            url = data.next_page ? data.next_page.replace(baseUrl(), '') : null;
+        }
+        siteOptionsCache = { at: Date.now(), options: all };
+    }
+    return siteOptionsCache.options;
+}
+
+/**
+ * The exactly-one option whose embedded house ID matches `siteNo`, else null. The house ID is
+ * embedded in the option name AND value; an ambiguous (>1) match resolves to null so callers
+ * fall through to their safe/unverified path rather than guessing.
+ */
+function matchSiteOption(options, siteNo) {
+    const matches = options.filter(o =>
+        new RegExp(`(^|[^0-9])${siteNo}([^0-9]|$)`).test(o.name) || o.value.includes(siteNo));
+    return matches.length === 1 ? matches[0] : null;
+}
+
+/**
+ * Extracts a human display name from a Zendesk site-field option name. The option name is
+ * `Brand::SubBrand::<houseNo> Pub Name (Location)` (verified live 2026-09-16, field 11405878329244,
+ * e.g. "Greene King::Chef & Brewer::6261 Wheatstone Inn (Gloucester)"). We return the last `::`
+ * segment (the "<houseNo> Pub Name (Location)" part) with the leading house number stripped so the
+ * confirm target reads as the recognisable pub, e.g. "Wheatstone Inn (Gloucester)". Falls back to
+ * the whole option name if the shape is unexpected — never returns an empty/opaque value.
+ */
+function humanNameFromOption(option, siteNo) {
+    const raw = String(option?.name || '').trim();
+    if (!raw) return null;
+    const seg = raw.includes('::') ? raw.split('::').pop().trim() : raw;
+    // Strip a leading house number (the same siteNo) so it isn't duplicated next to the siteNo chip.
+    const stripped = seg.replace(new RegExp(`^${siteNo}\\s+`), '').trim();
+    return stripped || seg || raw;
+}
+
 async function resolveSiteTag(siteNo) {
     if (!live()) return `fixture::site::${siteNo}`;
     try {
-        if (Date.now() - siteOptionsCache.at > 60 * 60 * 1000) {
-            const all = [];
-            let url = `/ticket_fields/${config.zendesk.siteFieldId}/options.json?per_page=100`;
-            while (url) {
-                const data = await zd('GET', url);
-                all.push(...(data.custom_field_options || []));
-                url = data.next_page ? data.next_page.replace(baseUrl(), '') : null;
-            }
-            siteOptionsCache = { at: Date.now(), options: all };
-        }
-        // House ID is embedded in the option name/value — require exactly one match
-        const matches = siteOptionsCache.options.filter(o =>
-            new RegExp(`(^|[^0-9])${siteNo}([^0-9]|$)`).test(o.name) || o.value.includes(siteNo));
-        return matches.length === 1 ? matches[0].value : null;
+        const options = await loadSiteOptions();
+        const match = matchSiteOption(options, siteNo);
+        return match ? match.value : null;
     } catch (err) {
         console.error(`[ZD] Site tag resolution failed for ${siteNo}: ${err.message}`);
+        return null;
+    }
+}
+
+/**
+ * B0/R0 — resolves the HUMAN site name for a house number from the same cached site-field options
+ * used for tagging (no new external call; 1h cache). Returns the recognisable pub name (distinct
+ * from the machine tag `value`), or null on miss / ambiguous match / error. A null return is the
+ * signal for callers to fall back to the accountId and show the "unverified site name" warning —
+ * this NEVER throws, so eager enrichment in fetchLiveSites() stays non-fatal.
+ */
+export async function resolveSiteName(siteNo) {
+    if (!live()) return null;
+    try {
+        const options = await loadSiteOptions();
+        const match = matchSiteOption(options, siteNo);
+        return match ? humanNameFromOption(match, siteNo) : null;
+    } catch (err) {
+        console.error(`[ZD] Site name resolution failed for ${siteNo}: ${err.message}`);
         return null;
     }
 }

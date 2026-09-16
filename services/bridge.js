@@ -11,13 +11,14 @@
  * fixture mode → data/fixtures/bridge-devices.json (mirrors the design prototype data).
  *
  * The canonical internal shape consumed by resolution/control/flows:
- *   site:   { siteNo, siteName, brand, address, callsLast30Days, devices[] }
+ *   site:   { siteNo, siteName, nameUnverified?, accountId?, brand, address, callsLast30Days, devices[] }
  *   device: { deviceId, zone, deviceType, kind, online, telemetry{}, schedule?, _demo? }
  */
 
 import { readFileSync } from 'fs';
 import axios from 'axios';
 import { config } from '../config.js';
+import { resolveSiteName } from './zendesk.js';
 
 let fixtureData = null;
 let liveCache = { sites: null, at: 0 };
@@ -117,15 +118,33 @@ async function fetchLiveSites() {
     if (skipped.length) {
         console.warn(`[BRIDGE] Skipped ${skipped.length} non-house account(s) (no numeric site): ${[...new Set(skipped)].join(', ')}`);
     }
-    const sites = [...groups.entries()].map(([siteNo, g]) => ({
-        siteNo,
-        // TODO: siteName is not in the /api/devices payload — proxied by accountId for now.
-        //       A real site name needs a registry/Zendesk lookup (F025 follow-up).
-        siteName: g.accountId,
-        brand: undefined,           // not in payload — registry/Zendesk-sourced (guarded downstream)
-        address: undefined,         // not in payload
-        callsLast30Days: undefined, // not in payload
-        devices: g.devices
+    // B0/R0 — enrich each site with a HUMAN name EAGERLY here, before search and dispatch read
+    // the record (searchSites filters on siteName; control.dispatch writes site.siteName into the
+    // irreversible-action audit). The name comes from the Zendesk site-field options, which are
+    // paged ONCE PER HOUR then served from an in-memory cache (services/zendesk.js), so per-site
+    // enrichment is an in-memory filter over cached options, NOT N external calls. Enrichment is
+    // best-effort and NON-FATAL: resolveSiteName() never throws, and on miss/ambiguous/error we
+    // fall back to the accountId and flag nameUnverified so the confirm UI shows the warning.
+    // brand/address stay undefined until B2 lights them up with no further change here.
+    const sites = await Promise.all([...groups.entries()].map(async ([siteNo, g]) => {
+        let humanName = null;
+        try {
+            humanName = await resolveSiteName(siteNo);
+        } catch (err) {
+            // Defence in depth — resolveSiteName is already non-throwing, but never let a
+            // Zendesk fault break the inventory read (which callers treat as degraded mode).
+            console.error(`[BRIDGE] Site name enrichment failed for ${siteNo}: ${err.message}`);
+        }
+        return {
+            siteNo,
+            siteName: humanName || g.accountId,   // human pub name when resolved, else the accountId
+            nameUnverified: !humanName,           // true ⇒ confirm UI shows the "unverified" warning
+            accountId: g.accountId,               // kept for the de-emphasised fallback display
+            brand: undefined,           // not in payload — registry/Zendesk-sourced (guarded downstream)
+            address: undefined,         // not in payload
+            callsLast30Days: undefined, // not in payload
+            devices: g.devices
+        };
     }));
     liveCache = { sites, at: Date.now() };
     return sites;
