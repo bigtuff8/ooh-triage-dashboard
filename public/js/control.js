@@ -9,6 +9,41 @@
 
 window.ctl = null;
 let ctlPollTimer = null;
+// R11/C7: one-shot mid-wait decision-prompt timer. Armed on entering the confirm/waiting phase,
+// fires once at midWaitPromptMs (default 30s, before the 90s server timeout) to interrupt the
+// silent spinner with an active keep-on-hold / escalate / stop-waiting choice. Cleared at every
+// teardown/settle site alongside ctlPollTimer. UX-only — the server clock is never touched.
+let ctlMidWaitTimer = null;
+
+// Client-side mid-wait horizon delivered by the server via /api/me (config.control.midWaitPromptMs).
+// Falls back to 30s if /me hasn't loaded (defensive; the panel arrives after auth in practice).
+function ctlMidWaitMs() {
+    const ms = state.me?.control?.midWaitPromptMs;
+    return Number.isFinite(ms) && ms > 0 ? ms : 30000;
+}
+
+// Phases in which an action has SETTLED — a mid-wait prompt must never fire (or stay) over one.
+const CTL_SETTLED_PHASES = ['done', 'failed', 'rejected', 'timeout'];
+
+// Arm the one-shot mid-wait timer. Only fires while the action is genuinely still in-flight
+// (phase 'confirm', not settled, prompt not already showing).
+function armCtlMidWait() {
+    clearTimeout(ctlMidWaitTimer);
+    ctlMidWaitTimer = setTimeout(() => {
+        const c = window.ctl;
+        if (!c || c.phase !== 'confirm' || CTL_SETTLED_PHASES.includes(c.phase) || c.midWait) return;
+        c.midWait = true;   // interrupt-precedence: the card lives inside the confirm-phase tracker,
+        drawControl();      // never over the (now-closed) confirm modal or a settled state.
+    }, ctlMidWaitMs());
+    ctlMidWaitTimer.unref?.();
+}
+
+// Dismiss the mid-wait card and stop the one-shot timer (used by keep-on-hold and every teardown).
+function clearCtlMidWait() {
+    clearTimeout(ctlMidWaitTimer);
+    ctlMidWaitTimer = null;
+    if (window.ctl) window.ctl.midWait = false;
+}
 
 const CTL_TITLES = { up: 'Raise setpoint', down: 'Lower setpoint', frost: 'Turn heating off (frost-hold)', modeoff: 'Turn off (mode)', boost: 'Hot-water boost' };
 const CTL_WHAT = { up: 'Setpoint raise', down: 'Setpoint lower', frost: 'Heating off (frost-hold)', modeoff: 'Heating off (mode)', boost: 'HW boost' };
@@ -127,7 +162,15 @@ function drawControl() {
    <div class="ss ${ph === 'confirm' ? 'on wait' : ph === 'done' ? 'ok' : ['failed', 'rejected', 'timeout'].includes(ph) ? 'bad' : ''}">2. Device confirming…</div>
    <div class="ss ${ph === 'done' ? 'ok' : ['failed', 'rejected', 'timeout'].includes(ph) ? 'bad' : ''}">${ph === 'failed' ? '✕ Failed' : ph === 'rejected' ? '✕ Rejected' : ph === 'timeout' ? '⚠ No confirmation' : '3. Applied'}</div></div>`;
     let tail = '';
-    if (ph === 'sent' || ph === 'confirm') tail = `<p class="small" style="text-align:center" aria-live="polite">Waiting for the device to echo the change back — usually under 30 seconds. <b>“Applied” only means device-confirmed.</b></p>`;
+    // R11/C7 mid-wait decision prompt — a one-shot interrupt over the confirm-phase spinner.
+    // It replaces the passive "waiting" copy with an active caller-on-hold decision. Only rendered
+    // while genuinely still confirming (never over a settled phase); the confirm modal is already
+    // closed by this point, so it cannot stack on it. (Forward-compat: a late-sync applied-late
+    // banner supersedes this stale card by settling the phase to 'done' before it can show.)
+    if (ph === 'confirm' && c.midWait) {
+        tail = `<div class="alert warn" data-testid="sync-midwait" aria-live="assertive">⏳ <b>Still no confirmation from the device.</b>${c.action?.slowEchoDevice ? ' This unit (IT700) can be slow to echo.' : ''} It may still land — but you have a caller on hold. <b>What do you want to do?</b></div>
+   <div style="display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap"><button class="btn" data-testid="midwait-hold" onclick="ctlMidWaitHold()">Keep caller on hold</button><button class="btn" data-testid="midwait-stop" onclick="ctlMidWaitStop()">Stop waiting</button><button class="btn primary" data-testid="midwait-escalate" onclick="ctlEscalate()">Escalate</button></div>`;
+    } else if (ph === 'sent' || ph === 'confirm') tail = `<p class="small" style="text-align:center" aria-live="polite">Waiting for the device to echo the change back — usually under 30 seconds. <b>“Applied” only means device-confirmed.</b></p>`;
     if (ph === 'done') tail = `<div class="alert ok" data-testid="sync-applied" aria-live="polite">✅ <b>Applied — device confirmed ${ctlValTxt()} at ${new Date(c.action.settledAt).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}.</b>${c.hold !== 'none' ? ` Hold active: reverts at ${holdRevertText(c.hold)}.` : ''}</div><div style="text-align:right"><button class="btn primary" data-testid="sync-done" onclick="ctlFinish()">Done</button></div>`;
     if (ph === 'failed' || ph === 'rejected') tail = `<div class="alert err" data-testid="sync-failed" aria-live="assertive">❌ <b>The device ${ph === 'rejected' ? 'rejected' : 'refused'} this command</b> (<span class="mono">${ph}</span>). Nothing has changed on site — do not tell the caller it’s done.</div><div style="text-align:right;display:flex;gap:8px;justify-content:flex-end"><button class="btn" onclick="ctlRetry()">Try again</button><button class="btn primary" data-testid="sync-escalate" onclick="ctlEscalate()">Escalate instead</button></div>`;
     if (ph === 'timeout') tail = `<div class="alert warn" data-testid="sync-timeout" aria-live="assertive">⏱️ <b>The device hasn’t confirmed yet.</b>${c.action?.slowEchoDevice ? ' This unit (IT700) can be slow to echo.' : ''} <b>Treat the change as NOT applied.</b> We’ll keep watching in the background and update the ticket if it lands.</div><div style="text-align:right;display:flex;gap:8px;justify-content:flex-end"><button class="btn" data-testid="sync-wait" onclick="ctlWaitMore()">Keep waiting (30s)</button><button class="btn primary" data-testid="sync-escalate" onclick="ctlEscalate()">Escalate</button></div>`;
@@ -156,8 +199,10 @@ async function ctlSend() {
         });
         c.action = action;
         c.phase = 'confirm';
+        c.midWait = false;
         drawControl();
         startCtlPolling();
+        armCtlMidWait();   // R11/C7: one-shot mid-wait prompt fires at midWaitPromptMs if still pending
     } catch (err) {
         // Guardrail (422), kill-switch (423), confirmation (409) → back to compose with the reason
         c.phase = 'compose';
@@ -176,6 +221,9 @@ function startCtlPolling() {
             ({ action } = await api.get(`/api/control/actions/${c.action.actionId}`));
         } catch { return; /* transient — keep polling */ }
         c.action = action;
+        // R11/C7: any settle cancels the pending mid-wait prompt so it can never fire (or linger)
+        // over a resolved action. late-sync applied-late (→ 'done') supersedes a stale mid-wait card.
+        if (['synced', 'late-synced', 'failed', 'rejected', 'timeout'].includes(action.state)) clearCtlMidWait();
         if (['synced', 'late-synced'].includes(action.state) && c.phase !== 'done') { c.phase = 'done'; drawControl(); }
         else if (['failed', 'rejected'].includes(action.state) && !['failed', 'rejected'].includes(c.phase)) { c.phase = action.state; drawControl(); }
         else if (action.state === 'timeout' && c.phase !== 'timeout') { c.phase = 'timeout'; drawControl(); }
@@ -189,16 +237,43 @@ async function ctlWaitMore() {
         const { action } = await api.post(`/api/control/actions/${c.action.actionId}/wait`);
         c.action = action;
         c.phase = 'confirm';
+        c.midWait = false;
         drawControl();
         startCtlPolling();
+        armCtlMidWait();   // re-arm for the fresh wait window (keeps behaviour consistent on re-wait)
     } catch (err) {
         toast(`⚠️ ${esc(err.message)}`);
     }
 }
 
+/**
+ * R11/C7 mid-wait choice — KEEP CALLER ON HOLD. Dismiss the prompt and stay in the confirm
+ * wait: no server change, the existing 2s client poll keeps running. The one-shot timer is spent
+ * (not re-armed) so the handler isn't nagged again for this wait window.
+ */
+function ctlMidWaitHold() {
+    clearCtlMidWait();
+    drawControl();
+}
+
+/**
+ * R11/C7 mid-wait choice — STOP WAITING. Adopt the existing timeout-card treatment immediately
+ * (treat as not-yet-confirmed) WITHOUT burning the residual time to the 90s server deadline. The
+ * server lifecycle is untouched: the background watch keeps polling, and if the device echoes
+ * late the client poller flips this to 'done' (applied-late). The timeout card's honest copy tells
+ * the handler the change may still land and where they'll be told (ticket note / applied-late
+ * banner if the tracker stays open).
+ */
+function ctlMidWaitStop() {
+    clearCtlMidWait();
+    window.ctl.phase = 'timeout';
+    drawControl();
+}
+
 function ctlRetry() {
     const c = window.ctl;
     clearInterval(ctlPollTimer);
+    clearCtlMidWait();
     c.phase = 'compose';
     c.action = null;
     drawControl();
@@ -206,6 +281,7 @@ function ctlRetry() {
 
 function ctlCancel() {
     clearInterval(ctlPollTimer);
+    clearCtlMidWait();
     window.ctl = null;
     closeModal();
     if (state.flow) state.flow.stage = Math.max(0, state.flow.stage - 1);
@@ -219,6 +295,7 @@ function ctlCancel() {
 async function ctlFinish() {
     const c = window.ctl;
     clearInterval(ctlPollTimer);
+    clearCtlMidWait();
     window.ctl = null;
     closeModal();
     const holdTxt = c.hold !== 'none' ? `Hold until ${holdRevertText(c.hold)} — will revert automatically (durable)` : null;
@@ -263,6 +340,7 @@ async function ctlFinish() {
 async function ctlEscalate() {
     const c = window.ctl;
     clearInterval(ctlPollTimer);
+    clearCtlMidWait();
     window.ctl = null;
     closeModal();
     const what = CTL_WHAT[c.mode];

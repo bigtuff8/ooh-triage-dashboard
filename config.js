@@ -114,8 +114,17 @@ export const config = {
 
     control: {
         syncPollIntervalMs: parseInt(env('SYNC_POLL_INTERVAL_MS', '3000'), 10),
+        // R11/C7: the server "decide now"/timeout deadline. 90s is JUSTIFIED-PROVISIONAL — it is
+        // NOT yet calibrated against measured device echo latency; that calibration is a proof
+        // obligation on B3/OOHDASH-18 (owner Spencer/IoT, not run). Do NOT treat this as closed.
+        // The decide-now (90s) vs late-echo-watch (10min) split is real in the model — keep it split.
         syncTimeoutMs: parseInt(env('SYNC_TIMEOUT_MS', '90000'), 10),
         lateSyncWatchMs: parseInt(env('LATE_SYNC_WATCH_MS', '600000'), 10),
+        // R11/C7: client-side mid-wait decision prompt horizon. A one-shot prompt fires this long
+        // into the confirm/waiting phase (default 30s, before the 90s decide-now deadline) so the
+        // handler makes an ACTIVE caller-on-hold decision instead of a silent 90s spinner. UX-only;
+        // the server clock is untouched. Invariant: 0 < midWaitPromptMs <= syncTimeoutMs.
+        midWaitPromptMs: parseInt(env('MID_WAIT_PROMPT_MS', '30000'), 10),
         // OOHDASH-24: freshness window for the /healthz active read-probe. A probe result older
         // than this is stale ⇒ the read tri-state can no longer report green off it (amber/unknown
         // until a fresh probe runs). Env-overridable; default 60s.
@@ -140,6 +149,11 @@ export const config = {
  */
 export function validateConfig() {
     const problems = [];
+    // R11/C7: the mid-wait prompt must fire strictly inside the decide-now window — a prompt at 0
+    // (or negative) or one at/after the 90s timeout is a misconfiguration, not a nudge.
+    if (!(config.control.midWaitPromptMs > 0 && config.control.midWaitPromptMs <= config.control.syncTimeoutMs)) {
+        problems.push('MID_WAIT_PROMPT_MS must satisfy 0 < midWaitPromptMs <= syncTimeoutMs (SYNC_TIMEOUT_MS)');
+    }
     if (config.isProduction) {
         if (config.authMode !== 'oidc') problems.push('AUTH_MODE must be "oidc" in production (fail-secure)');
         if (config.dataMode !== 'live') problems.push('DATA_MODE must be "live" in production');
