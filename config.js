@@ -82,9 +82,12 @@ export const config = {
 
     // Deploy-time device-write lock (F005). A synchronous, Cosmos-independent kill that engages
     // at first live boot regardless of the runtime kill-switch state — every device write routes
-    // through killswitch.writesBlocked(), which checks this FIRST. Fail-safe by design: absence
-    // leaves writes allowed only in a live, credentialed deploy that has explicitly not set it.
-    writesDisabled: env('WRITES_DISABLED') === 'true',
+    // through killswitch.writesBlocked(), which checks this FIRST. Fail-CLOSED by design: writes
+    // are enabled ONLY when WRITES_DISABLED is set to exactly "false" (trim + lower-case). Absence,
+    // empty, "true", "0", "no", a typo, or ANY other value ⇒ disabled. Read the RAW process.env
+    // value (NOT via env(), whose empty→fallback collapse must not be inherited here) so unset/empty
+    // cannot masquerade as anything but "not exactly false". Enable is a deliberate, auditable act.
+    writesDisabled: (process.env.WRITES_DISABLED ?? '').trim().toLowerCase() !== 'false',
 
     // Durable store: Cosmos DB in live mode, local JSON files in fixture/dev mode
     cosmos: {

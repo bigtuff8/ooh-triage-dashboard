@@ -65,6 +65,12 @@ spec:
             # exercises the P1 path end-to-end without sending. BOTH stay set until the SteerCo
             # conditions are met: flip WRITES_DISABLED off only at James go/no-go #3 (device writes),
             # and SMS_PROVIDER to the real gateway only at go/no-go #4 (Q-F).
+            #
+            # FAIL-CLOSED contract (OOHDASH-12): this VALUE is now load-bearing. Writes are enabled
+            # ONLY when WRITES_DISABLED is exactly "false" — flipping to "false" is the SINGLE enable
+            # (the go/no-go #3 go-live diff). "true" (as below), any other value, an unset var, or
+            # REMOVING this line entirely all resolve to writes DISABLED — that is intended and safe:
+            # absence never enables. Never assume deleting the line turns writes off vs on; it disables.
             - name: WRITES_DISABLED
               value: "true"
             - name: SMS_PROVIDER

@@ -9,7 +9,7 @@
     "dev": "node --watch server.js",
     "test": "npx playwright test",
     "test:headed": "npx playwright test --headed",
-    "test:unit": "node --test \"test/*.test.js\""
+    "test:unit": "node --experimental-test-module-mocks --test \"test/*.test.js\""
   },
   "dependencies": {
     "@azure/cosmos": "^4.9.3",
