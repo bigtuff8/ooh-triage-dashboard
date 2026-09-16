@@ -132,6 +132,18 @@ async function start() {
     app.listen(config.port, () => {
         console.log(`OOH Dashboard v${config.appVersion} on port ${config.port}`);
         console.log(`  auth: ${config.authMode} · data: ${config.dataMode} · origin: ${config.appOrigin}`);
+        // [WRITE-LOCK] boot announcement (OOHDASH-12). Loud and unmissable so neither a
+        // fail-closed-by-accident nor an enabled state can hide behind a quiet green.
+        if (config.writesDisabled) {
+            console.log('[WRITE-LOCK] Device writes are DISABLED (WRITES_DISABLED lock engaged).');
+        } else if (config.isProduction) {
+            console.warn('[WRITE-LOCK] ***************************************************************');
+            console.warn('[WRITE-LOCK] *** DEVICE WRITES ARE ENABLED IN PRODUCTION — WRITES_DISABLED=false ***');
+            console.warn('[WRITE-LOCK] *** Live device actuations WILL fire on dispatch. ***');
+            console.warn('[WRITE-LOCK] ***************************************************************');
+        } else {
+            console.warn('[WRITE-LOCK] *** DEVICE WRITES ARE ENABLED *** WRITES_DISABLED=false — live actuations will fire.');
+        }
     });
 }
 
