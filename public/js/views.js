@@ -147,6 +147,22 @@ function scheduleWorkspaceRefresh() {
     }, 30000);
 }
 
+// Presence-driven scope tag. Hot water gets an out-of-scope-with-context reading
+// at `mon` ("monitored / not adjustable from here") rather than the generic
+// "Monitored only", so a combi observed-but-not-controllable reads honestly and
+// never as a bare "Not on Lighthouse here". `ctl` still flips on live presence.
+function scopeTag(g) {
+    if (g.level === 'ctl') return '<span class="tag green">Controllable from here</span>';
+    if (g.level === 'mon') {
+        return g.key === 'hotwater'
+            ? '<span class="tag grey">Monitored — not adjustable from here</span>'
+            : '<span class="tag grey">Monitored only</span>';
+    }
+    return g.key === 'hotwater'
+        ? '<span class="tag grey">Not controllable here</span>'
+        : '<span class="tag grey">Not on Lighthouse here</span>';
+}
+
 function renderWorkspace() {
     const ws = state.workspace;
     const s = ws.site;
@@ -172,7 +188,7 @@ function renderWorkspace() {
   <div>
    <div class="card tight"><h3>Live device status</h3>${deviceBoard(ws)}</div>
    <div class="card tight"><h3>What Lighthouse controls at this site</h3><ul class="scopelist" data-testid="scope-list">
-    ${ws.scope.map(g => `<li><span${g.level === 'none' ? ' style="color:var(--text-disabled)"' : ''}>${esc(g.label)}</span>${g.level === 'ctl' ? '<span class="tag green">Controllable from here</span>' : g.level === 'mon' ? '<span class="tag grey">Monitored only</span>' : '<span class="tag grey">Not on Lighthouse here</span>'}</li>`).join('')}
+    ${ws.scope.map(g => `<li><span${g.level === 'none' ? ' style="color:var(--text-disabled)"' : ''}>${esc(g.label)}</span>${scopeTag(g)}</li>`).join('')}
    </ul><p class="small" style="margin-top:6px">Live from the device inventory — use it to answer “isn’t that you?”</p></div>
    <div class="card tight"><h3>Open tickets for this site</h3>${siteTickets(ws)}</div>
   </div></div></div>`;

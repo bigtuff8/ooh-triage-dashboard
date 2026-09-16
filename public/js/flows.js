@@ -264,11 +264,17 @@ const FLOWR = {
     },
 
     hotwater(ws, f) {
-        const dhw = ws.devices.find(d => d.deviceType === 'salus-it500-dhw');
+        // Presence-driven: a controllable DHW device is one whose registry
+        // capabilities actually expose a hot-water boost command — NOT a name-match
+        // on `salus-it500-dhw` (live bridge data never emits it, bridge.js:57-67).
+        // Out-of-scope is the DETERMINISTIC R1 default; the boost/compose affordance
+        // only appears if live inventory genuinely carries a controllable DHW device
+        // (R7-ready: flips on presence with no code change).
+        const dhw = ws.devices.find(d => (d.capabilities || []).includes('hwboost'));
         if (f.stage === 0) {
             if (!dhw) {
-                doneLine('No boostable hot-water device at this site');
-                return `<div class="alert info">Hot water at this site isn’t on a boostable Lighthouse device — likely boiler-side.</div><div class="chips"><button class="chip" onclick="flowStep({cap:1})">Capture &amp; escalate</button><button class="chip" onclick="flowStep({sc:1})">Scope guidance (boiler fault?)</button></div>`;
+                doneLine('Hot water not controllable here — capture & escalate');
+                return `<div class="alert info">Hot water is not controllable from here — it’s boiler-side, not on a boostable Lighthouse device. Capture the details and escalate.</div><div class="chips"><button class="chip" onclick="flowStep({cap:1})">Capture &amp; escalate</button><button class="chip" onclick="flowStep({sc:1})">Scope guidance (boiler fault?)</button></div>`;
             }
             if (!dhw.online) { f.cat = 'connectivity'; f.stage = 0; return FLOWR.connectivity(ws, f); }
             const boost = dhw.telemetry?.hwBoostHours || 0;
@@ -277,9 +283,12 @@ const FLOWR = {
    <div class="stepq">Boost the hot water now?</div><div class="chips"><button class="chip" data-testid="hw-boost-yes" onclick="flowStep({boost:1})">Yes — set a boost</button><button class="chip" onclick="flowStep({cap:1})">No — capture &amp; escalate</button></div>`;
         }
         if (f.stage === 1) {
-            const dhwDev = ws.devices.find(d => d.deviceType === 'salus-it500-dhw');
-            if (f.data.boost) { openControl(dhwDev, 'boost'); return ctlPlaceholder(); }
-            if (f.data.cap) {
+            const dhwDev = ws.devices.find(d => (d.capabilities || []).includes('hwboost'));
+            // Presence-guarded: the compose/boost path is reachable ONLY when a genuinely
+            // controllable DHW device is present. Without one, a boost intent falls through
+            // to the deterministic capture-and-escalate default (never openControl on nothing).
+            if (f.data.boost && dhwDev) { openControl(dhwDev, 'boost'); return ctlPlaceholder(); }
+            if (f.data.cap || f.data.boost) {
                 doneLine('Outcome: captured');
                 return outcomeCaptured(f, 'cap', {
                     subject: 'Hot water issue — not resolvable remotely tonight',
