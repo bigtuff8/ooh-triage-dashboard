@@ -22,7 +22,7 @@ import * as resolution from './resolution.js';
 import * as tb from './tb-client.js';
 import * as audit from './audit.js';
 import { scheduleOverride } from './overrides.js';
-import { addLateSyncNote } from './zendesk.js';
+import { addLateSyncNote, createLateSyncTicket } from './zendesk.js';
 import { recordControlEvent } from './metrics.js';
 
 /** Formats an ISO timestamp as e.g. "Sat 07:00" for audit detail strings. */
@@ -37,7 +37,16 @@ const COMMAND_ACTION_TYPE = {
     hwboost: () => 'hw-boost'
 };
 
-// actionId → action record (per-replica in-memory; durable trail lives in OohAuditLog)
+// actionId → action record (per-replica in-memory; durable trail lives in OohAuditLog).
+//
+// C1 (DEFERRED — NOT built in this item): this Map and the pollTimer below are the ONLY home of
+// an in-flight action's late-sync watch. A pod restart inside the lateSyncWatchMs window silently
+// drops both — the late echo is never observed, the audit stays uncorrected as 'timeout', and no
+// late-sync note ever fires. The only true fix is persisting the minimal watch fields (actionId,
+// _device identity, attribute, value, auditId, ticketId, deadline, watchUntil, state) to Cosmos on
+// dispatch and rehydrating non-settled actions into this Map (re-arming the poller) on startup.
+// That is the C1 proof obligation and is DEFERRED; C1 stays OPEN until it lands. The C1 known-gap
+// test asserts this restart hole as an expected LIMIT, not passing behaviour.
 const actions = new Map();
 let pollTimer = null;
 
@@ -184,8 +193,23 @@ async function pollOne(a) {
         a.reported = reported;
         await audit.updateOutcome(a.auditId, 'synced', wasTimeout ? `late device confirmation at ${a.settledAt}` : null);
         recordControlEvent('synced');
-        if (wasTimeout && a.ticketId) {
-            await addLateSyncNote(a.ticketId, a).catch(err => console.error(`[CONTROL] Late-sync ticket note failed: ${err.message}`));
+        if (wasTimeout) {
+            // C6 durable channel. LAZY ticket creation (panel decision): we do NOT create a Zendesk
+            // ticket for every timeout — most timed-out actions never echo late, so an eager ticket
+            // would be a wasted write on the overwhelming majority. The durable target is created
+            // here, at the ONE moment a late echo actually needs somewhere to land, and only when the
+            // handler never made an outcome/escalation ticket (a.ticketId still null). If a ticket
+            // already exists (escalate/Done via api.js:256), we reuse it. Best-effort: a failure to
+            // create/annotate is logged, never thrown — the audit correction above already stuck.
+            try {
+                if (!a.ticketId) {
+                    const ticket = await createLateSyncTicket(a);
+                    a.ticketId = ticket.id;
+                }
+                await addLateSyncNote(a.ticketId, a);
+            } catch (err) {
+                console.error(`[CONTROL] Late-sync ticket note failed: ${err.message}`);
+            }
         }
         if (a.hold?.revertAt) {
             try {
@@ -211,6 +235,17 @@ async function pollOne(a) {
         await audit.updateOutcome(a.auditId, 'timeout');
         recordControlEvent('timeout');
     }
+}
+
+/**
+ * TEST-ONLY seam (C1 known-gap test). Simulates exactly what a pod restart drops: the in-memory
+ * actions Map and the poll timer. There is deliberately NO rehydrate — that is the DEFERRED Cosmos
+ * persistence fix (C1). Used to prove the restart hole is a KNOWN, EXPECTED gap (no late note, no
+ * audit correction, no alert after a mid-window restart), not passing behaviour.
+ */
+export function __dropForRestartTest() {
+    actions.clear();
+    if (pollTimer) { clearInterval(pollTimer); pollTimer = null; }
 }
 
 /**
