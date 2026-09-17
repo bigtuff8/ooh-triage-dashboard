@@ -1,0 +1,11 @@
+{
+  "_comment": "Site-token alias overlay for the TB-direct site query (design §2.3, D1). TB textSearch is an unanchored substring match: the anchored client-side filter '^{brand}-({tokens})(?![0-9])' correctly rejects numeric-neighbour bleed (gk-62091) but would MISS split sites whose devices live under a TEXT-token variant (md-1110 has 6 devices as md-1110-* and 112 as md-1110meridian-*). Each entry lists the EXTRA name tokens a site's devices may carry BESIDES its bare siteNo; the bare siteNo is always included implicitly, so most sites need NO entry here. Keyed by siteNo. Tokens are matched case-insensitively against the normalised device name. Refreshed by a documented OFFLINE estate-scan job (never a runtime full-tenant pull) — seeded from the validation report's 50 collision pairs / known text-token split sites.",
+  "_format": { "<siteNo>": ["<extra-token>", "..."] },
+  "aliases": {
+    "1110": ["1110meridian"],
+    "319": ["319fossepark"],
+    "1244": ["1244battlefield"],
+    "linwood": ["linwoodfarm"],
+    "allertonhall": ["allertonhallfarm"]
+  }
+}

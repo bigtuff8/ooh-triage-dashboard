@@ -1,0 +1,47 @@
+{
+  "_comment": "TB-direct read-plane test fixture (design §5). Mirrors the shape TB returns from GET /api/tenant/devices?textSearch=... — a PageData { data:[deviceEntity], hasNext, totalElements } — plus the per-device latest-telemetry shape { key:[{ts,value}] } from GET /api/plugins/telemetry/DEVICE/{uuid}/values/timeseries. Keyed by tbName so tests can look up telemetry by device. The 6261 set includes a bleed neighbour (gk-62611) and a numeric-bleed drop (gk-62091) so the anchored client-side filter is exercised. Names carry realistic C4 exception classes.",
+  "devices": [
+    {
+      "id": { "id": "uuid-6261-it700" },
+      "name": "gk-6261-salusit700-1",
+      "type": "default",
+      "label": "Accomodation Gateway",
+      "isOnline": true,
+      "telemetry": { "temperature": 22.5, "localTemperature": 22.5, "heatingSetpoint": 6.5, "mode": "Heat", "heatingActive": false, "coolingActive": false, "hotWater": null }
+    },
+    {
+      "id": { "id": "uuid-6261-it500" },
+      "name": "gk-6261-salusit500-combi-2",
+      "type": "default",
+      "label": "Cellar",
+      "isOnline": false,
+      "telemetry": { "temperature": 18.0, "localTemperature": 18.0, "heatingSetpoint": 19.5, "mode": "Heat", "heatingActive": true, "coolingActive": false, "hotWater": 1 }
+    },
+    {
+      "id": { "id": "uuid-6261-fryer" },
+      "name": "gk-6261fryer-1",
+      "type": "gatewayDevice",
+      "label": "Kitchen — fryers",
+      "isOnline": true,
+      "telemetry": { "switchReported": true, "switchOn": true, "switch_1": false }
+    },
+    {
+      "id": { "id": "uuid-62611-bleed" },
+      "name": "gk-62611-salusit700-1",
+      "type": "default",
+      "label": "NEIGHBOUR SITE — must be filtered out",
+      "isOnline": true,
+      "telemetry": { "heatingSetpoint": 20 }
+    }
+  ],
+  "site4741": [
+    {
+      "id": { "id": "uuid-4741-it700" },
+      "name": "gk-4741-salusit700-1",
+      "type": "default",
+      "label": "Bar area",
+      "isOnline": true,
+      "telemetry": { "temperature": 21.0, "localTemperature": 21.0, "heatingSetpoint": 20.0, "mode": "Heat", "heatingActive": true, "coolingActive": false, "hotWater": null }
+    }
+  ]
+}
