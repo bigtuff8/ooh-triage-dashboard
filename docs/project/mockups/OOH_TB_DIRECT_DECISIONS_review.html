@@ -1,0 +1,190 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>OOH TB-Direct — Validation & Decisions</title>
+<style>
+  :root{
+    --bg:#f6f7f9; --panel:#ffffff; --ink:#1a1d21; --muted:#5b6470; --line:#e3e7ec;
+    --accent:#2563eb; --accent-soft:#eaf1ff;
+    --ok:#15803d; --ok-soft:#e6f4ea; --warn:#b45309; --warn-soft:#fdf1e0; --bad:#b91c1c; --bad-soft:#fdecec;
+    --shadow:0 1px 2px rgba(16,24,40,.06),0 1px 3px rgba(16,24,40,.08);
+    --radius:12px;
+  }
+  @media (prefers-color-scheme:dark){
+    :root{ --bg:#0f1216; --panel:#171b21; --ink:#e8ebef; --muted:#9aa4b1; --line:#262c34;
+      --accent:#6ea0ff; --accent-soft:#1b2740;
+      --ok:#43c97a; --ok-soft:#12291b; --warn:#e6a54a; --warn-soft:#2a2110; --bad:#f47174; --bad-soft:#2c1414; }
+  }
+  :root[data-theme="dark"]{ --bg:#0f1216; --panel:#171b21; --ink:#e8ebef; --muted:#9aa4b1; --line:#262c34; --accent:#6ea0ff; --accent-soft:#1b2740; --ok:#43c97a; --ok-soft:#12291b; --warn:#e6a54a; --warn-soft:#2a2110; --bad:#f47174; --bad-soft:#2c1414; }
+  :root[data-theme="light"]{ --bg:#f6f7f9; --panel:#ffffff; --ink:#1a1d21; --muted:#5b6470; --line:#e3e7ec; --accent:#2563eb; --accent-soft:#eaf1ff; --ok:#15803d; --ok-soft:#e6f4ea; --warn:#b45309; --warn-soft:#fdf1e0; --bad:#b91c1c; --bad-soft:#fdecec; }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.55 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;-webkit-text-size-adjust:100%}
+  .wrap{max-width:960px;margin:0 auto;padding:20px 16px 64px}
+  header.top{display:flex;flex-wrap:wrap;gap:12px;align-items:flex-start;justify-content:space-between;margin-bottom:8px}
+  h1{font-size:20px;margin:0 0 2px;letter-spacing:-.01em}
+  .sub{color:var(--muted);font-size:13px;margin:0}
+  .gonogo{display:inline-flex;align-items:center;gap:8px;background:var(--ok-soft);color:var(--ok);border:1px solid color-mix(in srgb,var(--ok) 30%,transparent);padding:7px 12px;border-radius:999px;font-weight:600;font-size:13px}
+  .gonogo .dot{width:8px;height:8px;border-radius:50%;background:var(--ok)}
+  .banner{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:14px 16px;box-shadow:var(--shadow);margin:14px 0 22px}
+  .banner b{color:var(--ink)}
+  section{margin:26px 0}
+  h2{font-size:13px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);margin:0 0 12px;font-weight:700}
+  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:10px}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow);overflow:hidden}
+  .claim{padding:12px 14px;cursor:pointer;display:flex;flex-direction:column;gap:8px}
+  .claim .row{display:flex;align-items:center;justify-content:space-between;gap:8px}
+  .cid{font-weight:700;font-size:13px;letter-spacing:.02em}
+  .chip{font-size:11px;font-weight:700;padding:3px 8px;border-radius:999px;white-space:nowrap}
+  .chip.ok{background:var(--ok-soft);color:var(--ok)} .chip.warn{background:var(--warn-soft);color:var(--warn)} .chip.bad{background:var(--bad-soft);color:var(--bad)}
+  .claim .t{font-size:13px;color:var(--ink);font-weight:600;margin:0}
+  .claim .basis{font-size:12.5px;color:var(--muted);margin:0}
+  .ev{display:none;padding:0 14px 13px;font-size:12.5px;color:var(--muted);border-top:1px solid var(--line);margin-top:2px}
+  .card.open .ev{display:block;padding-top:11px}
+  .ev code{background:var(--accent-soft);color:var(--accent);padding:.5px 5px;border-radius:5px;font-size:11.5px}
+  .legend{display:flex;gap:14px;flex-wrap:wrap;font-size:12px;color:var(--muted);margin:-4px 0 12px}
+  .legend span{display:inline-flex;align-items:center;gap:6px}
+  .sw{width:9px;height:9px;border-radius:2px;display:inline-block}
+  .dec{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow);margin-bottom:12px;overflow:hidden}
+  .dec .hd{padding:13px 15px;display:flex;gap:10px;align-items:flex-start;justify-content:space-between}
+  .dec .did{font-weight:700;color:var(--accent);font-size:13px;min-width:30px}
+  .dec .q{font-weight:600;font-size:14.5px;margin:0 0 3px}
+  .dec .why{color:var(--muted);font-size:12.5px;margin:0}
+  .prio{font-size:10.5px;font-weight:700;padding:2px 7px;border-radius:999px;text-transform:uppercase;letter-spacing:.04em}
+  .prio.blocker{background:var(--bad-soft);color:var(--bad)} .prio.build{background:var(--accent-soft);color:var(--accent)} .prio.ask{background:var(--warn-soft);color:var(--warn)}
+  .dec .body{padding:0 15px 14px}
+  .opts{display:flex;flex-direction:column;gap:6px;margin:6px 0 10px}
+  .opt{display:flex;gap:9px;align-items:flex-start;font-size:13px;padding:8px 10px;border:1px solid var(--line);border-radius:9px;background:var(--bg)}
+  .opt.rec{border-color:color-mix(in srgb,var(--ok) 45%,transparent);background:var(--ok-soft)}
+  .opt .k{font-weight:700;white-space:nowrap}
+  .rectag{font-size:10px;font-weight:700;color:var(--ok);border:1px solid color-mix(in srgb,var(--ok) 40%,transparent);border-radius:999px;padding:1px 6px;margin-left:auto;white-space:nowrap}
+  .lean{display:flex;gap:6px;flex-wrap:wrap;border-top:1px dashed var(--line);padding-top:10px}
+  .lean button{font:inherit;font-size:12px;font-weight:600;cursor:pointer;border:1px solid var(--line);background:var(--panel);color:var(--muted);padding:6px 11px;border-radius:999px;transition:.12s}
+  .lean button:hover{border-color:var(--accent)}
+  .lean button[aria-pressed="true"]{background:var(--accent);border-color:var(--accent);color:#fff}
+  .lean .lbl{font-size:11.5px;color:var(--muted);align-self:center;margin-right:2px}
+  .summary{position:sticky;bottom:0;background:color-mix(in srgb,var(--panel) 92%,transparent);backdrop-filter:blur(6px);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow);padding:11px 15px;margin-top:18px;font-size:13px;display:flex;gap:14px;flex-wrap:wrap;align-items:center}
+  .summary b{color:var(--ink)} .summary .pill{font-weight:700;padding:2px 9px;border-radius:999px;background:var(--accent-soft);color:var(--accent)}
+  .kick{background:var(--panel);border:1px solid var(--line);border-left:3px solid var(--accent);border-radius:var(--radius);padding:14px 16px;box-shadow:var(--shadow)}
+  .kick ol{margin:8px 0 0;padding-left:20px} .kick li{margin:5px 0;font-size:13.5px}
+  .foot{color:var(--muted);font-size:12px;margin-top:26px;border-top:1px solid var(--line);padding-top:12px}
+  .toggle{cursor:pointer;border:1px solid var(--line);background:var(--panel);color:var(--muted);border-radius:8px;padding:5px 10px;font:inherit;font-size:12px}
+  a{color:var(--accent)}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <div>
+      <h1>OOH Dashboard — ThingsBoard-Direct</h1>
+      <p class="sub">Adversarial validation → design decisions · 2026-09-17 · re-proven live, not inherited</p>
+    </div>
+    <span class="gonogo"><span class="dot"></span>GO to design — conditional</span>
+  </header>
+
+  <div class="banner">
+    Four adversarial agents tried to <b>break</b> each claim against live systems (prod TB read-only; all writes on the dev bench; zero prod writes).
+    The two make-or-break questions are <b>YES</b> — the read plane returns full site estates and the code swap is safe (and fixes a latent control bug).
+    Two read-plane claims (C3/C4) are <b>refuted as written</b> (design-hardening, not architecture). Spencer's control spec then <b>corrected C5</b> (bench results were the contract working) and resolved D5/D7. Decide <b>D1–D10</b> below to green-light the build.
+    <button class="toggle" id="themeBtn" style="float:right">◐ theme</button>
+  </div>
+
+  <section>
+    <h2>Claim verdicts — C1–C8 <span style="font-weight:400;text-transform:none;letter-spacing:0">(tap a card for evidence)</span></h2>
+    <div class="legend">
+      <span><i class="sw" style="background:var(--ok)"></i>Confirmed</span>
+      <span><i class="sw" style="background:var(--warn)"></i>Mixed / needs-decision</span>
+      <span><i class="sw" style="background:var(--bad)"></i>Refuted as written</span>
+    </div>
+    <div class="grid" id="claims"></div>
+  </section>
+
+  <section>
+    <h2>Decisions for you — D1–D10</h2>
+    <div id="decisions"></div>
+    <div class="summary">
+      <b>Your leanings:</b>
+      <span>Accept rec <span class="pill" id="cAccept">0</span></span>
+      <span>Modify <span class="pill" id="cMod">0</span></span>
+      <span>Discuss <span class="pill" id="cDisc">0</span></span>
+      <span style="color:var(--muted)">— captured locally as a thinking aid; your PR <b>Accept / Amend / Decline</b> is the governing act.</span>
+    </div>
+  </section>
+
+  <section>
+    <h2>If GO — recommended first design increment</h2>
+    <div class="kick">
+      Scope the first design pass to the safe, proven core; hold the unproven parts behind Spencer's answers.
+      <ol>
+        <li><b>Read-service</b> (<code>services/tb-device.js</code>) preserving the bridge interface: <code>deviceId = TB&nbsp;name</code>, robust site query (broad fetch + anchored-regex filter + site-token alias map), capability-based + typo-tolerant classifier covering the 19 extra profiles, telemetry-key population, warmed name-search index, boolean <code>bridgeStatus()</code> latch.</li>
+        <li><b>Confirm-loop redesign</b>: <code>Reported === Desired</code> + advanced timestamp + client-side timeout + pre-write value validation (kills the false-success traps).</li>
+        <li><b>Control v1 = Tuya switch only</b> (proven). Salus/Intesis <b>held</b> pending Spencer; boiler deferred.</li>
+        <li><b>Safety</b>: add <code>switchDesired</code> to <code>ATTRIBUTE_FAMILY</code>; push <code>WRITES_DISABLED</code> into the write primitive; live write-lock stays until you lift it.</li>
+        <li><b>Test migration</b> for the deviceId contract change; unit-test the classifier against the real 6261 set + the exception classes.</li>
+      </ol>
+    </div>
+  </section>
+
+  <p class="foot">
+    On <b>Accept</b>: the Orchestrator (GitHub App) merges this gate and the design increment begins with your D1–D10 answers baked in.
+    On <b>Amend</b>: leave the changes you want. Full evidence: <code>OOH_TB_DIRECT_VALIDATION_REPORT.md</code> · Spencer's open questions: <code>OOH_TB_DIRECT_SPENCER_QUERY_2026-09-17.md</code>.
+  </p>
+</div>
+
+<script>
+const CLAIMS=[
+ {id:"C1",v:"ok",t:"Read plane returns full estate",basis:"9 sites re-proven live; 6261 = 23/18; scalable",ev:"Name-search returned coherent full sets far beyond the bridge's 1-device view across numeric + alphanumeric site keys and brands (gk 6261=23, allertonhallfarm=51, md-319fossepark=138…). Per-site <code>textSearch</code> is a cheap server-side query — no full-estate pull needed on a 12,812-device tenant."},
+ {id:"C2",v:"warn",t:"Auth: JWT service accounts",basis:"Auth CONFIRMED; least-privilege REFUTED",ev:"Both accounts log in via JWT as designed — but <code>svc-read@</code> and <code>svc-control@</code> are BOTH TENANT_ADMIN, so the read cred can write. The read/write split is app-convention, not TB-enforced. See D5."},
+ {id:"C3",v:"bad",t:"gk-{site}-* prefix is authoritative",basis:"TB textSearch is unanchored substring",ev:"<code>gk-626</code> → 113 devices across FIVE sites. Bare form bleeds across real sites (<code>gk-010102</code>↔<code>0101020</code>); anchored form silently drops split sites (md-1110 loses 95%). Needs broad fetch + anchored-regex filter + alias map. See D1."},
+ {id:"C4",v:"bad",t:"Names parse cleanly into 4 parts",basis:"Only 76% conform; 19 undocumented profiles",ev:"3,086 non-conforming names (spaces, parentheses embedding OTHER site numbers, missing -n, raw devEUIs, hex UUIDs, underscores, typos). 19 populated profiles (~646 devices) absent from the dictionary — incl. controllable Salus on the <code>default</code> profile. Classify by capability, not profile. See D2."},
+ {id:"C5",v:"warn",t:"Control confirms via SyncStatus=synced",basis:"⟳ CORRECTED by Spencer — bench results were the contract working",ev:"Spencer's spec overturns our refutation: Salus IT700 setpoint was ACCEPTED (pending, slow-echo); modeDesired→failed and hwBoost→rejected are correct-by-design (IT700 has no mode; hwBoost is IT500-only). Tuya switch PROVEN; Intesis setpoint PROVEN synced (16–32°C). Genuinely unproven: Intesis on/off via modeDesired (no mode/power telemetry) + Salus IT500 hwBoost. Fan speed NOT controllable. Our 'dormant adapter' trap was the edge-triggered no-op. See D3/D4/D10."},
+ {id:"C6",v:"ok",t:"Bounded controllable set",basis:"Structural — no unexpected type appeared",ev:"Only the expected attribute families exist across the estate (Tuya switch, Salus, Intesis, boiler-deferred). Caveat: only Tuya actively proven E2E this session."},
+ {id:"C7",v:"ok",t:"Controllability is per-device",basis:"Controllable Salus on the default profile at 18 sites",ev:"Capability must be derived from telemetry/attribute signals, never the profile label — controllable thermostats sit on <code>default</code> and real kitchen gear on <code>gatewayDevice</code>. Confirms the per-device rule."},
+ {id:"C8",v:"ok",t:"Interface-preserving code swap is safe",basis:"Safe AND corrective — fixes a latent live bug",ev:"deviceId today is the BRIDGE id, not the TB name → live control is latently broken behind the write-lock. Setting deviceId = TB name is necessary + sufficient + safe. Conditions: keep pub-name search, populate telemetry keys, migrate the shape-pinning tests. See D8."},
+];
+const DECS=[
+ {id:"D1",prio:"blocker",q:"Site-query strategy",why:"Bare textSearch bleeds across real sites; anchored halves split sites (md-1110 loses 95%).",opts:[["Broad fetch + anchored-regex + alias map","Over-fetch a broad prefix, filter client-side ^{brand}-{site}(-|$) case-insensitive, resolve site-token aliases (1110↔1110meridian).",true],["Anchored textSearch only","Simple but silently drops split-site devices.",false],["Bare textSearch only","Returns everything but bleeds neighbouring sites.",false]]},
+ {id:"D2",prio:"blocker",q:"Classification model",why:"24% of names don't fit; controllable Salus sits on the default profile; 19 profiles undocumented.",opts:[["Capability-based + typo-tolerant + extend dictionary","Derive control-eligibility from telemetry/attribute signals; fuzzy assetType; document the 19 missing profiles first.",true],["Profile-label classification","Simplest, but mislabels controllable devices on default/gatewayDevice.",false]]},
+ {id:"D3",prio:"blocker",q:"Confirm-loop semantics",why:"Bad value & dormant adapter both leave a stale 'synced' (false success); 'pending' sticks forever.",opts:[["Reported===Desired + timestamp-advance + client timeout","Plus client-side value-type validation before every write.",true],["Trust SyncStatus==synced","Current design assumption — proven insufficient (false-success traps).",false]]},
+ {id:"D4",prio:"ask",q:"⟳ Control proof status (post-Spencer)",why:"Setpoint now contract-PROVEN for Salus + Intesis. Only Intesis on/off (modeDesired) + Salus IT500 hwBoost remain unproven.",opts:[["Treat setpoint + Tuya switch as proven; hold on/off + IT500 hwBoost","Matches Spencer's proof matrix; reconcile SD-492 (setpoint = shipping Salus path).",true],["Keep everything but Tuya held","Over-conservative — ignores proven setpoint control.",false]]},
+ {id:"D5",prio:"ask",q:"⟳ TB read least-privilege — RESOLVED pending checks",why:"Spencer is binding the 'Airedale Read Only' role.",opts:[["Accept + verify 3 things before closing","Role can read devices+telemetry; which KV secret maps to it; cannot write SHARED_SCOPE.",true],["Mark closed now","Premature — binding + verification not yet done.",false]]},
+ {id:"D6",prio:"build",q:"Push WRITES_DISABLED into the write primitive",why:"Fail-closed holds only because both callers guard; more important now setpoint control may enter scope.",opts:[["Add if(config.writesDisabled) throw in writeSharedAttribute","Belt-and-braces; small build item.",true],["Leave guards at the callers","Works today; relies on discipline.",false]]},
+ {id:"D7",prio:"ask",q:"⟳ Multi-gang Tuya — RESOLVED (not available)",why:"A single switchDesired drives one gang; switch_2 is not addressable — needs a contract change.",opts:[["Treat multi-gang as read-only; ask Spencer only if OOH needs it","Single-gang control unaffected and proven.",true],["Block on multi-gang","Unnecessary — not a v1 requirement.",false]]},
+ {id:"D8",prio:"build",q:"Name-search + status latch + test migration on the swap",why:"Pub-name search and the health latch are load-bearing; shape tests pin the old deviceId.",opts:[["Bake into the read-service design","Warmed name index, boolean bridgeStatus() latch, deviceId=TB name, telemetry-key population, migrate bridge.test.js.",true],["Handle later","Risks a name-search / degraded-banner regression on cutover.",false]]},
+ {id:"D9",prio:"blocker",q:"Registration-gate guard (NEW)",why:"Spencer §3: TB silently drops commands for a device that never published first state.",opts:[["Assert device has published a snapshot before dispatch","Existing online guard is a partial proxy; make it explicit.",true],["Rely on the online guard alone","Leaves a silent-drop failure mode.",false]]},
+ {id:"D10",prio:"ask",q:"Control v1 scope (NEW)",why:"Setpoint is now proven; decide how wide v1 goes.",opts:[["Tuya switch + setpoint (Salus + Intesis)","Proven; needs D3 confirm-loop + mode-casing fix, not on/off. RECOMMENDED.",true],["Tuya switch only","Most conservative.",false],["Add mode/on-off too","Blocked until Intesis modeDesired on/off is proven + casing bug fixed.",false]]},
+];
+const claimsEl=document.getElementById('claims');
+CLAIMS.forEach(c=>{
+  const chip=c.v==='ok'?'CONFIRMED':c.v==='warn'?(c.id==='C5'?'MIXED':c.id==='C2'?'PARTIAL':'NEEDS-DEC'):'REFUTED';
+  const el=document.createElement('div');el.className='card';
+  el.innerHTML=`<div class="claim"><div class="row"><span class="cid">${c.id}</span><span class="chip ${c.v}">${chip}</span></div>
+    <p class="t">${c.t}</p><p class="basis">${c.basis}</p></div><div class="ev">${c.ev}</div>`;
+  el.querySelector('.claim').addEventListener('click',()=>el.classList.toggle('open'));
+  claimsEl.appendChild(el);
+});
+const decEl=document.getElementById('decisions');const tally={accept:0,mod:0,disc:0};
+const upd=()=>{document.getElementById('cAccept').textContent=tally.accept;document.getElementById('cMod').textContent=tally.mod;document.getElementById('cDisc').textContent=tally.disc;};
+DECS.forEach(d=>{
+  const el=document.createElement('div');el.className='dec';
+  const opts=d.opts.map(o=>`<div class="opt ${o[2]?'rec':''}"><span class="k">${o[0]}</span><span style="color:var(--muted)">— ${o[1]}</span>${o[2]?'<span class="rectag">REC</span>':''}</div>`).join('');
+  const pl=d.prio==='blocker'?'Design blocker':d.prio==='build'?'Build item':'Ask Spencer';
+  el.innerHTML=`<div class="hd"><span class="did">${d.id}</span><div style="flex:1"><p class="q">${d.q}</p><p class="why">${d.why}</p></div><span class="prio ${d.prio}">${pl}</span></div>
+   <div class="body"><div class="opts">${opts}</div>
+   <div class="lean"><span class="lbl">Your lean:</span>
+     <button data-k="accept">Accept rec</button><button data-k="mod">Modify</button><button data-k="disc">Discuss</button></div></div>`;
+  const btns=[...el.querySelectorAll('.lean button')];
+  btns.forEach(b=>b.addEventListener('click',()=>{
+    const was=b.getAttribute('aria-pressed')==='true';
+    btns.forEach(x=>{if(x.getAttribute('aria-pressed')==='true'){x.setAttribute('aria-pressed','false');tally[x.dataset.k]--;}});
+    if(!was){b.setAttribute('aria-pressed','true');tally[b.dataset.k]++;}
+    upd();
+  }));
+  decEl.appendChild(el);
+});
+const tb=document.getElementById('themeBtn');
+tb.addEventListener('click',()=>{const r=document.documentElement;const cur=r.getAttribute('data-theme')|| (matchMedia('(prefers-color-scheme:dark)').matches?'dark':'light');r.setAttribute('data-theme',cur==='dark'?'light':'dark');});
+</script>
+</body>
+</html>
