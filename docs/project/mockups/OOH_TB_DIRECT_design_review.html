@@ -1,0 +1,200 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>OOH TB-Direct — Design Review (workspace mockup)</title>
+<style>
+  :root{
+    --bg:#f5f7fa; --panel:#fff; --ink:#161a20; --muted:#5c6672; --line:#e4e8ee; --line2:#eef1f5;
+    --accent:#2563eb; --accent-soft:#e9f0ff;
+    --ok:#15803d; --ok-soft:#e6f4ea; --warn:#b45309; --warn-soft:#fbf0dd; --bad:#b91c1c; --bad-soft:#fbe9e9;
+    --pend:#6d28d9; --pend-soft:#efe9fb; --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+    --shadow:0 1px 2px rgba(16,24,40,.05),0 1px 3px rgba(16,24,40,.07); --radius:12px;
+  }
+  @media (prefers-color-scheme:dark){:root{--bg:#0f1216;--panel:#171b21;--ink:#e8ebef;--muted:#98a2b0;--line:#262c34;--line2:#20252c;--accent:#6ea0ff;--accent-soft:#1a2740;--ok:#43c97a;--ok-soft:#12291b;--warn:#e6a54a;--warn-soft:#2a2110;--bad:#f47174;--bad-soft:#2c1414;--pend:#a78bfa;--pend-soft:#211a36;}}
+  :root[data-theme="dark"]{--bg:#0f1216;--panel:#171b21;--ink:#e8ebef;--muted:#98a2b0;--line:#262c34;--line2:#20252c;--accent:#6ea0ff;--accent-soft:#1a2740;--ok:#43c97a;--ok-soft:#12291b;--warn:#e6a54a;--warn-soft:#2a2110;--bad:#f47174;--bad-soft:#2c1414;--pend:#a78bfa;--pend-soft:#211a36;}
+  :root[data-theme="light"]{--bg:#f5f7fa;--panel:#fff;--ink:#161a20;--muted:#5c6672;--line:#e4e8ee;--line2:#eef1f5;--accent:#2563eb;--accent-soft:#e9f0ff;--ok:#15803d;--ok-soft:#e6f4ea;--warn:#b45309;--warn-soft:#fbf0dd;--bad:#b91c1c;--bad-soft:#fbe9e9;--pend:#6d28d9;--pend-soft:#efe9fb;}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);font:14.5px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;-webkit-text-size-adjust:100%}
+  .wrap{max-width:1000px;margin:0 auto;padding:18px 14px 60px}
+  .top{display:flex;flex-wrap:wrap;gap:10px;align-items:flex-start;justify-content:space-between}
+  h1{font-size:19px;margin:0 0 2px;letter-spacing:-.01em}
+  .sub{color:var(--muted);font-size:12.5px;margin:0}
+  .lock{display:inline-flex;gap:7px;align-items:center;background:var(--warn-soft);color:var(--warn);border:1px solid color-mix(in srgb,var(--warn) 30%,transparent);border-radius:999px;padding:6px 11px;font-size:12px;font-weight:600}
+  .banner{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow);padding:12px 14px;margin:13px 0 6px;font-size:13px;color:var(--muted)}
+  .banner b{color:var(--ink)}
+  .btn{font:inherit;cursor:pointer;border:1px solid var(--line);background:var(--panel);color:var(--ink);border-radius:8px;padding:5px 10px;font-size:12px;font-weight:600}
+  .demobar{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:10px 0 4px;font-size:12px;color:var(--muted)}
+  .demobar select{font:inherit;font-size:12px;padding:4px 8px;border:1px solid var(--line);border-radius:7px;background:var(--panel);color:var(--ink)}
+  .site{display:flex;flex-wrap:wrap;gap:8px 18px;align-items:baseline;margin:20px 2px 6px}
+  .site h2{font-size:17px;margin:0}
+  .site .meta{color:var(--muted);font-size:12.5px}
+  .cat{margin:16px 0 0}
+  .cat h3{font-size:12px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);margin:0 0 8px;display:flex;gap:8px;align-items:center}
+  .cat h3 .tag{font-size:10px;font-weight:700;border-radius:999px;padding:2px 7px}
+  .tag.ctl{background:var(--accent-soft);color:var(--accent)} .tag.mon{background:var(--line2);color:var(--muted)}
+  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(232px,1fr));gap:9px}
+  .dev{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow);padding:11px 12px;display:flex;flex-direction:column;gap:9px}
+  .dev .hd{display:flex;justify-content:space-between;gap:8px;align-items:flex-start}
+  .dev .nm{font-weight:600;font-size:13.5px}
+  .dev .zone{color:var(--muted);font-size:11.5px;font-family:var(--mono)}
+  .live{font-size:11px;font-weight:700;padding:2px 7px;border-radius:999px;white-space:nowrap}
+  .live.on{background:var(--ok-soft);color:var(--ok)} .live.off{background:var(--line2);color:var(--muted)} .live.stale{background:var(--warn-soft);color:var(--warn)}
+  .tel{font-size:12px;color:var(--muted);display:flex;flex-wrap:wrap;gap:3px 10px}
+  .tel b{color:var(--ink);font-weight:600}
+  .ctlrow{display:flex;gap:6px;align-items:center;flex-wrap:wrap;border-top:1px solid var(--line2);padding-top:9px}
+  .sw{display:inline-flex;border:1px solid var(--line);border-radius:8px;overflow:hidden}
+  .sw button{border:0;background:var(--panel);color:var(--muted);font:inherit;font-size:12px;font-weight:700;padding:5px 12px;cursor:pointer}
+  .sw button.on[aria-pressed="true"]{background:var(--ok);color:#fff} .sw button.off[aria-pressed="true"]{background:#334155;color:#fff}
+  .step{display:inline-flex;align-items:center;gap:8px;border:1px solid var(--line);border-radius:8px;padding:3px 6px}
+  .step button{border:0;background:transparent;color:var(--accent);font:inherit;font-size:15px;font-weight:800;cursor:pointer;width:22px;line-height:1}
+  .step .v{font-weight:700;font-size:13px;min-width:44px;text-align:center}
+  .state{font-size:11.5px;font-weight:600;padding:3px 8px;border-radius:999px;margin-left:auto;white-space:nowrap;display:inline-flex;gap:5px;align-items:center}
+  .state .d{width:7px;height:7px;border-radius:50%}
+  .state.idle{color:var(--muted);background:var(--line2)}
+  .state.pending{color:var(--pend);background:var(--pend-soft)} .state.pending .d{background:var(--pend);animation:pulse 1s infinite}
+  .state.synced{color:var(--ok);background:var(--ok-soft)} .state.synced .d{background:var(--ok)}
+  .state.already{color:var(--accent);background:var(--accent-soft)} .state.already .d{background:var(--accent)}
+  .state.failed{color:var(--bad);background:var(--bad-soft)} .state.failed .d{background:var(--bad)}
+  .state.timeout{color:var(--warn);background:var(--warn-soft)} .state.timeout .d{background:var(--warn)}
+  @keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
+  .capture{border-top:1px solid var(--line2);padding-top:9px;font-size:12px;color:var(--warn);display:flex;gap:7px;align-items:center}
+  .heldnote{font-size:11.5px;color:var(--muted);border-top:1px solid var(--line2);padding-top:8px}
+  .legend{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow);padding:12px 14px;margin:22px 0 0}
+  .legend h3{font-size:12px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);margin:0 0 9px}
+  .legend .row{display:flex;flex-wrap:wrap;gap:8px 16px}
+  .legend .it{font-size:12px;color:var(--muted);display:flex;gap:6px;align-items:center}
+  .foot{color:var(--muted);font-size:12px;margin-top:22px;border-top:1px solid var(--line);padding-top:12px}
+  .foot code{font-family:var(--mono);background:var(--accent-soft);color:var(--accent);padding:.5px 5px;border-radius:5px;font-size:11px}
+  a{color:var(--accent)}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="top">
+    <div><h1>OOH Triage — TB-Direct workspace</h1><p class="sub">Design review mockup · the redesigned operator view, read + control direct from ThingsBoard · v1 = Tuya switch + setpoint</p></div>
+    <span class="lock">🔒 WRITES_DISABLED — live control off until James lifts it</span>
+  </div>
+
+  <div class="banner">
+    Today the dashboard sees <b>1 of site 6261's 23 devices</b> (heating only, via the bridge). This mockup shows the TB-direct redesign: the <b>full estate by category</b> with control affordances for the proven surfaces (<b>Tuya on/off</b>, <b>setpoint</b>), monitor-only tiles for the rest, and the <b>confirm-loop states</b> from Spencer's contract. Interactions here are simulated.
+    <button class="btn" id="themeBtn" style="float:right">◐ theme</button>
+  </div>
+
+  <div class="demobar">
+    <span>Demo the confirm outcome when you press a control:</span>
+    <select id="outcome">
+      <option value="synced">synced ✓ (device echoed)</option>
+      <option value="already">already-satisfied (edge no-op)</option>
+      <option value="failed">failed / rejected</option>
+      <option value="timeout">timeout (slow echo)</option>
+    </select>
+    <span style="font-family:var(--mono);font-size:11px">— shows edge-aware dispatch + fresh-echo confirm</span>
+  </div>
+
+  <div class="site">
+    <h2>Wheatstone Inn</h2>
+    <span class="meta">Greene King · site <b>6261</b> · Gloucester · 4 calls / 30d · 23 devices (18 live)</span>
+  </div>
+
+  <div id="estate"></div>
+
+  <div class="legend">
+    <h3>Confirm-loop states (Spencer's contract · no server "timeout")</h3>
+    <div class="row">
+      <span class="it"><span class="state idle"><span class="d"></span>idle</span> ready</span>
+      <span class="it"><span class="state pending"><span class="d"></span>pending</span> dispatched, awaiting echo</span>
+      <span class="it"><span class="state synced"><span class="d"></span>synced</span> device echoed the new value (fresh <code>syncTs</code>)</span>
+      <span class="it"><span class="state already"><span class="d"></span>already-set</span> edge no-op — no write sent</span>
+      <span class="it"><span class="state failed"><span class="d"></span>failed / rejected</span> vendor refused</span>
+      <span class="it"><span class="state timeout"><span class="d"></span>timeout</span> no fresh echo by deadline (client-side)</span>
+    </div>
+  </div>
+
+  <p class="foot">
+    Design: <code>OOH_TB_DIRECT_READ_CONTROL_DESIGN.md</code> · decisions <code>D1–D10</code> (PR #25, merged) · contract <code>OOH_TB_DIRECT_CONTROL_SPEC_2026-09-17.md</code>.
+    Held in v1: Intesis on/off (needs a mode-capable bench unit) and Salus IT500 hot-water boost — both render as monitor + escalate. Multi-gang <code>switch_2</code> is read-only. On <b>Accept</b>, build begins per the sequencing in the design doc; live control stays locked until the read-only TB role is verified and James lifts <code>WRITES_DISABLED</code>.
+  </p>
+</div>
+
+<script>
+const OUT=()=>document.getElementById('outcome').value;
+const CATS=[
+ {key:'heating',label:'Heating & HVAC',ctl:true,devs:[
+   {nm:'Salus thermostat',zone:'gk-6261-salusit700-1',live:'on',tel:[['temp','19.5°C'],['setpoint','20°C'],['mode','heat']],ctl:{type:'setpoint',val:20,unit:'°C',min:5,max:35}},
+   {nm:'Intesis A/C',zone:'gk-6261-intesis-1',live:'on',tel:[['temp','22°C'],['setpoint','23°C'],['mode','off']],ctl:{type:'setpoint',val:23,unit:'°C',min:16,max:32},held:'On/off (modeDesired) HELD in v1 — escalate to enable'},
+   {nm:'Over-door heater',zone:'gk-6261-overdoorheater-1',live:'on',tel:[['switch','on'],['power','1.9 kW']],ctl:{type:'switch',on:true}},
+   {nm:'Boiler controller',zone:'gk-6261-boilercontrol-1',live:'on',tel:[['outside','11°C'],['zone1','heating']],mon:'Monitor only — boiler control deferred'},
+ ]},
+ {key:'kitchen',label:'Kitchen equipment',ctl:true,devs:[
+   {nm:'Fryer',zone:'gk-6261-fryer-1',live:'on',tel:[['switch','on'],['power','6.1 kW']],ctl:{type:'switch',on:true}},
+   {nm:'Merrychef',zone:'gk-6261-merrychef-1',live:'on',tel:[['switch','on'],['power','2.4 kW']],ctl:{type:'switch',on:true}},
+   {nm:'Grill',zone:'gk-6261-grill-1',live:'off',tel:[['switch','off'],['power','0 kW']],ctl:{type:'switch',on:false}},
+   {nm:'Dishwasher',zone:'gk-6261-dishwasher-1',live:'on',tel:[['switch','on'],['water','ok']],ctl:{type:'switch',on:true}},
+ ]},
+ {key:'lighting',label:'Lighting',ctl:true,devs:[
+   {nm:'External lighting',zone:'gk-6261-externallighting-1',live:'on',tel:[['switch','on'],['power','0.4 kW']],ctl:{type:'switch',on:true}},
+ ]},
+ {key:'fan',label:'Fans & ventilation',ctl:true,devs:[
+   {nm:'Extract fan',zone:'gk-6261-extractfan-1',live:'on',tel:[['switch','on'],['power','0.8 kW']],ctl:{type:'switch',on:true}},
+   {nm:'Bar fans',zone:'gk-6261-barfans-1',live:'on',tel:[['switch','on']],ctl:{type:'switch',on:true}},
+ ]},
+ {key:'metering',label:'Metering & electrical',ctl:false,devs:[
+   {nm:'Electric AMR',zone:'gk-6261-ElecAMR-1',live:'stale',tel:[['today','214 kWh'],['seen','2d']],mon:'Meter — read-only'},
+   {nm:'Gas AMR',zone:'gk-6261-GasAMR-1',live:'stale',tel:[['seen','2d']],mon:'Meter — read-only'},
+   {nm:'Main DB monitor',zone:'gk-6261-maindb-r10a',live:'off',tel:[['status','no recent data']],capture:'Never reported to the platform — capture & escalate (registration gate)'},
+ ]},
+];
+const est=document.getElementById('estate');
+CATS.forEach(cat=>{
+  const sec=document.createElement('div');sec.className='cat';
+  sec.innerHTML=`<h3>${cat.label} <span class="tag ${cat.ctl?'ctl':'mon'}">${cat.ctl?'control':'monitor'}</span></h3>`;
+  const grid=document.createElement('div');grid.className='grid';
+  cat.devs.forEach(d=>{
+    const el=document.createElement('div');el.className='dev';
+    const tel=d.tel.map(t=>`<span><b>${t[1]}</b> ${t[0]}</span>`).join('');
+    el.innerHTML=`<div class="hd"><div><div class="nm">${d.nm}</div><div class="zone">${d.zone}</div></div>
+      <span class="live ${d.live}">${d.live==='on'?'LIVE':d.live==='off'?'OFF':'STALE'}</span></div>
+      <div class="tel">${tel}</div>`;
+    if(d.ctl){
+      const row=document.createElement('div');row.className='ctlrow';
+      const st=`<span class="state idle"><span class="d"></span>idle</span>`;
+      if(d.ctl.type==='switch'){
+        row.innerHTML=`<span class="sw"><button class="on" aria-pressed="${d.ctl.on}">ON</button><button class="off" aria-pressed="${!d.ctl.on}">OFF</button></span>${st}`;
+        const [onB,offB]=row.querySelectorAll('.sw button');const state=row.querySelector('.state');
+        const set=v=>{onB.setAttribute('aria-pressed',v);offB.setAttribute('aria-pressed',!v);};
+        onB.onclick=()=>press(state,()=>set(true),d.ctl.on===true);
+        offB.onclick=()=>press(state,()=>set(false),d.ctl.on===false);
+        onB.addEventListener('click',()=>d.ctl.on=true);offB.addEventListener('click',()=>d.ctl.on=false);
+      }else{
+        row.innerHTML=`<span class="step"><button class="dn">−</button><span class="v">${d.ctl.val}${d.ctl.unit}</span><button class="up">+</button></span>${st}`;
+        const v=row.querySelector('.v');const state=row.querySelector('.state');let cur=d.ctl.val;
+        const upd=n=>{cur=Math.max(d.ctl.min,Math.min(d.ctl.max,n));v.textContent=cur+d.ctl.unit;press(state,()=>{},false);};
+        row.querySelector('.up').onclick=()=>upd(cur+1);row.querySelector('.dn').onclick=()=>upd(cur-1);
+      }
+      el.appendChild(row);
+    }
+    if(d.held){const h=document.createElement('div');h.className='heldnote';h.textContent='⏸ '+d.held;el.appendChild(h);}
+    if(d.mon){const m=document.createElement('div');m.className='heldnote';m.textContent=d.mon;el.appendChild(m);}
+    if(d.capture){const c=document.createElement('div');c.className='capture';c.innerHTML='⚠ '+d.capture;el.appendChild(c);}
+    grid.appendChild(el);
+  });
+  sec.appendChild(grid);est.appendChild(sec);
+});
+function press(state,apply,isSame){
+  const set=(cls,txt)=>{state.className='state '+cls;state.innerHTML=`<span class="d"></span>${txt}`;};
+  const outcome=OUT();
+  if(outcome==='already'||isSame){set('already','already-set');apply();return;}
+  set('pending','pending');apply();
+  setTimeout(()=>{
+    if(outcome==='synced')set('synced','synced ✓');
+    else if(outcome==='failed')set('failed','failed');
+    else if(outcome==='timeout')set('timeout','timeout');
+  },900);
+}
+const tb=document.getElementById('themeBtn');
+tb.onclick=()=>{const r=document.documentElement;const cur=r.getAttribute('data-theme')||(matchMedia('(prefers-color-scheme:dark)').matches?'dark':'light');r.setAttribute('data-theme',cur==='dark'?'light':'dark');};
+</script>
+</body>
+</html>
