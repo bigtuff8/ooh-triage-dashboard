@@ -1,0 +1,13 @@
+{
+  "run": "selfgate-ooh-triage-dashboard-phase-tb-direct-design",
+  "phase": "design",
+  "pr": 26,
+  "approvedBy": [
+    "bigtuff8"
+  ],
+  "reviewComments": [],
+  "mergeCommit": "c239261cb713b4ec71a4ec9c6a58d7f8567a5f59",
+  "phaseBranch": "phase/tb-direct-design",
+  "releaseBranch": "main",
+  "stamp": 1789674321352
+}
