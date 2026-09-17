@@ -1,0 +1,120 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>OOH — Asset Read/Control Matrix (corrected)</title>
+<style>
+  :root{
+    --bg:#0f1216; --card:#171b21; --ink:#e8ecf1; --muted:#9aa4b2; --line:#262c35;
+    --yes:#1f9d55; --yesbg:#12261b; --no:#6b7280; --nobg:#1a1e24;
+    --warn:#c98a1b; --warnbg:#2a2113; --accent:#3b82f6;
+  }
+  @media (prefers-color-scheme: light){
+    :root{ --bg:#f6f7f9; --card:#ffffff; --ink:#141922; --muted:#5b6672; --line:#e4e8ee;
+      --yesbg:#e7f4ec; --nobg:#eef1f4; --warnbg:#fbf1dc; }
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;-webkit-text-size-adjust:100%}
+  .wrap{max-width:1080px;margin:0 auto;padding:20px 16px 60px}
+  h1{font-size:22px;margin:0 0 4px}
+  .sub{color:var(--muted);font-size:13px;margin:0 0 18px}
+  .cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin:0 0 22px}
+  .stat{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px 14px}
+  .stat b{display:block;font-size:20px}
+  .stat span{color:var(--muted);font-size:12px}
+  h2{font-size:13px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);margin:26px 0 8px;border-bottom:1px solid var(--line);padding-bottom:6px}
+  .scroll{overflow-x:auto;-webkit-overflow-scrolling:touch;border:1px solid var(--line);border-radius:12px}
+  table{border-collapse:collapse;width:100%;min-width:720px;font-size:13.5px}
+  th,td{text-align:left;padding:9px 11px;border-bottom:1px solid var(--line);vertical-align:top}
+  th{background:var(--card);color:var(--muted);font-weight:600;position:sticky;top:0;font-size:12px}
+  tr:last-child td{border-bottom:0}
+  td.asset{font-weight:600;white-space:nowrap}
+  code{background:var(--nobg);border:1px solid var(--line);border-radius:5px;padding:1px 5px;font-size:12px}
+  .pill{display:inline-block;border-radius:999px;padding:2px 9px;font-size:11.5px;font-weight:700;white-space:nowrap}
+  .p-yes{color:var(--yes);background:var(--yesbg)}
+  .p-no{color:var(--no);background:var(--nobg)}
+  .p-warn{color:var(--warn);background:var(--warnbg)}
+  .tel{color:var(--muted);font-size:12.5px}
+  .note{font-size:12.5px;color:var(--muted);margin:10px 2px 0}
+  .fix{font-size:12.5px;color:var(--ink);background:var(--warnbg);border:1px solid var(--line);border-radius:10px;padding:10px 12px;margin:0 0 18px}
+  .legend{display:flex;gap:14px;flex-wrap:wrap;margin:14px 0 0;font-size:12.5px;color:var(--muted)}
+  footer{margin-top:30px;color:var(--muted);font-size:12px;border-top:1px solid var(--line);padding-top:14px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>OOH — Asset Read / Control Matrix</h1>
+  <p class="sub">What we can see in ThingsBoard, and what control we can action on each asset. Grounded in live prod reads (<code>portal.lhlive.co.uk</code>) + a full <b>live bench control matrix</b> (dev TB <code>airedale-dev.iot-private.cloud</code>) · corrected 2026-09-17</p>
+
+  <div class="fix"><b>Corrections applied 2026-09-17</b> (verified against a live write&rarr;confirm matrix on the bench): <b>(1) Salus</b> control is <code>setpointDesired</code> only &mdash; <code>modeDesired</code> returns <code>failed</code> (not implemented) and <code>hwBoostHoursDesired</code> returns <code>rejected</code> (IT500 DHW only). <b>(2) Intesis</b> has no <code>OnOff</code> or <code>FanSpeed</code> control key &mdash; on/off <b>is</b> <code>modeDesired</code> (<code>off</code>=off, any mode=on); fan speed is read-only, not controllable. <b>(3) Multi-gang Tuya</b> &mdash; a single <code>switchDesired</code> drives <b>one</b> relay; <code>switch_2</code> is not addressable yet.</p>
+
+  <div class="cards">
+    <div class="stat"><b>12,801</b><span>devices in prod tenant</span></div>
+    <div class="stat"><b>373</b><span>Greene King sites</span></div>
+    <div class="stat"><b>23 / 18</b><span>site 6261 devices / active</span></div>
+    <div class="stat"><b>4</b><span>controllable device types</span></div>
+    <div class="stat"><b>&lt;2s</b><span>switch write&rarr;confirm (proven)</span></div>
+  </div>
+
+  <p class="note"><b>The rule:</b> READ is available for essentially every device. CONTROL is a <b>bounded set</b> &mdash; Tuya switch, Salus thermostat, Intesis AC, and (deferred) a TB-native boiler. Everything else is monitor-only. Control = write a <code>&lt;thing&gt;Desired</code> shared attribute (<code>SHARED_SCOPE</code>) &rarr; the bridge dispatches to the vendor &rarr; confirms <code>&lt;thing&gt;SyncStatus=synced</code> (states: <code>pending</code>&rarr;<code>synced</code>, or <code>failed</code>/<code>rejected</code>). Edge-triggered: re-writing the same value does nothing.</p>
+
+  <h2>Heating &amp; HVAC</h2>
+  <div class="scroll"><table>
+    <thead><tr><th>Asset</th><th>Name token &middot; profile</th><th>Read</th><th>Key telemetry</th><th>Control</th><th>Control payload (shared attr)</th><th>Status</th></tr></thead>
+    <tbody>
+      <tr><td class="asset">Thermostat</td><td><code>salusit700</code> &middot; salusDevice</td><td><span class="pill p-yes">READ</span></td><td class="tel">localTemperature, heatingSetpoint, systemMode, holdType, runningState, heatingActive</td><td><span class="pill p-yes">CONTROL</span></td><td><code>setpointDesired</code> &deg;C (5&ndash;35) <span class="tel">&mdash; IT700: mode &amp; boost NOT supported. IT500 also does <code>hwBoostHoursDesired</code> (0&ndash;9).</span></td><td class="tel">setpoint proven (accepted; IT700 echoes slowly &rarr; <code>pending</code>)</td></tr>
+      <tr><td class="asset">Air conditioning</td><td><code>ac</code> &middot; airConditioningProfile (Intesis)</td><td><span class="pill p-yes">READ</span></td><td class="tel">Temperature, Setpoint, Mode, OnOff, FanSpeed, applianceOn, AlarmStatus, ErrorCode <span class="tel">(OnOff/FanSpeed read-only)</span></td><td><span class="pill p-yes">CONTROL</span></td><td><code>setpointDesired</code> &deg;C (16&ndash;32) <b>proven</b> &middot; <code>modeDesired</code> <span class="tel">(<code>off</code>|<code>heat</code>|<code>cool</code>|<code>auto</code>|<code>fan</code>; <b>on/off = modeDesired</b>, no separate OnOff key). Fan speed not controllable. Setpoint does NOT change power.</span></td><td><span class="pill p-yes">setpoint PROVEN</span> <span class="pill p-warn">on/off unproven</span> <span class="tel">bench unit reports no mode/power telemetry</span></td></tr>
+      <tr><td class="asset">Boiler controller</td><td><code>boilercontrol</code> &middot; boilerControl</td><td><span class="pill p-yes">READ</span></td><td class="tel">outsideTemp, per-zone output/flow states, valve alarms, summer_mode</td><td><span class="pill p-warn">DEFER</span></td><td class="tel">per-zone schedules/overrides &mdash; 2 incompatible schemas; TB-native</td><td><span class="pill p-warn">later design</span></td></tr>
+      <tr><td class="asset">Over-door heater</td><td><code>overdoorheater</code> &middot; tuya Profile</td><td><span class="pill p-yes">READ</span></td><td class="tel">switch_1, active_power_total, per-phase V/I</td><td><span class="pill p-yes">CONTROL</span></td><td><code>switchDesired</code> true/false</td><td><span class="pill p-yes">PROVEN</span></td></tr>
+      <tr><td class="asset">Heating/HW monitor</td><td><code>hhw</code> &middot; heatingHotWaterMonitoringProfile</td><td><span class="pill p-yes">READ</span></td><td class="tel">boilerFlowTemperature, boilerReturnTemperature, hotWaterTemperature</td><td><span class="pill p-no">monitor</span></td><td class="tel">&mdash;</td><td class="tel">read context</td></tr>
+    </tbody>
+  </table></div>
+
+  <h2>Kitchen equipment &mdash; all Tuya switched loads</h2>
+  <div class="scroll"><table>
+    <thead><tr><th>Asset</th><th>Name token &middot; profile</th><th>Read</th><th>Key telemetry</th><th>Control</th><th>Control payload</th><th>Status</th></tr></thead>
+    <tbody>
+      <tr><td class="asset">Merrychef / fryer / grill / combi-oven / dishwasher / bain-marie / heated gantry</td><td><code>merrychef</code>,<code>fryer</code>,<code>grill</code>,<code>combioven</code>,<code>dishwasher</code>,<code>bainmarie</code>,<code>heatedgantry</code> &middot; tuya Profile</td><td><span class="pill p-yes">READ</span></td><td class="tel">switch_1 (+switch_2 if 2-gang), active_power_total, V/I, Electrical_Consumption</td><td><span class="pill p-yes">CONTROL</span></td><td><code>switchDesired</code> true/false <span class="tel">&mdash; single relay; <code>switch_2</code> not addressable</span></td><td><span class="pill p-yes">PROVEN</span> <span class="tel">(single-gang)</span></td></tr>
+      <tr><td class="asset">Kitchen equip under <i>monitoring</i> profiles</td><td>warewash/fryer/oven monitoring</td><td><span class="pill p-yes">READ</span></td><td class="tel">water/energy metering; some carry a Tuya switch_1</td><td><span class="pill p-warn">if switch</span></td><td class="tel"><code>switchDesired</code> only IF device has switch_1</td><td><span class="pill p-warn">per-device</span></td></tr>
+    </tbody>
+  </table></div>
+
+  <h2>Lighting &amp; Fans &mdash; Tuya switched loads</h2>
+  <div class="scroll"><table>
+    <thead><tr><th>Asset</th><th>Name token &middot; profile</th><th>Read</th><th>Key telemetry</th><th>Control</th><th>Control payload</th><th>Status</th></tr></thead>
+    <tbody>
+      <tr><td class="asset">External lighting</td><td><code>externallighting</code> &middot; tuya Profile</td><td><span class="pill p-yes">READ</span></td><td class="tel">switch_1, cur_power, cur_voltage, online_state</td><td><span class="pill p-yes">CONTROL</span></td><td><code>switchDesired</code> true/false</td><td><span class="pill p-yes">PROVEN</span></td></tr>
+      <tr><td class="asset">Extract fan / bar fans</td><td><code>extractfan</code>,<code>barfans</code> &middot; tuya Profile</td><td><span class="pill p-yes">READ</span></td><td class="tel">switch_1, active_power_total, V/I</td><td><span class="pill p-yes">CONTROL</span></td><td><code>switchDesired</code> true/false <span class="tel">&mdash; single relay per unit</span></td><td><span class="pill p-yes">PROVEN</span></td></tr>
+    </tbody>
+  </table></div>
+
+  <h2>Monitoring only &mdash; read, no control</h2>
+  <div class="scroll"><table>
+    <thead><tr><th>Asset</th><th>Name token &middot; profile</th><th>Read</th><th>Key telemetry</th><th>Control</th><th>Why no control</th></tr></thead>
+    <tbody>
+      <tr><td class="asset">Utility AMR (elec/gas)</td><td><code>ElecAMR</code>,<code>GasAMR</code> &middot; AMR_profile</td><td><span class="pill p-yes">READ</span></td><td class="tel">consumption_kwh; SERVER attrs siteNo/siteName/Brand (site header)</td><td><span class="pill p-no">no</span></td><td class="tel">meter; no adapter</td></tr>
+      <tr><td class="asset">Electricity meter / main DB</td><td><code>maindb</code> &middot; meterOnlyProfile</td><td><span class="pill p-yes">READ</span></td><td class="tel">Electrical_Power, Electrical_Energy, Electrical_Consumption</td><td><span class="pill p-no">no</span></td><td class="tel">metering only</td></tr>
+      <tr><td class="asset">Electrical monitor (R10A)</td><td><code>kitchen-r10a</code>,<code>maindb-r10a</code> &middot; remoteItProfile</td><td><span class="pill p-yes">READ</span></td><td class="tel">remoteItActive, liveness/uptime</td><td><span class="pill p-no">no</span></td><td class="tel">enricher, not a controllable device</td></tr>
+      <tr><td class="asset">Fridge / freezer</td><td><code>fridge</code>,<code>freezer</code> &middot; fridge and freezer profile</td><td><span class="pill p-yes">READ</span></td><td class="tel">air_temp, doorStatus, door_open_day, batteryVoltage</td><td><span class="pill p-no">no</span></td><td class="tel">temp/door sensor</td></tr>
+      <tr><td class="asset">Cellar</td><td><code>cellar</code> &middot; cellar profile</td><td><span class="pill p-yes">READ</span></td><td class="tel">air_temp, evaporator_temp, line_temp, doorStatus (+Tuya switch on some)</td><td><span class="pill p-warn">if switch</span></td><td class="tel">monitor; control only if embedded switch_1</td></tr>
+      <tr><td class="asset">Door</td><td><code>door</code> &middot; door profile</td><td><span class="pill p-yes">READ</span></td><td class="tel">doorStatus, TempC1&ndash;3</td><td><span class="pill p-no">no</span></td><td class="tel">sensor</td></tr>
+      <tr><td class="asset">Gas valve / solenoid</td><td><code>gassolenoid</code> &middot; gasValveMonitoringProfile</td><td><span class="pill p-yes">READ</span></td><td class="tel">pinStatus, valveTotalPulse</td><td><span class="pill p-no">no</span></td><td class="tel">monitor (safety context)</td></tr>
+      <tr><td class="asset">Ambient temp/humidity</td><td><code>kitchen-temp</code> &middot; ambientTempMonitoringProfile</td><td><span class="pill p-yes">READ</span></td><td class="tel">temperature, humidity</td><td><span class="pill p-no">no</span></td><td class="tel">sensor</td></tr>
+      <tr><td class="asset">Oven (monitor / Unox)</td><td>ovenMonitoringProfile / unoxDevice</td><td><span class="pill p-yes">READ</span></td><td class="tel">water/pulse; Unox: cooking/washing energy</td><td><span class="pill p-no">no</span></td><td class="tel">Unox adapter = 0 accounts provisioned</td></tr>
+      <tr><td class="asset">Roof</td><td><code>roof</code> &middot; roof profile</td><td><span class="pill p-yes">READ</span></td><td class="tel">rssi, batteryVoltage (minimal)</td><td><span class="pill p-no">no</span></td><td class="tel">sensor</td></tr>
+    </tbody>
+  </table></div>
+
+  <div class="legend">
+    <span><span class="pill p-yes">READ / CONTROL / PROVEN</span> confirmed live</span>
+    <span><span class="pill p-warn">verify / defer / if switch</span> conditional or pending</span>
+    <span><span class="pill p-no">monitor</span> read-only</span>
+  </div>
+
+  <footer>
+    Control proven on the dev bench 2026-09-17 via a full write&rarr;confirm matrix (values restored after): four Tuya switches (<code>bench-owon-1</code>, <code>bench-tongou-sy1-1/-sy1-2/-sy2-1</code>) &rarr; <code>switchDesired</code> &rarr; <code>switchSyncStatus=synced</code>, relays audibly clicking; Intesis (<code>funklet-intesis-29d1f022</code>) &rarr; <code>setpointDesired</code> &rarr; <code>synced</code>; Salus IT700 (<code>spencer-home-salusit700</code>) &rarr; <code>setpointDesired</code> accepted (<code>pending</code>), <code>modeDesired</code>=<code>failed</code>, <code>hwBoostHoursDesired</code>=<code>rejected</code> (both by design). <b>Intesis on/off (<code>modeDesired</code>) is unproven:</b> a full <code>off&rarr;fan&rarr;off&rarr;fan&rarr;off</code> cycle returned no <code>modeSyncStatus</code> and the unit reports no mode/power telemetry &mdash; needs a mode-capable Intesis unit to prove. <b>Confirmed independent:</b> a <code>setpointDesired</code> write does NOT flip power on (setpoint synced, <code>OnOff</code> unchanged). No writes against production. Open items: multi-gang Tuya per-channel addressing and Intesis fan-speed both need a contract change; Intesis on/off needs a bench unit that reports mode/power.
+  </footer>
+</div>
+</body>
+</html>

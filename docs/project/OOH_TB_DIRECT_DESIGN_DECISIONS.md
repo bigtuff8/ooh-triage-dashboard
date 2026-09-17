@@ -1,53 +1,65 @@
 # OOH Dashboard — ThingsBoard-Direct: Design Decisions Gate
 
 **Timestamp:** 2026-09-17 · **Stage:** pre-design decision gate · **Owner:** James Brown
-**Gate ask:** review the adversarial validation outcome and record decisions **D1–D8** so the TB-direct re-engineering is scoped correctly before any build.
+**Gate ask:** review the adversarial validation outcome and record decisions **D1–D10** so the TB-direct re-engineering is scoped correctly before any build.
 
-> **Interactive review:** [`mockups/OOH_TB_DIRECT_DECISIONS_review.html`](mockups/OOH_TB_DIRECT_DECISIONS_review.html) — the verdict board (C1–C8, tap for evidence) and the decision console (D1–D8 with options, recommendations, and a lean-capture aid) are embedded as the **Live prototype** on this PR. Full evidence in `OOH_TB_DIRECT_VALIDATION_REPORT.md`; Spencer's open questions in `OOH_TB_DIRECT_SPENCER_QUERY_2026-09-17.md`.
+> **UPDATED 2026-09-17 (post-Spencer).** Spencer (bridge owner) sent the authoritative control contract (`OOH_TB_DIRECT_CONTROL_SPEC_2026-09-17.md`) + corrected matrix after the first draft of this gate. It **corrects our control-plane findings** and answers the open asks. Full analysis: `OOH_TB_DIRECT_CONTROL_SPEC_IMPACT_2026-09-17.md`. Changes folded in below (see the ⟳ markers).
+
+> **Interactive review:** [`mockups/OOH_TB_DIRECT_DECISIONS_review.html`](mockups/OOH_TB_DIRECT_DECISIONS_review.html) — the verdict board (C1–C8) and decision console (D1–D10). Evidence: `OOH_TB_DIRECT_VALIDATION_REPORT.md` + `OOH_TB_DIRECT_CONTROL_SPEC_2026-09-17.md`. Spencer's corrected asset matrix: `mockups/OOH_ASSET_CONTROL_MATRIX_corrected.html`.
 
 ---
 
 ## Go / No-Go
 
-**GO to design — conditional** on folding D1–D8 into the design brief. The two make-or-break questions are YES: the read plane returns full site estates directly from ThingsBoard at scale, and the interface-preserving code swap is safe *and corrective* (it fixes a latent live-control bug). Tuya switch control — the highest-volume controllable type — is proven end-to-end. This is **not** a no-go and **not** a blank cheque: three claims are refuted as written and must be hardened in design first.
+**GO to design — conditional** on folding D1–D10 into the design brief. The two make-or-break questions are YES: the read plane returns full site estates directly from ThingsBoard at scale, and the interface-preserving code swap is safe *and corrective*. With Spencer's spec, the **control plane is now in better shape than our validation implied** — setpoint control is contract-proven for both Salus and Intesis, and two open asks (least-privilege, multi-gang) are resolved. Three concrete pre-build code fixes and two new constraints now apply.
 
-## Claim verdicts (re-proven adversarially, live)
+## Claim verdicts (re-proven adversarially; ⟳ = corrected by Spencer's spec)
 
-- **C1 — Read plane returns the full estate · ✅ CONFIRMED.** 9 sites re-proven live; site 6261 = 23 devices / 18 active; per-site query is cheap and scalable on the 12,812-device tenant.
-- **C2 — Auth (JWT service accounts) · ✅ CONFIRMED, but least-privilege ⚠️ REFUTED.** Both accounts log in as designed, but `svc-read@` and `svc-control@` are both TENANT_ADMIN, so the read credential can write. See D5.
-- **C3 — `gk-{site}` prefix is authoritative · 🔴 REFUTED.** ThingsBoard `textSearch` is an unanchored substring match: the bare form bleeds across neighbouring real sites, and the dash-anchored form silently drops split sites (md-1110 loses 95%). See D1.
-- **C4 — Names parse cleanly into four parts · 🔴 REFUTED.** Only 76% conform; 3,086 exceptions; 19 populated profiles (~646 devices) are undocumented, including controllable Salus thermostats on the `default` profile. See D2.
-- **C5 — Control confirms via `SyncStatus=synced` · 🟡 MIXED.** Tuya switch proven end-to-end (under 1s); Salus refused to confirm on the bench (stuck pending / failed / rejected); Intesis adapter was dormant. Two false-success traps found. See D3 and D4.
-- **C6 — Bounded controllable set · ✅ CONFIRMED (structural).** No unexpected controllable type appeared; only Tuya was actively proven end-to-end this session.
-- **C7 — Controllability is per-device, not per-profile · ✅ CONFIRMED.** Controllable Salus thermostats sit on the `default` profile at 18 sites; capability must be derived from telemetry signals, not the profile label.
-- **C8 — Interface-preserving code swap is safe · ✅ CONFIRMED (with conditions).** Safe *and* corrective: `deviceId` today is the bridge id, not the TB name, so live control is latently broken behind the write-lock — setting `deviceId` to the TB name fixes it. Conditions: keep pub-name search, populate the telemetry keys consumers read, migrate the shape-pinning tests. See D8.
+- **C1 — Read plane returns the full estate · ✅ CONFIRMED.** 9 sites live; 6261 = 23/18; scalable per-site query.
+- **C2 — Auth (JWT service accounts) · ✅ CONFIRMED, least-privilege ⚠️ REFUTED but now REMEDIATED.** Both accounts are TENANT_ADMIN today; Spencer is binding a read-scoped role (see D5).
+- **C3 — `gk-{site}` prefix authoritative · 🔴 REFUTED.** Substring `textSearch` bleeds and halves split sites. See D1.
+- **C4 — Names parse cleanly · 🔴 REFUTED.** 76% conform; 3,086 exceptions; 19 undocumented profiles. See D2.
+- **C5 — Control confirms via `SyncStatus=synced` · ⟳ CORRECTED — the bench results were the contract behaving correctly, NOT a refutation.** Tuya switch PROVEN; Salus IT700 setpoint accepted (`pending`, slow-echo) with `modeDesired`→`failed` / `hwBoost`→`rejected` correct-by-design; Intesis setpoint PROVEN synced. Genuinely unproven: **Intesis on/off via `modeDesired`** (bench unit has no mode/power telemetry) and **Salus IT500 hwBoost** (none on bench). Fan speed is not controllable at all.
+- **C6 — Bounded controllable set · ✅ CONFIRMED (strengthened).** Spencer's four keys (`switchDesired`, `setpointDesired`, `modeDesired`, `hwBoostHoursDesired`) are the whole contract.
+- **C7 — Controllability is per-device · ✅ CONFIRMED.** Reinforced by the "control only if the device carries a switch" rows.
+- **C8 — Interface-preserving code swap · ✅ CONFIRMED (with conditions).** Safe + corrective (`deviceId`=TB-name fixes a latent break). See D8. Control-dispatch logic gains new requirements (D3, D9).
 
-## Decisions to record (D1–D8)
+## Decisions to record (D1–D10)
 
-**D1 — Site-query strategy · design blocker.** *Recommend:* over-fetch a broad prefix, then filter client-side with an anchored regex (brand + site, bounded by a dash or end-of-name, case-insensitive), plus a site-token alias map (e.g. `1110` ↔ `1110meridian`). Rejected: anchored-only (drops split sites); bare-only (bleeds neighbours).
+**D1 — Site-query strategy · design blocker.** *Recommend:* over-fetch a broad prefix, then filter client-side with an anchored regex (brand + site, bounded by a dash or end-of-name, case-insensitive), plus a site-token alias map. Unchanged by Spencer.
 
-**D2 — Classification model · design blocker.** *Recommend:* derive control-eligibility from telemetry/attribute capability signals (never the profile label), make assetType matching typo-tolerant, and extend the data dictionary with the 19 missing profiles before build.
+**D2 — Classification model · design blocker.** *Recommend:* capability-based + typo-tolerant; extend the dictionary with the 19 missing profiles. Now also carries concrete value bounds from the spec (setpoint ranges, `modeDesired` enum).
 
-**D3 — Confirm-loop semantics · design blocker.** *Recommend:* treat a command as confirmed only when `Reported` equals `Desired` **and** the sync timestamp advanced past the write, with a client-side timeout; validate value types before every write. `SyncStatus=synced` alone is insufficient (proven false-success traps).
+**D3 — Confirm-loop semantics · design blocker · ⟳ EXPANDED.** *Recommend:* (a) read the confirm keys from the **timeseries** endpoint, not attributes (code fix #1); (b) be **edge-aware** — compare the requested value to the current `*Desired` before dispatch and treat "already at value" as a distinct no-dispatch outcome (edge-triggering, spec §3 rule 1); (c) keep the extended `Reported===Desired` guard; (d) keep a client-side timeout (there is **no** server `timeout` state); (e) keep `failed`/`rejected` handling. Pre-write value-type validation stays (the bad-value trap survives).
 
-**D4 — Salus/Intesis control unproven on bench · ask Spencer.** *Recommend:* hold thermostat and AC control; ship Tuya-only control v1; send the Spencer query. Reconcile against SD-492's claimed shipping Salus path before enabling.
+**D4 — Which control ships in v1 · ask/decide · ⟳ CHANGED.** Setpoint is now contract-proven for Salus **and** Intesis; only **Intesis on/off (`modeDesired`)** and **Salus IT500 hwBoost** remain genuinely unproven. *Recommend:* see the new **D10** — decide whether v1 widens from Tuya-only to Tuya switch + setpoint. Reconcile SD-492 (setpoint is the shipping Salus path).
 
-**D5 — TB read least-privilege · ask Spencer.** *Recommend:* request a genuinely read-scoped TB role for the read path; otherwise consciously accept TENANT_ADMIN-both and rely on the app-layer `WRITES_DISABLED` + kill-switch as the sole barrier.
+**D5 — TB read least-privilege · ⟳ RESOLVED pending verification.** Spencer is binding the `Airedale Read Only` role. *Verify before closing:* the role can read devices **and** timeseries telemetry; which Key Vault secret maps to it; and that it genuinely cannot write `SHARED_SCOPE`. Until bound, keep `WRITES_DISABLED` + kill-switch.
 
-**D6 — Push `WRITES_DISABLED` into the write primitive · build item.** *Recommend:* add a fail-closed guard inside `writeSharedAttribute` itself, so a future caller cannot write despite the flag. Fail-closed holds today only because both callers remember to guard.
+**D6 — Push `WRITES_DISABLED` into the write primitive · build item.** *Recommend:* add a fail-closed guard inside `writeSharedAttribute` itself. More important now that setpoint control may enter scope.
 
-**D7 — Multi-gang Tuya addressing · ask Spencer.** *Recommend:* obtain a genuine 2-gang bench device (or the bridge's per-channel convention) before shipping multi-gang control. Single-gang is fully proven and unaffected.
+**D7 — Multi-gang Tuya · ⟳ RESOLVED (not available).** A single `switchDesired` drives one gang; `switch_2` is not addressable — needs a contract change. *Recommend:* treat multi-gang as read-only for now; raise a contract-change ask with Spencer only if OOH needs second-gang control.
 
-**D8 — Name-search, status latch and test migration on the swap · build item.** *Recommend:* bake into the read-service design a warmed pub-name search index, a boolean `bridgeStatus()` health latch, `deviceId` set to the TB name, telemetry-key population, and migration of the shape-pinning tests.
+**D8 — Name-search, status latch and test migration on the swap · build item.** *Recommend:* bake into the read-service design (warmed pub-name search index, boolean `bridgeStatus()` latch, `deviceId`=TB name, telemetry-key population, migrate the shape-pinning tests).
+
+**D9 — Registration-gate guard · design blocker (NEW, from spec §3 rule 2).** TB silently drops commands for a device that has never published first state. *Recommend:* before offering/dispatching control, assert the device has published a snapshot (the existing online guard is a partial proxy) so a never-reported device does not silently swallow commands.
+
+**D10 — Control v1 scope · decide (NEW).** *Options:* **(a) Tuya switch only** (most conservative — proven, highest volume); **(b) Tuya switch + setpoint (Salus + Intesis)** — setpoint is contract-proven, needs the D3 confirm-loop + mode-casing safety fix but not mode/on-off; **(c) add mode/on-off** — blocked until Intesis `modeDesired` on/off is proven on a mode-capable unit and the casing bug is fixed. *Recommend:* **(b)** — widen to Tuya + setpoint, hold mode/on-off and IT500 hwBoost.
+
+## Concrete pre-build code fixes surfaced (verified against the codebase)
+1. **`services/tb-client.js:177`** — confirm-read uses `/values/attributes`; the spec's `*Reported`/`*SyncStatus` are **telemetry** (use `/values/timeseries`). Latent (masked by the write-lock); **must fix before live control**.
+2. **`services/control.js:87`** — dispatch is not edge-aware (always writes the value); add compare-before-dispatch.
+3. **`public/js/control.js:64,202` + `registry.js:36`** — mode is sent capitalised (`'Off'`); Intesis treats any non-`off` value as ON, so `'Off'` could switch an AC **on**. Lowercase the vocabulary. **Safety.**
+4. Minor: Intesis range `16–30` → `16–32` (`registry.js:35`); confirm the `hwBoost` reported-key name and the IT500 one-device-vs-split-deviceType question with Spencer.
 
 ## Recommended first design increment (if GO)
-1. **Read-service** (`services/tb-device.js`) preserving the bridge interface: `deviceId` set to the TB name; robust site query (D1); capability-based, typo-tolerant classifier covering the 19 profiles (D2); telemetry-key population including `switch_1` normalisation; warmed name-search index; boolean `bridgeStatus()` latch (D8).
-2. **Confirm-loop redesign** (D3): `Reported` equals `Desired`, plus timestamp-advance, plus client-side timeout, plus pre-write value validation.
-3. **Control scope v1 = Tuya switch only** (proven). Salus/Intesis control **held** pending D4; boiler deferred.
-4. **Safety**: add `switchDesired` to `ATTRIBUTE_FAMILY`; add the `WRITES_DISABLED` primitive-level guard (D6); the live write-lock stays until James lifts it.
-5. **Test migration** for the `deviceId` contract change; unit-test the classifier against the real 6261 set and the C4 exception classes.
+1. **Read-service** (`services/tb-device.js`) preserving the bridge interface: `deviceId`=TB name; robust site query (D1); capability-based, typo-tolerant classifier covering the 19 profiles (D2); telemetry-key population; warmed name-search index; boolean `bridgeStatus()` latch (D8).
+2. **Confirm-loop redesign** (D3, expanded): timeseries endpoint + edge-aware compare-before-dispatch + `Reported===Desired` + client-side timeout + `failed`/`rejected` handling + registration-gate guard (D9).
+3. **Control scope v1 per D10** (recommend Tuya switch + setpoint); add `switchDesired` to `ATTRIBUTE_FAMILY` + registry; fix mode casing; hold Intesis on/off + IT500 hwBoost; boiler deferred.
+4. **Safety**: `WRITES_DISABLED` primitive-level guard (D6); live write-lock stays until James lifts it.
+5. **Test migration** for the `deviceId` contract change; unit-test the classifier and the confirm-loop edge cases.
 
 ## On approval
-- **Accept** → the design increment above begins with D1–D8 baked in.
-- **Amend** → leave the specific changes; the scope is revised before design starts.
-- Provenance: this gate attaches the hand-authored artefact; no doer produced it. Evidence: `OOH_TB_DIRECT_VALIDATION_REPORT.md`.
+- **Accept** → the design increment begins with D1–D10 baked in.
+- **Amend** → leave the specific changes; scope is revised before design starts.
+- Provenance: hand-authored artefact; no doer produced it. Evidence: `OOH_TB_DIRECT_VALIDATION_REPORT.md`, `OOH_TB_DIRECT_CONTROL_SPEC_2026-09-17.md`, `OOH_TB_DIRECT_CONTROL_SPEC_IMPACT_2026-09-17.md`.

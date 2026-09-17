@@ -86,7 +86,7 @@
   <div class="banner">
     Four adversarial agents tried to <b>break</b> each claim against live systems (prod TB read-only; all writes on the dev bench; zero prod writes).
     The two make-or-break questions are <b>YES</b> — the read plane returns full site estates and the code swap is safe (and fixes a latent control bug).
-    Three claims are <b>refuted as written</b>: they're design-hardening, not architecture changes. Decide <b>D1–D8</b> below to green-light the build.
+    Two read-plane claims (C3/C4) are <b>refuted as written</b> (design-hardening, not architecture). Spencer's control spec then <b>corrected C5</b> (bench results were the contract working) and resolved D5/D7. Decide <b>D1–D10</b> below to green-light the build.
     <button class="toggle" id="themeBtn" style="float:right">◐ theme</button>
   </div>
 
@@ -101,7 +101,7 @@
   </section>
 
   <section>
-    <h2>Decisions for you — D1–D8</h2>
+    <h2>Decisions for you — D1–D10</h2>
     <div id="decisions"></div>
     <div class="summary">
       <b>Your leanings:</b>
@@ -127,7 +127,7 @@
   </section>
 
   <p class="foot">
-    On <b>Accept</b>: the Orchestrator (GitHub App) merges this gate and the design increment begins with your D1–D8 answers baked in.
+    On <b>Accept</b>: the Orchestrator (GitHub App) merges this gate and the design increment begins with your D1–D10 answers baked in.
     On <b>Amend</b>: leave the changes you want. Full evidence: <code>OOH_TB_DIRECT_VALIDATION_REPORT.md</code> · Spencer's open questions: <code>OOH_TB_DIRECT_SPENCER_QUERY_2026-09-17.md</code>.
   </p>
 </div>
@@ -138,7 +138,7 @@ const CLAIMS=[
  {id:"C2",v:"warn",t:"Auth: JWT service accounts",basis:"Auth CONFIRMED; least-privilege REFUTED",ev:"Both accounts log in via JWT as designed — but <code>svc-read@</code> and <code>svc-control@</code> are BOTH TENANT_ADMIN, so the read cred can write. The read/write split is app-convention, not TB-enforced. See D5."},
  {id:"C3",v:"bad",t:"gk-{site}-* prefix is authoritative",basis:"TB textSearch is unanchored substring",ev:"<code>gk-626</code> → 113 devices across FIVE sites. Bare form bleeds across real sites (<code>gk-010102</code>↔<code>0101020</code>); anchored form silently drops split sites (md-1110 loses 95%). Needs broad fetch + anchored-regex filter + alias map. See D1."},
  {id:"C4",v:"bad",t:"Names parse cleanly into 4 parts",basis:"Only 76% conform; 19 undocumented profiles",ev:"3,086 non-conforming names (spaces, parentheses embedding OTHER site numbers, missing -n, raw devEUIs, hex UUIDs, underscores, typos). 19 populated profiles (~646 devices) absent from the dictionary — incl. controllable Salus on the <code>default</code> profile. Classify by capability, not profile. See D2."},
- {id:"C5",v:"warn",t:"Control confirms via SyncStatus=synced",basis:"Tuya CONFIRMED; Salus REFUTED; Intesis GATED",ev:"Tuya switch proven E2E (&lt;1s) on 4 devices. Salus bench stuck pending/failed/rejected — never synced. Intesis adapter dormant; OnOff/FanSpeed names unproven. TWO false-success traps: bad value + dormant adapter both leave a STALE synced. See D3 + D4."},
+ {id:"C5",v:"warn",t:"Control confirms via SyncStatus=synced",basis:"⟳ CORRECTED by Spencer — bench results were the contract working",ev:"Spencer's spec overturns our refutation: Salus IT700 setpoint was ACCEPTED (pending, slow-echo); modeDesired→failed and hwBoost→rejected are correct-by-design (IT700 has no mode; hwBoost is IT500-only). Tuya switch PROVEN; Intesis setpoint PROVEN synced (16–32°C). Genuinely unproven: Intesis on/off via modeDesired (no mode/power telemetry) + Salus IT500 hwBoost. Fan speed NOT controllable. Our 'dormant adapter' trap was the edge-triggered no-op. See D3/D4/D10."},
  {id:"C6",v:"ok",t:"Bounded controllable set",basis:"Structural — no unexpected type appeared",ev:"Only the expected attribute families exist across the estate (Tuya switch, Salus, Intesis, boiler-deferred). Caveat: only Tuya actively proven E2E this session."},
  {id:"C7",v:"ok",t:"Controllability is per-device",basis:"Controllable Salus on the default profile at 18 sites",ev:"Capability must be derived from telemetry/attribute signals, never the profile label — controllable thermostats sit on <code>default</code> and real kitchen gear on <code>gatewayDevice</code>. Confirms the per-device rule."},
  {id:"C8",v:"ok",t:"Interface-preserving code swap is safe",basis:"Safe AND corrective — fixes a latent live bug",ev:"deviceId today is the BRIDGE id, not the TB name → live control is latently broken behind the write-lock. Setting deviceId = TB name is necessary + sufficient + safe. Conditions: keep pub-name search, populate telemetry keys, migrate the shape-pinning tests. See D8."},
@@ -147,11 +147,13 @@ const DECS=[
  {id:"D1",prio:"blocker",q:"Site-query strategy",why:"Bare textSearch bleeds across real sites; anchored halves split sites (md-1110 loses 95%).",opts:[["Broad fetch + anchored-regex + alias map","Over-fetch a broad prefix, filter client-side ^{brand}-{site}(-|$) case-insensitive, resolve site-token aliases (1110↔1110meridian).",true],["Anchored textSearch only","Simple but silently drops split-site devices.",false],["Bare textSearch only","Returns everything but bleeds neighbouring sites.",false]]},
  {id:"D2",prio:"blocker",q:"Classification model",why:"24% of names don't fit; controllable Salus sits on the default profile; 19 profiles undocumented.",opts:[["Capability-based + typo-tolerant + extend dictionary","Derive control-eligibility from telemetry/attribute signals; fuzzy assetType; document the 19 missing profiles first.",true],["Profile-label classification","Simplest, but mislabels controllable devices on default/gatewayDevice.",false]]},
  {id:"D3",prio:"blocker",q:"Confirm-loop semantics",why:"Bad value & dormant adapter both leave a stale 'synced' (false success); 'pending' sticks forever.",opts:[["Reported===Desired + timestamp-advance + client timeout","Plus client-side value-type validation before every write.",true],["Trust SyncStatus==synced","Current design assumption — proven insufficient (false-success traps).",false]]},
- {id:"D4",prio:"ask",q:"Salus & Intesis control — bench didn't complete",why:"Two of four control types unproven E2E; Intesis OnOff/FanSpeed names unknown. SD-492 claims a shipping Salus path.",opts:[["Hold thermostat/AC control; ship Tuya v1; ask Spencer","Send the Spencer query; enable Salus/Intesis only after a proven round-trip.",true],["Enable on the contract shape alone","Risky — bench never reached synced; could mis-command a live thermostat.",false]]},
- {id:"D5",prio:"ask",q:"TB read least-privilege",why:"Both service accounts are TENANT_ADMIN — the read cred can write.",opts:[["Ask Spencer for a read-scoped role","Genuine least privilege for the read path.",true],["Accept TENANT_ADMIN-both + app-layer guard","Rely on WRITES_DISABLED + kill-switch as the only barrier.",false]]},
- {id:"D6",prio:"build",q:"Push WRITES_DISABLED into the write primitive",why:"Fail-closed holds only because both callers remember to guard; a future third caller could slip.",opts:[["Add if(config.writesDisabled) throw in writeSharedAttribute","Belt-and-braces; small build item.",true],["Leave guards at the callers","Works today; relies on discipline.",false]]},
- {id:"D7",prio:"ask",q:"Multi-gang Tuya addressing",why:"No 2-gang device on the bench; unknown whether switchDesired targets a channel.",opts:[["Get a 2-gang bench device before shipping multi-gang","Single-gang unaffected and fully proven.",true],["Assume per-device switchDesired","Unverified; could toggle the wrong channel.",false]]},
+ {id:"D4",prio:"ask",q:"⟳ Control proof status (post-Spencer)",why:"Setpoint now contract-PROVEN for Salus + Intesis. Only Intesis on/off (modeDesired) + Salus IT500 hwBoost remain unproven.",opts:[["Treat setpoint + Tuya switch as proven; hold on/off + IT500 hwBoost","Matches Spencer's proof matrix; reconcile SD-492 (setpoint = shipping Salus path).",true],["Keep everything but Tuya held","Over-conservative — ignores proven setpoint control.",false]]},
+ {id:"D5",prio:"ask",q:"⟳ TB read least-privilege — RESOLVED pending checks",why:"Spencer is binding the 'Airedale Read Only' role.",opts:[["Accept + verify 3 things before closing","Role can read devices+telemetry; which KV secret maps to it; cannot write SHARED_SCOPE.",true],["Mark closed now","Premature — binding + verification not yet done.",false]]},
+ {id:"D6",prio:"build",q:"Push WRITES_DISABLED into the write primitive",why:"Fail-closed holds only because both callers guard; more important now setpoint control may enter scope.",opts:[["Add if(config.writesDisabled) throw in writeSharedAttribute","Belt-and-braces; small build item.",true],["Leave guards at the callers","Works today; relies on discipline.",false]]},
+ {id:"D7",prio:"ask",q:"⟳ Multi-gang Tuya — RESOLVED (not available)",why:"A single switchDesired drives one gang; switch_2 is not addressable — needs a contract change.",opts:[["Treat multi-gang as read-only; ask Spencer only if OOH needs it","Single-gang control unaffected and proven.",true],["Block on multi-gang","Unnecessary — not a v1 requirement.",false]]},
  {id:"D8",prio:"build",q:"Name-search + status latch + test migration on the swap",why:"Pub-name search and the health latch are load-bearing; shape tests pin the old deviceId.",opts:[["Bake into the read-service design","Warmed name index, boolean bridgeStatus() latch, deviceId=TB name, telemetry-key population, migrate bridge.test.js.",true],["Handle later","Risks a name-search / degraded-banner regression on cutover.",false]]},
+ {id:"D9",prio:"blocker",q:"Registration-gate guard (NEW)",why:"Spencer §3: TB silently drops commands for a device that never published first state.",opts:[["Assert device has published a snapshot before dispatch","Existing online guard is a partial proxy; make it explicit.",true],["Rely on the online guard alone","Leaves a silent-drop failure mode.",false]]},
+ {id:"D10",prio:"ask",q:"Control v1 scope (NEW)",why:"Setpoint is now proven; decide how wide v1 goes.",opts:[["Tuya switch + setpoint (Salus + Intesis)","Proven; needs D3 confirm-loop + mode-casing fix, not on/off. RECOMMENDED.",true],["Tuya switch only","Most conservative.",false],["Add mode/on-off too","Blocked until Intesis modeDesired on/off is proven + casing bug fixed.",false]]},
 ];
 const claimsEl=document.getElementById('claims');
 CLAIMS.forEach(c=>{
