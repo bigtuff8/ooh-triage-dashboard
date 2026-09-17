@@ -1,0 +1,15 @@
+{
+  "run": "selfgate-ooh-triage-dashboard-phase-tb-direct-design-decisions",
+  "phase": "design-decisions",
+  "pr": 25,
+  "approvedBy": [
+    "bigtuff8"
+  ],
+  "reviewComments": [
+    "bigtuff8: - Live prototype — click through the actual screen: Looks right\n\n(submitted via the interactive gate review)"
+  ],
+  "mergeCommit": "97513b6e01ce40747c34552e8b424d865473323f",
+  "phaseBranch": "phase/tb-direct-design-decisions",
+  "releaseBranch": "main",
+  "stamp": 1789658359419
+}
