@@ -174,6 +174,35 @@ function otherShortcut() {
 
 function ctlPlaceholder() { return '<div class="alert info">Complete the control action in the window…</div>'; }
 
+/**
+ * D10 — a device offers remote on/off only when it carries the `switch` capability AND is online
+ * AND has registered with the platform (published first state). Anything short of all three falls
+ * back to the capture path, so we never present a switch that would be silently dropped.
+ */
+function canSwitch(d) {
+    return !!d && (d.capabilities || []).includes('switch') && d.online && d.registered !== false;
+}
+
+/**
+ * Per-circuit Turn ON / Turn OFF buttons — only the OPPOSITE of the current state is offered (a
+ * circuit reading ON shows Turn OFF, and vice-versa). Renders nothing when the device isn't
+ * switchable (canSwitch false) — the flow's capture fallback still applies.
+ */
+function switchButtons(d, testid) {
+    if (!canSwitch(d)) return '';
+    const isOn = !!d.telemetry?.switch_1;
+    return `<div class="switchbtns" style="display:flex;gap:6px;margin-left:auto">${isOn
+        ? `<button class="btn" data-testid="${testid}-off" onclick="startSwitch('${esc(d.deviceId)}','off')">Turn OFF</button>`
+        : `<button class="btn primary" data-testid="${testid}-on" onclick="startSwitch('${esc(d.deviceId)}','on')">Turn ON</button>`}</div>`;
+}
+
+/** Opens the control modal for a Tuya switch circuit (looked up by deviceId in the live workspace). */
+function startSwitch(deviceId, dir) {
+    const dev = state.workspace.devices.find(d => d.deviceId === deviceId);
+    if (!dev) { toast('⚠️ Device no longer in the live inventory — refresh the site.'); return; }
+    openControl(dev, dir === 'on' ? 'switchon' : 'switchoff');
+}
+
 /* ------------------------ flow renderers ------------------------ */
 const FLOWR = {
     heating(ws, f) {
@@ -229,7 +258,19 @@ const FLOWR = {
             }
             if (need === 'off') {
                 doneLine('Requested: turn heating off');
-                if (z.deviceType === 'intesis') { openControl(z, 'modeoff'); return ctlPlaceholder(); }
+                // D10 SAFETY: Intesis on/off via modeDesired is HELD in v1 — the bridge treats any
+                // non-'off' mode as ON and the bench unit gave NO modeSyncStatus, so a "turn off" we
+                // can't confirm is unsafe. Redirect the Intesis off request to capture-and-escalate
+                // rather than firing an unconfirmable mode write.
+                if (z.deviceType === 'intesis') {
+                    doneLine('Intesis off — mode control held (unconfirmable); captured');
+                    return outcomeCaptured(f, 'intesisoff', {
+                        subject: `AC turn-off requested (${z.zone})`,
+                        detail: `Caller asked to turn off the Intesis AC in ${z.zone}. Remote on/off for this unit isn’t confirmable yet (mode control held), so it’s captured for the IoT team rather than fired unconfirmed. Live read ${temp != null ? temp + '°C' : 'n/a'}${sp != null ? `, setpoint ${sp}°C` : ''}.`,
+                        script: 'I can’t safely switch that AC off remotely tonight because the unit doesn’t confirm the change back — so rather than tell you it’s done when it might not be, I’ve logged it as a priority for the IoT team. If there’s an on-site controller you can use that in the meantime.',
+                        OohCaptureClass: 'intesis-off-held'
+                    });
+                }
                 return `<div class="reco" data-testid="reco-frost"><b class="hd">This thermostat has no “off” switch.</b>It’s a Salus heat-only unit. The closest safe action is a <b>frost-hold</b>: set it to 5°C, so the heating stays off unless the building risks freezing. Normal service resumes when the hold ends.<div class="outbtns"><button class="btn primary" data-testid="frost-recommended" onclick="flowStep({frost:1})">Set frost-hold 5°C (recommended)</button><button class="btn" data-testid="frost-decline" onclick="flowStep({offnoact:1})">End with no action</button></div></div>`;
             }
             if (need === 'broken') {
@@ -315,8 +356,12 @@ const FLOWR = {
             const off = ks.some(k => !k.online);
             doneLine('Live read: ' + ks.map(k => `${esc(k.zone.replace('Kitchen — ', ''))} <b>${k.online ? (k.telemetry?.switch_1 ? 'On' : 'Off — schedule ' + (k.schedule || 'unknown')) : 'OFFLINE'}</b>`).join(' · '));
             if (off) { f.cat = 'connectivity'; f.stage = 0; return FLOWR.connectivity(ws, f); }
-            return ks.map(k => `<div class="zoneread"><span style="font-size:20px">🍳</span><div><div><b>${esc(k.zone)}</b> — ${k.telemetry?.switch_1 ? 'currently ON' : 'currently OFF'}</div><div class="small">${k.schedule ? 'Schedule ' + esc(k.schedule) + ' · ' : ''}${esc(k.deviceId)}</div></div><span class="tag ${k.telemetry?.switch_1 ? 'green' : 'grey'}">${k.telemetry?.switch_1 ? 'on' : 'off'}</span></div>`).join('') +
-                `<div class="alert info">Kitchen circuits can’t be switched remotely from here yet (that control path is on the priority list with our platform team). If it’s simply outside the schedule window, the schedule explains it — otherwise capture it.</div>
+            // D10: per-circuit Turn ON/OFF when the device is switch-capable + online + registered.
+            // Otherwise the circuit falls back to the capture path (unchanged) — capture is never lost.
+            const anySwitch = ks.some(k => canSwitch(k));
+            const rows = ks.map((k, i) => `<div class="zoneread"><span style="font-size:20px">🍳</span><div><div><b>${esc(k.zone)}</b> — ${k.telemetry?.switch_1 ? 'currently ON' : 'currently OFF'}</div><div class="small">${k.schedule ? 'Schedule ' + esc(k.schedule) + ' · ' : ''}${esc(k.deviceId)}</div></div>${switchButtons(k, `kitchen-switch-${i}`)}<span class="tag ${k.telemetry?.switch_1 ? 'green' : 'grey'}">${k.telemetry?.switch_1 ? 'on' : 'off'}</span></div>`).join('');
+            return rows +
+                `<div class="alert info">${anySwitch ? 'Switchable circuits can be turned on/off directly above — the change only counts once the device confirms. ' : 'Kitchen circuits can’t be switched remotely from here yet (that control path is on the priority list with our platform team). '}If it’s simply outside the schedule window, the schedule explains it — otherwise capture it.</div>
    <div class="stepq">Is the kitchen needed for service <b>right now</b> (food being served / hotel breakfast)?</div>
    <div class="chips"><button class="chip" data-testid="kitchen-critical" onclick="flowStep({crit:1})">Yes — business critical now</button><button class="chip" data-testid="kitchen-notcritical" onclick="flowStep({crit:0})">No — needed later / tomorrow</button></div>`;
         }
@@ -347,7 +392,10 @@ const FLOWR = {
         if (f.stage === 0) {
             doneLine('Live read: external lighting ' + (lg ? (lg.online ? 'device online' : 'device NOT responding') : 'not on Lighthouse here'));
             if (!lg) return '<div class="alert info">External lighting at this site isn’t on Lighthouse.</div>' + otherShortcut();
-            return `<div class="alert info">External lighting can’t be switched remotely from here yet (on the priority list with our platform team).${lg.online ? '' : ' The lighting controller is also <b>not responding</b>, which often means a tripped fuse board.'}</div>
+            const lgSwitch = canSwitch(lg)
+                ? `<div class="zoneread"><span style="font-size:20px">💡</span><div><div><b>${esc(lg.zone)}</b> — ${lg.telemetry?.switch_1 ? 'currently ON' : 'currently OFF'}</div><div class="small">${esc(lg.deviceId)}</div></div>${switchButtons(lg, 'lighting-switch')}<span class="tag ${lg.telemetry?.switch_1 ? 'green' : 'grey'}">${lg.telemetry?.switch_1 ? 'on' : 'off'}</span></div>`
+                : '';
+            return lgSwitch + `<div class="alert info">${canSwitch(lg) ? 'This lighting circuit can be switched on/off directly above — the change only counts once the device confirms.' : `External lighting can’t be switched remotely from here yet (on the priority list with our platform team).${lg.online ? '' : ' The lighting controller is also <b>not responding</b>, which often means a tripped fuse board.'}`}</div>
    <div class="script">“There’s a manual override for the outside lights${lg.online ? '' : ' — but first it’s worth checking your fuse board, because the lighting controller isn’t responding'}. If you have the Lighthouse lighting switch, flick it to override and they’ll come on.”</div>
    <div class="chips"><button class="chip" onclick="flowStep({r:'ok'})">Caller sorted it with the override</button><button class="chip" onclick="flowStep({r:'cap'})">Still not working — capture &amp; escalate</button></div>`;
         }
@@ -376,6 +424,12 @@ const FLOWR = {
         if (f.stage === 0) {
             doneLine('Live read: extractor fans ' + (fan ? (fan.online ? 'controller online' : 'controller NOT responding') : 'not on Lighthouse here'));
             if (!fan) return '<div class="alert info">Extractor fans at this site aren’t on Lighthouse.</div>' + otherShortcut();
+            const fanSwitch = canSwitch(fan)
+                ? `<div class="zoneread"><span style="font-size:20px">🌀</span><div><div><b>${esc(fan.zone)}</b> — ${fan.telemetry?.switch_1 ? 'currently ON' : 'currently OFF'}</div><div class="small">${esc(fan.deviceId)}</div></div>${switchButtons(fan, 'fan-switch')}<span class="tag ${fan.telemetry?.switch_1 ? 'green' : 'grey'}">${fan.telemetry?.switch_1 ? 'on' : 'off'}</span></div>`
+                : '';
+            if (canSwitch(fan)) return fanSwitch + `<div class="alert info">This fan circuit can be switched on/off directly above — the change only counts once the device confirms. If the caller needs a schedule change instead, capture it below.</div>
+   <div class="formrow"><label>Capture a schedule/time request (optional)</label><input id="fannote" data-testid="fan-note" placeholder="e.g. fans on until 1am for deep clean"></div>
+   <div class="chips"><button class="chip" onclick="flowStep({note:document.getElementById('fannote').value||'(not specified)'})">Capture &amp; escalate</button></div>`;
             return `<div class="alert info">Fan control isn’t available remotely yet (on the priority list with our platform team). Capture the request — include the times the caller needs.</div>
    <div class="formrow"><label>What does the caller need? (times, which fans)</label><input id="fannote" data-testid="fan-note" placeholder="e.g. fans on until 1am for deep clean"></div>
    <div class="chips"><button class="chip" onclick="flowStep({note:document.getElementById('fannote').value||'(not specified)'})">Capture &amp; escalate</button></div>`;

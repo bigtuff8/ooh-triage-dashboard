@@ -100,6 +100,16 @@
         { "deviceId": "TUYA-K1-6759", "zone": "Kitchen — all circuits", "deviceType": "tuya", "kind": "kitchen", "online": true, "telemetry": { "switch_1": false }, "schedule": "07:00–22:00" },
         { "deviceId": "GW-6759", "zone": "Lighthouse gateway", "deviceType": "gateway", "kind": "gateway", "online": true }
       ]
+    },
+    {
+      "siteNo": "6901", "siteName": "Control Bench", "brand": "Greene King · Farmhouse Inns", "address": "(control-plane test fixtures)", "callsLast30Days": 0,
+      "devices": [
+        { "deviceId": "TUYA-SW-6901", "zone": "Kitchen — fryers", "deviceType": "tuya", "kind": "kitchen", "online": true, "telemetry": { "switch_1": false }, "schedule": "07:00–22:00" },
+        { "deviceId": "TUYA-ALREADY-6901", "zone": "Kitchen — grills", "deviceType": "tuya", "kind": "kitchen", "online": true, "telemetry": { "switch_1": true }, "_demo": "already" },
+        { "deviceId": "TUYA-DUP-6901", "zone": "Kitchen — pot wash", "deviceType": "tuya", "kind": "kitchen", "online": true, "telemetry": { "switch_1": false }, "_demo": "duplicate" },
+        { "deviceId": "TUYA-UNREG-6901", "zone": "Kitchen — glasswash", "deviceType": "tuya", "kind": "kitchen", "online": true, "telemetry": { "switch_1": false }, "_demo": "unregistered" },
+        { "deviceId": "GW-6901", "zone": "Lighthouse gateway", "deviceType": "gateway", "kind": "gateway", "online": true }
+      ]
     }
   ]
 }

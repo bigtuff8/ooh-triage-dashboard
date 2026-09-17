@@ -126,12 +126,19 @@ function hasHotWaterSignal(site) {
     return site.devices.some(d => d.hotWaterCapable || d.telemetry?.hotWater != null);
 }
 
+// D10: kitchen/lighting/fan flip from hard-'mon' to capability-driven 'ctl' when a device of that
+// kind actually exposes the `switch` command (Tuya single-gang). Presence-driven — the tile lights
+// up to controllable with NO code change once a switch-capable device appears in live inventory,
+// and honestly stays 'mon' where the kind is present but not switchable (e.g. tb-rulechain fans).
+const switchControllable = (s, kind) => s.devices.some(d =>
+    d.kind === kind && (registry.capabilitiesFor(d.deviceType)?.commands || []).includes('switch'));
+
 export const SCOPE_GROUPS = [
     { key: 'heating', label: 'Heating', level: s => s.devices.some(d => d.kind === 'heating' && d.deviceType !== 'boiler-panel') ? 'ctl' : s.devices.some(d => d.kind === 'heating') ? 'mon' : 'none' },
     { key: 'hotwater', label: 'Hot water', level: s => hasControllableDhw(s) ? 'ctl' : hasHotWaterSignal(s) ? 'mon' : 'none' },
-    { key: 'kitchen', label: 'Kitchen equipment', level: s => s.devices.some(d => d.kind === 'kitchen') ? 'mon' : 'none' },
-    { key: 'lighting', label: 'External lighting', level: s => s.devices.some(d => d.kind === 'lighting') ? 'mon' : 'none' },
-    { key: 'fan', label: 'Extractor fans', level: s => s.devices.some(d => d.kind === 'fan') ? 'mon' : 'none' },
+    { key: 'kitchen', label: 'Kitchen equipment', level: s => switchControllable(s, 'kitchen') ? 'ctl' : s.devices.some(d => d.kind === 'kitchen') ? 'mon' : 'none' },
+    { key: 'lighting', label: 'External lighting', level: s => switchControllable(s, 'lighting') ? 'ctl' : s.devices.some(d => d.kind === 'lighting') ? 'mon' : 'none' },
+    { key: 'fan', label: 'Extractor fans', level: s => switchControllable(s, 'fan') ? 'ctl' : s.devices.some(d => d.kind === 'fan') ? 'mon' : 'none' },
     { key: 'electrics', label: 'Internal lighting / sockets', level: () => 'none' },
     { key: 'boiler', label: 'Boiler internals / PCB', level: () => 'none' }
 ];
@@ -145,6 +152,11 @@ async function workspacePayload(site) {
         devices: site.devices.map(d => ({
             ...stripDemo(d),
             capabilities: registry.capabilitiesFor(d.deviceType)?.commands || [],
+            // D9: registration is derived — fixture devices are registered unless flagged
+            // `_demo:'unregistered'`; live inventory sets it from published-state (§3.3). The flows
+            // gate the Turn ON/OFF affordance on it; the dispatch-time hasPublishedState is the
+            // authoritative re-assert.
+            registered: d._demo !== 'unregistered',
             setpointWindow: typeof d.telemetry?.heatingSetpoint === 'number' ? registry.setpointWindow(d.deviceType, d.telemetry.heatingSetpoint) : null
         })),
         scope: SCOPE_GROUPS.map(g => ({ key: g.key, label: g.label, level: g.level(site) })),

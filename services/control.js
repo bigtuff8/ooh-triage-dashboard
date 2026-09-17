@@ -20,6 +20,7 @@ import * as registry from './registry.js';
 import * as killswitch from './killswitch.js';
 import * as resolution from './resolution.js';
 import * as tb from './tb-client.js';
+import * as confirm from './confirm.js';
 import * as audit from './audit.js';
 import { scheduleOverride } from './overrides.js';
 import { addLateSyncNote, createLateSyncTicket } from './zendesk.js';
@@ -32,6 +33,7 @@ function friendlyTime(iso) {
 
 const COMMAND_ACTION_TYPE = {
     setpoint: v => `setpoint-${v.direction || 'change'}`,
+    switch: v => `switch-${v.value ? 'on' : 'off'}`,
     frost: () => 'heating-off-frost',
     mode: () => 'heating-off-mode',
     hwboost: () => 'hw-boost'
@@ -75,19 +77,52 @@ export async function dispatch({ operator, confirmToken, siteNo, deviceId, comma
     if (!device) throw Object.assign(new Error('Device not found at this site'), { status: 404 });
     if (!device.online) throw Object.assign(new Error('Device is offline — no command can reach it'), { status: 409 });
 
+    // D9 — registration gate (Spencer §3 rule 2). TB silently drops commands for a device it hasn't
+    // claimed via a first state publish; assert ≥1 published timeseries key before dispatching so the
+    // handler is never told a change was sent when the bridge would swallow it. A failing device is
+    // capture-only. Inserted after the online check, before validation/write.
+    if (!await tb.hasPublishedState(device)) {
+        throw Object.assign(new Error('Device has not registered with the platform yet (no state published) — it cannot accept remote commands. Capture and escalate.'), { status: 409, registration: true });
+    }
+
     // 4. F009 guardrails
     const check = registry.validateCommand(device, command, value);
     if (!check.ok) throw Object.assign(new Error(check.reason), { status: 422, guardrail: true });
 
-    const previousValue = check.attribute === 'setpointDesired' ? device.telemetry?.heatingSetpoint
+    const previousValue = check.attribute === 'switchDesired' ? device.telemetry?.switch_1
+        : check.attribute === 'setpointDesired' ? device.telemetry?.heatingSetpoint
         : check.attribute === 'modeDesired' ? device.telemetry?.mode
         : device.telemetry?.hwBoostHours ?? 0;
 
-    // 5. dispatch
+    // D3 #2 — pre-dispatch edge classification. The bridge is edge-triggered: re-writing the same
+    // desired dispatches nothing. Classify BEFORE any write so an already-satisfied request is an
+    // honest no-op success (no write) and a duplicate-pending one surfaces "identical change in
+    // flight" rather than a silent do-nothing that the handler mistakes for a fresh dispatch.
+    const edge = await confirm.classifyPreDispatch(tb, device, check.attribute, check.value);
+    const dispatchTs = Date.now();
+
+    if (edge.outcome === 'already-satisfied') {
+        // No write. Success-equivalent: the device is already confirmed at the requested value.
+        return await recordNoWriteOutcome({
+            device, site, operator, command, direction, hold, check, previousValue,
+            state: 'already-set',
+            detail: `${check.attribute} already at ${check.value} (device already confirmed) — no change dispatched`
+        });
+    }
+    if (edge.outcome === 'duplicate-pending') {
+        // No write — an identical change is in flight / never confirmed; a re-send won't move the
+        // edge-triggered bridge. Surface it so the handler waits/escalates rather than re-issuing.
+        throw Object.assign(
+            new Error('An identical change is already in flight and has not confirmed yet — re-sending won’t move it. Keep waiting or escalate.'),
+            { status: 409, duplicatePending: true }
+        );
+    }
+
+    // 5. dispatch (edge.outcome === 'dispatch')
     await tb.writeSharedAttribute(device, check.attribute, check.value);
 
     const actionId = randomUUID();
-    const actionType = COMMAND_ACTION_TYPE[command]({ direction });
+    const actionType = COMMAND_ACTION_TYPE[command]({ direction, value: check.value });
     const auditEntry = await audit.logAction({
         actionType,
         operator,
@@ -117,6 +152,7 @@ export async function dispatch({ operator, confirmToken, siteNo, deviceId, comma
         hold: hold || null,           // { revertAt: ISO string, label }
         state: 'pending',
         dispatchedAt: new Date().toISOString(),
+        dispatchTs,                   // D3 #3 fresh-echo guard: a settle requires syncTs > dispatchTs
         deadline: Date.now() + config.control.syncTimeoutMs,
         watchUntil: Date.now() + config.control.lateSyncWatchMs,
         settledAt: null,
@@ -127,6 +163,62 @@ export async function dispatch({ operator, confirmToken, siteNo, deviceId, comma
     };
     actions.set(actionId, action);
     ensurePolling();
+    return publicAction(action);
+}
+
+/**
+ * Records an edge no-op outcome (already-satisfied) — no device write happened, but the requested
+ * state is already confirmed on the device, so this is an honest success-equivalent. Audited as
+ * 'already-set' and returned as a terminal action the frontend treats like synced (no polling).
+ */
+async function recordNoWriteOutcome({ device, site, operator, command, direction, hold, check, previousValue, state, detail }) {
+    const actionId = randomUUID();
+    const actionType = COMMAND_ACTION_TYPE[command]({ direction, value: check.value });
+    const auditEntry = await audit.logAction({
+        actionType,
+        operator,
+        siteNo: site.siteNo,
+        siteName: site.siteName,
+        deviceId: device.deviceId,
+        zone: device.zone,
+        detail,
+        outcome: 'already-set',
+        controlActionId: actionId
+    });
+    const action = {
+        actionId,
+        operator: { id: operator.id, name: operator.name, email: operator.email },
+        siteNo: site.siteNo,
+        siteName: site.siteName,
+        deviceId: device.deviceId,
+        zone: device.zone,
+        deviceType: device.deviceType,
+        slowEchoDevice: !!registry.capabilitiesFor(device.deviceType)?.slowEcho,
+        command,
+        actionType,
+        attribute: check.attribute,
+        value: check.value,
+        previousValue,
+        hold: hold || null,
+        state,                          // 'already-set' — terminal, no write, no poll
+        dispatchedAt: new Date().toISOString(),
+        dispatchTs: Date.now(),
+        deadline: Date.now(),
+        watchUntil: Date.now(),
+        settledAt: new Date().toISOString(),
+        reported: check.value,
+        auditId: auditEntry.id,
+        ticketId: null,
+        overrideId: null,
+        _device: device
+    };
+    // A hold on an already-satisfied change still needs to be scheduled (the value is right NOW but
+    // the operator asked to hold it past the next schedule slot).
+    if (action.hold?.revertAt) {
+        try { action.overrideId = await scheduleOverride(action); }
+        catch (err) { console.error(`[CONTROL] Failed to persist hold for already-set ${actionId}: ${err.message}`); }
+    }
+    recordControlEvent('already-set');
     return publicAction(action);
 }
 
@@ -183,8 +275,12 @@ async function pollAll() {
 }
 
 async function pollOne(a) {
-    const { sync, reported } = await tb.readControlState(a._device, a.attribute);
-    const settled = sync === 'synced' && String(reported) === String(a.value);
+    const state = await tb.readControlState(a._device, a.attribute);
+    const { sync, reported } = state;
+    // D3 #3 — a settle requires a FRESH echo (syncTs > dispatchTs). This defeats the stale-synced
+    // trap: a silently-ignored value never lands a fresh 'synced' of the requested value, so the
+    // action times out honestly instead of latching onto a leftover 'synced' from a prior command.
+    const settled = confirm.isSettled(state, a.value, a.dispatchTs);
 
     if (settled) {
         const wasTimeout = a.state === 'timeout';
@@ -222,7 +318,9 @@ async function pollOne(a) {
         return;
     }
 
-    if (sync === 'failed' || sync === 'rejected') {
+    // failed/rejected only count when FRESH (belong to this dispatch) — a stale terminal echo from a
+    // previous command must not fail a brand-new dispatch (same syncTs>dispatchTs freshness gate).
+    if (confirm.isFreshTerminal(state, a.dispatchTs)) {
         a.state = sync;
         a.settledAt = new Date().toISOString();
         await audit.updateOutcome(a.auditId, sync);

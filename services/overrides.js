@@ -17,6 +17,7 @@ import { randomUUID, createHash } from 'crypto';
 import { hostname } from 'os';
 import { collection, ConcurrencyError } from './store.js';
 import * as tb from './tb-client.js';
+import * as confirm from './confirm.js';
 import * as bridge from './bridge.js';
 import * as killswitch from './killswitch.js';
 import * as audit from './audit.js';
@@ -161,16 +162,28 @@ async function revert(col, doc) {
         const device = await bridge.getDevice(doc.siteNo, doc.deviceId) || {
             deviceId: doc.deviceId, deviceType: doc.deviceType, telemetry: {}
         };
-        await tb.writeSharedAttribute(device, doc.attribute, doc.revertValue);
 
-        // Confirm the revert echoed back before declaring it done
-        const deadline = Date.now() + REVERT_CONFIRM_TIMEOUT_MS;
-        let confirmed = false;
-        while (Date.now() < deadline) {
-            await new Promise(r => setTimeout(r, 3000));
-            const { sync, reported } = await tb.readControlState(device, doc.attribute);
-            if (sync === 'synced' && String(reported) === String(doc.revertValue)) { confirmed = true; break; }
-            if (sync === 'failed' || sync === 'rejected') break;
+        // Edge-safe revert (D3 §3.7): the device may already be at revertValue (its own schedule
+        // reclaimed the slot). Re-writing the same desired dispatches NOTHING on the edge-triggered
+        // bridge, so the confirm poll would never see a FRESH echo and we'd raise a FALSE
+        // revert-failed. Classify first: already-satisfied → truthfully 'reverted', no write, no alert.
+        const edge = await confirm.classifyPreDispatch(tb, device, doc.attribute, doc.revertValue);
+        let confirmed;
+        if (edge.outcome === 'already-satisfied') {
+            confirmed = true; // already at the revert value and confirmed — honestly reverted
+        } else {
+            const dispatchTs = Date.now();
+            await tb.writeSharedAttribute(device, doc.attribute, doc.revertValue);
+
+            // Confirm the revert echoed back FRESH (syncTs > dispatchTs) before declaring it done.
+            const deadline = Date.now() + REVERT_CONFIRM_TIMEOUT_MS;
+            confirmed = false;
+            while (Date.now() < deadline) {
+                await new Promise(r => setTimeout(r, 3000));
+                const state = await tb.readControlState(device, doc.attribute);
+                if (confirm.isSettled(state, doc.revertValue, dispatchTs)) { confirmed = true; break; }
+                if (confirm.isFreshTerminal(state, dispatchTs)) break;
+            }
         }
 
         doc.status = confirmed ? 'reverted' : 'revert-failed';
