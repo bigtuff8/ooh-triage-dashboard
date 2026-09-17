@@ -98,6 +98,19 @@ function tbSession(username, password, label) {
 const readSession = tbSession(config.thingsboard.readUsername, config.thingsboard.readPassword, 'read');
 const writeSession = tbSession(config.thingsboard.writeUsername, config.thingsboard.writePassword, 'write/SR-3');
 
+/**
+ * Thin read-plane request wrapper (read plane / D5). Lets services/tb-device.js issue
+ * arbitrary read-only TB REST calls (device inventory `textSearch`, telemetry) over the
+ * SAME single read credential/session/JWT/health-probe used by the confirm reads — one
+ * credential, one probe, no second login. Read-only by contract: only GET/POST query
+ * endpoints are ever passed here; the write primitive stays writeSharedAttribute().
+ * No-op-unsafe in fixture mode by design — tb-device.js branches on config.dataMode and
+ * never calls this outside live mode (mirroring bridge.js's fixture/live split).
+ */
+export async function readRequest(method, path, data) {
+    return readSession.request(method, path, data);
+}
+
 const deviceUuidCache = new Map();
 
 async function tbDeviceUuid(deviceName) {

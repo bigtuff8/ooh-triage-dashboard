@@ -127,6 +127,60 @@ export async function resolveSiteName(siteNo) {
     }
 }
 
+/**
+ * Extracts the house number embedded in a site-field option (name or value). The number is
+ * the run of digits after the last `::`-segment brand prefix; falls back to the value's digits.
+ * Returns null when no bare number is present (alphanumeric farm keys carry no numeric siteNo).
+ */
+function siteNoFromOption(option) {
+    const raw = String(option?.name || '');
+    const seg = raw.includes('::') ? raw.split('::').pop().trim() : raw;
+    const m = seg.match(/(^|[^0-9])(\d{3,})([^0-9]|$)/);
+    return m ? m[2] : null;
+}
+
+/**
+ * Extracts the brand (the FIRST `::` segment of the option name), e.g.
+ * "Greene King::Chef & Brewer::6261 Wheatstone Inn (Gloucester)" → "Greene King". Null if absent.
+ */
+function brandFromOption(option) {
+    const raw = String(option?.name || '');
+    return raw.includes('::') ? raw.split('::')[0].trim() || null : null;
+}
+
+/**
+ * D8 — the pub-name search index source. Returns the cached Zendesk site directory as
+ * `[{ siteNo, siteName, brand }]` — the REVERSE of resolveSiteName (name-by-number), used by the
+ * TB-direct read service's searchSites() so pub-name search does NOT depend on a TB call (TB
+ * textSearch cannot satisfy pub-name search). Served from the same 1h-cached site-field options
+ * as tagging/name-resolution (no new external call). In fixture mode there is no live directory,
+ * so this returns [] and searchSites() falls back to live-inventory sites. NEVER throws — a
+ * Zendesk fault yields the last cache (or [])so search degrades rather than erroring.
+ */
+export async function siteDirectory() {
+    if (!live()) return [];
+    let options;
+    try {
+        options = await loadSiteOptions();
+    } catch (err) {
+        console.error(`[ZD] Site directory load failed: ${err.message}`);
+        return siteOptionsCache.options.length
+            ? siteOptionsCache.options.map(toDirectoryEntry).filter(Boolean)
+            : [];
+    }
+    return options.map(toDirectoryEntry).filter(Boolean);
+}
+
+function toDirectoryEntry(option) {
+    const siteNo = siteNoFromOption(option);
+    if (!siteNo) return null;
+    return {
+        siteNo,
+        siteName: humanNameFromOption(option, siteNo),
+        brand: brandFromOption(option)
+    };
+}
+
 /* ------------------------------------------------------------------ */
 /* Fixture ticket store (dev/tests only)                               */
 /* ------------------------------------------------------------------ */

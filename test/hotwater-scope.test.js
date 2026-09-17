@@ -27,14 +27,35 @@ import axios from 'axios';
 // them consult the write flag. Keep the test write-inert but importable.
 process.env.WRITES_DISABLED = 'false';
 process.env.DATA_MODE = 'live';
-process.env.BRIDGE_BASE_URL = 'http://integration-bridge.test.svc';
+process.env.TB_URL = 'https://tb.test';
+process.env.TB_USERNAME = 'svc-read';
+process.env.TB_PASSWORD = 'x';
 
-const rawDevices = JSON.parse(
-    readFileSync(new URL('../data/fixtures/bridge-api-devices.raw.json', import.meta.url), 'utf8')
+// MIGRATED to the TB-direct read: intercept the TB device/telemetry endpoints (not /api/devices),
+// and drive the scope surfaces off getSitesByNumber('6261'). The 6261 combi (salus-it500 + hotWater)
+// still exercises the presence-driven hot-water-scope behaviour the old test pinned.
+const tbFixture = JSON.parse(
+    readFileSync(new URL('../data/fixtures/tb-devices.raw.json', import.meta.url), 'utf8')
 );
-axios.defaults.adapter = async (cfg) => ({
-    data: rawDevices, status: 200, statusText: 'OK', headers: {}, config: cfg, request: {}
-});
+const allDevices = [...tbFixture.devices, ...tbFixture.site4741];
+const telemetryByUuid = new Map(allDevices.map(d => [d.id.id, d.telemetry || {}]));
+axios.defaults.adapter = (cfg) => {
+    const url = cfg.url || '';
+    const ok = data => ({ data, status: 200, statusText: 'OK', headers: {}, config: cfg, request: {} });
+    if (url.includes('/api/auth/login')) return Promise.resolve(ok({ token: 'test-jwt' }));
+    if (url.includes('/api/tenant/devices')) {
+        const m = url.match(/textSearch=([^&]+)/);
+        const q = m ? decodeURIComponent(m[1]).toLowerCase() : '';
+        const data = allDevices.filter(d => d.name.toLowerCase().includes(q));
+        return Promise.resolve(ok({ data, hasNext: false, totalElements: data.length }));
+    }
+    if (url.includes('/values/timeseries')) {
+        const um = url.match(/DEVICE\/([^/]+)\/values\/timeseries/);
+        const bag = telemetryByUuid.get(um ? um[1] : null) || {};
+        return Promise.resolve(ok(Object.fromEntries(Object.entries(bag).map(([k, v]) => [k, [{ ts: Date.now(), value: v }]]))));
+    }
+    return Promise.resolve(ok({}));
+};
 
 const bridge = await import('../services/bridge.js');
 const registry = await import('../services/registry.js');
@@ -92,8 +113,7 @@ function syntheticControllableDhw() {
 }
 
 test('server: live-shaped combi (salus-it500 + hotWater, no salus-it500-dhw) → hot-water level is mon (out-of-scope-with-context), NOT ctl', async () => {
-    const sites = await bridge.getSites();
-    const site = sites.find(s => s.siteNo === '6261');   // has the combi carrying hotWater:1
+    const [site] = await bridge.getSitesByNumber('6261');
     const scope = scopeOf(site);
     const hw = scope.find(g => g.key === 'hotwater');
     assert.equal(hw.level, 'mon', 'combi with hotWater signal but no controllable DHW device reads as mon');
@@ -101,8 +121,7 @@ test('server: live-shaped combi (salus-it500 + hotWater, no salus-it500-dhw) →
 });
 
 test('server: presence predicate is registry-driven, not a name-match on salus-it500-dhw', async () => {
-    const sites = await bridge.getSites();
-    const site = sites.find(s => s.siteNo === '6261');
+    const [site] = await bridge.getSitesByNumber('6261');
     // No live device exposes hwboost → not controllable.
     assert.equal(api.hasControllableDhw(site), false);
     // Inject a device NAMED salus-it500-dhw would be controllable ONLY because the
@@ -112,8 +131,7 @@ test('server: presence predicate is registry-driven, not a name-match on salus-i
 });
 
 test('server R7-ready flip (presence-driven, NO code change): synthetic controllable DHW device flips the tile to ctl', async () => {
-    const sites = await bridge.getSites();
-    const site = sites.find(s => s.siteNo === '6261');
+    const [site] = await bridge.getSitesByNumber('6261');
     assert.equal(scopeOf(site).find(g => g.key === 'hotwater').level, 'mon', 'baseline: out-of-scope-with-context');
     const flipped = { ...site, devices: [...site.devices, syntheticControllableDhw()] };
     assert.equal(scopeOf(flipped).find(g => g.key === 'hotwater').level, 'ctl',
@@ -121,8 +139,7 @@ test('server R7-ready flip (presence-driven, NO code change): synthetic controll
 });
 
 test('view: out-of-scope-with-context (mon) hot-water tile reads "monitored — not adjustable from here", not a bare "Not on Lighthouse here"', async () => {
-    const sites = await bridge.getSites();
-    const site = sites.find(s => s.siteNo === '6261');
+    const [site] = await bridge.getSitesByNumber('6261');
     const { ctx } = loadClient({ site: { siteName: site.siteName }, devices: workspaceDevices(site), scope: scopeOf(site) });
     const tag = ctx.scopeTag({ key: 'hotwater', label: 'Hot water', level: 'mon' });
     assert.match(tag, /not adjustable from here/i);
@@ -134,8 +151,7 @@ test('view: out-of-scope-with-context (mon) hot-water tile reads "monitored — 
 });
 
 test('flow: before-compose out-of-scope — HW complaint front-loads "not controllable here — capture and escalate" with NO compose affordance', async () => {
-    const sites = await bridge.getSites();
-    const site = sites.find(s => s.siteNo === '6261');   // live combi, no controllable DHW
+    const [site] = await bridge.getSitesByNumber('6261');
     const ws = { site: { siteName: site.siteName }, devices: workspaceDevices(site), scope: scopeOf(site) };
     const { ctx, state } = loadClient(ws);
     state.flow = { stage: 0, done: [], data: {} };
@@ -146,8 +162,7 @@ test('flow: before-compose out-of-scope — HW complaint front-loads "not contro
 });
 
 test('flow: compose chip never renders from live-shaped inventory, and no boost/openControl path is reachable', async () => {
-    const sites = await bridge.getSites();
-    const site = sites.find(s => s.siteNo === '6261');
+    const [site] = await bridge.getSitesByNumber('6261');
     const ws = { site: { siteName: site.siteName }, devices: workspaceDevices(site), scope: scopeOf(site) };
     const { ctx, state, opened } = loadClient(ws);
     state.flow = { stage: 0, done: [], data: {} };
@@ -160,8 +175,7 @@ test('flow: compose chip never renders from live-shaped inventory, and no boost/
 });
 
 test('flow: capture-and-escalate outcome logs a hot-water class ticket (OohCaptureClass:hot-water)', async () => {
-    const sites = await bridge.getSites();
-    const site = sites.find(s => s.siteNo === '6261');
+    const [site] = await bridge.getSitesByNumber('6261');
     const ws = { site: { siteName: site.siteName }, devices: workspaceDevices(site), scope: scopeOf(site) };
     const { ctx, state, captured } = loadClient(ws);
     state.flow = { stage: 1, done: [], data: { cap: 1 } };
@@ -172,8 +186,7 @@ test('flow: capture-and-escalate outcome logs a hot-water class ticket (OohCaptu
 });
 
 test('flow R7-ready flip (presence-driven, NO code change): a synthetic controllable DHW device makes the boost/compose chip reappear', async () => {
-    const sites = await bridge.getSites();
-    const site = sites.find(s => s.siteNo === '6261');
+    const [site] = await bridge.getSitesByNumber('6261');
     const flippedSite = { ...site, devices: [...site.devices, syntheticControllableDhw()] };
     const ws = { site: { siteName: site.siteName }, devices: workspaceDevices(flippedSite), scope: scopeOf(flippedSite) };
     const { ctx, state, opened } = loadClient(ws);
