@@ -13,6 +13,7 @@ import axios from 'axios';
 import { config } from '../config.js';
 
 const ATTRIBUTE_FAMILY = {
+    switchDesired: { reported: 'switchReported', sync: 'switchSyncStatus' },
     setpointDesired: { reported: 'setpointReported', sync: 'setpointSyncStatus' },
     modeDesired: { reported: 'modeReported', sync: 'modeSyncStatus' },
     hwBoostHoursDesired: { reported: 'hwBoostReported', sync: 'hwBoostSyncStatus' }
@@ -126,7 +127,7 @@ async function tbDeviceUuid(deviceName) {
 /* Fixture simulation                                                  */
 /* ------------------------------------------------------------------ */
 
-// deviceId → { attribute → { desired, reported, sync, settleAt, demo } }
+// deviceId → { attribute → { desired, desiredTs, reported, reportedTs, sync, syncTs, settleAt, demo } }
 const simState = new Map();
 
 function simFor(deviceId) {
@@ -134,31 +135,87 @@ function simFor(deviceId) {
     return simState.get(deviceId);
 }
 
+/**
+ * Edge-aware fixture write (mirrors Spencer §3 rule 1). Re-writing the SAME desired value does NOT
+ * re-arm a pending cycle — the edge-triggered bridge would dispatch nothing. Records desiredTs so
+ * the confirm/edge logic can compare freshness. `_demo` steers the settle outcome:
+ *   (none)         → settles 'synced' at the desired value after ~2.5s
+ *   'fail'         → settles 'failed' after ~2.5s
+ *   'slow'         → never settles (IT700 slow-echo timeout path)
+ *   'already'      → pre-seeds a fresh synced echo AT the first written value (already-satisfied)
+ *   'duplicate'    → stays 'pending' forever after the first write (duplicate-pending on re-write)
+ *   'rejected'     → settles 'rejected' after ~2.5s
+ *   'stale-synced' → settles 'synced' but at the PREVIOUS reported value (never the new one) with a
+ *                    STALE syncTs — the silently-ignored-value trap; the fresh-echo guard must
+ *                    reject it so the action times out honestly.
+ */
 function simWrite(device, attribute, value) {
     const s = simFor(device.deviceId);
     const demo = device._demo || null;
+    const prev = s[attribute];
+    const now = Date.now();
+
+    // Edge-triggered: an identical desired re-write dispatches nothing — leave the existing cycle
+    // (and its timestamps) untouched so the confirm loop still sees the in-flight/settled state.
+    if (prev && String(prev.desired) === String(value)) return;
+
+    if (demo === 'stale-synced') {
+        // The write is accepted but the device reports a STALE synced echo of the OLD value with an
+        // old syncTs — modelling a silently-ignored command. Never a fresh echo of `value`.
+        s[attribute] = {
+            desired: value, desiredTs: now,
+            reported: prev?.reported ?? 'stale', reportedTs: (prev?.reportedTs ?? now - 60000),
+            sync: 'synced', syncTs: (prev?.syncTs ?? now - 60000),
+            settleAt: Infinity, demo
+        };
+        return;
+    }
+
     s[attribute] = {
-        desired: value,
-        reported: null,
-        sync: 'pending',
-        // normal: settles synced after ~2.5s; fail: settles failed; slow: never settles (IT700 timeout path)
-        settleAt: demo === 'slow' ? Infinity : Date.now() + 2500,
+        desired: value, desiredTs: now,
+        reported: null, reportedTs: null,
+        sync: 'pending', syncTs: null,
+        settleAt: (demo === 'slow' || demo === 'duplicate') ? Infinity : now + 2500,
         demo
     };
+
+    // 'already' pre-settles a fresh synced echo immediately so classifyPreDispatch reads
+    // already-satisfied on a repeat write of the same value (see simReadDesired seeding below).
+    if (demo === 'already') {
+        s[attribute] = { ...s[attribute], reported: value, reportedTs: now, sync: 'synced', syncTs: now, settleAt: now };
+    }
+}
+
+/**
+ * Reads the desired (SHARED_SCOPE) attribute for the edge compare. In fixture mode the desired is
+ * whatever was last written (undefined if never written).
+ */
+function simReadDesired(deviceId, attribute) {
+    const s = simFor(deviceId)[attribute];
+    if (!s) return { desired: undefined, desiredTs: null };
+    return { desired: s.desired, desiredTs: s.desiredTs ?? null };
 }
 
 function simRead(deviceId, attribute) {
     const s = simFor(deviceId)[attribute];
-    if (!s) return { sync: null, reported: null };
+    if (!s) return { sync: null, syncTs: null, reported: null, reportedTs: null };
     if (s.sync === 'pending' && Date.now() >= s.settleAt) {
-        if (s.demo === 'fail') {
-            s.sync = 'failed';
-        } else {
-            s.sync = 'synced';
-            s.reported = s.desired;
-        }
+        const now = Date.now();
+        if (s.demo === 'fail') { s.sync = 'failed'; s.syncTs = now; }
+        else if (s.demo === 'rejected') { s.sync = 'rejected'; s.syncTs = now; }
+        else { s.sync = 'synced'; s.syncTs = now; s.reported = s.desired; s.reportedTs = now; }
     }
-    return { sync: s.sync, reported: s.reported };
+    return { sync: s.sync, syncTs: s.syncTs ?? null, reported: s.reported, reportedTs: s.reportedTs ?? null };
+}
+
+/**
+ * Registration gate in fixture mode (Spencer §3 rule 2). Fixture devices are considered REGISTERED
+ * by default (they carry live telemetry in the fixture inventory) — the gate only fails for a device
+ * explicitly flagged `_demo: 'unregistered'`, so the never-reported drop path stays exercisable
+ * without breaking every happy-path dispatch.
+ */
+function simHasPublished(device) {
+    return device?._demo !== 'unregistered';
 }
 
 /* ------------------------------------------------------------------ */
@@ -174,22 +231,68 @@ export async function writeSharedAttribute(device, attribute, value) {
         simWrite(device, attribute, value);
         return;
     }
+    // D6 — WRITES_DISABLED primitive guard. Belt-and-braces to the killswitch caller-guards: even if
+    // a caller reaches the LIVE write path with the deploy-time lock engaged, the write is refused
+    // here (423 Locked) BEFORE any TB POST fires. Fixture writes are unaffected (the branch above).
+    if (config.writesDisabled) throw Object.assign(new Error('Device writes are disabled at deploy time (WRITES_DISABLED)'), { status: 423 });
     const uuid = await tbDeviceUuid(device.deviceId);
     await writeSession.request('POST', `/api/plugins/telemetry/DEVICE/${uuid}/attributes/SHARED_SCOPE`, { [attribute]: value });
 }
 
 /**
- * Reads the write-back state for a control attribute:
- * { sync: 'pending'|'synced'|'failed'|'rejected'|null, reported }
+ * Reads the write-back state for a control attribute from TELEMETRY (D3 #1 — the *Reported /
+ * *SyncStatus keys are TELEMETRY, not attributes; the old /values/attributes read never saw them so
+ * every live command timed out). Parses the TB timeseries shape `{ key: [{ ts, value }] }` and
+ * returns the freshest sample plus its timestamp: { sync, syncTs, reported, reportedTs }.
  */
 export async function readControlState(device, attribute) {
     const fam = ATTRIBUTE_FAMILY[attribute];
     if (config.dataMode === 'fixture') return simRead(device.deviceId, attribute);
     const uuid = await tbDeviceUuid(device.deviceId);
     const keys = `${fam.sync},${fam.reported}`;
-    const attrs = await readSession.request('GET', `/api/plugins/telemetry/DEVICE/${uuid}/values/attributes?keys=${encodeURIComponent(keys)}`);
-    const map = Object.fromEntries((attrs || []).map(a => [a.key, a.value]));
-    return { sync: map[fam.sync] ?? null, reported: map[fam.reported] ?? null };
+    const ts = await readSession.request('GET', `/api/plugins/telemetry/DEVICE/${uuid}/values/timeseries?keys=${encodeURIComponent(keys)}`);
+    const latest = (key) => {
+        const series = ts?.[key];
+        return Array.isArray(series) && series.length ? series[0] : null;
+    };
+    const syncS = latest(fam.sync);
+    const repS = latest(fam.reported);
+    return {
+        sync: syncS ? syncS.value : null,
+        syncTs: syncS ? Number(syncS.ts) : null,
+        reported: repS ? repS.value : null,
+        reportedTs: repS ? Number(repS.ts) : null
+    };
+}
+
+/**
+ * Reads the current SHARED_SCOPE desired attribute for the pre-dispatch edge compare (D3 #2). The
+ * bridge is edge-triggered, so we must know the value already sitting in the desired slot before
+ * deciding whether a write would move anything. Returns { desired, desiredTs }.
+ */
+export async function readDesiredState(device, attribute) {
+    if (config.dataMode === 'fixture') return simReadDesired(device.deviceId, attribute);
+    const uuid = await tbDeviceUuid(device.deviceId);
+    const attrs = await readSession.request('GET', `/api/plugins/telemetry/DEVICE/${uuid}/values/attributes/SHARED_SCOPE?keys=${encodeURIComponent(attribute)}`);
+    const row = (attrs || []).find(a => a.key === attribute);
+    return { desired: row ? row.value : undefined, desiredTs: row ? Number(row.lastUpdateTs) : null };
+}
+
+/**
+ * Registration gate (D9 / Spencer §3 rule 2): TB only forwards commands for a device it has already
+ * claimed via a first state publish. A device with NO published timeseries has its command silently
+ * dropped — so we assert ≥1 published timeseries key before offering/dispatching control. Read-only.
+ */
+export async function hasPublishedState(device) {
+    if (config.dataMode === 'fixture') return simHasPublished(device);
+    const uuid = await tbDeviceUuid(device.deviceId);
+    const keys = await readSession.request('GET', `/api/plugins/telemetry/DEVICE/${uuid}/keys/timeseries`);
+    return Array.isArray(keys) && keys.length > 0;
+}
+
+/** TEST-ONLY seam — clears the fixture sim state so edge/settle tests don't leak across each other. */
+export function __resetSim() {
+    simState.clear();
 }
 
 /**

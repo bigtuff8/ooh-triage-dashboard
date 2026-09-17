@@ -81,7 +81,10 @@ let lastAuditSiteName = null;
 mock.module('../services/tb-client.js', {
     namedExports: {
         writeSharedAttribute: async () => { writeCount += 1; },
-        readControlState: async () => ({ sync: 'pending', reported: null }),
+        // Edge-aware confirm plane (D3): no current desired ⇒ dispatch; registration gate passes.
+        readDesiredState: async () => ({ desired: undefined, desiredTs: null }),
+        readControlState: async () => ({ sync: 'pending', syncTs: null, reported: null, reportedTs: null }),
+        hasPublishedState: async () => true,
         // tb-device.js resolves readRequest lazily on the live read path; delegate to axios so the
         // adapter above serves the TB device/telemetry responses (the real readSession is bypassed).
         readRequest: async (method, path, data) => (await axios({ method, url: `https://tb.test${path}`, data })).data,

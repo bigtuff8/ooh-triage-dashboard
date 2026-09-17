@@ -41,11 +41,18 @@ process.env.SYNC_POLL_INTERVAL_MS = '5';    // sweep fast so the test wait is sh
 // Controllable device sync, keyed by deviceId so two in-flight actions on different devices can be
 // steered independently (a shared global would leak one action's echo onto another). Default pending.
 let syncByDevice = {};
-function setSync(deviceId, result) { syncByDevice[deviceId] = result; }
+// setSync stamps a FRESH syncTs (now) so a 'synced'/'failed'/'rejected' echo passes the
+// syncTs>dispatchTs fresh-echo guard (D3 #3) — these actions dispatched at t0 with SYNC_TIMEOUT_MS=0,
+// so any echo we inject later is legitimately fresh. A default pending echo carries no syncTs.
+function setSync(deviceId, result) { syncByDevice[deviceId] = { syncTs: Date.now(), reportedTs: Date.now(), ...result }; }
 mock.module('../services/tb-client.js', {
     namedExports: {
         writeSharedAttribute: async () => {},
-        readControlState: async (device) => ({ ...(syncByDevice[device.deviceId] || { sync: 'pending', reported: null }) }),
+        // Edge-aware confirm plane (D3): no current desired ⇒ classifyPreDispatch → dispatch;
+        // registration gate passes. readControlState carries syncTs (timeseries shape).
+        readDesiredState: async () => ({ desired: undefined, desiredTs: null }),
+        readControlState: async (device) => ({ sync: 'pending', syncTs: null, reported: null, reportedTs: null, ...(syncByDevice[device.deviceId] || {}) }),
+        hasPublishedState: async () => true,
         tbStatus: () => ({ mode: 'fixture', read: true, write: true })
     }
 });

@@ -33,7 +33,12 @@ let writeCount = 0;
 mock.module('../services/tb-client.js', {
     namedExports: {
         writeSharedAttribute: async () => { writeCount += 1; },
-        readControlState: async () => ({ sync: 'pending', reported: null }),
+        // Edge-aware confirm plane (D3): no current desired ⇒ classifyPreDispatch → 'dispatch', so
+        // the single-use property under test is exercised on the real write path. Registration gate
+        // (D9) passes. readControlState carries syncTs (timeseries shape) but stays pending here.
+        readDesiredState: async () => ({ desired: undefined, desiredTs: null }),
+        readControlState: async () => ({ sync: 'pending', syncTs: null, reported: null, reportedTs: null }),
+        hasPublishedState: async () => true,
         tbStatus: () => ({ mode: 'fixture', read: true, write: true })
     }
 });

@@ -31,13 +31,20 @@ const REGISTRY = {
     },
     'intesis': {
         label: 'Intesis',
-        commands: ['setpoint', 'mode'],
-        deviceRange: { min: 16, max: 30 },
-        modes: ['Off', 'Heat', 'Cool', 'Auto', 'Fan'],
+        // v1: setpoint only. `mode` is DROPPED so validateCommand rejects modeDesired everywhere
+        // (D10 safety fix) — mode/on-off is HELD until Intesis modeSyncStatus is proven on a
+        // mode-capable unit and the confirm copy is softened (open item O-2). Re-enabling = add
+        // 'mode' back here.
+        commands: ['setpoint'],
+        deviceRange: { min: 16, max: 32 }, // SD-492 corrected range (was 16–30)
+        // Vocabulary kept lowercase end-to-end (D10) so no path can emit a capitalised 'Off' — the
+        // bridge treats any non-'off' mode as ON, so a stray 'Off' could switch an AC ON. Retained
+        // (unused while mode is held) as the canonical lowercase set for when mode ships.
+        modes: ['off', 'heat', 'cool', 'auto', 'fan'],
         stepC: 0.5
     },
-    // No remote command path — capture & escalate only (SD-515 / SR-4)
-    'tuya': { label: 'Tuya (PowerPause/kitchen)', commands: [] },
+    // Tuya single-gang switch (v1 NEW, D10). Single relay only (D7) — switch_2 is not addressable.
+    'tuya': { label: 'Tuya (PowerPause/kitchen)', commands: ['switch'] },
     'boiler-panel': { label: 'Pub boiler panel', commands: [] },
     'tb-rulechain': { label: 'TB rule-chain (lighting/fans)', commands: [] },
     'gateway': { label: 'Lighthouse gateway', commands: [] }
@@ -89,10 +96,21 @@ export function validateCommand(device, command, value) {
             if (!entry.commands.includes('frost')) return { ok: false, reason: `${entry.label} does not support a frost-hold` };
             return { ok: true, attribute: 'setpointDesired', value: entry.frostSetpoint };
         }
+        case 'switch': {
+            // Tuya single-gang on/off (v1 NEW, D10). STRICT boolean only — no truthy coercion, no
+            // per-gang key (switch_2 is not addressable, D7). A non-boolean is rejected here so the
+            // guardrail is the primary guard, not the bridge.
+            if (!entry.commands.includes('switch')) return { ok: false, reason: `${entry.label} does not support remote on/off switching` };
+            if (typeof value !== 'boolean') return { ok: false, reason: 'Switch value must be true (on) or false (off)' };
+            return { ok: true, attribute: 'switchDesired', value };
+        }
         case 'mode': {
-            if (!entry.commands.includes('mode')) return { ok: false, reason: `${entry.label} does not support mode changes (Intesis only)` };
-            if (!entry.modes.includes(value)) return { ok: false, reason: `Mode "${value}" is not one of ${entry.modes.join('/')}` };
-            return { ok: true, attribute: 'modeDesired', value };
+            // HELD in v1 (D10): no deviceType carries 'mode', so this rejects everywhere. The lowercase
+            // vocabulary check is kept defensively so a re-enable can never admit a capitalised value.
+            if (!entry.commands.includes('mode')) return { ok: false, reason: `${entry.label} does not support mode changes` };
+            const lower = String(value).toLowerCase();
+            if (!entry.modes.includes(lower)) return { ok: false, reason: `Mode "${value}" is not one of ${entry.modes.join('/')}` };
+            return { ok: true, attribute: 'modeDesired', value: lower };
         }
         case 'hwboost': {
             if (!entry.commands.includes('hwboost')) return { ok: false, reason: `${entry.label} is not a boostable hot-water device` };

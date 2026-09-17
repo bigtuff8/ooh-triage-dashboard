@@ -45,8 +45,8 @@ function clearCtlMidWait() {
     if (window.ctl) window.ctl.midWait = false;
 }
 
-const CTL_TITLES = { up: 'Raise setpoint', down: 'Lower setpoint', frost: 'Turn heating off (frost-hold)', modeoff: 'Turn off (mode)', boost: 'Hot-water boost' };
-const CTL_WHAT = { up: 'Setpoint raise', down: 'Setpoint lower', frost: 'Heating off (frost-hold)', modeoff: 'Heating off (mode)', boost: 'HW boost' };
+const CTL_TITLES = { up: 'Raise setpoint', down: 'Lower setpoint', frost: 'Turn heating off (frost-hold)', modeoff: 'Turn off (mode)', switchon: 'Turn ON', switchoff: 'Turn OFF', boost: 'Hot-water boost' };
+const CTL_WHAT = { up: 'Setpoint raise', down: 'Setpoint lower', frost: 'Heating off (frost-hold)', modeoff: 'Heating off (mode)', switchon: 'Switch ON', switchoff: 'Switch OFF', boost: 'HW boost' };
 
 function openControl(device, mode) {
     const blocked = writesDisabled(state.siteNo);
@@ -61,7 +61,13 @@ function openControl(device, mode) {
     const c = window.ctl;
     if (mode === 'up' || mode === 'down') c.val = (t.heatingSetpoint ?? 20) + (mode === 'up' ? 1 : -1) * (device.setpointWindow?.step ?? 0.5) * 2;
     if (mode === 'frost') c.val = 5;
-    if (mode === 'modeoff') c.val = 'Off';
+    // D10 SAFETY: mode vocabulary is lowercase end-to-end — the bridge treats any non-'off' mode as
+    // ON, so a capitalised 'Off' could switch an AC ON. (modeoff itself is HELD in v1 and no longer
+    // reachable — the Intesis off flow redirects to capture-and-escalate — but keep it safe if wired.)
+    if (mode === 'modeoff') c.val = 'off';
+    // switchon/switchoff carry a strict boolean value (Tuya single-gang, D10). Plain confirm, no stepper.
+    if (mode === 'switchon') c.val = true;
+    if (mode === 'switchoff') c.val = false;
     if (mode === 'boost') c.val = 2;
     c.hold = (mode === 'frost') ? '07:00' : 'none';
     clampCtlVal();
@@ -110,7 +116,11 @@ function ctlStep(dx) {
 }
 
 function ctlValTxt(c = window.ctl) {
-    return c.mode === 'boost' ? c.val + 'h boost' : c.mode === 'modeoff' ? 'Mode Off' : c.val + '°C';
+    if (c.mode === 'boost') return c.val + 'h boost';
+    if (c.mode === 'modeoff') return 'Mode Off';
+    if (c.mode === 'switchon') return 'ON';
+    if (c.mode === 'switchoff') return 'OFF';
+    return c.val + '°C';
 }
 
 /**
@@ -147,6 +157,7 @@ function drawControl() {
         }
         if (c.mode === 'frost') body = `<div style="text-align:center;margin:10px 0"><span class="val" style="font-size:34px;font-weight:700">5°C frost-hold</span></div><p class="guard">Heating stays off unless the building risks freezing.</p>${holdPicker()}`;
         if (c.mode === 'modeoff') body = `<div style="text-align:center;margin:10px 0"><span class="val" style="font-size:34px;font-weight:700">Mode → Off</span></div><p class="guard">Intesis native Off. Current mode: ${esc(d.telemetry?.mode || '—')}.</p>${holdPicker()}`;
+        if (c.mode === 'switchon' || c.mode === 'switchoff') body = `<div style="text-align:center;margin:10px 0"><span class="val" style="font-size:34px;font-weight:700">Switch → ${c.mode === 'switchon' ? 'ON' : 'OFF'}</span></div><p class="guard" data-testid="switch-guard">This turns the <b>${esc(d.zone)}</b> circuit ${c.mode === 'switchon' ? 'ON' : 'OFF'} (single relay). Applied only when the device confirms.</p>`;
         if (c.mode === 'boost') body = `<div class="stepper"><button data-testid="stepper-down" onclick="ctlStep(-1)" ${c.val <= 1 ? 'disabled' : ''}>−</button><span class="val" data-testid="stepper-value">${c.val}h</span><button data-testid="stepper-up" onclick="ctlStep(1)" ${c.val >= 9 ? 'disabled' : ''}>+</button></div><p class="guard">Hot-water boost 1–9 hours (device-native timer — reverts by itself).</p>`;
         openModal(`<div class="mh">${CTL_TITLES[c.mode]}<button class="btn link" onclick="ctlCancel()">✕</button></div><div class="mb">
    <div class="target" data-testid="control-target">${ctlTargetBlock(ws.site, d)}</div>
@@ -191,19 +202,33 @@ async function ctlSend() {
     c.error = null;
     c.phase = 'sent';
     drawControl();
-    const command = { up: 'setpoint', down: 'setpoint', frost: 'frost', modeoff: 'mode', boost: 'hwboost' }[c.mode];
+    const command = { up: 'setpoint', down: 'setpoint', frost: 'frost', modeoff: 'mode', switchon: 'switch', switchoff: 'switch', boost: 'hwboost' }[c.mode];
     const hold = c.hold !== 'none' ? { revertAt: holdRevertAt(c.hold).toISOString(), label: c.hold === '4h' ? 'For 4 hours' : 'Until 07:00 tomorrow' } : null;
+    // D10 SAFETY: 'off' is lowercase (never 'Off'); switch carries a strict boolean.
+    const dispatchValue = c.mode === 'modeoff' ? 'off'
+        : c.mode === 'switchon' ? true
+        : c.mode === 'switchoff' ? false
+        : c.val;
     try {
         const { action } = await api.post('/api/control/dispatch', {
             confirmToken: state.confirmToken,
             siteNo: state.siteNo,
             deviceId: c.device.deviceId,
             command,
-            value: c.mode === 'modeoff' ? 'Off' : c.val,
+            value: dispatchValue,
             direction: c.mode === 'up' ? 'up' : c.mode === 'down' ? 'down' : undefined,
             hold
         });
         c.action = action;
+        // D3: an already-satisfied request is a terminal no-write success — the device is already at
+        // the requested value. Settle straight to 'done' (no polling, no mid-wait); the applied card
+        // is honest ("already confirmed"). Any other state enters the normal confirm/poll loop.
+        if (action.state === 'already-set') {
+            c.phase = 'done';
+            c.midWait = false;
+            drawControl();
+            return;
+        }
         c.phase = 'confirm';
         c.midWait = false;
         drawControl();
@@ -317,6 +342,8 @@ async function ctlFinish() {
         down: `Done — lowered to ${c.val} degrees and confirmed by the device.`,
         frost: `The heating’s now off on a frost-hold — it’ll only kick in if the building gets near freezing${holdTxt ? ', and normal service resumes at 7am' : ''}.`,
         modeoff: 'That’s the system switched off — confirmed by the unit itself.',
+        switchon: `That circuit is now switched ON — confirmed by the device.`,
+        switchoff: `That circuit is now switched OFF — confirmed by the device.`,
         boost: `Hot water boost is on for ${c.val} hours — it’ll switch back by itself.`
     }[c.mode];
     const detail = `${what} to <b>${ctlValTxt(c)}</b> on <span class="mono">${esc(c.device.deviceId)}</span>, device-confirmed (<span class="mono">synced</span>).`;
@@ -329,7 +356,7 @@ async function ctlFinish() {
             siteNo: state.workspace.site.siteNo,
             siteName: state.workspace.site.siteName,
             subject: `${what} — ${c.device.zone}`,
-            detail: `${what} to ${c.mode === 'modeoff' ? 'Off' : c.val}${c.mode === 'boost' ? 'h' : c.mode === 'modeoff' ? '' : '°C'} on ${c.device.deviceId}, device-confirmed (synced).`,
+            detail: `${what} to ${ctlValTxt(c)} on ${c.device.deviceId}, device-confirmed (synced).`,
             callerWords: state.flow?.data?.freeText || null,
             holdText: holdTxt
         });
