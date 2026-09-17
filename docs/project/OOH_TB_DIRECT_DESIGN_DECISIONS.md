@@ -9,40 +9,43 @@
 
 ## Go / No-Go
 
-**GO to design — conditional** on folding D1–D8 into the design brief. The two make-or-break questions are YES: the read plane returns full site estates directly from TB at scale, and the interface-preserving code swap is safe *and corrective* (it fixes a latent live-control bug). Tuya switch control — the highest-volume controllable type — is proven end-to-end. This is **not** a no-go and **not** a blank cheque: three claims are refuted as written and must be hardened in design first.
+**GO to design — conditional** on folding D1–D8 into the design brief. The two make-or-break questions are YES: the read plane returns full site estates directly from ThingsBoard at scale, and the interface-preserving code swap is safe *and corrective* (it fixes a latent live-control bug). Tuya switch control — the highest-volume controllable type — is proven end-to-end. This is **not** a no-go and **not** a blank cheque: three claims are refuted as written and must be hardened in design first.
 
 ## Claim verdicts (re-proven adversarially, live)
 
-| Claim | Verdict | Basis |
-|---|---|---|
-| C1 Read plane returns full estate | ✅ CONFIRMED | 9 sites live; 6261 = 23/18; scalable per-site query |
-| C2 Auth (JWT service accounts) | ✅ CONFIRMED auth / ⚠️ least-privilege REFUTED | both accounts are TENANT_ADMIN — read cred can write |
-| C3 `gk-{site}-*` prefix authoritative | 🔴 REFUTED | TB `textSearch` is unanchored substring — bleeds AND halves split sites |
-| C4 Names parse cleanly | 🔴 REFUTED | 76% conform; 3,086 exceptions; 19 undocumented profiles |
-| C5 Control confirms via `SyncStatus=synced` | 🟡 MIXED | Tuya CONFIRMED; Salus REFUTED on bench; Intesis GATED; false-success traps |
-| C6 Bounded controllable set | ✅ CONFIRMED (structural) | no unexpected type; only Tuya proven E2E |
-| C7 Controllability per-device | ✅ CONFIRMED | controllable Salus on the `default` profile at 18 sites |
-| C8 Interface-preserving swap safe | ✅ CONFIRMED (w/ conditions) | safe + corrective; `deviceId`=TB-name fixes latent break |
+- **C1 — Read plane returns the full estate · ✅ CONFIRMED.** 9 sites re-proven live; site 6261 = 23 devices / 18 active; per-site query is cheap and scalable on the 12,812-device tenant.
+- **C2 — Auth (JWT service accounts) · ✅ CONFIRMED, but least-privilege ⚠️ REFUTED.** Both accounts log in as designed, but `svc-read@` and `svc-control@` are both TENANT_ADMIN, so the read credential can write. See D5.
+- **C3 — `gk-{site}` prefix is authoritative · 🔴 REFUTED.** ThingsBoard `textSearch` is an unanchored substring match: the bare form bleeds across neighbouring real sites, and the dash-anchored form silently drops split sites (md-1110 loses 95%). See D1.
+- **C4 — Names parse cleanly into four parts · 🔴 REFUTED.** Only 76% conform; 3,086 exceptions; 19 populated profiles (~646 devices) are undocumented, including controllable Salus thermostats on the `default` profile. See D2.
+- **C5 — Control confirms via `SyncStatus=synced` · 🟡 MIXED.** Tuya switch proven end-to-end (under 1s); Salus refused to confirm on the bench (stuck pending / failed / rejected); Intesis adapter was dormant. Two false-success traps found. See D3 and D4.
+- **C6 — Bounded controllable set · ✅ CONFIRMED (structural).** No unexpected controllable type appeared; only Tuya was actively proven end-to-end this session.
+- **C7 — Controllability is per-device, not per-profile · ✅ CONFIRMED.** Controllable Salus thermostats sit on the `default` profile at 18 sites; capability must be derived from telemetry signals, not the profile label.
+- **C8 — Interface-preserving code swap is safe · ✅ CONFIRMED (with conditions).** Safe *and* corrective: `deviceId` today is the bridge id, not the TB name, so live control is latently broken behind the write-lock — setting `deviceId` to the TB name fixes it. Conditions: keep pub-name search, populate the telemetry keys consumers read, migrate the shape-pinning tests. See D8.
 
 ## Decisions to record (D1–D8)
 
-| # | Decision | Type | Recommendation |
-|---|---|---|---|
-| **D1** | Site-query strategy | Design blocker | Broad fetch + anchored-regex `^{brand}-{site}(-\|$)` + site-token alias map |
-| **D2** | Classification model | Design blocker | Capability-based + typo-tolerant; extend dictionary with the 19 profiles |
-| **D3** | Confirm-loop semantics | Design blocker | `Reported===Desired` + timestamp-advance + client timeout + value validation |
-| **D4** | Salus/Intesis control unproven on bench | Ask Spencer | Hold thermostat/AC control; ship Tuya v1; send the Spencer query |
-| **D5** | TB read least-privilege | Ask Spencer | Request a read-scoped TB role, else accept TENANT_ADMIN-both + app guard |
-| **D6** | Push `WRITES_DISABLED` into the write primitive | Build item | Add `if(config.writesDisabled) throw` in `writeSharedAttribute` |
-| **D7** | Multi-gang Tuya addressing | Ask Spencer | Get a 2-gang bench device before shipping multi-gang; single-gang unaffected |
-| **D8** | Name-search + status latch + test migration | Build item | Bake into the read-service design |
+**D1 — Site-query strategy · design blocker.** *Recommend:* over-fetch a broad prefix, then filter client-side with an anchored regex (brand + site, bounded by a dash or end-of-name, case-insensitive), plus a site-token alias map (e.g. `1110` ↔ `1110meridian`). Rejected: anchored-only (drops split sites); bare-only (bleeds neighbours).
+
+**D2 — Classification model · design blocker.** *Recommend:* derive control-eligibility from telemetry/attribute capability signals (never the profile label), make assetType matching typo-tolerant, and extend the data dictionary with the 19 missing profiles before build.
+
+**D3 — Confirm-loop semantics · design blocker.** *Recommend:* treat a command as confirmed only when `Reported` equals `Desired` **and** the sync timestamp advanced past the write, with a client-side timeout; validate value types before every write. `SyncStatus=synced` alone is insufficient (proven false-success traps).
+
+**D4 — Salus/Intesis control unproven on bench · ask Spencer.** *Recommend:* hold thermostat and AC control; ship Tuya-only control v1; send the Spencer query. Reconcile against SD-492's claimed shipping Salus path before enabling.
+
+**D5 — TB read least-privilege · ask Spencer.** *Recommend:* request a genuinely read-scoped TB role for the read path; otherwise consciously accept TENANT_ADMIN-both and rely on the app-layer `WRITES_DISABLED` + kill-switch as the sole barrier.
+
+**D6 — Push `WRITES_DISABLED` into the write primitive · build item.** *Recommend:* add a fail-closed guard inside `writeSharedAttribute` itself, so a future caller cannot write despite the flag. Fail-closed holds today only because both callers remember to guard.
+
+**D7 — Multi-gang Tuya addressing · ask Spencer.** *Recommend:* obtain a genuine 2-gang bench device (or the bridge's per-channel convention) before shipping multi-gang control. Single-gang is fully proven and unaffected.
+
+**D8 — Name-search, status latch and test migration on the swap · build item.** *Recommend:* bake into the read-service design a warmed pub-name search index, a boolean `bridgeStatus()` health latch, `deviceId` set to the TB name, telemetry-key population, and migration of the shape-pinning tests.
 
 ## Recommended first design increment (if GO)
-1. **Read-service** (`services/tb-device.js`) preserving the bridge interface: `deviceId = TB name`; robust site query (D1); capability-based, typo-tolerant classifier covering the 19 profiles (D2); telemetry-key population incl. `switch_1` normalisation; warmed name-search index; boolean `bridgeStatus()` latch (D8).
-2. **Confirm-loop redesign** (D3): `Reported===Desired` + timestamp-advance + client-side timeout + pre-write value validation.
+1. **Read-service** (`services/tb-device.js`) preserving the bridge interface: `deviceId` set to the TB name; robust site query (D1); capability-based, typo-tolerant classifier covering the 19 profiles (D2); telemetry-key population including `switch_1` normalisation; warmed name-search index; boolean `bridgeStatus()` latch (D8).
+2. **Confirm-loop redesign** (D3): `Reported` equals `Desired`, plus timestamp-advance, plus client-side timeout, plus pre-write value validation.
 3. **Control scope v1 = Tuya switch only** (proven). Salus/Intesis control **held** pending D4; boiler deferred.
-4. **Safety**: `switchDesired` → `ATTRIBUTE_FAMILY`; `WRITES_DISABLED` primitive-level guard (D6); live write-lock stays until James lifts it.
-5. **Test migration** for the `deviceId` contract change; unit-test the classifier against the real 6261 set + the C4 exception classes.
+4. **Safety**: add `switchDesired` to `ATTRIBUTE_FAMILY`; add the `WRITES_DISABLED` primitive-level guard (D6); the live write-lock stays until James lifts it.
+5. **Test migration** for the `deviceId` contract change; unit-test the classifier against the real 6261 set and the C4 exception classes.
 
 ## On approval
 - **Accept** → the design increment above begins with D1–D8 baked in.
