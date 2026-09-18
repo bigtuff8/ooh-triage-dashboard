@@ -221,7 +221,7 @@ function friendlyHold(iso) {
  * Control outcomes get the full site→zone→read→dispatch→sync→hold trail from the control action;
  * non-control outcomes get the shorter site→detail trail. Every line carries an HH:MM timestamp.
  */
-function buildOutcomeTranscript({ action, type, siteNo, siteName, detail, holdText, outcomeTime }) {
+export function buildOutcomeTranscript({ action, type, siteNo, siteName, detail, holdText, outcomeTime }) {
     const steps = [];
     if (action) {
         const t0 = action.dispatchedAt || outcomeTime;
@@ -236,7 +236,11 @@ function buildOutcomeTranscript({ action, type, siteNo, siteName, detail, holdTe
         if (detail) steps.push({ time: hhmm(outcomeTime), text: detail });
         if (holdText) steps.push({ time: hhmm(outcomeTime), text: holdText });
     }
-    if (type === 'escalate-p1') steps.push({ time: hhmm(outcomeTime), text: 'P1 escalation → SMS dispatched to on-duty manager' });
+    // Test 11c — neutral, true-at-build-time line. The transcript is built (and the [TRG] first
+    // comment baked) BEFORE escalateP1 runs, so dispatchOk does not exist here — asserting "SMS
+    // dispatched" was a false claim in log-mode. The ACTUAL dispatch result is written afterwards by
+    // addP1DispatchNote as a second #ooh-p1-dispatch comment. Does not perturb the Outcome: anchor.
+    if (type === 'escalate-p1') steps.push({ time: hhmm(outcomeTime), text: 'P1 escalation raised — on-duty manager to be paged' });
     return steps;
 }
 
@@ -266,6 +270,15 @@ router.post('/outcomes', wrap(async (req, res) => {
     let p1 = null;
     if (isP1) {
         p1 = await escalation.escalateP1({ operator: op, siteNo, siteName, ticketId: ticket.id, summary: p1Summary || subject });
+        // Test 11c — corrective post-dispatch comment carrying the ACTUAL send result (sent /
+        // log-mode-not-sent / failed). Like reconciliation + the SMS log, it must NEVER block or
+        // fail the outcome — wrap fail-safe, alert on failure, and return the ticket regardless.
+        try {
+            await zendesk.addP1DispatchNote(ticket.id, p1);
+        } catch (err) {
+            console.error(`[API] P1 dispatch note failed for ticket #${ticket.id}: ${err.message}`);
+            metrics.raiseAlert('p1-dispatch-note-failed', `P1 dispatch note for ticket #${ticket.id} (${siteName}) failed to write — dispatch result not recorded on the ticket`);
+        }
     }
 
     let auditId = action?.auditId || null;
@@ -309,7 +322,7 @@ router.post('/outcomes', wrap(async (req, res) => {
 
     res.json({
         ticket,
-        p1: p1 ? { dispatchedAt: p1.dispatchedAt, sentTo: p1.sentTo, link: p1.OohP1EscalationLink, dispatchOk: p1.dispatchOk } : null,
+        p1: p1 ? { dispatchedAt: p1.dispatchedAt, sentTo: p1.sentTo, link: p1.OohP1EscalationLink, dispatchOk: p1.dispatchOk, provider: p1.provider } : null,
         reconciliation: reconcileResult
     });
 }));

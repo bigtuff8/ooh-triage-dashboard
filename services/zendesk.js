@@ -329,6 +329,42 @@ export async function addLateSyncNote(ticketId, action) {
 }
 
 /**
+ * Test 11c — posts the CORRECTIVE second [TRG] comment stating the ACTUAL P1 SMS dispatch result,
+ * AFTER escalateP1 returns. The [TRG] first comment is kept honest (it says the P1 was raised, not
+ * that a text was sent — routes/api.js), and this second comment carries the durable truth of what
+ * actually happened, per provider. Modelled on addLateSyncNote — a second comment never mutates the
+ * frozen first comment, so the oversight parse (Outcome: anchor) is preserved (freeze rule).
+ *
+ * Three cases, each stating the NEXT ACTION where nothing went out:
+ *   - genuine send (dispatchOk && provider !== 'log'): SMS SENT.
+ *   - log-mode (provider === 'log'): NOT SENT — phone the on-duty manager now.
+ *   - send failure (provider twilio, !dispatchOk): FAILED — chase by phone now.
+ * Never persists the raw phone number (mirrors escalation.js — status only).
+ */
+export async function addP1DispatchNote(ticketId, p1) {
+    const at = hhmm(p1?.dispatchedAt) || '';
+    const who = p1?.sentTo ? ` (${oneLine(p1.sentTo)})` : '';
+    const numberStatus = p1?.sentToNumber || '(not configured)';
+    let body;
+    if (p1?.provider === 'log') {
+        body = [
+            `[TRG] ⚠️ P1 SMS NOT SENT — gateway in log mode. #ooh-p1-dispatch`,
+            `ACTION NEEDED: phone the on-duty manager${who} now — the escalation text was NOT dispatched (SMS gateway is in log mode, on-duty number ${numberStatus}). The P1 stays recorded on this ticket.`
+        ].join('\n');
+    } else if (p1?.dispatchOk) {
+        body = [
+            `[TRG] ✅ P1 SMS SENT to on-duty manager${who}${at ? ` at ${at}` : ''}. #ooh-p1-dispatch`
+        ].join('\n');
+    } else {
+        body = [
+            `[TRG] ⚠️ P1 SMS FAILED to send. #ooh-p1-dispatch`,
+            `ACTION NEEDED: chase the on-duty manager${who} by phone now — the escalation text did not send. The P1 stays recorded on this ticket.`
+        ].join('\n');
+    }
+    return addInternalComment(ticketId, body);
+}
+
+/**
  * C6 — lazily creates a minimal internal Zendesk ticket to CARRY a late-sync note when a
  * timed-out action echoes late and no outcome/escalation ticket was ever created for it (the
  * handler simply closed the tracker). Deliberately NOT called for every timeout — only at the
