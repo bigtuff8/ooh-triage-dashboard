@@ -344,7 +344,9 @@ export function mapTbDevice(raw, telemetryBag) {
 /* ------------------------------------------------------------------ */
 
 async function fetchTbDevicePage(textSearch, page) {
-    const q = `/api/tenant/devices?textSearch=${encodeURIComponent(textSearch)}&pageSize=${TB_PAGE_SIZE}&page=${page}&sortProperty=name&sortOrder=ASC`;
+    // OOHDASH-80: query deviceInfos (superset of Device) — it carries the `active` boolean that
+    // /api/tenant/devices omits, so `online` status resolves. Same query string, same PageData shape.
+    const q = `/api/tenant/deviceInfos?textSearch=${encodeURIComponent(textSearch)}&pageSize=${TB_PAGE_SIZE}&page=${page}&sortProperty=name&sortOrder=ASC`;
     const res = await readRequest('GET', q);
     // TB PageData: { data:[...], hasNext, totalElements }
     return { data: Array.isArray(res?.data) ? res.data : (Array.isArray(res) ? res : []), hasNext: !!res?.hasNext };
