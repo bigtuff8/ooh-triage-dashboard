@@ -9,9 +9,10 @@
  * over the exception classes, the site-query filter, telemetry mapping incl. switch normalisation,
  * and the boolean bridgeStatus() latch.
  *
- * config.js snapshots env at import, so DATA_MODE=live is set before the dynamic imports. The TB
- * read session hits POST /api/auth/login, GET /api/tenant/deviceInfos and GET .../values/timeseries —
- * all intercepted here. Runs under `node --test` (see package.json test:unit).
+ * config.js snapshots env at import, so DATA_MODE=live is set before the dynamic imports. The TB read
+ * session hits POST /api/auth/login, GET /api/tenant/devices, GET .../values/timeseries and GET
+ * .../values/attributes/SERVER_SCOPE (the `active` source, OOHDASH-80) — all intercepted here. Runs
+ * under `node --test` (see package.json test:unit).
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -25,6 +26,11 @@ const tbFixture = JSON.parse(
 // All device entities keyed by TB uuid → telemetry, so the timeseries route can answer per device.
 const allDevices = [...tbFixture.devices, ...tbFixture.site4741];
 const telemetryByUuid = new Map(allDevices.map(d => [d.id.id, d.telemetry || {}]));
+// OOHDASH-80: `active` now comes from the per-device SERVER_SCOPE read, not the device-list entity.
+const activeByUuid = new Map(allDevices.map(d => [d.id.id, d.active]));
+// Test seam — UUIDs whose SERVER_SCOPE read should THROW, to prove the per-device fail-safe degrades
+// that device to offline without failing the whole site query (the prod-outage regression guard).
+const serverScopeFailUuids = new Set();
 
 /**
  * TB REST adapter — routes by the request URL, exactly the shape services/tb-client.readRequest
@@ -41,13 +47,27 @@ function tbAdapter(cfg) {
 
     if (url.includes('/api/auth/login')) return Promise.resolve(ok({ token: 'test-jwt' }));
 
-    if (url.includes('/api/tenant/device')) deviceListRequests.push(url);
-    if (url.includes('/api/tenant/deviceInfos')) {
+    if (url.includes('/api/tenant/devices') && url.includes('textSearch')) {
+        deviceListRequests.push(url);
         const m = url.match(/textSearch=([^&]+)/);
         const q = m ? decodeURIComponent(m[1]).toLowerCase() : '';
-        // Real TB textSearch is an unanchored substring over the device name.
-        const data = allDevices.filter(d => d.name.toLowerCase().includes(q));
+        // Real TB textSearch is an unanchored substring over the device name. The Device entity does
+        // NOT carry `active` (OOHDASH-80) — online status comes from the SERVER_SCOPE route below.
+        const data = allDevices
+            .filter(d => d.name.toLowerCase().includes(q))
+            .map(({ active, telemetry, ...entity }) => entity);
         return Promise.resolve(ok({ data, hasNext: false, totalElements: data.length }));
+    }
+
+    if (url.includes('/values/attributes/SERVER_SCOPE')) {
+        const um = url.match(/DEVICE\/([^/]+)\/values\/attributes\/SERVER_SCOPE/);
+        const uuid = um ? um[1] : null;
+        if (serverScopeFailUuids.has(uuid)) {
+            return Promise.reject(Object.assign(new Error('SERVER_SCOPE read failed'), { response: { status: 500 } }));
+        }
+        // TB attribute shape: [{ key, value, lastUpdateTs }].
+        const attrs = [{ key: 'active', value: activeByUuid.get(uuid), lastUpdateTs: Date.now() }];
+        return Promise.resolve(ok(attrs));
     }
 
     if (url.includes('/values/timeseries')) {
@@ -130,7 +150,7 @@ test('flags combi hot-water capability from a non-null hotWater reading', async 
     const combi = site.devices.find(d => d.deviceId === 'gk-6261-salusit500-combi-2');
     assert.equal(combi.hotWaterCapable, true, 'hotWater != null should set hotWaterCapable');
     assert.equal(combi.telemetry.hotWater, 1);
-    assert.equal(combi.online, false, 'isOnline=false should map to online=false');
+    assert.equal(combi.online, false, 'SERVER_SCOPE active:false should map to online=false');
 });
 
 test('getDevice resolves one device within the resolved site by its (name) deviceId', async () => {
@@ -156,31 +176,63 @@ test('bridgeStatus() is a BOOLEAN latch — healthy true after a good read, mode
 });
 
 /* ------------------------------------------------------------------ */
-/* OOHDASH-80: online status resolves from DeviceInfo `active`          */
+/* OOHDASH-80: online status resolves from per-device SERVER_SCOPE      */
+/* `active` (supersedes the reverted deviceInfos approach, PR #33)      */
 /* ------------------------------------------------------------------ */
 
-test('OOHDASH-80: the device-list query targets /api/tenant/deviceInfos (not /devices, which omits `active`)', async () => {
+test('OOHDASH-80: the device-list query targets /api/tenant/devices (NOT deviceInfos — that endpoint does not exist on this TB and 400s)', async () => {
     tb._resetCache();
     deviceListRequests.length = 0;
     await tb.getSitesByNumber('6261');
     assert.ok(deviceListRequests.length > 0, 'the service must have issued at least one device-list request');
     for (const url of deviceListRequests) {
-        assert.ok(url.includes('/api/tenant/deviceInfos'), `device-list query must hit deviceInfos, got: ${url}`);
-        assert.ok(!/\/api\/tenant\/devices(\?|$)/.test(url), `must NOT hit the plain /api/tenant/devices endpoint, got: ${url}`);
+        assert.ok(/\/api\/tenant\/devices(\?|$)/.test(url), `device-list query must hit /api/tenant/devices, got: ${url}`);
+        assert.ok(!url.includes('deviceInfos'), `must NEVER hit the non-existent deviceInfos endpoint (the reverted outage), got: ${url}`);
     }
 });
 
-test('OOHDASH-80: mapTbDevice maps DeviceInfo `active:true` → online:true', () => {
-    const dev = tb.mapTbDevice({ name: 'gk-6261-x', type: 'default', active: true }, {});
-    assert.equal(dev.online, true, 'active:true from deviceInfos must yield online:true');
+test('OOHDASH-80: online:true when the device SERVER_SCOPE `active` is true (end-to-end via the site query)', async () => {
+    tb._resetCache();
+    const [site] = await tb.getSitesByNumber('6261');
+    const it700 = site.devices.find(d => d.deviceId === 'gk-6261-salusit700-1'); // active:true in fixture
+    assert.equal(it700.online, true, 'SERVER_SCOPE active:true → online:true');
 });
 
-test('OOHDASH-80: mapTbDevice maps DeviceInfo `active:false` → online:false', () => {
+test('OOHDASH-80: online:false when the device SERVER_SCOPE `active` is false (end-to-end via the site query)', async () => {
+    tb._resetCache();
+    const [site] = await tb.getSitesByNumber('6261');
+    const combi = site.devices.find(d => d.deviceId === 'gk-6261-salusit500-combi-2'); // active:false in fixture
+    assert.equal(combi.online, false, 'SERVER_SCOPE active:false → online:false');
+});
+
+test('OOHDASH-80 REGRESSION GUARD: a SERVER_SCOPE read failure for ONE device degrades it to offline but the site still returns ALL devices (no throw)', async () => {
+    tb._resetCache();
+    serverScopeFailUuids.add('uuid-6261-it700'); // force the it700 attribute read to throw
+    try {
+        const sites = await tb.getSitesByNumber('6261');
+        assert.equal(sites.length, 1, 'the site query must still succeed (the outage was a single-read failure taking down the whole site)');
+        assert.equal(sites[0].devices.length, 3, 'ALL 3 devices still returned despite one failing attribute read');
+        const it700 = sites[0].devices.find(d => d.deviceId === 'gk-6261-salusit700-1');
+        assert.equal(it700.online, false, 'the device whose active read failed degrades to offline (fail-safe)');
+        // the other devices are unaffected — the combi (active:false) still resolves its own state
+        const combi = sites[0].devices.find(d => d.deviceId === 'gk-6261-salusit500-combi-2');
+        assert.equal(combi.online, false);
+    } finally {
+        serverScopeFailUuids.delete('uuid-6261-it700');
+    }
+});
+
+test('OOHDASH-80: mapTbDevice maps populated `active:true` → online:true', () => {
+    const dev = tb.mapTbDevice({ name: 'gk-6261-x', type: 'default', active: true }, {});
+    assert.equal(dev.online, true, 'active:true (from SERVER_SCOPE) must yield online:true');
+});
+
+test('OOHDASH-80: mapTbDevice maps `active:false` → online:false', () => {
     const dev = tb.mapTbDevice({ name: 'gk-6261-x', type: 'default', active: false }, {});
     assert.equal(dev.online, false, 'active:false must yield online:false');
 });
 
-test('OOHDASH-80: mapTbDevice defaults online:false when `active` is absent (the old /devices response shape)', () => {
+test('OOHDASH-80: mapTbDevice defaults online:false when `active` is absent (plain /api/tenant/devices entity shape)', () => {
     const dev = tb.mapTbDevice({ name: 'gk-6261-x', type: 'default' }, {});
     assert.equal(dev.online, false, 'no active field present → online defaults to false');
 });
