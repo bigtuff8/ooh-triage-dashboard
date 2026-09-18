@@ -1,0 +1,15 @@
+{
+  "run": "selfgate-ooh-triage-dashboard-design-tester-feedback",
+  "phase": "design",
+  "pr": 30,
+  "approvedBy": [
+    "bigtuff8"
+  ],
+  "reviewComments": [
+    "bigtuff8: - On approval: Approve this part\n\n(submitted via the interactive gate review)"
+  ],
+  "mergeCommit": "5be76101c5ac9a3cff9b66a4b015a7f731e2cdbe",
+  "phaseBranch": "design/tester-feedback",
+  "releaseBranch": "main",
+  "stamp": 1789734028779
+}
