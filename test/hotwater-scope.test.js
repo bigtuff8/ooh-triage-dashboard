@@ -39,15 +39,21 @@ const tbFixture = JSON.parse(
 );
 const allDevices = [...tbFixture.devices, ...tbFixture.site4741];
 const telemetryByUuid = new Map(allDevices.map(d => [d.id.id, d.telemetry || {}]));
+const activeByUuid = new Map(allDevices.map(d => [d.id.id, d.active]));
 axios.defaults.adapter = (cfg) => {
     const url = cfg.url || '';
     const ok = data => ({ data, status: 200, statusText: 'OK', headers: {}, config: cfg, request: {} });
     if (url.includes('/api/auth/login')) return Promise.resolve(ok({ token: 'test-jwt' }));
-    if (url.includes('/api/tenant/deviceInfos')) {
+    if (url.includes('/api/tenant/devices') && url.includes('textSearch')) {
         const m = url.match(/textSearch=([^&]+)/);
         const q = m ? decodeURIComponent(m[1]).toLowerCase() : '';
-        const data = allDevices.filter(d => d.name.toLowerCase().includes(q));
+        // OOHDASH-80: plain Device entity has no `active` — online comes from SERVER_SCOPE below.
+        const data = allDevices.filter(d => d.name.toLowerCase().includes(q)).map(({ active, telemetry, ...e }) => e);
         return Promise.resolve(ok({ data, hasNext: false, totalElements: data.length }));
+    }
+    if (url.includes('/values/attributes/SERVER_SCOPE')) {
+        const um = url.match(/DEVICE\/([^/]+)\/values\/attributes\/SERVER_SCOPE/);
+        return Promise.resolve(ok([{ key: 'active', value: activeByUuid.get(um ? um[1] : null), lastUpdateTs: Date.now() }]));
     }
     if (url.includes('/values/timeseries')) {
         const um = url.match(/DEVICE\/([^/]+)\/values\/timeseries/);

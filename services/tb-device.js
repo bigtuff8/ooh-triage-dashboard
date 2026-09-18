@@ -40,6 +40,16 @@ async function readRequest(method, path, data) {
 }
 
 /**
+ * Lazily resolves tb-client.readServerScopeAttributes (same defer rationale as readRequest — a static
+ * import forces every fixture-mode test that mock.module()'s tb-client.js to re-export it). Only ever
+ * reached on the live inventory read.
+ */
+async function readServerScopeAttributes(uuid, keys) {
+    const mod = await import('./tb-client.js');
+    return mod.readServerScopeAttributes(uuid, keys);
+}
+
+/**
  * Lazily resolves zendesk.siteDirectory ONLY on the live search/directory path (same rationale as
  * readRequest above — it is a NEW export, so a static import would break every fixture-mode test
  * that mock.module()'s zendesk.js without re-declaring it). Never called in fixture mode.
@@ -344,9 +354,11 @@ export function mapTbDevice(raw, telemetryBag) {
 /* ------------------------------------------------------------------ */
 
 async function fetchTbDevicePage(textSearch, page) {
-    // OOHDASH-80: query deviceInfos (superset of Device) — it carries the `active` boolean that
-    // /api/tenant/devices omits, so `online` status resolves. Same query string, same PageData shape.
-    const q = `/api/tenant/deviceInfos?textSearch=${encodeURIComponent(textSearch)}&pageSize=${TB_PAGE_SIZE}&page=${page}&sortProperty=name&sortOrder=ASC`;
+    // OOHDASH-80 (corrected): query /api/tenant/devices. The earlier deviceInfos swap (PR #33) was
+    // WRONG — that endpoint does NOT exist on this TB instance (returns HTTP 400 "Invalid UUID
+    // string: deviceInfos") and broke all site inventory in prod. The Device entity has no `active`
+    // field, so online status is sourced per-device from SERVER_SCOPE `active` in fetchTelemetry().
+    const q = `/api/tenant/devices?textSearch=${encodeURIComponent(textSearch)}&pageSize=${TB_PAGE_SIZE}&page=${page}&sortProperty=name&sortOrder=ASC`;
     const res = await readRequest('GET', q);
     // TB PageData: { data:[...], hasNext, totalElements }
     return { data: Array.isArray(res?.data) ? res.data : (Array.isArray(res) ? res : []), hasNext: !!res?.hasNext };
@@ -365,29 +377,51 @@ async function fetchTbDevicesForToken(brand, token) {
     return collected;
 }
 
+/** SERVER_SCOPE `active` array → boolean (OOHDASH-80). Any unexpected shape ⇒ false (fail-safe). */
+function parseActive(attrs) {
+    const v = attrs ? attrs.active : undefined;
+    if (typeof v === 'boolean') return v;
+    if (v === 'true' || v === 1 || v === '1') return true;
+    return false;
+}
+
 /**
- * Bulk latest telemetry for a set of TB devices. Uses per-device latest-timeseries reads over the
- * read session; the design's bulk Entity Data Query (POST /api/entitiesQuery/find) is the
- * optimisation and is an open item to verify at build — the per-device path is the proven fallback
- * (validation report). Returns Map<tbId, telemetryBag>. Never throws for a single-device miss.
+ * Bulk latest telemetry for a set of TB devices, PLUS the per-device online state (OOHDASH-80). Uses
+ * per-device latest-timeseries reads over the read session AND a per-device SERVER_SCOPE `active`
+ * read (the Device entity from /api/tenant/devices has no `active`/`lastActivityTime`; SERVER_SCOPE
+ * carries the TB UI Active state). Both reads for a device run concurrently, and every device is
+ * fetched concurrently — no extra serial round-trip. Returns Map<tbId, telemetryBag> where the bag
+ * additionally carries a private `__active` boolean. Never throws for a single-device miss: a failed
+ * telemetry OR active read degrades THAT device (empty bag / offline) and the site query still
+ * returns every device — the regression guard for the prod outage this ticket supersedes.
  */
 async function fetchTelemetry(devices) {
     const out = new Map();
     await Promise.all(devices.map(async d => {
         const uuid = d?.id?.id || d?.id;
         if (!uuid) return;
-        try {
-            const res = await readRequest('GET', `/api/plugins/telemetry/DEVICE/${uuid}/values/timeseries`);
+        // Dispatch both reads concurrently; settle independently so one failing never fails the other.
+        const [tsRes, activeRes] = await Promise.allSettled([
+            readRequest('GET', `/api/plugins/telemetry/DEVICE/${uuid}/values/timeseries`),
+            readServerScopeAttributes(uuid, 'active,lastActivityTime')
+        ]);
+        const bag = {};
+        if (tsRes.status === 'fulfilled') {
             // TB shape: { key: [{ ts, value }] } → flatten to { key: value }.
-            const bag = {};
-            for (const [k, series] of Object.entries(res || {})) {
+            for (const [k, series] of Object.entries(tsRes.value || {})) {
                 if (Array.isArray(series) && series.length) bag[k] = series[0].value;
             }
-            out.set(uuid, bag);
-        } catch (err) {
-            console.error(`[TB] Telemetry read failed for device ${uuid}: ${err.message}`);
-            out.set(uuid, {});
+        } else {
+            console.error(`[TB] Telemetry read failed for device ${uuid}: ${tsRes.reason?.message}`);
         }
+        if (activeRes.status === 'fulfilled') {
+            bag.__active = parseActive(activeRes.value);
+        } else {
+            // Fail-safe: a SERVER_SCOPE read failure degrades this device to offline, never the site.
+            console.error(`[TB] SERVER_SCOPE active read failed for device ${uuid}: ${activeRes.reason?.message}`);
+            bag.__active = false;
+        }
+        out.set(uuid, bag);
     }));
     return out;
 }
@@ -418,7 +452,11 @@ async function fetchLiveSitesByNumber(siteNo) {
 
     const devices = matched.map(d => {
         const uuid = d?.id?.id || d?.id;
-        return mapTbDevice(d, telemetryById.get(uuid));
+        const bag = telemetryById.get(uuid) || {};
+        // OOHDASH-80: source `online` from the SERVER_SCOPE `active` read stashed in the bag, then
+        // strip the private key so it never leaks into the canonical telemetry{} shape.
+        const { __active, ...telemetryBag } = bag;
+        return mapTbDevice({ ...d, active: __active ?? false }, telemetryBag);
     });
 
     if (!devices.length) {
