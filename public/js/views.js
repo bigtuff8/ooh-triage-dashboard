@@ -174,7 +174,7 @@ function renderWorkspace() {
    <h3>What is the caller reporting?</h3>
    <input class="issueinput" id="iq" data-testid="smart-entry" placeholder="Type it in the caller’s words — e.g. “pub is freezing”, “no power in the kitchen”…" autocomplete="off" oninput="issueSearch(this.value)">
    <div class="sugg" id="isugg"></div>
-   <div class="tiles" data-testid="category-tiles">${CATS.map(c => `<div class="tile" data-testid="tile-${c.k}" onclick="startFlow('${c.k}')"><div class="tt">${c.ic} ${c.t}</div><div class="td">${c.d}</div></div>`).join('')}</div></div>`;
+   <div class="tiles" data-testid="category-tiles">${CATS.map(c => `<div class="tile" data-testid="tile-${c.k}" onclick="startTileFlow('${c.k}')"><div class="tt">${c.ic} ${c.t}</div><div class="td">${c.d}</div></div>`).join('')}</div></div>`;
 
     $('#view').innerHTML = `<div class="content"><div class="wsgrid">
   <div>

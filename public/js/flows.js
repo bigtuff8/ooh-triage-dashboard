@@ -52,6 +52,16 @@ function startSuggestedFlow(k) {
     startFlow(k, state.smartEntryText || '');
 }
 
+/**
+ * Starts a category-tile flow, carrying the typed caller words from state (Test 10).
+ * Symmetric with startSuggestedFlow — the tile path must carry the handler's words too.
+ * The text stays in state.smartEntryText and is NEVER interpolated into the onclick
+ * attribute (quotes/apostrophes in natural speech would break the inline handler).
+ */
+function startTileFlow(k) {
+    startFlow(k, state.smartEntryText || '');
+}
+
 /* ------------------------ flow engine ------------------------ */
 function startFlow(k, freeText) {
     state.flow = { cat: k, stage: 0, data: { freeText: freeText || '' }, done: [] };
@@ -123,7 +133,14 @@ function finishOutcome(f, key, payload, renderCard) {
             callerWords: f.data.freeText || null,
             ...payload
         }).then(res => {
-            const html = renderCard(res) + outButtons();
+            // Test 10 (D-10a) — echo the handler's typed words on the outcome card, so note
+            // retention is verifiable at their own screen, not only trusted to the back office.
+            // Rendered once here so all four outcome card types inherit it; nothing shown when
+            // no words were typed (a legitimate tile-without-typing path) — never an empty quote.
+            const echo = f.data.freeText
+                ? `<div class="stepdone small" data-testid="outcome-callerwords"><span>💬</span>Recorded from the caller: “${esc(f.data.freeText)}”</div>`
+                : '';
+            const html = echo + renderCard(res) + outButtons();
             f.data['_out_' + key] = html;
             registerIssue(payload.issueLabel || payload.subject, payload.issueCls || 'blue', res.ticket.id);
             f.stage = 99;
@@ -150,7 +167,9 @@ function outcomeP1(f, key, { subject, detail, script, p1Summary }) {
     return finishOutcome(f, key,
         { type: 'escalate-p1', subject, detail, p1Summary, issueLabel: subject, issueCls: 'red' },
         res => `<div class="outcome p1" data-testid="outcome-p1"><h3>🚨 Escalated — P1</h3><p>${detail}</p>
-  <p style="margin-top:4px">A <b>text message</b> has been sent to the <b>on-duty escalation manager</b> at ${esc(new Date(res.p1?.dispatchedAt || Date.now()).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }))}, with a direct link to ticket <b>#${res.ticket.id}</b> in the IoT Support dashboard.${res.p1 && !res.p1.dispatchOk ? ' <span class="tag red">text delivery failed — the IoT team has been alerted; chase by phone</span>' : ''}</p>
+  <p style="margin-top:4px" data-testid="p1-dispatch-status">${res.p1 && res.p1.dispatchOk
+      ? `A <b>text message</b> has been sent to the <b>on-duty escalation manager</b> at ${esc(new Date(res.p1.dispatchedAt || Date.now()).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }))}, with a direct link to ticket <b>#${res.ticket.id}</b> in the IoT Support dashboard.`
+      : `<span class="tag red">Text not sent — phone the on-duty manager now.</span> The P1 is logged as ticket <b>#${res.ticket.id}</b> in the IoT Support dashboard.`}</p>
   <div class="script">“${script}”</div><p class="small">Ticket <b>#${res.ticket.id}</b></p></div>`);
 }
 

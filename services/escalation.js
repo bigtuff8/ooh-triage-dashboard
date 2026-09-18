@@ -39,11 +39,12 @@ async function sendViaProvider(to, body) {
             new URLSearchParams({ To: to, From: from, Body: body }),
             { auth: { username: accountSid, password: authToken }, timeout: 15000 }
         );
-        return { provider: 'twilio' };
+        return { provider: 'twilio', sent: true };
     }
-    // 'log' provider — dispatch recorded, nothing sent
+    // 'log' provider — dispatch recorded, nothing sent. `sent: false` is what makes dispatchOk
+    // honest: a log-mode no-op must NOT be recorded as a successful dispatch (Test 11c).
     console.warn(`[SMS:log] Would send to ${to || '(no on-duty number configured)'}: ${body}`);
-    return { provider: 'log' };
+    return { provider: 'log', sent: false };
 }
 
 /**
@@ -70,8 +71,10 @@ export async function escalateP1({ operator, siteNo, siteName, ticketId, summary
         OohP1AckBy: null
     };
     try {
-        await sendViaProvider(config.sms.onDutyNumber, body);
-        entry.dispatchOk = true;
+        const result = await sendViaProvider(config.sms.onDutyNumber, body);
+        // dispatchOk is true ONLY on a genuine transmission (twilio 2xx). Log-mode returns
+        // sent:false, so a no-op is never recorded as a send (Test 11c).
+        entry.dispatchOk = (result?.sent !== false);
     } catch (err) {
         console.error(`[SMS] P1 dispatch failed for ticket ${ticketId}: ${err.message}`);
         raiseAlert('sms-dispatch-failed', `P1 SMS for ticket #${ticketId} (${siteName}) failed to send — chase manually`);
