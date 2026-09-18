@@ -20,6 +20,7 @@ COPY services ./services
 COPY routes ./routes
 COPY public ./public
 COPY data/fixtures ./data/fixtures
+COPY data/site-aliases.json ./data/
 
 # Non-root user (alpine node image ships the 'node' user)
 USER node

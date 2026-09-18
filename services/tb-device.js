@@ -67,9 +67,17 @@ function loadFixture() {
 
 let aliasData = null;
 function loadAliases() {
+    // The alias overlay is OPTIONAL (most sites need no entry) — a missing/unreadable file must
+    // degrade to no-overlay, never abort the whole site query (OOHDASH-79). Memoise the resolved
+    // map (incl. the {} fallback) so a missing file doesn't retry-spam on every query.
     if (!aliasData) {
-        const json = JSON.parse(readFileSync(new URL('../data/site-aliases.json', import.meta.url), 'utf8'));
-        aliasData = json.aliases || {};
+        try {
+            const json = JSON.parse(readFileSync(new URL('../data/site-aliases.json', import.meta.url), 'utf8'));
+            aliasData = json.aliases || {};
+        } catch (err) {
+            console.warn(`[TB] Site-alias overlay unavailable — proceeding with no overlay: ${err.message}`);
+            aliasData = {};
+        }
     }
     return aliasData;
 }
