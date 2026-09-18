@@ -34,7 +34,7 @@ axios.defaults.adapter = (cfg) => {
     const url = cfg.url || '';
     const ok = data => ({ data, status: 200, statusText: 'OK', headers: {}, config: cfg, request: {} });
     if (url.includes('/api/auth/login')) return Promise.resolve(ok({ token: 'test-jwt' }));
-    if (url.includes('/api/tenant/devices')) {
+    if (url.includes('/api/tenant/deviceInfos')) {
         const m = url.match(/textSearch=([^&]+)/);
         const q = m ? decodeURIComponent(m[1]).toLowerCase() : '';
         const data = allDevices.filter(d => d.name.toLowerCase().includes(q));

@@ -10,7 +10,7 @@
  * and the boolean bridgeStatus() latch.
  *
  * config.js snapshots env at import, so DATA_MODE=live is set before the dynamic imports. The TB
- * read session hits POST /api/auth/login, GET /api/tenant/devices and GET .../values/timeseries —
+ * read session hits POST /api/auth/login, GET /api/tenant/deviceInfos and GET .../values/timeseries —
  * all intercepted here. Runs under `node --test` (see package.json test:unit).
  */
 import { test } from 'node:test';
@@ -31,13 +31,18 @@ const telemetryByUuid = new Map(allDevices.map(d => [d.id.id, d.telemetry || {}]
  * expects back. Substring-matches textSearch (as real TB does) so the anchored client-side filter is
  * genuinely exercised: `gk-6261` returns the 6261 devices AND the gk-62611 bleed neighbour.
  */
+// Records every device-list request URL the service builds, so the OOHDASH-80 guard test can assert
+// the query targets deviceInfos (carries `active`) and can never silently regress to /devices.
+const deviceListRequests = [];
+
 function tbAdapter(cfg) {
     const url = cfg.url || '';
     const ok = data => ({ data, status: 200, statusText: 'OK', headers: {}, config: cfg, request: {} });
 
     if (url.includes('/api/auth/login')) return Promise.resolve(ok({ token: 'test-jwt' }));
 
-    if (url.includes('/api/tenant/devices')) {
+    if (url.includes('/api/tenant/device')) deviceListRequests.push(url);
+    if (url.includes('/api/tenant/deviceInfos')) {
         const m = url.match(/textSearch=([^&]+)/);
         const q = m ? decodeURIComponent(m[1]).toLowerCase() : '';
         // Real TB textSearch is an unanchored substring over the device name.
@@ -148,4 +153,34 @@ test('bridgeStatus() is a BOOLEAN latch — healthy true after a good read, mode
     assert.equal(s.healthy, true);
     assert.equal(s.mode, 'live');
     assert.equal(s.lastError, null);
+});
+
+/* ------------------------------------------------------------------ */
+/* OOHDASH-80: online status resolves from DeviceInfo `active`          */
+/* ------------------------------------------------------------------ */
+
+test('OOHDASH-80: the device-list query targets /api/tenant/deviceInfos (not /devices, which omits `active`)', async () => {
+    tb._resetCache();
+    deviceListRequests.length = 0;
+    await tb.getSitesByNumber('6261');
+    assert.ok(deviceListRequests.length > 0, 'the service must have issued at least one device-list request');
+    for (const url of deviceListRequests) {
+        assert.ok(url.includes('/api/tenant/deviceInfos'), `device-list query must hit deviceInfos, got: ${url}`);
+        assert.ok(!/\/api\/tenant\/devices(\?|$)/.test(url), `must NOT hit the plain /api/tenant/devices endpoint, got: ${url}`);
+    }
+});
+
+test('OOHDASH-80: mapTbDevice maps DeviceInfo `active:true` → online:true', () => {
+    const dev = tb.mapTbDevice({ name: 'gk-6261-x', type: 'default', active: true }, {});
+    assert.equal(dev.online, true, 'active:true from deviceInfos must yield online:true');
+});
+
+test('OOHDASH-80: mapTbDevice maps DeviceInfo `active:false` → online:false', () => {
+    const dev = tb.mapTbDevice({ name: 'gk-6261-x', type: 'default', active: false }, {});
+    assert.equal(dev.online, false, 'active:false must yield online:false');
+});
+
+test('OOHDASH-80: mapTbDevice defaults online:false when `active` is absent (the old /devices response shape)', () => {
+    const dev = tb.mapTbDevice({ name: 'gk-6261-x', type: 'default' }, {});
+    assert.equal(dev.online, false, 'no active field present → online defaults to false');
 });
