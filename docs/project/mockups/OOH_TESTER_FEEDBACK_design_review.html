@@ -1,0 +1,261 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>OOH Tester Feedback — Design Review (Tests 10 / 11a / 11b / 11c)</title>
+<style>
+  :root{
+    --bg:#f5f7fa; --panel:#fff; --ink:#161a20; --muted:#5c6672; --line:#e4e8ee; --line2:#eef1f5;
+    --accent:#2563eb; --accent-soft:#e9f0ff;
+    --ok:#15803d; --ok-soft:#e6f4ea; --warn:#b45309; --warn-soft:#fbf0dd; --bad:#b91c1c; --bad-soft:#fbe9e9;
+    --pend:#6d28d9; --pend-soft:#efe9fb; --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+    --shadow:0 1px 2px rgba(16,24,40,.05),0 1px 3px rgba(16,24,40,.07); --radius:12px;
+  }
+  @media (prefers-color-scheme:dark){:root{--bg:#0f1216;--panel:#171b21;--ink:#e8ebef;--muted:#98a2b0;--line:#262c34;--line2:#20252c;--accent:#6ea0ff;--accent-soft:#1a2740;--ok:#43c97a;--ok-soft:#12291b;--warn:#e6a54a;--warn-soft:#2a2110;--bad:#f47174;--bad-soft:#2c1414;--pend:#a78bfa;--pend-soft:#211a36;}}
+  :root[data-theme="dark"]{--bg:#0f1216;--panel:#171b21;--ink:#e8ebef;--muted:#98a2b0;--line:#262c34;--line2:#20252c;--accent:#6ea0ff;--accent-soft:#1a2740;--ok:#43c97a;--ok-soft:#12291b;--warn:#e6a54a;--warn-soft:#2a2110;--bad:#f47174;--bad-soft:#2c1414;--pend:#a78bfa;--pend-soft:#211a36;}
+  :root[data-theme="light"]{--bg:#f5f7fa;--panel:#fff;--ink:#161a20;--muted:#5c6672;--line:#e4e8ee;--line2:#eef1f5;--accent:#2563eb;--accent-soft:#e9f0ff;--ok:#15803d;--ok-soft:#e6f4ea;--warn:#b45309;--warn-soft:#fbf0dd;--bad:#b91c1c;--bad-soft:#fbe9e9;--pend:#6d28d9;--pend-soft:#efe9fb;}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);font:14.5px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;-webkit-text-size-adjust:100%}
+  .wrap{max-width:1000px;margin:0 auto;padding:18px 14px 60px}
+  .top{display:flex;flex-wrap:wrap;gap:10px;align-items:flex-start;justify-content:space-between}
+  h1{font-size:19px;margin:0 0 2px;letter-spacing:-.01em}
+  .sub{color:var(--muted);font-size:12.5px;margin:0}
+  .lock{display:inline-flex;gap:7px;align-items:center;background:var(--warn-soft);color:var(--warn);border:1px solid color-mix(in srgb,var(--warn) 30%,transparent);border-radius:999px;padding:6px 11px;font-size:12px;font-weight:600}
+  .banner{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow);padding:12px 14px;margin:13px 0 6px;font-size:13px;color:var(--muted)}
+  .banner b{color:var(--ink)}
+  .btn{font:inherit;cursor:pointer;border:1px solid var(--line);background:var(--panel);color:var(--ink);border-radius:8px;padding:5px 10px;font-size:12px;font-weight:600}
+  h2.sec{font-size:15px;margin:26px 2px 4px;letter-spacing:-.01em}
+  p.secsub{color:var(--muted);font-size:12.5px;margin:0 2px 10px}
+  .chip{display:inline-flex;gap:5px;align-items:center;font-size:11px;font-weight:700;border-radius:999px;padding:2px 9px;white-space:nowrap}
+  .chip.ship{background:var(--ok-soft);color:var(--ok)}
+  .chip.gated{background:var(--warn-soft);color:var(--warn)}
+  .chip.close{background:var(--accent-soft);color:var(--accent)}
+  .chip.leave{background:var(--line2);color:var(--muted)}
+  .cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(232px,1fr));gap:9px}
+  .item{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow);padding:12px 13px;display:flex;flex-direction:column;gap:7px}
+  .item .hd{display:flex;justify-content:space-between;gap:8px;align-items:flex-start}
+  .item .nm{font-weight:700;font-size:13.5px}
+  .item .bd{font-size:12.5px;color:var(--muted)}
+  .item .bd b{color:var(--ink);font-weight:600}
+  .tblwrap{overflow-x:auto;border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow);margin-top:6px}
+  table{border-collapse:collapse;width:100%;min-width:560px;background:var(--panel);font-size:12.5px}
+  th,td{text-align:left;padding:8px 10px;border-bottom:1px solid var(--line2);vertical-align:top}
+  th{font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);background:var(--line2);position:sticky;top:0}
+  td .t{font-weight:600}
+  tr:last-child td{border-bottom:0}
+  .ba{display:grid;grid-template-columns:1fr 1fr;gap:9px}
+  @media (max-width:620px){.ba{grid-template-columns:1fr}}
+  .pane{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow);padding:11px 12px}
+  .pane .lbl{font-size:11px;text-transform:uppercase;letter-spacing:.05em;font-weight:700;margin:0 0 8px;display:inline-flex;gap:6px;align-items:center}
+  .pane.before .lbl{color:var(--bad)} .pane.after .lbl{color:var(--ok)}
+  .txn{font-family:var(--mono);font-size:11.5px;line-height:1.5;color:var(--ink);white-space:pre-wrap;word-break:break-word}
+  .txn .false{color:var(--bad);font-weight:700}
+  .txn .true{color:var(--ok);font-weight:700}
+  .txn .muted{color:var(--muted)}
+  .oc{border:1px solid var(--line);border-radius:9px;padding:9px 10px;font-size:12.5px;margin-top:8px}
+  .oc.bad{border-color:color-mix(in srgb,var(--bad) 40%,var(--line));background:var(--bad-soft)}
+  .oc.good{border-color:color-mix(in srgb,var(--ok) 40%,var(--line));background:var(--ok-soft)}
+  .oc .h{font-weight:700;margin-bottom:3px}
+  .flowbox{border:1px solid var(--line);border-radius:9px;padding:9px 10px;font-size:12.5px;background:var(--line2)}
+  .flowbox .ent{font-family:var(--mono);font-size:11.5px;background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:5px 8px;margin:4px 0;color:var(--ink)}
+  .arrow{text-align:center;color:var(--muted);font-size:16px;margin:2px 0}
+  .drop{color:var(--bad);font-weight:700}
+  .keep{color:var(--ok);font-weight:700}
+  .dec{background:var(--panel);border:1px solid var(--line);border-left:4px solid var(--accent);border-radius:var(--radius);box-shadow:var(--shadow);padding:12px 13px;margin-top:9px}
+  .dec.human{border-left-color:var(--pend)}
+  .dec .id{font-family:var(--mono);font-size:11px;font-weight:700;color:var(--accent);background:var(--accent-soft);border-radius:5px;padding:1px 6px}
+  .dec.human .id{color:var(--pend);background:var(--pend-soft)}
+  .dec .q{font-weight:700;font-size:13.5px;margin:7px 0 4px}
+  .dec .who{font-size:11.5px;color:var(--muted)}
+  .dec .rec{font-size:12.5px;margin-top:7px;padding:8px 10px;border-radius:8px;background:var(--line2);color:var(--muted)}
+  .dec .rec.yes{background:var(--ok-soft);color:var(--ok);font-weight:600}
+  .dec .rec.no{background:var(--bad-soft);color:var(--bad);font-weight:600}
+  .opts{display:flex;flex-direction:column;gap:5px;margin-top:8px}
+  .opt{font-size:12.5px;border:1px solid var(--line);border-radius:8px;padding:6px 9px;display:flex;gap:8px;align-items:baseline}
+  .opt.pick{border-color:color-mix(in srgb,var(--ok) 45%,var(--line));background:var(--ok-soft)}
+  .opt.no{border-color:color-mix(in srgb,var(--bad) 30%,var(--line))}
+  .opt .v{font-weight:700;white-space:nowrap}
+  .opt.pick .v{color:var(--ok)} .opt.no .v{color:var(--bad)}
+  .star{font-size:10px;font-weight:700;color:var(--ok);background:var(--ok-soft);border-radius:999px;padding:1px 7px;margin-left:auto;white-space:nowrap}
+  .foot{color:var(--muted);font-size:12px;margin-top:26px;border-top:1px solid var(--line);padding-top:12px}
+  .foot code{font-family:var(--mono);background:var(--accent-soft);color:var(--accent);padding:.5px 5px;border-radius:5px;font-size:11px}
+  a{color:var(--accent)}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="top">
+    <div><h1>OOH Triage — Tester Feedback design review</h1><p class="sub">Design gate · Tony Willetts Tier-1 · open items Tests 10 / 11a / 11b / 11c · 2026-09-18</p></div>
+    <span class="lock">🔒 WRITES_DISABLED — no write-flip proposed</span>
+  </div>
+
+  <div class="banner">
+    Tony's Tier-1 pack was <b>6 pass / 7 fail</b>. The TB-direct read cutover already resolved six fails (they need a live re-test, not new build). <b>Four items remain</b> — two in-repo trust defects that ship now (Test 10, Test 11c) and two externally gated (Test 11a welfare flows, Test 11b real gateway). This page lets you review the four items, the full per-test disposition, the before/after for the two trust fixes, and the decisions this gate asks of you.
+    <button class="btn" id="themeBtn" style="float:right">◐ theme</button>
+  </div>
+
+  <!-- FOUR ITEMS -->
+  <h2 class="sec">The four open items</h2>
+  <p class="secsub">Each traced to a code-confirmed root cause. Status chip shows whether it builds now or waits on a gate.</p>
+  <div class="cards">
+    <div class="item">
+      <div class="hd"><span class="nm">Test 10 — typed words dropped</span><span class="chip ship">Ship now</span></div>
+      <div class="bd"><b>Cause:</b> category tiles start a flow with no free-text arg (<code style="font-family:var(--mono);font-size:11px">views.js:177</code>), so the handler's typed words never reach the ticket. The suggestion chip already carries them.</div>
+      <div class="bd"><b>Fix:</b> a thin <code style="font-family:var(--mono);font-size:11px">startTileFlow</code> wrapper carries the words from state (mirrors the chip) + echo them on the confirmation card.</div>
+    </div>
+    <div class="item">
+      <div class="hd"><span class="nm">Test 11a — auto-P1</span><span class="chip gated">Gated · James+Sam</span></div>
+      <div class="bd"><b>Cause:</b> P1 is hard-coded in three flows (fine as-is). Welfare flows don't capture the qualifying signal (vulnerability / active-safety), so it's new logic, not routing.</div>
+      <div class="bd"><b>Fix:</b> new in-flow qualifying step routes to P1; a <code style="font-family:var(--mono);font-size:11px">p1Reason</code> tag; an audited, reason-tagged escape-hatch. Flow selection is your call (D-11a-1).</div>
+    </div>
+    <div class="item">
+      <div class="hd"><span class="nm">Test 11b — real SMS gateway</span><span class="chip gated">Gated · OOHDASH-73</span></div>
+      <div class="bd"><b>Cause:</b> provider is in <code style="font-family:var(--mono);font-size:11px">log</code> mode; the Twilio path already exists. Enabling is a config/secret op, not new code.</div>
+      <div class="bd"><b>Fix:</b> a startup config-guard makes a half-configured gateway fail loudly at deploy. Needs sign-off, on-duty number, creds (D-11b).</div>
+    </div>
+    <div class="item">
+      <div class="hd"><span class="nm">Test 11c — false "SMS sent"</span><span class="chip ship">Ship now · decoupled</span></div>
+      <div class="bd"><b>Cause:</b> log-mode no-op is recorded as a send; the transcript is baked before dispatch runs, so a naive conditional is impossible.</div>
+      <div class="bd"><b>Fix:</b> honest first comment + a corrective second comment (proven late-sync pattern); card tells the truth and states the next action.</div>
+    </div>
+  </div>
+
+  <!-- DISPOSITION TABLE -->
+  <h2 class="sec">Per-test disposition — all 13 tests</h2>
+  <p class="secsub">Close-after-retest = resolved by deployed work, needs a live handler re-test then close. Design-needed = the four items above. Leave-alone = passed.</p>
+  <div class="tblwrap">
+    <table id="disp">
+      <thead><tr><th>Test</th><th>Tony's item</th><th>Result</th><th>Disposition</th></tr></thead>
+      <tbody></tbody>
+    </table>
+  </div>
+
+  <!-- TEST 11c BEFORE/AFTER -->
+  <h2 class="sec">Test 11c — false "SMS sent" today vs honest after</h2>
+  <p class="secsub">The operator card and the ticket both claim a text was sent when nothing was (log mode). After: the card tells the truth and states the next action; the ticket keeps an honest first comment and carries a corrective second comment.</p>
+  <div class="ba">
+    <div class="pane before">
+      <p class="lbl">✕ Today (log mode)</p>
+      <div class="oc bad"><div class="h">Operator card</div>A text message has been sent to the on-duty escalation manager.</div>
+      <div style="margin-top:9px" class="txn"><span class="muted">Ticket [TRG] first comment:</span>
+Outcome: escalate-p1
+<span class="false">P1 escalation → SMS dispatched to on-duty manager</span>
+<span class="muted">(nothing was actually sent — no gateway)</span></div>
+    </div>
+    <div class="pane after">
+      <p class="lbl">✓ After (still log mode)</p>
+      <div class="oc good"><div class="h">Operator card</div><b>Text not sent — phone the on-duty manager now.</b> The P1 is logged as ticket #48663.</div>
+      <div style="margin-top:9px" class="txn"><span class="muted">Ticket [TRG] first comment (honest, frozen):</span>
+Outcome: escalate-p1
+<span class="true">P1 escalation raised — on-duty manager to be paged</span>
+<span class="muted">— second comment appended after dispatch —</span>
+<span class="true">[TRG] ⚠ P1 SMS NOT SENT — gateway in log mode.
+ACTION NEEDED: phone the on-duty manager now.
+#ooh-p1-dispatch</span></div>
+    </div>
+  </div>
+
+  <!-- TEST 10 ILLUSTRATION -->
+  <h2 class="sec">Test 10 — typed words dropped vs carried through</h2>
+  <p class="secsub">The handler types the caller's words, then clicks a category tile. Today the words are dropped on that path; after, they ride through to the ticket and the card — exactly as the "Sounds like" chip already does.</p>
+  <div class="ba">
+    <div class="pane before">
+      <p class="lbl">✕ Today — tile path</p>
+      <div class="flowbox">Handler types:<div class="ent">"boiler's making a banging noise, no heat"</div>
+        <div class="arrow">↓ click category tile</div>
+        <div class="drop">typed words dropped (freeText = null)</div>
+        <div class="arrow">↓</div>
+        Ticket: <span class="drop">no "Caller's words" line</span></div>
+    </div>
+    <div class="pane after">
+      <p class="lbl">✓ After — startTileFlow wrapper</p>
+      <div class="flowbox">Handler types:<div class="ent">"boiler's making a banging noise, no heat"</div>
+        <div class="arrow">↓ click category tile</div>
+        <div class="keep">words carried from state (like the chip)</div>
+        <div class="arrow">↓</div>
+        Ticket: <span class="keep">Caller's words: "boiler's making…"</span><br>
+        Card: <span class="keep">Recorded from the caller: "boiler's making…"</span></div>
+    </div>
+  </div>
+
+  <!-- DECISIONS -->
+  <h2 class="sec">Decisions this gate asks of you</h2>
+  <p class="secsub">Highlighted rows show the design's recommendation. D-11a-1 is a James + Sam product call; the rest are gate confirmations.</p>
+
+  <div class="dec">
+    <span class="id">D-10a</span> <span class="who">· Owner: Gate</span>
+    <div class="q">Echo the handler's typed words on the confirmation card (not only the ticket)?</div>
+    <div class="rec yes">Recommend YES — note retention is a trust criterion the handler verifies at their own screen. Low cost: the flow panel already renders the words mid-flow; the card does not.</div>
+  </div>
+
+  <div class="dec">
+    <span class="id">D-10b</span> <span class="who">· Owner: Gate</span>
+    <div class="q">Add an optional "notes for the IoT team" outcome-compose field?</div>
+    <div class="rec no">Recommend NO for R1 — not needed to fix Test 10 and adds surface. Defer unless the gate wants it.</div>
+  </div>
+
+  <div class="dec human">
+    <span class="id">D-11a-1</span> <span class="who">· Owner: James + Sam (product call)</span>
+    <div class="q">Which welfare flows warrant auto-P1?</div>
+    <div class="opts">
+      <div class="opt pick"><span class="v">Heating</span><span>P1 on total heat-loss + vulnerable occupants / hard-freeze</span><span class="star">recommended default</span></div>
+      <div class="opt pick"><span class="v">Fan</span><span>P1 on active cooking + gas-safety / extraction failure only</span><span class="star">recommended default</span></div>
+      <div class="opt no"><span class="v">Hot-water</span><span>NOT auto-P1 (edge: care setting)</span></div>
+      <div class="opt no"><span class="v">Lighting</span><span>NOT auto-P1 (premises-dark is a site-electrician matter)</span></div>
+      <div class="opt no"><span class="v">Connectivity / other</span><span>NOT auto-P1 — covered by the escape-hatch</span></div>
+    </div>
+    <div class="rec">Gate accepts or amends. Each "P1" flow implies a new in-flow qualifying step to capture the signal the flow does not capture today.</div>
+  </div>
+
+  <div class="dec">
+    <span class="id">D-11a-2</span> <span class="who">· Owner: Gate</span>
+    <div class="q">Escape-hatch UX — placement and copy of the reason-tagged confirm-prompt.</div>
+    <div class="rec">Recommend a confirm-with-mandatory-reason action on every non-P1 outcome card, tagged <code style="font-family:var(--mono);font-size:11px">operator-override</code> and audited. NOT a bare "escalate as P1" button — so "no auto-P1 button" never means "no P1 path".</div>
+  </div>
+
+  <div class="dec human">
+    <span class="id">D-11b</span> <span class="who">· Owner: James / Spencer (OOHDASH-73 #4)</span>
+    <div class="q">Go/no-go — enable the real gateway? On-duty number confirmed? Creds present?</div>
+    <div class="rec">Design is switch-on-when-ready. No-go ⇒ 11b defers and 11c ships anyway (the app is truthful in log mode regardless).</div>
+  </div>
+
+  <p class="foot">
+    Full design: <code>OOH_TESTER_FEEDBACK_DESIGN_2026-09-18.md</code> · discovery: <code>OOH_TESTER_FEEDBACK_DISCOVERY_2026-09-18.md</code> · gate: <code>OOH_TESTER_FEEDBACK_DESIGN_GATE.md</code>.
+    Ship now: Test 10 + Test 11c (in-repo, no external party; Test 10 lands before any write-flip). Gated: Test 11a welfare flows (James + Sam), Test 11b real gateway (OOHDASH-73). On <b>Accept</b>, build begins on 10 + 11c; the welfare flows and 11b are held. Writes stay <code>LOCKED</code>; this gate authorises the build, not any live write.
+  </p>
+</div>
+
+<script>
+const ROWS=[
+ ['1','Search a site by number — no name shown','FAIL','close','Close-after-retest'],
+ ['2','Search a site by name — no sites found','FAIL','close','Close-after-retest'],
+ ['3','Confirm the correct site — no name/location','FAIL','close','Close-after-retest'],
+ ['4','Ambiguous entry correctly rejected','PASS','leave','Leave-alone'],
+ ['5','Read live device status — only Salus shown','FAIL','close','Close-after-retest'],
+ ['6','Lighthouse scope tiles — "only control heating"','FAIL','close','Close-after-retest'],
+ ['7','Recent tickets view','PASS','leave','Leave-alone'],
+ ['8','Callback lookup','PASS','leave','Leave-alone'],
+ ['9','Tonight view','PASS','leave','Leave-alone'],
+ ['10','Record an outcome — typed notes missing','FAIL','ship','Design-needed · Ship now'],
+ ['11a','Escalate P1 — only via Contractor','FAIL','gated','Design-needed · James+Sam'],
+ ['11b','Escalate P1 — no text sent','FAIL','gated','Design-needed · OOHDASH-73'],
+ ['11c','App claims a text was sent when it was not','FAIL','ship','Design-needed · Ship now'],
+ ['12','Safety-lock negative test','PASS','leave','Leave-alone'],
+ ['13','Add a follow-up note','PASS','leave','Leave-alone'],
+];
+const RES={FAIL:'bad',PASS:'ok'};
+const tb0=document.querySelector('#disp tbody');
+ROWS.forEach(r=>{
+  const tr=document.createElement('tr');
+  const chipClass=r[3];
+  tr.innerHTML=`<td class="t">${r[0]}</td><td>${r[1]}</td>`+
+    `<td><span class="chip ${r[2]==='FAIL'?'':''}" style="background:${r[2]==='FAIL'?'var(--bad-soft)':'var(--ok-soft)'};color:${r[2]==='FAIL'?'var(--bad)':'var(--ok)'}">${r[2]}</span></td>`+
+    `<td><span class="chip ${chipClass}">${r[4]}</span></td>`;
+  tb0.appendChild(tr);
+});
+const tb=document.getElementById('themeBtn');
+tb.onclick=()=>{const r=document.documentElement;const cur=r.getAttribute('data-theme')||(matchMedia('(prefers-color-scheme:dark)').matches?'dark':'light');r.setAttribute('data-theme',cur==='dark'?'light':'dark');};
+</script>
+</body>
+</html>
