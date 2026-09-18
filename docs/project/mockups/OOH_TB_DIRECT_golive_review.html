@@ -1,0 +1,110 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>OOH TB-Direct — Go-Live Go/No-Go</title>
+<style>
+  :root{
+    --bg:#f5f7fa;--panel:#fff;--ink:#161a20;--muted:#5c6672;--line:#e4e8ee;--line2:#eef1f5;
+    --accent:#2563eb;--accent-soft:#e9f0ff;
+    --ok:#15803d;--ok-soft:#e6f4ea;--warn:#b45309;--warn-soft:#fbf0dd;--bad:#b91c1c;--bad-soft:#fbe9e9;
+    --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;--shadow:0 1px 2px rgba(16,24,40,.05),0 1px 3px rgba(16,24,40,.07);--radius:12px;
+  }
+  @media (prefers-color-scheme:dark){:root{--bg:#0f1216;--panel:#171b21;--ink:#e8ebef;--muted:#98a2b0;--line:#262c34;--line2:#20252c;--accent:#6ea0ff;--accent-soft:#1a2740;--ok:#43c97a;--ok-soft:#12291b;--warn:#e6a54a;--warn-soft:#2a2110;--bad:#f47174;--bad-soft:#2c1414;}}
+  :root[data-theme="dark"]{--bg:#0f1216;--panel:#171b21;--ink:#e8ebef;--muted:#98a2b0;--line:#262c34;--line2:#20252c;--accent:#6ea0ff;--accent-soft:#1a2740;--ok:#43c97a;--ok-soft:#12291b;--warn:#e6a54a;--warn-soft:#2a2110;--bad:#f47174;--bad-soft:#2c1414;}
+  :root[data-theme="light"]{--bg:#f5f7fa;--panel:#fff;--ink:#161a20;--muted:#5c6672;--line:#e4e8ee;--line2:#eef1f5;--accent:#2563eb;--accent-soft:#e9f0ff;--ok:#15803d;--ok-soft:#e6f4ea;--warn:#b45309;--warn-soft:#fbf0dd;--bad:#b91c1c;--bad-soft:#fbe9e9;}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);font:14.5px/1.55 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;-webkit-text-size-adjust:100%}
+  .wrap{max-width:960px;margin:0 auto;padding:18px 14px 60px}
+  h1{font-size:19px;margin:0 0 2px;letter-spacing:-.01em}
+  .sub{color:var(--muted);font-size:12.5px;margin:0}
+  .alert{background:var(--bad-soft);color:var(--bad);border:1px solid color-mix(in srgb,var(--bad) 30%,transparent);border-radius:var(--radius);padding:12px 14px;margin:14px 0;font-size:13.5px;font-weight:600;display:flex;gap:10px;align-items:flex-start}
+  .alert b{font-weight:800}
+  h2{font-size:12px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);margin:24px 0 10px}
+  .cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:9px}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow);padding:12px 13px}
+  .card .t{font-weight:600;font-size:13.5px;margin:0 0 6px}
+  .card .d{color:var(--muted);font-size:12.5px}
+  .chip{display:inline-block;font-size:10.5px;font-weight:700;padding:2px 8px;border-radius:999px;margin-bottom:7px}
+  .chip.ok{background:var(--ok-soft);color:var(--ok)} .chip.warn{background:var(--warn-soft);color:var(--warn)} .chip.held{background:var(--line2);color:var(--muted)}
+  .board{display:grid;grid-template-columns:1fr;gap:7px}
+  .item{display:flex;gap:10px;align-items:flex-start;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:9px 12px;box-shadow:var(--shadow)}
+  .item .st{font-size:10.5px;font-weight:700;padding:2px 8px;border-radius:999px;white-space:nowrap;margin-top:1px}
+  .st.proven{background:var(--ok-soft);color:var(--ok)} .st.assumed{background:var(--warn-soft);color:var(--warn)} .st.held{background:var(--line2);color:var(--muted)}
+  .item .x{font-size:13px} .item .x b{font-weight:600}
+  .item .x .why{color:var(--muted);font-size:12.5px}
+  ol.steps{list-style:none;counter-reset:s;padding:0;margin:0}
+  ol.steps li{counter-increment:s;position:relative;background:var(--panel);border:1px solid var(--line);border-radius:10px;box-shadow:var(--shadow);margin-bottom:8px;padding:11px 13px 11px 46px;cursor:pointer}
+  ol.steps li::before{content:counter(s);position:absolute;left:12px;top:11px;width:22px;height:22px;border-radius:50%;background:var(--accent);color:#fff;font-weight:700;font-size:12px;display:flex;align-items:center;justify-content:center}
+  ol.steps li.canary::before{background:var(--warn)}
+  ol.steps li .hd{font-weight:600;font-size:13.5px}
+  ol.steps li .dt{display:none;color:var(--muted);font-size:12.5px;margin-top:6px;font-family:var(--mono);white-space:pre-wrap}
+  ol.steps li.open .dt{display:block}
+  .abort{background:var(--panel);border:1px solid var(--line);border-left:3px solid var(--bad);border-radius:var(--radius);box-shadow:var(--shadow);padding:13px 15px}
+  .abort .r{display:flex;gap:9px;margin:6px 0;font-size:13px} .abort .n{font-weight:700;color:var(--bad);min-width:78px}
+  code{font-family:var(--mono);background:var(--accent-soft);color:var(--accent);padding:.5px 5px;border-radius:5px;font-size:11.5px}
+  .foot{color:var(--muted);font-size:12px;margin-top:24px;border-top:1px solid var(--line);padding-top:12px}
+  .btn{cursor:pointer;border:1px solid var(--line);background:var(--panel);color:var(--muted);border-radius:8px;padding:5px 10px;font:inherit;font-size:12px;float:right}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>OOH TB-Direct — Go-Live Go/No-Go <button class="btn" id="themeBtn">◐ theme</button></h1>
+  <p class="sub">go/no-go #3 · deploy the read+control build AND lift the write-lock · one approval</p>
+
+  <div class="alert">⚠ <div><b>This makes control actuate real devices at real pubs.</b> Two production changes at once: the operator view (1-of-23 heating → full estate) and live device writes (<code>WRITES_DISABLED=false</code>). The write-flip is the least-reversible act in the programme — the kill-switch is your instant undo.</div></div>
+
+  <h2>What ships</h2>
+  <div class="cards">
+    <div class="card"><span class="chip ok">READ CUTOVER</span><p class="t">Full site estate by category</p><p class="d">Heating, kitchen, lighting, fans, metering — direct from ThingsBoard, replacing the bridge's 1-of-23 view.</p></div>
+    <div class="card"><span class="chip ok">CONTROL v1</span><p class="t">Tuya on/off + setpoint</p><p class="d">Kitchen/lighting/fans/over-door switches + Salus & Intesis setpoint.</p></div>
+    <div class="card"><span class="chip held">HELD</span><p class="t">Monitor + escalate</p><p class="d">Intesis on/off, Salus IT500 hot-water boost, multi-gang switch_2, boiler control.</p></div>
+  </div>
+
+  <h2>Readiness — proven vs assumed vs held</h2>
+  <div class="board" id="board"></div>
+
+  <h2>Recommended rollout (inside this one approval · tap a step)</h2>
+  <ol class="steps" id="steps"></ol>
+
+  <h2>Abort / rollback — fastest first</h2>
+  <div class="abort">
+    <div class="r"><span class="n">Instant</span><div>Runtime <b>kill-switch</b> (global or per-site, Cosmos-persisted) — blocks all/any writes immediately, no deploy. Reads continue.</div></div>
+    <div class="r"><span class="n">~1 min</span><div>Re-lock: <code>set env WRITES_DISABLED=true</code> → rollout. Absence/typo also disables (fail-closed).</div></div>
+    <div class="r"><span class="n">~2 min</span><div>Roll back the code: <code>kubectl rollout undo</code> — reverts the read cutover too.</div></div>
+  </div>
+
+  <p class="foot">Runbook: <code>OOH_TB_DIRECT_GOLIVE_RUNBOOK.md</code> · design <code>OOH_TB_DIRECT_READ_CONTROL_DESIGN.md</code> · contract <code>OOH_TB_DIRECT_CONTROL_SPEC_2026-09-17.md</code>.
+  Out of scope: SMS go-live (<code>SMS_PROVIDER=log</code> stays), held control surfaces, least-privilege read-role binding. <b>Accept</b> authorises the deploy AND the write-flip; <b>Amend</b> to split them, require the read-role first, or start Tuya-only.</p>
+</div>
+
+<script>
+const BOARD=[
+ ['proven','161 unit tests green on main','the full read+control build'],
+ ['proven','Bench control smoke — live over HTTP','Tuya write→confirm reached synced (fresh echo); the /values/timeseries confirm-read works (a latent bug we fixed); edge-aware no-op + registration probe proven'],
+ ['proven','Read plane live','validation: site 6261 = 23 devices, multi-site, telemetry'],
+ ['proven','Safety levers','kill-switch (global + per-site, instant); handler roles provisioned; WRITES_DISABLED fail-closed'],
+ ['assumed','Live setpoint round-trip through our confirm loop','write path + confirm-read proven; a full setpoint→synced on a live-echoing thermostat not yet observed (bench Intesis dormant). Guard fails safe (honest timeout); watch on the canary'],
+ ['assumed','Least-privilege read role','both TB accounts still TENANT_ADMIN — a leaked read cred could write outside the app. App path guarded by WRITES_DISABLED + kill-switch; bind Airedale Read Only to close (Spencer, independent)'],
+ ['held','Intesis on/off, IT500 hwBoost, multi-gang, boiler','render as monitor + escalate; no live actuation in v1'],
+];
+const STEPS=[
+ ['Deploy (writes still locked)','Quiet hours (replicas:1 re-SSOs users). Build from git archive → az acr build → kubectl set image → rollout. WRITES_DISABLED still true.'],
+ ['Verify read cutover','/healthz healthy, writesDisabled:true. Full estate renders across categories; no heating-path regression; logs clean.'],
+ ['Arm safety','Engage per-site kill-switches for all but ONE canary site, so the first live write is contained.'],
+ ['Write-flip (go/no-go #3)','kubectl set env WRITES_DISABLED=false → rollout → /healthz writesDisabled:false. The single enable diff.'],
+ ['Canary live write','One Tuya switch off→on on the canary → confirm synced + audit + revert; watch a real setpoint round-trip. Clean → release other sites. Bad → kill-switch instantly.'],
+];
+const b=document.getElementById('board');
+BOARD.forEach(([st,t,why])=>{const e=document.createElement('div');e.className='item';
+  const lbl=st==='proven'?'PROVEN':st==='assumed'?'ASSUMED':'HELD';
+  e.innerHTML=`<span class="st ${st}">${lbl}</span><div class="x"><b>${t}</b><div class="why">${why}</div></div>`;b.appendChild(e);});
+const s=document.getElementById('steps');
+STEPS.forEach(([hd,dt],i)=>{const li=document.createElement('li');if(i===4||i===2)li.className='canary';
+  li.innerHTML=`<div class="hd">${hd}</div><div class="dt">${dt}</div>`;
+  li.onclick=()=>li.classList.toggle('open');s.appendChild(li);});
+document.getElementById('themeBtn').onclick=()=>{const r=document.documentElement;const c=r.getAttribute('data-theme')||(matchMedia('(prefers-color-scheme:dark)').matches?'dark':'light');r.setAttribute('data-theme',c==='dark'?'light':'dark');};
+</script>
+</body>
+</html>
