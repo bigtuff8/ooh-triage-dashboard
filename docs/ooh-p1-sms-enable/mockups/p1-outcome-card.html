@@ -73,7 +73,7 @@
 <body>
 <div class="wrap">
   <h1>P1 escalation outcome card — the two states</h1>
-  <p class="lede">This is the exact card an OOH handler sees at the end of a system-decided P1 flow (<span class="mono">outcomeP1</span>, <span class="mono">public/js/flows.js:166-174</span>). The only thing that changes between the two states is the deployment value <span class="mono">SMS_PROVIDER</span>. Flip the switch below to see what today (log) looks like versus what enablement (twilio) delivers. No real phone numbers appear anywhere — the recipient is shown by name only, exactly as the product persists it.</p>
+  <p class="lede">This is the exact card an OOH handler sees at the end of a system-decided P1 flow (<span class="mono">outcomeP1</span>, <span class="mono">public/js/flows.js:166-174</span>). The only thing that changes between the two states is the deployment value <span class="mono">SMS_PROVIDER</span>. Flip the switch below to see what today (log) looks like versus what enablement (twilio) delivers. No real phone numbers appear anywhere — the recipient is shown by a <b>real name</b> only (never the generic "On-duty escalation manager" default), exactly as the product must persist it. <b>Mobile sign-off:</b> this card is read on a phone out of hours, so all three states are laid out to reflow to phone width — the sent variant keeps the timestamp and the tappable ticket deep-link readable. Confirming that on a real phone-width viewport is a required live-test sign-off item (DESIGN-GATE.md §4).</p>
 
   <div class="controls">
     <div class="row">
@@ -123,7 +123,10 @@
   // Realistic, stable sample data — real field names, realistic values, no lorem, no real numbers.
   var TICKET = '48231';
   var LINK = 'https://iot-support.airedale-group.co.uk/?ticket=' + TICKET; // sample host, not a secret
-  var MANAGER = 'On-duty escalation manager';
+  // A REAL on-duty name — the product must never persist the generic
+  // "On-duty escalation manager" default (see DESIGN-GATE.md §1 / §6). IoT Support
+  // (Sam Day's team) owns and rotates this value; shown here as a realistic sample.
+  var MANAGER = 'Darren Booth (on-duty)';
   var TIME = '02:14';
 
   var STATES = {
