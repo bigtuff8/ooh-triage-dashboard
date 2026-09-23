@@ -1,0 +1,13 @@
+{
+  "run": "selfgate-ooh-triage-dashboard-design-oohdash-82-area-model",
+  "phase": "design",
+  "pr": 44,
+  "approvedBy": [
+    "bigtuff8"
+  ],
+  "reviewComments": [],
+  "mergeCommit": "7768535e2ebd11ea79916a1cb721290f1b0e823f",
+  "phaseBranch": "design/oohdash-82-area-model",
+  "releaseBranch": "main",
+  "stamp": 1790173142074
+}
