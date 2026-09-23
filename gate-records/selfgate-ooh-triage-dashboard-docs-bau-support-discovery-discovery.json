@@ -1,0 +1,15 @@
+{
+  "run": "selfgate-ooh-triage-dashboard-docs-bau-support-discovery",
+  "phase": "discovery",
+  "pr": 35,
+  "approvedBy": [
+    "bigtuff8"
+  ],
+  "reviewComments": [
+    "bigtuff8: - Proceed to Stage 2 (design the final support document)?: Approve — proceed to design\n- Live prototype — click through the actual screen: (no option selected) — note: 1. i believe the sms is still canary gated, but we need to and will switch it on\n2. before the product gets to them - control will be enabled\n3. anything P2+ will be a ticket that gets picked up by the team the following day, in hours\n4. yes, confirm its from the system all the devices are wired back too, thingsboard\n5. i dont know - i dont understand the question therefore am unable to answer it\n\n(submitted via the interactive gate review)"
+  ],
+  "mergeCommit": "23edb07e33ba8f4fd26fdf31c31ffca49d4e2d5c",
+  "phaseBranch": "docs/bau-support-discovery",
+  "releaseBranch": "main",
+  "stamp": 1790155622468
+}
