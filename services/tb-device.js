@@ -161,6 +161,63 @@ const ASSET_INTENT = [
     { tokens: ['gateway', 'r10a', 'dragino', 'gw'], kind: 'gateway', deviceType: 'gateway', label: 'Lighthouse gateway' }
 ];
 
+/* ------------------------------------------------------------------ */
+/* Refrigeration switch-deny (Stream A / OOHDASH-19) — design §3        */
+/* ------------------------------------------------------------------ */
+
+// Refrigeration APPLIANCE nouns — ALWAYS monitor-only, with NO override consulted. Each is matched
+// with `norm.includes(...)` over the REAL normaliser (lower-case, strip parens, `_`→`-`, collapse
+// whitespace). Because normaliseName maps `_`→`-` but NOT `-`→space, both "cold-room" and "cold_room"
+// normalise to `cold-room`; all three literal shapes of "cold room" are listed so EVERY written form
+// is caught (`cold_room` is covered by `cold-room` after normalisation). Every token is ≥5 chars or an
+// unambiguous hyphenated/spaced pair, so substring matching is bleed-safe.
+export const REFRIG_APPLIANCE = ['fridge', 'freezer', 'chiller', 'coldroom', 'cold-room', 'cold room', 'refrigeration', 'refrig'];
+
+// LOCATION class — monitor-only UNLESS an explicit controllable-appliance token is also present
+// (a cellar LIGHT or FAN is a real switchable circuit that merely sits in the cellar).
+export const REFRIG_LOCATION = ['cellar'];
+
+// Device PROFILE deny signal — additive, deny-only, overridable like the location class.
+// FIXME(CR3): held EMPTY until the read-only ThingsBoard probe (CR3, the first build input) confirms
+// the live cellar/refrigeration profile string(s); populate from data/cr3-cellar-profile.json. An
+// empty list is fail-closed (the profile signal is inert; the name-token deny + registry backstop
+// still protect every recognised device). An empty/incomplete list ONCE CR3 has landed is a defect,
+// not a valid state — test/refrigeration-deny.test.js FAILS if the CR3 artefact exists but this list
+// is still empty/incomplete.
+export const REFRIG_PROFILES = [];
+
+// Controllable-appliance OVERRIDE tokens — an explicit one of these in the name WINS over the
+// location word `cellar` and the profile (but NEVER over an appliance noun). Matched as a SUBSTRING
+// of the normalised name INCLUDING the short tokens (`fan`, `lgt`) so GLUED forms (`cellarfan-1`,
+// `cellarlgt-1`, `cellarlight-1`) are recognised as controllable. Safe: the override is only ever
+// consulted for a location/profile device carrying NO appliance noun, and no cooling/location word
+// contains any override token as a substring. Bare generic power words (`switch`, `relay`,
+// `contactor`, `powerpause`) are DELIBERATELY excluded — a cellar device carrying only such a word is
+// ambiguous (could be the cooling relay), so fail-closed keeps it monitor-only (design §3.2).
+export const CTRL_OVERRIDE = ['light', 'lighting', 'lgt', 'fan', 'extractfan', 'extractor', 'socket', 'fryer', 'grill', 'bainmarie', 'potwash', 'oven', 'dishwash'];
+
+/**
+ * isRefrigerationDeny(norm, profile) — true when the device is refrigeration and must be forced
+ * monitor-only EVEN IF it carries a switch signal (design §3.3). `norm` is the already-normalised
+ * name; `profile` is the raw TB profile/type string. Fail-closed.
+ */
+export function isRefrigerationDeny(norm, profile) {
+    const n = String(norm || '');
+    const p = String(profile || '').toLowerCase();
+    const hasAppliance = REFRIG_APPLIANCE.some(t => n.includes(t));
+    const hasLocation = REFRIG_LOCATION.some(t => n.includes(t));
+    const hasProfile = REFRIG_PROFILES.some(t => p.includes(t));
+    if (!hasAppliance && !hasLocation && !hasProfile) return false;   // not refrigeration
+    // ASSUMPTION (verify at CR3, §9): no controllable circuit in the estate carries a refrigeration
+    // appliance noun in its name. An appliance noun therefore returns the deny with NO override
+    // consulted — e.g. "fridge-light-circuit" is monitor-only despite the `light` token. Fail-closed.
+    if (hasAppliance) return true;
+    // Location- or profile-only → yield to an explicit controllable-appliance token. Substring-match
+    // EVERY override token (incl. short `fan`/`lgt`) so glued forms are recognised as controllable.
+    const override = CTRL_OVERRIDE.some(t => n.includes(t));
+    return !override;
+}
+
 /** Bounded Levenshtein distance (early-exit at > max) — for near-miss asset tokens only. */
 function levWithin(a, b, max) {
     if (Math.abs(a.length - b.length) > max) return max + 1;
@@ -199,6 +256,16 @@ function hasSetpointSignal(t) {
 export function classifyDevice(name, profile, telemetry) {
     const norm = normaliseName(name);
     const tokens = norm.split(/[-\s]+/).filter(Boolean);
+
+    // 0) Refrigeration switch-deny (Stream A / OOHDASH-19) — the FIRST branch, highest precedence.
+    // A refrigeration asset (fridge/freezer/chiller/cold room/refrigeration, a cellar unit with no
+    // controllable-override token, or — once CR3 lands — a confirmed cellar profile) is ALWAYS
+    // monitor-only, EVEN when it carries a switch signal. Returning early gives this deny precedence
+    // over BOTH the capability-first switch intent AND matchAssetIntent: the switch telemetry never
+    // reaches hasSwitchSignal and no fuzzy name pass can pull a fridge into `kitchen`.
+    if (isRefrigerationDeny(norm, profile)) {
+        return { kind: 'fridge', deviceType: 'refrigeration', deviceTypeLabel: 'Refrigeration (monitor-only)', controllable: false, control: null };
+    }
 
     // 1) Capability from telemetry signals first (control-eligibility, never profile).
     let intent = null;

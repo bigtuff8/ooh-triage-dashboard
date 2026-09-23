@@ -25,6 +25,7 @@ import { startWorker } from './services/overrides.js';
 import { activeAlerts } from './services/metrics.js';
 import { controlQueueStatus } from './services/control.js';
 import { startLivenessMonitor } from './services/liveness.js';
+import { runRefrigerationBootGuard } from './services/refrig-guard.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -142,6 +143,12 @@ async function start() {
     }
     startWorker(); // durable hold reverts resume after restart (F010 overrides)
     startLivenessMonitor(); // F010 — producer business-liveness self-check (no-overnight-activity)
+    // Stream A / OOHDASH-19 runtime boot guard (§6.1): if writes are enabled but the refrigeration
+    // switch-deny is missing from this image, keep writes LOCKED (via killswitch latch) and log hard.
+    const refrigGuard = runRefrigerationBootGuard(config);
+    if (refrigGuard.lockWrites) {
+        console.error('[REFRIG-GUARD] Writes remain LOCKED until an image carrying the refrigeration switch-deny is deployed.');
+    }
     app.listen(config.port, () => {
         console.log(`OOH Dashboard v${config.appVersion} on port ${config.port}`);
         console.log(`  auth: ${config.authMode} · data: ${config.dataMode} · origin: ${config.appOrigin}`);

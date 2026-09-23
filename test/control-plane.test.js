@@ -90,6 +90,23 @@ test('switch validation — strict boolean only; single-gang; non-boolean reject
     assert.equal(registry.validateCommand(dt, 'switch', 'on').ok, false, 'string "on" is not a boolean');
 });
 
+test('refrigeration type — capabilitiesFor has an empty command list (monitor-only) [Stream A]', () => {
+    const e = registry.capabilitiesFor('refrigeration');
+    assert.equal(e.label, 'Refrigeration (monitor-only)');
+    assert.deepEqual(e.commands, [], 'refrigeration commands must be empty so no button renders and the write guard rejects');
+});
+
+test('refrigeration write guard — a switch is REJECTED (empty commands + explicit deviceType backstop) [Stream A]', () => {
+    const dr = { deviceType: 'refrigeration', telemetry: { switch_1: true } };
+    const r = registry.validateCommand(dr, 'switch', false);
+    assert.equal(r.ok, false, 'a refrigeration device can never accept a switch');
+    assert.match(r.reason, /monitor-only|not permitted|switching/i);
+    // Backstop holds independently of the value type (proves it is the deviceType refusal, not the
+    // strict-boolean check, that fires first).
+    assert.equal(registry.validateCommand(dr, 'switch', true).ok, false);
+    assert.equal(registry.validateCommand(dr, 'switch', 'nonsense').ok, false);
+});
+
 test('mode rejected in v1 — no deviceType admits modeDesired (mode/on-off HELD)', () => {
     for (const type of ['intesis', 'salus-it500', 'salus-it700', 'tuya']) {
         const d = { deviceType: type, telemetry: { heatingSetpoint: 20, mode: 'heat' } };

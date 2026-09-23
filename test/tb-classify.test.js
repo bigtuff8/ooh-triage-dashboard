@@ -120,6 +120,109 @@ test('classify typo-tolerance: `extracfan`→extractfan (fan) and `bainmare`→b
 });
 
 /* ------------------------------------------------------------------ */
+/* Refrigeration switch-deny (Stream A / OOHDASH-19) — design §3, §8.1  */
+/* ------------------------------------------------------------------ */
+
+test('refrig deny: cellar + switch → monitor-only refrigeration (deny beats the capability-first switch intent)', () => {
+    const c = classifyDevice('gk-6261-cellar-1', 'default', { switchReported: true });
+    assert.equal(c.kind, 'fridge');
+    assert.equal(c.deviceType, 'refrigeration');
+    assert.equal(c.deviceTypeLabel, 'Refrigeration (monitor-only)');
+    assert.equal(c.controllable, false);
+    assert.equal(c.control, null);
+});
+
+test('refrig deny: every appliance noun denies even with a switch signal present', () => {
+    for (const noun of ['fridge', 'freezer', 'chiller', 'coldroom', 'cold-room', 'refrigeration', 'refrig']) {
+        const c = classifyDevice(`gk-6261-${noun}-1`, 'default', { switchReported: true });
+        assert.equal(c.deviceType, 'refrigeration', `${noun} must deny to refrigeration`);
+        assert.equal(c.controllable, false, `${noun} must be monitor-only`);
+        assert.equal(c.kind, 'fridge', `${noun} must be kind fridge`);
+    }
+});
+
+test('refrig deny: all FOUR cold-room forms deny (blocking-finding-1 — matches the REAL normaliser, _→- not -→space)', () => {
+    for (const name of ['gk-6261-coldroom-1', 'gk-6261-cold-room-1', 'gk-6261-cold_room-1', 'gk-6261-cold room 1']) {
+        const c = classifyDevice(name, 'default', { switch_1: true });
+        assert.equal(c.deviceType, 'refrigeration', `${name} must deny to refrigeration`);
+        assert.equal(c.controllable, false, `${name} must be monitor-only`);
+    }
+});
+
+test('refrig deny: fail-closed default — cellar with no override and NO switch signal is still refrigeration (consistent typing)', () => {
+    const c = classifyDevice('gk-6261-cellar-1', 'default', {});
+    assert.equal(c.deviceType, 'refrigeration');
+    assert.equal(c.controllable, false);
+});
+
+test('refrig deny: cellar + bare generic switch/relay word (no override) denies (deliberate tightening §3.2)', () => {
+    for (const word of ['switch', 'relay', 'contactor', 'powerpause']) {
+        const c = classifyDevice(`gk-6261-cellar-${word}-1`, 'default', { switchReported: true });
+        assert.equal(c.deviceType, 'refrigeration', `cellar-${word} must fail-closed to refrigeration`);
+        assert.equal(c.controllable, false);
+    }
+});
+
+test('refrig deny: precedence over name intent — cellar + refrigeration word + a kitchen-context (non-override) word still denies', () => {
+    const c = classifyDevice('gk-6261-cellar-kitchen-1', 'default', { switchReported: true });
+    // `kitchen` is NOT an override token; cellar location with no override ⇒ deny.
+    assert.equal(c.deviceType, 'refrigeration');
+    assert.equal(c.controllable, false);
+});
+
+/* --- precision carve-out: genuine controllable cellar circuits are NOT over-blocked --- */
+
+test('carve-out: cellar LIGHT is controllable (hyphenated + glued) — lighting/tuya', () => {
+    for (const name of ['gk-6261-cellar-light-1', 'gk-6261-cellarlight-1']) {
+        const c = classifyDevice(name, 'gatewayDevice', { switchReported: true });
+        assert.equal(c.deviceType, 'tuya', `${name} must stay controllable tuya`);
+        assert.equal(c.controllable, true, `${name} must stay controllable`);
+        assert.equal(c.kind, 'lighting', `${name} groups under lighting (matchAssetIntent substring)`);
+    }
+});
+
+test('carve-out: cellar FAN hyphenated → fan/tuya/controllable', () => {
+    const c = classifyDevice('gk-6261-cellar-fan-1', 'gatewayDevice', { switchReported: true });
+    assert.equal(c.deviceType, 'tuya');
+    assert.equal(c.controllable, true);
+    assert.equal(c.kind, 'fan');
+});
+
+test('carve-out: GLUED short-token forms are controllable (blocking-finding-2 fix) — ratified option (b): kind=kitchen', () => {
+    // The substring override in isRefrigerationDeny lets these THROUGH the deny; matchAssetIntent
+    // stays EXACT-match (unchanged), so the glued `cellarfan`/`cellarlgt` token matches no asset row
+    // and they fall through to the telemetry-driven tuya switch ⇒ kind:'kitchen' (ratified decision b,
+    // overriding the design's §8.1 fan/lighting kind assertion). Regression guard against re-introducing
+    // the exact-only short-token rule INTO isRefrigerationDeny (which would wrongly deny these).
+    for (const name of ['gk-6261-cellarfan-1', 'gk-6261-cellarlgt-1']) {
+        const c = classifyDevice(name, 'gatewayDevice', { switchReported: true });
+        assert.equal(c.deviceType, 'tuya', `${name} must be controllable tuya (NOT denied)`);
+        assert.equal(c.controllable, true, `${name} must be controllable`);
+        assert.equal(c.kind, 'kitchen', `${name} groups under kitchen per ratified option (b)`);
+    }
+});
+
+test('carve-out: cellar SOCKET is controllable (override token socket) — tuya/controllable', () => {
+    const c = classifyDevice('gk-6261-cellar-socket-1', 'gatewayDevice', { switchReported: true });
+    assert.equal(c.deviceType, 'tuya');
+    assert.equal(c.controllable, true);
+});
+
+test('carve-out: a genuine kitchen/lighting/fan switch on a NON-cellar site is untouched', () => {
+    assert.equal(classifyDevice('gk-6209fryer-1', 'gatewayDevice', { switchReported: true }).deviceType, 'tuya');
+    assert.equal(classifyDevice('gk-6209-switch-1', 'gatewayDevice', { switchReported: true }).controllable, true, 'non-cellar bare switch stays controllable');
+});
+
+test('appliance-absolutism: fridge-light-circuit is monitor-only DESPITE the light token (deliberate fail-closed §3.2)', () => {
+    // An appliance noun returns the deny with NO override consulted. This is intentional, load-bearing
+    // fail-closed behaviour resting on the §3.2 assumption (verified at CR3): no controllable circuit
+    // carries a refrigeration appliance noun in its name.
+    const c = classifyDevice('gk-6261-fridge-light-circuit', 'default', { switchReported: true });
+    assert.equal(c.deviceType, 'refrigeration');
+    assert.equal(c.controllable, false);
+});
+
+/* ------------------------------------------------------------------ */
 /* Site-query filter (D1)                                              */
 /* ------------------------------------------------------------------ */
 
