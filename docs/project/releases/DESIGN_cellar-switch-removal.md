@@ -63,6 +63,8 @@ Three classes of signal, all evaluated over the **normalised** name (`normaliseN
 
 The **switch telemetry** (`switch_1`/`switch`/`switchReported`/`switchOn`, `services/tb-device.js:184-187`) is the *problem* signal the deny exists to override; it is not part of the deny key.
 
+> **Full deny-rule mapping (48 representative device cases, code-true):** the exhaustive one-row-per-case classification mapping — matched signal & class, switch telemetry, resulting kind/deviceType/controllable/control, Turn OFF button, control scope tile, write-guard result and the rule branch/precedence that fired — is maintained as a spreadsheet at `docs/project/releases/mappings/cellar-deny-rule-mapping.xlsx` (sheet 1 = mapping, sheet 2 = legend/assumptions incl. the two code-vs-design deltas found while building it).
+
 ### 3.2 The controllable-override set (the precision carve-out)
 
 An explicit controllable-appliance word in the name **wins over the location word `cellar` and the profile** (but not over an appliance word — a fridge is a fridge). The override set:
