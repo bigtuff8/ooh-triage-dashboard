@@ -1,0 +1,222 @@
+<title>Cellar switch removal — before / after</title>
+<style>
+  :root{
+    --bg:#f4f6f8; --panel:#fff; --ink:#1a2230; --muted:#5a6577; --line:#e2e7ee;
+    --green:#137a4b; --greenbg:#e4f5ec; --grey:#6b7686; --greybg:#eef1f5;
+    --red:#b3261e; --redbg:#fdecea; --amber:#8a5a00; --amberbg:#fdf3e0; --blue:#1f5fbf; --bluebg:#e8f0fd;
+    --btn:#2b6cb0; --shadow:0 1px 3px rgba(20,30,50,.10),0 4px 14px rgba(20,30,50,.06);
+  }
+  @media (prefers-color-scheme:dark){
+    :root{ --bg:#11151c; --panel:#1a212b; --ink:#e7ecf3; --muted:#9aa6b6; --line:#2a333f;
+      --green:#4ac98a; --greenbg:#122a1f; --grey:#9aa6b6; --greybg:#222b36;
+      --red:#ff6b60; --redbg:#2c1614; --amber:#e0aa4a; --amberbg:#2c2210; --blue:#6ea8fe; --bluebg:#14203a; --btn:#3b82f6; }
+  }
+  :root[data-theme="dark"]{ --bg:#11151c; --panel:#1a212b; --ink:#e7ecf3; --muted:#9aa6b6; --line:#2a333f;
+    --green:#4ac98a; --greenbg:#122a1f; --grey:#9aa6b6; --greybg:#222b36;
+    --red:#ff6b60; --redbg:#2c1614; --amber:#e0aa4a; --amberbg:#2c2210; --blue:#6ea8fe; --bluebg:#14203a; --btn:#3b82f6; }
+  :root[data-theme="light"]{ --bg:#f4f6f8; --panel:#fff; --ink:#1a2230; --muted:#5a6577; --line:#e2e7ee;
+    --green:#137a4b; --greenbg:#e4f5ec; --grey:#6b7686; --greybg:#eef1f5;
+    --red:#b3261e; --redbg:#fdecea; --amber:#8a5a00; --amberbg:#fdf3e0; --blue:#1f5fbf; --bluebg:#e8f0fd; --btn:#2b6cb0; }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;-webkit-font-smoothing:antialiased}
+  .wrap{max-width:1120px;margin:0 auto;padding:24px 18px 64px}
+  header h1{font-size:22px;margin:0 0 4px}
+  header p{margin:0 0 18px;color:var(--muted);max-width:70ch}
+  .toolbar{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin:0 0 18px}
+  .seg{display:inline-flex;border:1px solid var(--line);border-radius:10px;overflow:hidden;background:var(--panel)}
+  .seg button{appearance:none;border:0;background:transparent;color:var(--muted);padding:9px 16px;font:inherit;font-weight:600;cursor:pointer}
+  .seg button[aria-pressed="true"]{background:var(--btn);color:#fff}
+  .hint{color:var(--muted);font-size:13px}
+  .grid{display:grid;grid-template-columns:1fr;gap:18px}
+  @media(min-width:820px){.grid{grid-template-columns:1fr 1fr}}
+  .col h2{font-size:13px;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);margin:0 0 8px;display:flex;align-items:center;gap:8px}
+  .flag{font-size:11px;font-weight:700;padding:2px 8px;border-radius:999px}
+  .flag.bad{background:var(--redbg);color:var(--red)}
+  .flag.good{background:var(--greenbg);color:var(--green)}
+  .panel{background:var(--panel);border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow);overflow:hidden}
+  .flowhead{display:flex;align-items:center;gap:8px;padding:12px 16px;border-bottom:1px solid var(--line);font-weight:600}
+  .flowhead .sub{color:var(--muted);font-weight:400;font-size:13px;margin-left:2px}
+  .flowbody{padding:14px 16px}
+  .stepdone{display:flex;gap:8px;align-items:flex-start;color:var(--muted);font-size:13px;margin:0 0 10px}
+  .tick{color:var(--green);font-weight:700}
+  .zoneread{display:flex;align-items:center;gap:12px;border:1px solid var(--line);border-radius:11px;padding:11px 13px;margin:0 0 10px;background:color-mix(in srgb,var(--panel) 92%, var(--bg))}
+  .zoneread .big{font-size:22px}
+  .zoneread .grow{flex:1;min-width:0}
+  .zoneread .dev{font-size:12px;color:var(--muted);margin-top:2px;word-break:break-all}
+  .tag{font-size:11px;font-weight:700;padding:3px 9px;border-radius:999px;white-space:nowrap}
+  .tag.green{background:var(--greenbg);color:var(--green)}
+  .tag.grey{background:var(--greybg);color:var(--grey)}
+  .tag.red{background:var(--redbg);color:var(--red)}
+  .btn{appearance:none;border:1px solid var(--line);background:var(--panel);color:var(--ink);border-radius:9px;padding:8px 14px;font:inherit;font-weight:600;cursor:pointer}
+  .btn.off{border-color:var(--red);color:var(--red)}
+  .btn.primary{background:var(--btn);border-color:var(--btn);color:#fff}
+  .btn:active{transform:translateY(1px)}
+  .switchbtns{margin-left:auto;display:flex;gap:6px}
+  .alert{border-radius:10px;padding:11px 13px;font-size:13.5px;margin:0 0 10px;border:1px solid transparent}
+  .alert.info{background:var(--bluebg);color:var(--blue);border-color:color-mix(in srgb,var(--blue) 30%,transparent)}
+  .alert.warn{background:var(--amberbg);color:var(--amber);border-color:color-mix(in srgb,var(--amber) 30%,transparent)}
+  .alert.err{background:var(--redbg);color:var(--red);border-color:color-mix(in srgb,var(--red) 35%,transparent)}
+  .alert.ok{background:var(--greenbg);color:var(--green);border-color:color-mix(in srgb,var(--green) 30%,transparent)}
+  .hazard{margin-top:10px}
+  .stepq{font-weight:600;margin:12px 0 8px}
+  .chips{display:flex;flex-wrap:wrap;gap:8px}
+  .chip{appearance:none;border:1px solid var(--line);background:var(--panel);color:var(--ink);border-radius:999px;padding:7px 13px;font:inherit;font-size:13px;cursor:pointer}
+  .note{font-size:12.5px;color:var(--muted);margin-top:6px}
+  .legend{margin-top:22px;background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:16px 18px;box-shadow:var(--shadow)}
+  .legend h3{margin:0 0 10px;font-size:15px}
+  .legend ul{margin:0;padding-left:18px}
+  .legend li{margin:0 0 6px;color:var(--muted);font-size:13.5px}
+  .legend b{color:var(--ink)}
+  code{background:color-mix(in srgb,var(--panel) 80%,var(--bg));border:1px solid var(--line);border-radius:5px;padding:1px 5px;font-size:12.5px}
+  .precision{margin-top:18px}
+  .prow{display:grid;grid-template-columns:1fr;gap:12px}
+  @media(min-width:640px){.prow{grid-template-columns:1fr 1fr 1fr}}
+</style>
+
+<div class="wrap">
+  <header>
+    <h1>Cellar switch removal — before / after</h1>
+    <p>Stream A, OOH Triage Dashboard R1. A cellar cooling unit carrying an embedded switch signal is mis-classified as a controllable kitchen switch, so it currently draws a live <b>Turn OFF</b> button. After the fix it is monitor-only. Genuine controllable circuits — including a cellar <b>light</b> — are unaffected. Site 6261, realistic device names.</p>
+  </header>
+
+  <div class="toolbar">
+    <div class="seg" role="group" aria-label="View">
+      <button id="tab-both" aria-pressed="true" onclick="setView('both')">Before &amp; after</button>
+      <button id="tab-before" aria-pressed="false" onclick="setView('before')">Before only</button>
+      <button id="tab-after" aria-pressed="false" onclick="setView('after')">After only</button>
+    </div>
+    <span class="hint">Buttons are live — try the <b>Turn OFF</b> in the Before panel.</span>
+    <button class="btn" style="margin-left:auto" onclick="toggleTheme()">Toggle light / dark</button>
+  </div>
+
+  <div class="grid" id="grid">
+    <!-- BEFORE -->
+    <div class="col" id="col-before">
+      <h2>Before the fix <span class="flag bad">LEAK</span></h2>
+      <div class="panel">
+        <div class="flowhead"><span>🍳</span><b>Kitchen equipment</b><span class="sub">guided flow · this is where the cellar wrongly appears</span></div>
+        <div class="flowbody">
+          <div class="stepdone"><span class="tick">✓</span>Live read: Cellar cooling <b>On</b> · Fryer bank <b>Off — schedule 06:00–23:00</b></div>
+
+          <div class="zoneread">
+            <span class="big">🍳</span>
+            <div class="grow">
+              <div><b>Kitchen — Cellar cooling</b> — currently ON</div>
+              <div class="dev">classified <code>tuya</code> · kind <code>kitchen</code> · gk-6261-cellar-1</div>
+            </div>
+            <div class="switchbtns"><button class="btn off" onclick="fireHazard()">Turn OFF</button></div>
+            <span class="tag green">on</span>
+          </div>
+
+          <div class="zoneread">
+            <span class="big">🍳</span>
+            <div class="grow">
+              <div><b>Kitchen — Fryer bank</b> — currently OFF</div>
+              <div class="dev">classified <code>tuya</code> · kind <code>kitchen</code> · gk-6209fryer-1</div>
+            </div>
+            <div class="switchbtns"><button class="btn primary" onclick="alert('Genuine kitchen circuit — this is correct and stays after the fix.')">Turn ON</button></div>
+            <span class="tag grey">off</span>
+          </div>
+
+          <div class="alert info">Switchable circuits can be turned on/off directly above — the change only counts once the device confirms.</div>
+
+          <div id="hazard" class="hazard" hidden>
+            <div class="alert err"><b>⚠️ This is the leak.</b> The dashboard just tried to switch <b>cellar cooling</b> OFF — the exact stock-loss risk the CTO flagged. Inert today only because writes are globally locked (<code>WRITES_DISABLED="true"</code>); it goes live the moment OOHDASH-19 flips writes on without this fix.</div>
+          </div>
+          <div class="note">Root cause: any device with a <code>switch_1</code> signal is typed <code>tuya</code>/<code>kitchen</code> before anything checks whether it is a fridge. The words <i>cellar / fridge / freezer</i> are absent from the classifier's name table.</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- AFTER -->
+    <div class="col" id="col-after">
+      <h2>After the fix <span class="flag good">MONITOR-ONLY</span></h2>
+      <div class="panel">
+        <div class="flowhead"><span>🧊</span><b>Fridges &amp; freezers</b><span class="sub">guided flow · where a cellar/fridge belongs</span></div>
+        <div class="flowbody">
+          <div class="stepdone"><span class="tick">✓</span>Refrigeration is monitored-only on Lighthouse</div>
+
+          <div class="zoneread">
+            <span class="big">🧊</span>
+            <div class="grow">
+              <div><b>Cellar cooling</b> — 6.4°C · monitored</div>
+              <div class="dev">classified <code>refrigeration</code> · kind <code>fridge</code> · capabilities <code>[]</code> · gk-6261-cellar-1</div>
+            </div>
+            <span class="tag grey">Monitored — not adjustable from here</span>
+          </div>
+
+          <div class="alert info">Lighthouse <b>monitors</b> fridge/freezer &amp; cellar temperatures but doesn't control them — a warm unit is an appliance fault. There is no Turn OFF button for a cooling unit anywhere.</div>
+
+          <div class="stepq">Is stock at risk right now (cellar/freezer warming, temperature alarm)?</div>
+          <div class="chips">
+            <button class="chip" onclick="showP1()">Yes — stock at risk</button>
+            <button class="chip" onclick="showQuery()">No — just a query</button>
+          </div>
+
+          <div id="p1out" hidden>
+            <div class="alert err" style="margin-top:12px"><b>🚨 Escalated — P1.</b> Refrigeration temperature alarm — stock at risk. A text has gone to the on-duty manager; logged as an OOH ticket. The correct outcome for a cooling failure — never a remote off/on.</div>
+          </div>
+          <div id="qout" hidden>
+            <div class="alert ok" style="margin-top:12px"><b>ℹ️ Monitored only.</b> Logged as a scope-only ticket so "blame Lighthouse" cellar calls are tracked. No control was ever offered.</div>
+          </div>
+
+          <div class="note">The write guard also refuses a switch to a <code>refrigeration</code> device server-side — fail-closed — even if a crafted request reaches dispatch.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- PRECISION -->
+  <div class="precision">
+    <h2 style="font-size:13px;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);margin:22px 0 8px">Precision carve-out — genuine controllable circuits are untouched</h2>
+    <div class="panel"><div class="flowbody">
+      <div class="prow">
+        <div class="zoneread" style="margin:0">
+          <span class="big">💡</span>
+          <div class="grow"><div><b>Cellar light</b> — OFF</div><div class="dev"><code>tuya</code> · lighting · gk-6261-cellarlight-1</div></div>
+          <div class="switchbtns"><button class="btn primary" onclick="alert('Cellar LIGHT stays switchable — an explicit controllable token (light) wins over the bare cellar location word.')">Turn ON</button></div>
+        </div>
+        <div class="zoneread" style="margin:0">
+          <span class="big">🌀</span>
+          <div class="grow"><div><b>Cellar fan</b> — ON</div><div class="dev"><code>tuya</code> · fan · gk-6261-cellarfan-1</div></div>
+          <div class="switchbtns"><button class="btn off" onclick="alert('Cellar FAN stays switchable — ventilation, not cooling.')">Turn OFF</button></div>
+        </div>
+        <div class="zoneread" style="margin:0">
+          <span class="big">🍳</span>
+          <div class="grow"><div><b>Fryer bank</b> — OFF</div><div class="dev"><code>tuya</code> · kitchen · gk-6209fryer-1</div></div>
+          <div class="switchbtns"><button class="btn primary" onclick="alert('Kitchen circuit unchanged — controllable end to end.')">Turn ON</button></div>
+        </div>
+      </div>
+      <div class="note" style="margin-top:12px">A <b>cellar cooling</b> unit (gk-6261-cellar-1) is denied; a <b>cellar light / cellar fan</b> is not. The deny fires on refrigeration intent only when no explicit controllable-appliance token is present.</div>
+    </div></div>
+  </div>
+
+  <div class="legend">
+    <h3>What the fix does, in one screen</h3>
+    <ul>
+      <li><b>Classification.</b> A deterministic refrigeration deny at the top of <code>classifyDevice</code> reassigns a cellar/fridge/freezer/chiller/coldroom unit to <code>deviceType:'refrigeration'</code>, <code>kind:'fridge'</code>, <code>controllable:false</code> — taking precedence over the capability-first switch intent and the name match.</li>
+      <li><b>Registry.</b> A new <code>refrigeration</code> type with <code>commands:[]</code> means capabilities serialise empty (no button) and the write guard rejects a switch by construction, plus an explicit backstop refusal.</li>
+      <li><b>Precision.</b> An explicit controllable token — <code>light</code>, <code>fan</code>, <code>socket</code>, or a kitchen appliance — wins over the bare <code>cellar</code> location word, so a cellar light/fan stays switchable.</li>
+      <li><b>Fail-closed &amp; interlock.</b> When in doubt, monitor-only. Writes stay locked (<code>WRITES_DISABLED="true"</code>) throughout; the fix must be observed running live before OOHDASH-19 flips writes on.</li>
+    </ul>
+  </div>
+</div>
+
+<script>
+  function setView(v){
+    document.getElementById('col-before').style.display = (v==='after')?'none':'';
+    document.getElementById('col-after').style.display  = (v==='before')?'none':'';
+    for(const [id,val] of [['tab-both','both'],['tab-before','before'],['tab-after','after']])
+      document.getElementById(id).setAttribute('aria-pressed', String(val===v));
+    document.getElementById('grid').style.gridTemplateColumns = (v==='both')?'':'1fr';
+  }
+  function fireHazard(){ document.getElementById('hazard').hidden = false;
+    document.getElementById('hazard').scrollIntoView({behavior:'smooth',block:'nearest'}); }
+  function showP1(){ document.getElementById('p1out').hidden=false; document.getElementById('qout').hidden=true; }
+  function showQuery(){ document.getElementById('qout').hidden=false; document.getElementById('p1out').hidden=true; }
+  function toggleTheme(){
+    const r=document.documentElement;
+    const cur=r.getAttribute('data-theme')|| (matchMedia('(prefers-color-scheme:dark)').matches?'dark':'light');
+    r.setAttribute('data-theme', cur==='dark'?'light':'dark');
+  }
+</script>
