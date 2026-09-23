@@ -1,0 +1,210 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>P1 outcome card — log vs twilio (OOHDASH-73)</title>
+<style>
+  /* Palette + tokens lifted verbatim from public/css/styles.css so the mockup is the
+     visual truth of the live product, not an approximation. */
+  :root{
+    --primary:#594AE2;--primary-dark:#4338CA;--primary-light:#EEF2FF;
+    --success:#10B981;--success-light:#D1FAE5;
+    --warning:#F59E0B;--warning-light:#FEF3C7;
+    --danger:#EF4444;--danger-light:#FEE2E2;
+    --info:#3B82F6;--info-light:#DBEAFE;
+    --surface:#FFFFFF;--surface-variant:#F8FAFC;--background:#F1F5F9;
+    --text-primary:#1E293B;--text-secondary:#64748B;--text-disabled:#94A3B8;
+    --border:#E2E8F0;
+    --urgency-critical:#DC2626;--urgency-critical-bg:#FEF2F2;
+    --radius-sm:6px;--radius-md:8px;--radius-lg:12px;
+    --shadow-sm:0 1px 2px rgba(15,23,42,.06);
+    --shadow-md:0 4px 10px rgba(15,23,42,.08);
+  }
+  *{box-sizing:border-box}
+  body{font-family:Inter,system-ui,-apple-system,'Segoe UI',sans-serif;font-size:14px;line-height:22px;color:var(--text-primary);background:var(--background);margin:0;padding:24px}
+  .wrap{max-width:760px;margin:0 auto}
+  h1{font-size:20px;margin:0 0 4px}
+  .lede{color:var(--text-secondary);font-size:13.5px;margin:0 0 18px;max-width:640px}
+
+  /* --- live control panel (mockup chrome, not part of the product) --- */
+  .controls{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-md);box-shadow:var(--shadow-sm);padding:14px 16px;margin-bottom:18px}
+  .controls .row{display:flex;flex-wrap:wrap;gap:10px;align-items:center}
+  .controls .lbl{font-weight:600;font-size:13px;margin-right:4px}
+  .seg{display:inline-flex;border:1.5px solid var(--border);border-radius:var(--radius-md);overflow:hidden}
+  .seg button{border:0;background:var(--surface);color:var(--text-secondary);padding:8px 14px;font-size:13px;font-weight:600;cursor:pointer}
+  .seg button.on{background:var(--primary);color:#fff}
+  .statepill{font-size:11.5px;font-weight:600;border-radius:var(--radius-sm);padding:2px 9px}
+  .statepill.log{background:var(--danger-light);color:#991B1B}
+  .statepill.twilio{background:var(--success-light);color:#065F46}
+  .statepill.fail{background:var(--warning-light);color:#92400E}
+  .hint{font-size:12.5px;color:var(--text-secondary);margin-top:10px;line-height:18px}
+
+  /* --- product classes, verbatim from styles.css --- */
+  .card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-md);box-shadow:var(--shadow-sm);padding:18px;margin-bottom:12px}
+  .flowpanel{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);box-shadow:var(--shadow-md);overflow:hidden}
+  .flowhead{padding:12px 18px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px;background:var(--surface-variant);font-weight:600}
+  .flowbody{padding:16px 18px}
+  .stepdone{display:flex;gap:8px;align-items:center;color:var(--text-secondary);font-size:13px;padding:5px 0;border-bottom:1px dashed var(--surface-variant)}
+  .stepdone .tick{color:var(--success);font-weight:700}
+  .small{font-size:12.5px;line-height:17px;color:var(--text-secondary)}
+  .tag{display:inline-flex;align-items:center;gap:5px;font-size:11.5px;font-weight:600;border-radius:var(--radius-sm);padding:1px 7px;line-height:17px;white-space:nowrap}
+  .tag.red{background:var(--danger-light);color:#991B1B}
+  .alert{border-radius:var(--radius-md);padding:11px 14px;font-size:13.5px;margin:10px 0;line-height:20px}
+  .alert.warn{background:var(--warning-light);color:#92400E}
+  .script{background:var(--surface-variant);border-left:3px solid var(--primary);border-radius:0 var(--radius-md) var(--radius-md) 0;padding:11px 14px;font-size:14px;font-style:italic;margin:10px 0;line-height:21px}
+  .outcome{border-radius:var(--radius-lg);padding:16px;margin-top:14px}
+  .outcome.p1{background:var(--urgency-critical-bg);border:1px solid #FECACA}
+  .outcome h3{margin-bottom:6px;font-size:15px}
+  .outcome p{margin:0 0 4px}
+  .outcome a{color:var(--primary-dark);font-weight:600}
+
+  /* the append-only P1 dispatch log surface (Admin / F026), realistic sample */
+  .logtbl{width:100%;border-collapse:collapse;font-size:12.5px;margin-top:8px}
+  .logtbl th{text-align:left;color:var(--text-secondary);font-size:10.5px;text-transform:uppercase;letter-spacing:.4px;font-weight:600;padding:5px 8px;border-bottom:1px solid var(--border)}
+  .logtbl td{padding:6px 8px;border-bottom:1px solid var(--surface-variant);vertical-align:middle}
+  .ok{color:#065F46;font-weight:700}
+  .no{color:#991B1B;font-weight:700}
+  .mono{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+  .tblwrap{overflow-x:auto}
+  .caption{font-size:12px;color:var(--text-secondary);margin:16px 0 4px;font-weight:600;text-transform:uppercase;letter-spacing:.4px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>P1 escalation outcome card — the two states</h1>
+  <p class="lede">This is the exact card an OOH handler sees at the end of a system-decided P1 flow (<span class="mono">outcomeP1</span>, <span class="mono">public/js/flows.js:166-174</span>). The only thing that changes between the two states is the deployment value <span class="mono">SMS_PROVIDER</span>. Flip the switch below to see what today (log) looks like versus what enablement (twilio) delivers. No real phone numbers appear anywhere — the recipient is shown by name only, exactly as the product persists it.</p>
+
+  <div class="controls">
+    <div class="row">
+      <span class="lbl">SMS_PROVIDER</span>
+      <span class="seg">
+        <button id="b-log" class="on" onclick="setState('log')">log &mdash; today</button>
+        <button id="b-twilio" onclick="setState('twilio')">twilio &mdash; enabled</button>
+        <button id="b-fail" onclick="setState('fail')">twilio, creds missing</button>
+      </span>
+      <span id="pill" class="statepill log">no-send mode</span>
+    </div>
+    <div class="hint" id="hint"></div>
+  </div>
+
+  <div class="flowpanel">
+    <div class="flowhead">🚨 Fridges &amp; freezers &middot; Greggs &mdash; Wakefield Trinity Walk (gk-6261)</div>
+    <div class="flowbody">
+      <div class="stepdone"><span class="tick">&#10003;</span> Site confirmed &mdash; Greggs, Wakefield Trinity Walk (site 6261)</div>
+      <div class="stepdone"><span class="tick">&#10003;</span> Issue: walk-in fridge holding +11&deg;C, stock at risk</div>
+      <div class="stepdone"><span class="tick">&#10003;</span> System decision: <b>P1 &mdash; refrigeration stock at risk</b></div>
+
+      <!-- outcome card: swapped by setState() -->
+      <div id="outcome"></div>
+    </div>
+  </div>
+
+  <div class="caption">What gets persisted — OohSmsLog (Admin / P1 log tab)</div>
+  <div class="card" style="padding:12px 14px">
+    <div class="tblwrap">
+      <table class="logtbl">
+        <thead>
+          <tr><th>Dispatched</th><th>Site</th><th>Ticket</th><th>Recipient</th><th>Number</th><th>Provider</th><th>dispatchOk</th></tr>
+        </thead>
+        <tbody id="logrows"></tbody>
+      </table>
+    </div>
+    <p class="small" style="margin-top:8px">The raw recipient number is <b>never</b> written &mdash; the log stores only <span class="mono">(configured)</span> / <span class="mono">(not configured)</span> (<span class="mono">escalation.js:65</span>).</p>
+  </div>
+
+  <div class="caption">Corrective comment posted to the Zendesk ticket (#ooh-p1-dispatch)</div>
+  <div class="card" style="padding:12px 14px">
+    <div id="zd" class="small"></div>
+  </div>
+</div>
+
+<script>
+  // Realistic, stable sample data — real field names, realistic values, no lorem, no real numbers.
+  var TICKET = '48231';
+  var LINK = 'https://iot-support.airedale-group.co.uk/?ticket=' + TICKET; // sample host, not a secret
+  var MANAGER = 'On-duty escalation manager';
+  var TIME = '02:14';
+
+  var STATES = {
+    log: {
+      pill: ['statepill log', 'no-send mode'],
+      hint: 'Today. <b>SMS_PROVIDER=log</b>. The flow runs end-to-end and the dispatch is recorded, but nothing is sent. <b>sent:false</b> keeps <b>dispatchOk</b> honestly false (Test 11c) &mdash; the card must tell the handler to phone the manager.',
+      card:
+        '<div class="outcome p1"><h3>🚨 Escalated &mdash; P1</h3>' +
+        '<p>Walk-in fridge at Greggs, Wakefield Trinity Walk is holding +11&deg;C &mdash; stock at risk.</p>' +
+        '<p style="margin-top:4px"><span class="tag red">Text not sent &mdash; phone the on-duty manager now.</span> ' +
+        'The P1 is logged as ticket <b>#' + TICKET + '</b> in the IoT Support dashboard.</p>' +
+        '<div class="script">&ldquo;This is a P1 &mdash; stock at risk. I’m logging it now and I’ll phone the on-duty manager straight away so it’s actioned tonight.&rdquo;</div>' +
+        '<p class="small">Ticket <b>#' + TICKET + '</b></p></div>',
+      logrow: row(TIME, '(configured)', 'log', false),
+      zd: zd(false)
+    },
+    twilio: {
+      pill: ['statepill twilio', 'sending live'],
+      hint: 'After enablement. <b>SMS_PROVIDER=twilio</b> and the five secret keys are loaded. The same code posts to the Twilio REST API, gets a 2xx, sets <b>dispatchOk:true</b>, and the card confirms the text landed with a working ticket deep-link.',
+      card:
+        '<div class="outcome p1"><h3>🚨 Escalated &mdash; P1</h3>' +
+        '<p>Walk-in fridge at Greggs, Wakefield Trinity Walk is holding +11&deg;C &mdash; stock at risk.</p>' +
+        '<p style="margin-top:4px">A <b>text message</b> has been sent to the <b>' + MANAGER + '</b> at ' + TIME + ', ' +
+        'with a direct link to ticket <b>#' + TICKET + '</b> in the IoT Support dashboard.</p>' +
+        '<div class="script">&ldquo;This is a P1 &mdash; stock at risk. The on-duty manager has been texted with the ticket link and will pick it up now.&rdquo;</div>' +
+        '<p class="small">Ticket <b>#' + TICKET + '</b> &middot; deep-link: <a href="#" onclick="return false">' + LINK + '</a></p></div>',
+      logrow: row(TIME, '(configured)', 'twilio', true),
+      zd: zd(true)
+    },
+    fail: {
+      pill: ['statepill fail', 'fail-closed'],
+      hint: 'The safety net. Provider is <b>twilio</b> but a credential is missing/invalid, so <b>sendViaProvider</b> throws &ldquo;Twilio provider selected but not configured&rdquo;. The code <b>fails closed</b>: no crash, <b>dispatchOk</b> stays false, the handler sees the same &ldquo;phone the manager&rdquo; card, and an <b>sms-dispatch-failed</b> alert is raised for the team to chase.',
+      card:
+        '<div class="outcome p1"><h3>🚨 Escalated &mdash; P1</h3>' +
+        '<p>Walk-in fridge at Greggs, Wakefield Trinity Walk is holding +11&deg;C &mdash; stock at risk.</p>' +
+        '<p style="margin-top:4px"><span class="tag red">Text not sent &mdash; phone the on-duty manager now.</span> ' +
+        'The P1 is logged as ticket <b>#' + TICKET + '</b> in the IoT Support dashboard.</p>' +
+        '<div class="alert warn">⚠ Internal: <b>sms-dispatch-failed</b> alert raised for ticket #' + TICKET + ' &mdash; SMS could not be sent, chase manually. (The handler is never blocked by this.)</div>' +
+        '<div class="script">&ldquo;This is a P1 &mdash; stock at risk. I’m logging it and phoning the on-duty manager now so nothing waits on the text.&rdquo;</div>' +
+        '<p class="small">Ticket <b>#' + TICKET + '</b></p></div>',
+      logrow: row(TIME, '(configured)', 'twilio', false),
+      zd: zd(false)
+    }
+  };
+
+  function row(time, num, provider, ok){
+    return '<tr>' +
+      '<td>23 Sep ' + time + '</td>' +
+      '<td>Greggs &mdash; Wakefield Trinity Walk (6261)</td>' +
+      '<td>#' + TICKET + '</td>' +
+      '<td>' + MANAGER + '</td>' +
+      '<td class="mono">' + num + '</td>' +
+      '<td class="mono">' + provider + '</td>' +
+      '<td>' + (ok ? '<span class="ok">true</span>' : '<span class="no">false</span>') + '</td>' +
+      '</tr>';
+  }
+
+  function zd(ok){
+    if (ok) {
+      return '<b>#ooh-p1-dispatch &mdash; SMS SENT.</b> P1 escalation text sent to the on-duty escalation manager at ' + TIME +
+        ' with a deep-link to this ticket. Dispatched by handler on the OOH Triage Dashboard.';
+    }
+    return '<b>#ooh-p1-dispatch &mdash; NOT SENT.</b> The P1 escalation text was <b>not</b> sent from the OOH Triage Dashboard &mdash; ' +
+      'the on-duty manager must be phoned directly. This corrective comment exists so the ticket record is never dishonestly marked as sent.';
+  }
+
+  function setState(s){
+    var st = STATES[s];
+    document.getElementById('outcome').innerHTML = st.card;
+    document.getElementById('logrows').innerHTML = st.logrow;
+    document.getElementById('zd').innerHTML = st.zd;
+    var pill = document.getElementById('pill');
+    pill.className = st.pill[0];
+    pill.textContent = st.pill[1];
+    document.getElementById('hint').innerHTML = st.hint;
+    ['log','twilio','fail'].forEach(function(k){
+      document.getElementById('b-' + k).classList.toggle('on', k === s);
+    });
+  }
+
+  setState('log');
+</script>
+</body>
+</html>
