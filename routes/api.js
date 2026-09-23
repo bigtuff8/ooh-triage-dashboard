@@ -269,7 +269,10 @@ router.post('/outcomes', wrap(async (req, res) => {
 
     let p1 = null;
     if (isP1) {
-        p1 = await escalation.escalateP1({ operator: op, siteNo, siteName, ticketId: ticket.id, summary: p1Summary || subject });
+        // origin: 'ooh-dashboard' asserts the OOH categorisation to escalateP1's fail-closed guard
+        // (§1A) — valid here because this path has just created an OOH-categorised ticket above
+        // (ooh_p1 tag, "Support Request" category, [OOH] subject). Only a verified OOH P1 pages.
+        p1 = await escalation.escalateP1({ operator: op, siteNo, siteName, ticketId: ticket.id, summary: p1Summary || subject, origin: 'ooh-dashboard' });
         // Test 11c — corrective post-dispatch comment carrying the ACTUAL send result (sent /
         // log-mode-not-sent / failed). Like reconciliation + the SMS log, it must NEVER block or
         // fail the outcome — wrap fail-safe, alert on failure, and return the ticket regardless.

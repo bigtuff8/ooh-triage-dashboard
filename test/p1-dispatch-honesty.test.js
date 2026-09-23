@@ -100,7 +100,10 @@ function loadEscalation({ provider = 'log', creds = {}, onDuty = '', axiosBehavi
     return { mod: { escalateP1 }, upserts: escUpserts, alerts: escAlerts };
 }
 
-const P1_ARGS = { operator: { name: 'Handler One' }, siteNo: '6832', siteName: 'The Red Lion', ticketId: 55501, summary: 'Kitchen off during service' };
+// origin:'ooh-dashboard' is REQUIRED post-OOHDASH-73: escalateP1 now fail-closes on origin (§1A), so
+// the send-path cases below must assert a verified OOH origin to reach sendViaProvider. (Updated call
+// signature — the origin-guard cases further down exercise the missing/non-OOH branch explicitly.)
+const P1_ARGS = { operator: { name: 'Handler One' }, siteNo: '6832', siteName: 'The Red Lion', ticketId: 55501, summary: 'Kitchen off during service', origin: 'ooh-dashboard' };
 
 test('Change 3: LOG-MODE ⇒ dispatchOk is NOT true (a log no-op is never recorded as a send)', async () => {
     const { mod } = await loadEscalation({ provider: 'log' });
@@ -123,6 +126,59 @@ test('Change 3: a twilio failure ⇒ dispatchOk false + an sms-dispatch-failed a
     assert.equal(entry.dispatchOk, false, 'a failed send leaves dispatchOk false');
     assert.ok(entry, 'the escalation entry is still returned (send failure never blocks the outcome)');
     assert.ok(alerts.some(a => a.k === 'sms-dispatch-failed'), 'a dispatch-failure alert was raised');
+});
+
+/* ============================ State 0 (OOHDASH-73, §1A) — fail-closed OOH-origin guard ============================ */
+// escalateP1 sends ONLY for a P1 raised from the OOH dashboard (origin === 'ooh-dashboard'). A missing,
+// unknown or BAU origin must NOT page (fail-closed): dispatchOk false, p1-escalation-origin-unverified
+// alert, the honest "phone the manager" card returned, no crash — proving a BAU alarm can never trigger
+// the text. These run in twilio mode with valid creds so the ONLY thing stopping the send is the origin.
+
+test('State 0: MISSING origin ⇒ NOT sent (fail-closed) — dispatchOk false, origin-unverified alert, outcome never blocked', async () => {
+    const { mod, alerts } = await loadEscalation({ provider: 'twilio', creds: { accountSid: 'AC1', authToken: 't', from: '+100' }, onDuty: '+200', axiosBehaviour: 'ok' });
+    const { origin, ...noOrigin } = P1_ARGS; // strip origin entirely — the fail-closed default path
+    const entry = await mod.escalateP1(noOrigin);
+    assert.equal(entry.dispatchOk, false, 'a missing origin is NEVER recorded as a send');
+    assert.equal(entry.dispatchReason, 'origin-unverified', 'the not-sent record carries a distinct reason');
+    assert.ok(entry, 'the escalation entry is still returned — the P1 outcome is never blocked');
+    assert.ok(alerts.some(a => a.k === 'p1-escalation-origin-unverified'), 'the origin-unverified alert was raised');
+    assert.ok(!alerts.some(a => a.k === 'sms-dispatch-failed'), 'it is NOT miscategorised as a dispatch failure');
+});
+
+test('State 0: an UNKNOWN / BAU origin ⇒ NOT sent — a BAU alarm can never trigger the escalation text', async () => {
+    const { mod, alerts } = await loadEscalation({ provider: 'twilio', creds: { accountSid: 'AC1', authToken: 't', from: '+100' }, onDuty: '+200', axiosBehaviour: 'ok' });
+    const entry = await mod.escalateP1({ ...P1_ARGS, origin: 'bau-alarm' });
+    assert.equal(entry.dispatchOk, false, 'a non-OOH origin must NOT send');
+    assert.ok(alerts.some(a => a.k === 'p1-escalation-origin-unverified'), 'the origin-unverified alert was raised');
+});
+
+test('State 0: a VERIFIED ooh-dashboard origin ⇒ proceeds to send (twilio 2xx ⇒ dispatchOk true), no origin block', async () => {
+    const { mod, alerts } = await loadEscalation({ provider: 'twilio', creds: { accountSid: 'AC1', authToken: 't', from: '+100' }, onDuty: '+200', axiosBehaviour: 'ok' });
+    const entry = await mod.escalateP1({ ...P1_ARGS, origin: 'ooh-dashboard' });
+    assert.equal(entry.dispatchOk, true, 'a verified OOH origin sends');
+    assert.ok(!alerts.some(a => a.k === 'p1-escalation-origin-unverified'), 'no origin block on a genuine OOH P1');
+});
+
+test('State 0: a VERIFIED ooh-dashboard origin in LOG mode ⇒ logs (dispatchOk false, provider log), no origin block', async () => {
+    const { mod, alerts } = await loadEscalation({ provider: 'log' });
+    const entry = await mod.escalateP1({ ...P1_ARGS, origin: 'ooh-dashboard' });
+    assert.equal(entry.dispatchOk, false, 'log-mode with a valid origin is a no-op, not a send');
+    assert.equal(entry.provider, 'log');
+    assert.ok(!alerts.some(a => a.k === 'p1-escalation-origin-unverified'), 'a valid origin in log mode is not an origin block');
+});
+
+/* ============ State C (missing-credential half) — twilio selected, creds absent ⇒ guard throws, fail-closed ============ */
+// Complements the existing "twilio failure (axios reject)" case with the MISSING-credential half of
+// State C (design §3/§4). Origin is verified so the guard is passed and sendViaProvider's credential
+// check (escalation.js: throws 'Twilio provider selected but not configured') is what fails, caught by
+// the try/catch → dispatchOk false, sms-dispatch-failed alert, no crash. Proven in the suite, never on prod.
+test('State C: twilio selected but credentials MISSING ⇒ guard throws, caught fail-closed (dispatchOk false, sms-dispatch-failed alert, no crash)', async () => {
+    const { mod, alerts } = await loadEscalation({ provider: 'twilio', creds: {}, onDuty: '+200', axiosBehaviour: 'ok' });
+    const entry = await mod.escalateP1({ ...P1_ARGS, origin: 'ooh-dashboard' });
+    assert.equal(entry.dispatchOk, false, 'missing credentials are NEVER recorded as a send');
+    assert.ok(entry, 'the P1 outcome is never blocked');
+    assert.ok(alerts.some(a => a.k === 'sms-dispatch-failed'), 'the credential fail-closed path raises the dispatch-failed alert');
+    assert.ok(!alerts.some(a => a.k === 'p1-escalation-origin-unverified'), 'a verified origin is not an origin block — this is a credential failure');
 });
 
 /* ============================ Change 2 — corrective #ooh-p1-dispatch comment ============================ */
