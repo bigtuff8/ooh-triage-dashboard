@@ -1,0 +1,15 @@
+{
+  "run": "selfgate-ooh-triage-dashboard-discovery-oohdash-82-area-model",
+  "phase": "discovery",
+  "pr": 43,
+  "approvedBy": [
+    "bigtuff8"
+  ],
+  "reviewComments": [
+    "bigtuff8: - 1. Problem framing: Approve this part\n- 4. The two-area target model — mapping rules and grounding: Approve this part\n- 5. Aircon-control removal — impact scope (firsthand, not implemented): Approve this part\n- 6. Acceptance criteria → what each requires of Design / Build: Approve this part\n- 7. Risks: Approve this part\n- 8. Recommended first step: Approve this part\n\n(submitted via the interactive gate review)"
+  ],
+  "mergeCommit": "8f82a31676d59b4b5516adadd7c86c9104c3c76c",
+  "phaseBranch": "discovery/oohdash-82-area-model",
+  "releaseBranch": "main",
+  "stamp": 1790170201374
+}
