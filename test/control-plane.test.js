@@ -61,15 +61,15 @@ test('isFreshTerminal gates failed/rejected on a fresh syncTs too', () => {
 
 /* ============================ registry: ranges + switch + mode-held ============================ */
 
-test('range validation — Intesis device range is 16–32 (33 out of range)', () => {
-    const r = registry.capabilitiesFor('intesis').deviceRange;
-    assert.equal(r.min, 16);
-    assert.equal(r.max, 32, 'Intesis corrected to 16–32');
-    // The effective window is APP_POLICY (±3 / cap 25) intersected with the device range; 33 is out
-    // of the device range and can never be admitted.
+test('OOHDASH-82 §6 — Intesis aircon control is REMOVED: every setpoint command is refused', () => {
+    // Aircon is no longer controllable from the dashboard (design §6, A3): intesis.commands is empty,
+    // so validateCommand refuses setpoint at ANY value (defence-in-depth behind the classifier's
+    // non-controllable force). Requests are captured and referred, never actuated.
+    assert.deepEqual(registry.capabilitiesFor('intesis').commands, [], 'intesis commands must be empty (aircon control removed)');
     const di = { deviceType: 'intesis', telemetry: { heatingSetpoint: 24 } };
-    assert.equal(registry.validateCommand(di, 'setpoint', 33).ok, false, '33 rejected');
-    assert.equal(registry.validateCommand(di, 'setpoint', 25).ok, true, '25 within ±3 and the cap');
+    assert.equal(registry.validateCommand(di, 'setpoint', 25).ok, false, 'a previously-valid setpoint is now refused');
+    assert.equal(registry.validateCommand(di, 'setpoint', 33).ok, false, 'out-of-range still refused');
+    assert.match(registry.validateCommand(di, 'setpoint', 25).reason, /does not support/i);
 });
 
 test('range validation — Salus IT500 window boundaries (±3 of current, within 5–35)', () => {

@@ -50,6 +50,16 @@ async function readServerScopeAttributes(uuid, keys) {
 }
 
 /**
+ * Lazily resolves tb-client.readClientScopeAttributes (same defer rationale as readServerScopeAttributes
+ * — a static import forces every fixture-mode test that mock.module()'s tb-client.js to re-export it).
+ * Only ever reached on the live inventory read (OOHDASH-82 design §4).
+ */
+async function readClientScopeAttributes(uuid, keys) {
+    const mod = await import('./tb-client.js');
+    return mod.readClientScopeAttributes(uuid, keys);
+}
+
+/**
  * Lazily resolves zendesk.siteDirectory ONLY on the live search/directory path (same rationale as
  * readRequest above — it is a NEW export, so a static import would break every fixture-mode test
  * that mock.module()'s zendesk.js without re-declaring it). Never called in fixture mode.
@@ -149,16 +159,24 @@ const TYPO_MAP = {
 
 // Asset token → { kind, deviceType (a registry.js key) }. deviceType MUST be a registry key so
 // capabilitiesFor/setpointWindow/validateCommand join cleanly (the hard registry join, §2.4).
+// OOHDASH-82 (design §5): the gateway row is tested BEFORE the Salus rows so a paired gateway whose
+// name carries a salus token (e.g. `gk-6218-salusit700-gateway-1`) matches the gateway row FIRST and
+// is typed gateway everywhere, not just hidden from the chip list. Regression-safe because the
+// name-token path is only reached for no-telemetry devices (genuine thermostats classify capability-
+// first from their setpoint signal), and no genuine Salus name carries the longer gateway tokens; the
+// short `gw` token is exact-only (matchAssetIntent :exactOnly), so it cannot bleed.
+// OOHDASH-82 (design §6): Intesis is re-kinded to `aircon` (deviceType stays `intesis`) so it leaves
+// the heating candidate set; it is additionally forced non-controllable in classifyDevice.
 const ASSET_INTENT = [
+    { tokens: ['gateway', 'r10a', 'dragino', 'gw'], kind: 'gateway', deviceType: 'gateway', label: 'Lighthouse gateway' },
     { tokens: ['salusit700', 'it700', 'salus700'], kind: 'heating', deviceType: 'salus-it700', label: 'Salus iT700' },
     { tokens: ['salusit500', 'it500', 'salus500'], kind: 'heating', deviceType: 'salus-it500', label: 'Salus iT500' },
     { tokens: ['salus'], kind: 'heating', deviceType: 'salus-it700', label: 'Salus thermostat' },
-    { tokens: ['intesis', 'ac', 'aircon'], kind: 'heating', deviceType: 'intesis', label: 'Intesis AC' },
+    { tokens: ['intesis', 'ac', 'aircon'], kind: 'aircon', deviceType: 'intesis', label: 'Intesis AC' },
     { tokens: ['fryer', 'grill', 'bainmarie', 'potwash', 'kitchen', 'oven', 'dishwash'], kind: 'kitchen', deviceType: 'tuya', label: 'Kitchen circuit' },
     { tokens: ['powerpause', 'tongou', 'owon', 'contactor', 'switch', 'relay'], kind: 'kitchen', deviceType: 'tuya', label: 'Power circuit' },
     { tokens: ['light', 'lighting', 'lgt'], kind: 'lighting', deviceType: 'tuya', label: 'Lighting circuit' },
-    { tokens: ['extractfan', 'fan', 'extractor'], kind: 'fan', deviceType: 'tuya', label: 'Extractor fan' },
-    { tokens: ['gateway', 'r10a', 'dragino', 'gw'], kind: 'gateway', deviceType: 'gateway', label: 'Lighthouse gateway' }
+    { tokens: ['extractfan', 'fan', 'extractor'], kind: 'fan', deviceType: 'tuya', label: 'Extractor fan' }
 ];
 
 /* ------------------------------------------------------------------ */
@@ -306,6 +324,14 @@ export function classifyDevice(name, profile, telemetry) {
     else if (control?.attribute === 'setpointDesired') controllable = hasSetpointSignal(telemetry);
     if (!controllable) control = null;
 
+    // OOHDASH-82 (design §6, A2): Intesis aircon is NEVER controllable from the dashboard — force it
+    // non-controllable with no control descriptor even when a setpoint signal is present. Aircon
+    // requests are captured and referred to the IoT team (flows.js aircon flow), never actuated.
+    if (intent.deviceType === 'intesis') {
+        controllable = false;
+        control = null;
+    }
+
     return {
         kind: intent.kind,
         deviceType: intent.deviceType,
@@ -323,7 +349,13 @@ function matchAssetIntent(tokens) {
     for (const row of ASSET_INTENT) {
         for (const at of row.tokens) {
             const exactOnly = at.length <= 3;
-            if (corrected.some(t => t === at || (!exactOnly && (t.includes(at) || at.includes(t))))) return row;
+            // OOHDASH-82: the `at.includes(t)` direction (asset token CONTAINS the name token) is
+            // guarded to name tokens of ≥3 chars. Without this, a 1-2 char device-instance suffix
+            // (e.g. the `1` in `gk-6261-cellar-fan-1`) spuriously matches an asset token that merely
+            // contains that digit (`r10a`.includes(`1`)). This surfaced once the gateway row — which
+            // carries `r10a` — was reordered to the front (design §5); it is a latent bleed the fix
+            // closes without weakening the glued-form `t.includes(at)` direction.
+            if (corrected.some(t => t === at || (!exactOnly && (t.includes(at) || (t.length >= 3 && at.includes(t)))))) return row;
         }
     }
     // Bounded fuzzy pass (Levenshtein ≤2), never across a control boundary (each row is one family).
@@ -332,6 +364,46 @@ function matchAssetIntent(tokens) {
             if (at.length < 4) continue;   // don't fuzzy-match tiny tokens (ac/gw/fan)
             if (corrected.some(t => t.length >= 4 && levWithin(t, at, 2) <= 2)) return row;
         }
+    }
+    return null;
+}
+
+/* ------------------------------------------------------------------ */
+/* Device → area derivation (OOHDASH-82, design §3)                      */
+/* ------------------------------------------------------------------ */
+
+/**
+ * parseSiteCodeLetter(siteCode) — extracts the single iT500 class letter from the CLIENT_SCOPE `site`
+ * value (design §3). Observed shapes are like `(1771-f-1)` and `5670-s-1`: a site number, a hyphen,
+ * the class letter, a hyphen, an instance number, optionally wrapped in parentheses. Lower-cases the
+ * value and matches the anchored pattern `^\(?\s*\d+\s*-\s*([sfrb])\s*-` (first capture is the letter).
+ * Returns one of `s`/`f`/`r`/`b`, or null (empty, malformed, or a non-sfrb letter). Bleed-safe: it
+ * anchors on the leading site-number-then-hyphen and only accepts the four known class letters.
+ */
+export function parseSiteCodeLetter(siteCode) {
+    const s = String(siteCode || '').toLowerCase().trim();
+    const m = s.match(/^\(?\s*\d+\s*-\s*([sfrb])\s*-/);
+    return m ? m[1] : null;
+}
+
+/**
+ * deriveArea(deviceType, clientScope) — the caller-meaningful heating area for a device (design §3).
+ * Returns the string `Accommodation`, the string `Bar/Restaurant`, or null ("not an area device" —
+ * gateways, temp sensors, aircon, and any unmapped case; null is the safe default).
+ *
+ *   - salus-it700 → Accommodation unconditionally (the one-per-site accommodation controller maps
+ *     100%; no attribute needed, so the default `IT700` salusLocation label is handled correctly).
+ *   - salus-it500 → parse the CLIENT_SCOPE `site` letter: s (Staff)/f (Flats) → Accommodation;
+ *     r (Restaurant)/b (Bar) → Bar/Restaurant; any other/missing letter → null (fallback, §7.2).
+ *   - every other deviceType (intesis, gateway, tuya, refrigeration, boiler-panel, unknown) → null.
+ */
+export function deriveArea(deviceType, clientScope) {
+    if (deviceType === 'salus-it700') return 'Accommodation';
+    if (deviceType === 'salus-it500') {
+        const letter = parseSiteCodeLetter(clientScope && clientScope.site);
+        if (letter === 's' || letter === 'f') return 'Accommodation';
+        if (letter === 'r' || letter === 'b') return 'Bar/Restaurant';
+        return null;
     }
     return null;
 }
@@ -394,7 +466,7 @@ function pickSwitch(t) {
  * TB NAME (corrective fix, C8). `zone` is the human location label the device carries (TB `label`
  * or a `zone`/`site` attribute), matching the old per-device zone semantics.
  */
-export function mapTbDevice(raw, telemetryBag) {
+export function mapTbDevice(raw, telemetryBag, clientScope) {
     const name = raw.name ?? raw.deviceId ?? '';
     const profile = raw.type ?? raw.profile ?? null;
     const telemetry = mapTelemetry(telemetryBag || raw.telemetry);
@@ -406,6 +478,9 @@ export function mapTbDevice(raw, telemetryBag) {
         deviceType: cls.deviceType,             // a registry.js key
         deviceTypeLabel: cls.deviceTypeLabel,
         kind: cls.kind,
+        // OOHDASH-82 (design §3/§4): the caller-meaningful heating area, derived once server-side from
+        // deviceType + the CLIENT_SCOPE attributes and consumed opaquely by the flow (never re-derived).
+        area: deriveArea(cls.deviceType, clientScope),
         hotWaterCapable: telemetry.hotWater != null,
         online: raw.isOnline ?? raw.active ?? false,
         telemetry,
@@ -467,10 +542,14 @@ async function fetchTelemetry(devices) {
     await Promise.all(devices.map(async d => {
         const uuid = d?.id?.id || d?.id;
         if (!uuid) return;
-        // Dispatch both reads concurrently; settle independently so one failing never fails the other.
-        const [tsRes, activeRes] = await Promise.allSettled([
+        // Dispatch all three reads concurrently; settle independently so one failing never fails the
+        // others. OOHDASH-82 (design §4): the CLIENT_SCOPE read is added as a THIRD concurrent settled
+        // read (no extra serial round-trip) to source the iT500 `site` code / iT700 `salusLocation`
+        // for area derivation.
+        const [tsRes, activeRes, clientScopeRes] = await Promise.allSettled([
             readRequest('GET', `/api/plugins/telemetry/DEVICE/${uuid}/values/timeseries`),
-            readServerScopeAttributes(uuid, 'active,lastActivityTime')
+            readServerScopeAttributes(uuid, 'active,lastActivityTime'),
+            readClientScopeAttributes(uuid, 'site,salusLocation')
         ]);
         const bag = {};
         if (tsRes.status === 'fulfilled') {
@@ -487,6 +566,14 @@ async function fetchTelemetry(devices) {
             // Fail-safe: a SERVER_SCOPE read failure degrades this device to offline, never the site.
             console.error(`[TB] SERVER_SCOPE active read failed for device ${uuid}: ${activeRes.reason?.message}`);
             bag.__active = false;
+        }
+        // OOHDASH-82 (design §4): stash the CLIENT_SCOPE map under a private key. A failed read degrades
+        // THIS device to no client-scope (area falls back to the §7.2 rule), never the whole site.
+        if (clientScopeRes.status === 'fulfilled') {
+            bag.__clientScope = clientScopeRes.value || {};
+        } else {
+            console.error(`[TB] CLIENT_SCOPE read failed for device ${uuid}: ${clientScopeRes.reason?.message}`);
+            bag.__clientScope = {};
         }
         out.set(uuid, bag);
     }));
@@ -522,8 +609,10 @@ async function fetchLiveSitesByNumber(siteNo) {
         const bag = telemetryById.get(uuid) || {};
         // OOHDASH-80: source `online` from the SERVER_SCOPE `active` read stashed in the bag, then
         // strip the private key so it never leaks into the canonical telemetry{} shape.
-        const { __active, ...telemetryBag } = bag;
-        return mapTbDevice({ ...d, active: __active ?? false }, telemetryBag);
+        // OOHDASH-82 (design §4): strip the private `__clientScope` map the same way and pass it into
+        // mapTbDevice so deriveArea can consume the iT500 `site` code / iT700 `salusLocation`.
+        const { __active, __clientScope, ...telemetryBag } = bag;
+        return mapTbDevice({ ...d, active: __active ?? false }, telemetryBag, __clientScope || {});
     });
 
     if (!devices.length) {

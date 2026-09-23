@@ -16,9 +16,18 @@ const CATS = [
     { k: 'contractor', ic: '🧰', t: 'Contractor on site', d: 'Engineer needs Lighthouse info now' },
     { k: 'other', ic: '✍️', t: 'Something else / not sure', d: 'Describe it in the caller’s words' }
 ];
-const HIDDENCATS = [{ k: 'connectivity', ic: '📡', t: 'Connection check', d: 'Lighthouse gateway / equipment not responding' }];
+const HIDDENCATS = [
+    { k: 'connectivity', ic: '📡', t: 'Connection check', d: 'Lighthouse gateway / equipment not responding' },
+    // OOHDASH-82 (design §6): aircon is not a top-level tile — it is reached from smart-entry keywords
+    // (suggestion chip) and the in-context shortcut in the heating step. Both start the `aircon` flow,
+    // whose only outcome is a captured referral to the IoT team (no dashboard control of AC).
+    { k: 'aircon', ic: '❄️', t: 'Air conditioning', d: 'Handled by the IoT team — captured and referred' }
+];
 const KEYWORDS = [
     { k: 'hotwater', words: ['hot water', 'no water', 'shower', 'tap', 'washing up', 'wash up'] },
+    // OOHDASH-82 (design §6): aircon keywords route a typed request straight to the referral. Ordered
+    // before heating so "air con" / "aircon" / "cooling" score to aircon, not heating's 'warm'/'cold'.
+    { k: 'aircon', words: ['air con', 'aircon', 'a/c', 'air conditioning', 'cooling', 'air-con'] },
     { k: 'heating', words: ['heat', 'cold', 'freez', 'warm', 'too hot', 'boiling hot', 'radiator', 'temperature', 'thermostat', 'boiler'] },
     { k: 'kitchen', words: ['fryer', 'grill', 'glasswash', 'dishwash', 'oven', 'merrychef', 'kitchen', 'equipment', 'no power', 'lincat', 'coffee', 'pot wash', 'deep clean'] },
     { k: 'lighting', words: ['light', 'dark', 'car park', 'festoon', 'sign'] },
@@ -83,7 +92,74 @@ function flowStep(patch) {
 
 function doneLine(txt) { state.flow.done.push(txt); }
 
-function heatingZones() { return state.workspace.devices.filter(d => d.kind === 'heating'); }
+/* ------------------------ heating area model (OOHDASH-82, design §7) ------------------------ */
+
+// Fixed display order for the two caller-meaningful areas (Accommodation first, design §7.1).
+const HEATING_AREA_ORDER = ['Accommodation', 'Bar/Restaurant'];
+
+/**
+ * The site's heating devices for the area model — Salus iT700/iT500 (design §7.1), PLUS pub
+ * boiler-panel devices so the existing boiler-panel read/guidance branch is not lost (design §7.1
+ * notes the boiler-panel case must still be handled; §7.5 keeps its branch working unchanged). This
+ * structurally excludes gateways, aircon (intesis, now kind `aircon`), and temp sensors, so no
+ * serial/gateway can ever become an area chip even independent of the classifier reorder (§5
+ * structural backstop). Boiler-panels derive a null `area` and so surface under the fallback chip.
+ */
+function heatingDevices() {
+    return state.workspace.devices.filter(d =>
+        d.deviceType === 'salus-it700' || d.deviceType === 'salus-it500' || d.deviceType === 'boiler-panel');
+}
+
+/** True when the site has any aircon (Intesis) device — gates the in-context aircon shortcut (§6). */
+function siteHasAircon() {
+    return state.workspace.devices.some(d => d.kind === 'aircon');
+}
+
+/**
+ * The DISTINCT non-null area names present across heatingDevices(), in fixed display order (design
+ * §7.1) — at most Accommodation and Bar/Restaurant.
+ */
+function heatingAreasPresent() {
+    const present = new Set(heatingDevices().map(d => d.area).filter(Boolean));
+    return HEATING_AREA_ORDER.filter(a => present.has(a));
+}
+
+/** True when any controllable heating device has a null area — drives the fallback chip (design §7.2). */
+function hasUnmappedHeating() {
+    return heatingDevices().some(d => !d.area);
+}
+
+/** The device SET for a chosen area name; the fallback area (null) resolves to all unmapped devices. */
+function devicesForArea(area) {
+    return area === null
+        ? heatingDevices().filter(d => !d.area)
+        : heatingDevices().filter(d => d.area === area);
+}
+
+/**
+ * areaRepresentative(devices) — the single representative reading for an area (design §7.3, B1-read):
+ * the COLDEST online thermostat. Returns null when no device in the set is online (→ connectivity
+ * branch). Among online devices, picks the lowest current temperature (localTemperature, then
+ * roomSensor1Temp); ties break by deviceId ascending; if no online device has a numeric temperature,
+ * the first online device by deviceId ascending. Degrades cleanly: a single-device area returns it.
+ */
+function areaRepresentative(devices) {
+    const online = (devices || []).filter(d => d.online);
+    if (!online.length) return null;
+    const tempOf = d => {
+        const t = d.telemetry || {};
+        if (typeof t.localTemperature === 'number') return t.localTemperature;
+        if (typeof t.roomSensor1Temp === 'number') return t.roomSensor1Temp;
+        return null;
+    };
+    const byId = (a, b) => String(a.deviceId).localeCompare(String(b.deviceId));
+    const withTemp = online.filter(d => tempOf(d) != null);
+    if (!withTemp.length) return [...online].sort(byId)[0];
+    return withTemp.sort((a, b) => {
+        const ta = tempOf(a), tb = tempOf(b);
+        return ta !== tb ? ta - tb : byId(a, b);
+    })[0];
+}
 
 function renderFlow() {
     const f = state.flow;
@@ -225,20 +301,51 @@ function startSwitch(deviceId, dir) {
 /* ------------------------ flow renderers ------------------------ */
 const FLOWR = {
     heating(ws, f) {
-        const zones = heatingZones();
+        // OOHDASH-82 (design §7): area-first model. Chips are the DISTINCT areas present (max two:
+        // Accommodation / Bar-Restaurant), plus a labelled fallback chip for unmapped iT500s and the
+        // aircon shortcut when the site has AC. The chosen area is stored by NAME (not a list index).
+        const areas = heatingAreasPresent();
+        const unmapped = hasUnmappedHeating();
         if (f.stage === 0) {
-            if (!zones.length) return '<div class="alert warn">No heating on Lighthouse at this site.</div>' + otherShortcut();
-            return `<div class="stepq">Which area is the caller talking about?</div><div class="chips">${zones.map((z, i) =>
-                `<button class="chip" data-testid="zone-${i}" onclick="flowStep({zi:${i}})">${esc(z.zone)}</button>`).join('')}</div>`;
+            if (!areas.length && !unmapped) return '<div class="alert warn">No heating on Lighthouse at this site.</div>' + otherShortcut();
+            const areaChips = areas.map(a =>
+                `<button class="chip" data-testid="area-${a === 'Accommodation' ? 'accommodation' : 'bar-restaurant'}" onclick="flowStep({area:'${a}'})">${esc(a)}</button>`).join('');
+            // Fallback chip (§7.2): unmapped iT500s — a caller-meaningful label, never a serial.
+            const fallbackChip = unmapped
+                ? `<button class="chip" data-testid="area-unmapped" onclick="flowStep({area:'__unmapped__'})">Heating — area not identified</button>`
+                : '';
+            // In-context aircon shortcut (§6): visibly NOT one of the two areas; starts the referral flow.
+            const airconChip = siteHasAircon()
+                ? `<div class="chips" style="margin-top:8px"><button class="chip" data-testid="aircon-shortcut" onclick="startFlow('aircon', state.flow.data.freeText||'')">❄️ Air conditioning (handled by the IoT team)</button></div>`
+                : '';
+            return `<div class="stepq">Which area is the caller talking about?</div><div class="chips">${areaChips}${fallbackChip}</div>${airconChip}`;
         }
-        const z = zones[f.data.zi];
+        // Resolve the chosen area (by name) to its device SET, then to the coldest-online representative.
+        const chosenArea = f.data.area === '__unmapped__' ? null : f.data.area;
+        const areaLabel = f.data.area === '__unmapped__' ? 'Heating — area not identified' : f.data.area;
+        const set = devicesForArea(chosenArea);
+        const z = areaRepresentative(set);
+        // No online device in the area → connectivity branch (design §7.3 rule 2), same as a single
+        // offline device today. Uses any device in the set to name the area in the connectivity line.
+        if (!z) {
+            doneLine(`Area: <b>${esc(areaLabel)}</b>`);
+            doneLine('Live read: <b>no thermostat online in this area</b>');
+            f.cat = 'connectivity'; f.stage = 0; f.data.from = 'heating';
+            return FLOWR.connectivity(ws, f);
+        }
         const t = z.telemetry || {};
         const temp = typeof t.localTemperature === 'number' ? t.localTemperature : (typeof t.roomSensor1Temp === 'number' ? t.roomSensor1Temp : null);
         const sp = t.heatingSetpoint;
+        const nInArea = set.length;
         if (f.stage === 1) {
-            doneLine(`Area: <b>${esc(z.zone)}</b>`);
+            doneLine(`Area: <b>${esc(areaLabel)}</b>`);
             if (!z.online) { doneLine('Live read: <b>device offline</b>'); f.cat = 'connectivity'; f.stage = 0; f.data.from = 'heating'; return FLOWR.connectivity(ws, f); }
-            const read = `<div class="zoneread"><span class="t">${temp != null ? temp + '°C' : '—'}</span><div><div>${sp != null ? `Setpoint <b>${sp}°C</b>` : ''}${t.mode ? ' · mode <b>' + esc(t.mode) + '</b>' : ''}</div><div class="small">${esc(z.deviceId)} · ${z.deviceType === 'boiler-panel' ? 'pub boiler panel' : 'live read just now'}</div></div><span class="tag green">online</span></div>`;
+            // OOHDASH-82 (design §7.3): when the area has more than one device the read is the COLDEST
+            // online zone — make the subline honest so the handler knows it is the worst-case zone.
+            const liveNote = z.deviceType === 'boiler-panel'
+                ? 'pub boiler panel'
+                : 'live read just now' + (nInArea > 1 ? ` · coldest of ${nInArea} zones in ${esc(areaLabel)}` : '');
+            const read = `<div class="zoneread"><span class="t">${temp != null ? temp + '°C' : '—'}</span><div><div>${sp != null ? `Setpoint <b>${sp}°C</b>` : ''}${t.mode ? ' · mode <b>' + esc(t.mode) + '</b>' : ''}</div><div class="small">${esc(z.deviceId)} · ${liveNote}</div></div><span class="tag green">online</span></div>`;
             if (z.deviceType === 'boiler-panel') {
                 doneLine(`Live read: ${temp != null ? temp + '°C' : 'no reading'} · pub boiler panel`);
                 return read + `<div class="reco" data-testid="reco-boiler-panel"><b class="hd">This zone can’t be adjusted remotely yet.</b>It runs on the pub’s boiler control panel, which isn’t connected for remote changes (it’s on the priority list with our platform team).<div class="outbtns"><button class="btn primary" onclick="flowStep({need:'bp'})">Capture &amp; escalate for the IoT team</button><button class="btn" onclick="flowStep({need:'noact'})">End with no action</button></div></div>`;
@@ -277,19 +384,10 @@ const FLOWR = {
             }
             if (need === 'off') {
                 doneLine('Requested: turn heating off');
-                // D10 SAFETY: Intesis on/off via modeDesired is HELD in v1 — the bridge treats any
-                // non-'off' mode as ON and the bench unit gave NO modeSyncStatus, so a "turn off" we
-                // can't confirm is unsafe. Redirect the Intesis off request to capture-and-escalate
-                // rather than firing an unconfirmable mode write.
-                if (z.deviceType === 'intesis') {
-                    doneLine('Intesis off — mode control held (unconfirmable); captured');
-                    return outcomeCaptured(f, 'intesisoff', {
-                        subject: `AC turn-off requested (${z.zone})`,
-                        detail: `Caller asked to turn off the Intesis AC in ${z.zone}. Remote on/off for this unit isn’t confirmable yet (mode control held), so it’s captured for the IoT team rather than fired unconfirmed. Live read ${temp != null ? temp + '°C' : 'n/a'}${sp != null ? `, setpoint ${sp}°C` : ''}.`,
-                        script: 'I can’t safely switch that AC off remotely tonight because the unit doesn’t confirm the change back — so rather than tell you it’s done when it might not be, I’ve logged it as a priority for the IoT team. If there’s an on-site controller you can use that in the meantime.',
-                        OohCaptureClass: 'intesis-off-held'
-                    });
-                }
+                // OOHDASH-82 (design §6, A4): the heating flow no longer sees Intesis (aircon is removed
+                // from the candidate set and served by the dedicated `aircon` referral flow), so the old
+                // `z.deviceType === 'intesis'` off-held branch here is dead and has been removed. Salus
+                // heat-only units offer the frost-hold below.
                 return `<div class="reco" data-testid="reco-frost"><b class="hd">This thermostat has no “off” switch.</b>It’s a Salus heat-only unit. The closest safe action is a <b>frost-hold</b>: set it to 5°C, so the heating stays off unless the building risks freezing. Normal service resumes when the hold ends.<div class="outbtns"><button class="btn primary" data-testid="frost-recommended" onclick="flowStep({frost:1})">Set frost-hold 5°C (recommended)</button><button class="btn" data-testid="frost-decline" onclick="flowStep({offnoact:1})">End with no action</button></div></div>`;
             }
             if (need === 'broken') {
@@ -321,6 +419,20 @@ const FLOWR = {
             }
         }
         return '';
+    },
+
+    // OOHDASH-82 (design §6): the aircon referral flow. A single step whose only outcome is a NORMAL
+    // capture via outcomeCaptured (the exact mechanism behind the former intesis-off-held capture),
+    // with the new capture class `aircon-referral`. No setpoint, no openControl, no write — aircon is
+    // not controllable from the dashboard; every request is captured and referred to the IoT team.
+    aircon(ws, f) {
+        doneLine('Air conditioning — not controllable from the dashboard; captured for the IoT team');
+        return outcomeCaptured(f, 'aircon', {
+            subject: `Air conditioning request (${ws.site.siteName})`,
+            detail: 'Caller raised an air-conditioning issue. Aircon is not controllable from the dashboard, so it is captured and referred to the IoT team rather than actioned here.',
+            script: 'Air conditioning isn’t something I can adjust from here, so I’ve logged it for the IoT team — they’ll pick it up on the next working day. If it becomes urgent overnight, call back and we can escalate.',
+            OohCaptureClass: 'aircon-referral'
+        });
     },
 
     hotwater(ws, f) {
