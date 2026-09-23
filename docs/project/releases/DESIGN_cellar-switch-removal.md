@@ -85,70 +85,30 @@ Substring-matching the short override tokens is **provably safe here** for two r
 
 ### 3.3 The predicate (build-ready pseudocode)
 
-Add these constants near `ASSET_INTENT` (`services/tb-device.js:152`) and a helper alongside `hasSwitchSignal`:
+Add these constants near `ASSET_INTENT` (`services/tb-device.js:152`) and a helper alongside `hasSwitchSignal`. Stated as build-ready specification (identifiers and values inline):
 
-```
-// Appliance nouns — ALL forms of every noun that must always mean monitor-only. Matched with
-// norm.includes(...) over the REAL normaliser (lower-case, strip parens, _→-, collapse ws).
-// NB: normaliseName maps _→- but NOT -→space, so "cold-room" and "cold_room" both normalise to
-// "cold-room"; all three literal shapes are listed so every written form of cold room is caught.
-const REFRIG_APPLIANCE = ['fridge', 'freezer', 'chiller', 'coldroom', 'cold-room', 'cold room',
-                          'refrigeration', 'refrig'];
-const REFRIG_LOCATION  = ['cellar'];                      // location class — overridable
-// FIXME(CR3): populate REFRIG_PROFILES from the confirmed live cellar/refrigeration profile string
-// BEFORE the profile-deny is relied upon. Empty [] = fail-closed: profile signal is inert and the
-// name-token deny + registry backstop still protect every recognised name. An empty array once CR3
-// is resolved is a defect, not a valid state — see the enforcement test in §8.3 which FAILS if the
-// CR3 probe artefact exists yet this array is still empty.
-const REFRIG_PROFILES  = [];
-const CTRL_OVERRIDE    = ['light', 'lighting', 'lgt', 'fan', 'extractfan', 'extractor', 'socket',
-                          'fryer', 'grill', 'bainmarie', 'potwash', 'oven', 'dishwash'];
+- **`REFRIG_APPLIANCE`** — appliance nouns: ALL forms of every noun that must always mean monitor-only, matched with `norm.includes(...)` over the REAL normaliser (lower-case, strip parens, `_`→`-`, collapse whitespace). Because `normaliseName` maps `_`→`-` but NOT `-`→space, both "cold-room" and "cold_room" normalise to `cold-room`; all three literal shapes are listed so every written form of "cold room" is caught. Values: `fridge`, `freezer`, `chiller`, `coldroom`, `cold-room`, `cold room`, `refrigeration`, `refrig`.
+- **`REFRIG_LOCATION`** — the location class (overridable): `cellar`.
+- **`REFRIG_PROFILES`** — an empty list until CR3. Carry a `FIXME(CR3)` on this constant: populate it from the confirmed live cellar/refrigeration profile string BEFORE the profile-deny is relied upon. An empty list is fail-closed — the profile signal is inert and the name-token deny plus the registry backstop still protect every recognised name. An empty list once CR3 is resolved is a defect, not a valid state — see the enforcement test in §8.3 which FAILS if the CR3 probe artefact exists yet this list is still empty.
+- **`CTRL_OVERRIDE`** — the controllable-appliance tokens: `light`, `lighting`, `lgt`, `fan`, `extractfan`, `extractor`, `socket`, `fryer`, `grill`, `bainmarie`, `potwash`, `oven`, `dishwash`.
 
-// True ⇒ this device is refrigeration and must be forced monitor-only, EVEN IF it carries a switch signal.
-function isRefrigerationDeny(norm, profile) {
-    const hasAppliance = REFRIG_APPLIANCE.some(t => norm.includes(t));
-    const hasLocation  = REFRIG_LOCATION.some(t => norm.includes(t));
-    const prof = String(profile || '').toLowerCase();
-    const hasProfile   = REFRIG_PROFILES.some(p => prof.includes(p));   // empty until CR3
-    if (!hasAppliance && !hasLocation && !hasProfile) return false;
-    // ASSUMPTION (verify at CR3, §9): no controllable circuit in the estate carries a refrigeration
-    // appliance noun in its name. An appliance noun therefore returns the deny with NO override
-    // consulted — e.g. "fridge-light-circuit" is monitor-only despite the "light" token. Fail-closed.
-    if (hasAppliance) return true;                                       // appliance noun ⇒ always monitor-only
-    // location- or profile-only ⇒ yield to an explicit controllable-appliance token.
-    // Substring-match EVERY override token, incl. short ones (fan, lgt), so GLUED forms
-    // (cellarfan-1, cellarlgt-1, cellarlight-1) are recognised. Safe: override is only reached for a
-    // location/profile device with no appliance noun, and no cooling/location word contains any
-    // override token as a substring.
-    const override = CTRL_OVERRIDE.some(t => norm.includes(t));
-    return !override;
-}
-```
+Helper **`isRefrigerationDeny(norm, profile)`** — returns true when the device is refrigeration and must be forced monitor-only, EVEN IF it carries a switch signal:
+
+- compute **hasAppliance** = any `REFRIG_APPLIANCE` token is a substring of `norm`;
+- compute **hasLocation** = any `REFRIG_LOCATION` token is a substring of `norm`;
+- compute **hasProfile** = any `REFRIG_PROFILES` entry is a substring of the lower-cased profile (empty until CR3);
+- if none of hasAppliance / hasLocation / hasProfile is true → return false (not refrigeration);
+- **ASSUMPTION** (verify at CR3, §9): no controllable circuit in the estate carries a refrigeration appliance noun in its name. An appliance noun therefore returns the deny with NO override consulted — e.g. a name like "fridge-light-circuit" is monitor-only despite the `light` token. Fail-closed. So: if hasAppliance → return true (appliance noun ⇒ always monitor-only);
+- otherwise (location- or profile-only) → yield to an explicit controllable-appliance token: compute **override** = any `CTRL_OVERRIDE` token is a substring of `norm`, then return NOT override. Substring-match EVERY override token, including the short ones (`fan`, `lgt`), so GLUED forms (`cellarfan-1`, `cellarlgt-1`, `cellarlight-1`) are recognised. This is safe because the override is only reached for a location/profile device with no appliance noun, and no cooling/location word contains any override token as a substring.
 
 ### 3.4 Where it sits and what precedence it takes
 
 Insert the deny as the **first** branch of `classifyDevice`, immediately after `norm`/`tokens` are computed (`services/tb-device.js:200-201`) and **before** the capability-first switch intent (`:203-206`) and the name asset-intent match (`:214`):
 
-```
-export function classifyDevice(name, profile, telemetry) {
-    const norm = normaliseName(name);
-    const tokens = norm.split(/[-\s]+/).filter(Boolean);
+In `classifyDevice`, immediately after `norm` and `tokens` are computed (`normaliseName(name)`, then split on `[-\s]+`), add the deterministic refrigeration deny as the FIRST branch. It mirrors the existing deterministic non-controllable patterns (Intesis-off-held, hot-water-out-of-scope): a safe outcome forced regardless of a raw capability, with precedence over the capability-first switch intent AND over `matchAssetIntent`.
 
-    // Stream A — DETERMINISTIC REFRIGERATION DENY. Precedence over the capability-first switch intent
-    // AND over matchAssetIntent. Mirrors the existing deterministic non-controllable patterns
-    // (Intesis-off-held, hot-water-out-of-scope): a safe outcome forced regardless of a raw capability.
-    if (isRefrigerationDeny(norm, profile)) {   // tokens no longer needed — deny matches over `norm`
-        return {
-            kind: 'fridge',                     // NOT 'kitchen' — never enters the Kitchen flow or Kitchen scope test
-            deviceType: 'refrigeration',        // a registry key whose commands are [] (§4)
-            deviceTypeLabel: 'Refrigeration (monitor-only)',
-            controllable: false,
-            control: null
-        };
-    }
-    // …existing capability-first + name-intent logic unchanged…
-}
-```
+- When `isRefrigerationDeny(norm, profile)` is true (the deny matches over `norm`, so `tokens` are no longer needed for it), return early with: `kind: 'fridge'` (NOT `'kitchen'` — so it never enters the Kitchen flow or the Kitchen scope test); `deviceType: 'refrigeration'` (a registry key whose commands are `[]`, §4); `deviceTypeLabel: 'Refrigeration (monitor-only)'`; `controllable: false`; `control: null`.
+- Otherwise fall through to the existing capability-first plus name-intent logic, unchanged.
 
 **Precedence order:** refrigeration deny **>** capability-first switch intent **>** name asset intent. Because it returns early, the switch telemetry never reaches the `hasSwitchSignal` branch and `matchAssetIntent` is never consulted for a denied device — no fuzzy pass can pull a fridge into `kitchen`.
 
@@ -160,11 +120,7 @@ export function classifyDevice(name, profile, telemetry) {
 
 ### 4.1 New monitor-only device type
 
-Add one entry to `REGISTRY` (`services/registry.js:11-51`):
-
-```
-'refrigeration': { label: 'Refrigeration (monitor-only)', commands: [] },
-```
+Add one entry to `REGISTRY` (`services/registry.js:11-51`): a key `refrigeration` whose value sets `label` to `Refrigeration (monitor-only)` and `commands` to an empty list.
 
 With empty commands, `capabilitiesFor('refrigeration').commands` is `[]`, so:
 
@@ -175,17 +131,10 @@ This alone closes the leak at every gate by construction. It also keeps `admin/r
 
 ### 4.2 Independent backstop (defence-in-depth)
 
-Add an explicit, type-level refusal at the top of the `switch` case (`services/registry.js:99`), independent of the command list, so the guard holds even if a future edit ever gave `refrigeration` a stray command:
+Add an explicit, type-level refusal at the top of the `switch` case (`services/registry.js:99`), independent of the command list, so the guard holds even if a future edit ever gave `refrigeration` a stray command. In the `switch` case, before the existing checks:
 
-```
-case 'switch': {
-    if (device.deviceType === 'refrigeration')
-        return { ok: false, reason: 'Refrigeration assets are monitor-only — remote switching is not permitted' };
-    if (!entry.commands.includes('switch')) return { ok: false, reason: `${entry.label} does not support remote on/off switching` };
-    if (typeof value !== 'boolean') return { ok: false, reason: 'Switch value must be true (on) or false (off)' };
-    return { ok: true, attribute: 'switchDesired', value };
-}
-```
+- if `device.deviceType` equals `refrigeration` → return not-ok with the reason that refrigeration assets are monitor-only and remote switching is not permitted;
+- then the existing checks unchanged: if `entry.commands` does not include `switch` → return not-ok ("<label> does not support remote on/off switching"); if `value` is not a boolean → return not-ok ("Switch value must be true (on) or false (off)"); otherwise return ok with attribute `switchDesired` and the boolean value.
 
 This is the second, independent guard the registry header already envisages ("primary guard … bridge edge-gating is the backstop", `services/registry.js:1-6`). Here the registry is the independent backstop behind the classifier: even a crafted request that names a refrigeration device is refused.
 
