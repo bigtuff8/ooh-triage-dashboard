@@ -1,0 +1,15 @@
+{
+  "run": "selfgate-ooh-triage-dashboard-discovery-cellar-switch-removal",
+  "phase": "discovery",
+  "pr": 36,
+  "approvedBy": [
+    "bigtuff8"
+  ],
+  "reviewComments": [
+    "bigtuff8: - Accept this discovery and proceed to design of the refrigeration switch-deny?: Accept — proceed to design\n\n(submitted via the interactive gate review)"
+  ],
+  "mergeCommit": "5247b9724d4a6d1d19e37d492ffb45ad6c7766c6",
+  "phaseBranch": "discovery/cellar-switch-removal",
+  "releaseBranch": "main",
+  "stamp": 1790157902738
+}
