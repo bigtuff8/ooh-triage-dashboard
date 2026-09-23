@@ -45,6 +45,11 @@ const REGISTRY = {
     },
     // Tuya single-gang switch (v1 NEW, D10). Single relay only (D7) — switch_2 is not addressable.
     'tuya': { label: 'Tuya (PowerPause/kitchen)', commands: ['switch'] },
+    // Refrigeration (monitor-only) — Stream A / OOHDASH-19. A refrigeration/cellar cooling asset is
+    // MONITOR-ONLY: empty commands means the Turn OFF button never renders (capabilities:[]) and the
+    // write guard rejects a switch by construction. The explicit deviceType backstop in the switch
+    // case below is a SECOND, independent refusal that holds even if this list were ever mutated.
+    'refrigeration': { label: 'Refrigeration (monitor-only)', commands: [] },
     'boiler-panel': { label: 'Pub boiler panel', commands: [] },
     'tb-rulechain': { label: 'TB rule-chain (lighting/fans)', commands: [] },
     'gateway': { label: 'Lighthouse gateway', commands: [] }
@@ -97,6 +102,13 @@ export function validateCommand(device, command, value) {
             return { ok: true, attribute: 'setpointDesired', value: entry.frostSetpoint };
         }
         case 'switch': {
+            // DEFENCE-IN-DEPTH backstop (Stream A / OOHDASH-19). A refrigeration asset is monitor-only
+            // and can NEVER accept a remote switch — refused here by deviceType, independent of the
+            // command list, so the guard holds even if a future edit ever gave `refrigeration` a stray
+            // command. This is the registry backstop behind the classifier deny (defence-in-depth).
+            if (device.deviceType === 'refrigeration') {
+                return { ok: false, reason: 'Refrigeration assets are monitor-only — remote on/off switching is not permitted' };
+            }
             // Tuya single-gang on/off (v1 NEW, D10). STRICT boolean only — no truthy coercion, no
             // per-gang key (switch_2 is not addressable, D7). A non-boolean is rejected here so the
             // guardrail is the primary guard, not the bridge.

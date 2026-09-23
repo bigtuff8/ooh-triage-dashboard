@@ -8,6 +8,7 @@
 
 import { config } from '../config.js';
 import { collection } from './store.js';
+import { refrigWritesLocked } from './refrig-guard.js';
 
 const DOC_ID = 'killswitch';
 
@@ -31,6 +32,13 @@ export async function writesBlocked(siteNo) {
     // write cannot fire at first live boot / during the canary regardless of runtime state.
     if (config.writesDisabled) {
         return 'Device control is disabled at deploy time (WRITES_DISABLED) — safety/canary lock';
+    }
+    // Stream A / OOHDASH-19 runtime boot guard (belt-and-braces): if the refrigeration switch-deny is
+    // NOT present in the running image, the boot guard has engaged this latch and writes stay LOCKED
+    // even though WRITES_DISABLED is "false". Checked synchronously (no Cosmos read) before any store
+    // access, so a write cannot fire on an image missing the deny.
+    if (refrigWritesLocked()) {
+        return 'Device control is locked — the refrigeration switch-deny is not present in the running image (Stream A / OOHDASH-19 interlock)';
     }
     const doc = await getDoc();
     if (doc.OohWriteKillSwitchGlobal) {

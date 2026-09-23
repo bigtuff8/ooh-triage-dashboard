@@ -1,0 +1,11 @@
+{
+  "_comment": "Stream A / OOHDASH-19 tightening-safety fixture (design §3.2, §8.1). Enumerates the KNOWN controllable cellar circuits in the estate. Every entry MUST still classify controllable under the tightened override set (bare switch/relay/contactor/powerpause dropped). SEEDED with the confirmed carve-out examples; the CR3 probe (data/cr3-cellar-profile.json) repopulates this from real live names. If a real controllable cellar circuit is found named with ONLY a bare switch/relay token, add it here — the test/refrigeration-deny test will then fail and the tightening must be revisited before build lands.",
+  "names": [
+    { "name": "gk-6261-cellar-light-1", "profile": "gatewayDevice", "telemetry": { "switchReported": true } },
+    { "name": "gk-6261-cellarlight-1", "profile": "gatewayDevice", "telemetry": { "switchReported": true } },
+    { "name": "gk-6261-cellar-fan-1", "profile": "gatewayDevice", "telemetry": { "switchReported": true } },
+    { "name": "gk-6261-cellarfan-1", "profile": "gatewayDevice", "telemetry": { "switchReported": true } },
+    { "name": "gk-6261-cellarlgt-1", "profile": "gatewayDevice", "telemetry": { "switchReported": true } },
+    { "name": "gk-6261-cellar-socket-1", "profile": "gatewayDevice", "telemetry": { "switchReported": true } }
+  ]
+}
