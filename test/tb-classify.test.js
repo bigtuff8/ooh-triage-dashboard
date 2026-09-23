@@ -47,10 +47,14 @@ test('classify: Tuya switch signal → tuya + switchDesired (C5), kitchen kind f
     assert.equal(c.kind, 'kitchen');
 });
 
-test('classify: Intesis AC → intesis + setpointDesired (mode held in v1)', () => {
+test('classify: Intesis AC → intesis, kind aircon, non-controllable (OOHDASH-82 §6 — aircon control removed)', () => {
     const c = classifyDevice('gk-6770-intesis-1', 'default', { heatingSetpoint: 22, mode: 'Cool' });
     assert.equal(c.deviceType, 'intesis');
-    assert.equal(c.control.attribute, 'setpointDesired');
+    // OOHDASH-82: Intesis is re-kinded to `aircon` and forced non-controllable — even with a setpoint
+    // signal present it offers NO control. Aircon requests are captured and referred, never actuated.
+    assert.equal(c.kind, 'aircon');
+    assert.equal(c.controllable, false);
+    assert.equal(c.control, null);
 });
 
 test('classify: gateway/R10A with no control signal is monitor-only', () => {

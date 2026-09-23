@@ -131,6 +131,25 @@ export async function readServerScopeAttributes(uuid, keys) {
     return out;
 }
 
+/**
+ * Reads CLIENT_SCOPE attributes for a device by TB UUID (read plane, OOHDASH-82 design §4). Mirrors
+ * readServerScopeAttributes exactly, but against the CLIENT_SCOPE attributes endpoint — TB returns the
+ * array form `[{ key, value, lastUpdateTs }]` which we fold to a plain `{ key: value }` map. Used by
+ * tb-device.js to source the iT500 `site` code (and the iT700 `salusLocation`) for area derivation.
+ * Read-only by contract; no write session touched.
+ */
+export async function readClientScopeAttributes(uuid, keys) {
+    const attrs = await readSession.request(
+        'GET',
+        `/api/plugins/telemetry/DEVICE/${uuid}/values/attributes/CLIENT_SCOPE?keys=${encodeURIComponent(keys)}`
+    );
+    const out = {};
+    for (const row of Array.isArray(attrs) ? attrs : []) {
+        if (row && row.key !== undefined) out[row.key] = row.value;
+    }
+    return out;
+}
+
 const deviceUuidCache = new Map();
 
 async function tbDeviceUuid(deviceName) {

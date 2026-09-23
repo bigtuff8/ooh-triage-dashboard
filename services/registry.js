@@ -31,11 +31,13 @@ const REGISTRY = {
     },
     'intesis': {
         label: 'Intesis',
-        // v1: setpoint only. `mode` is DROPPED so validateCommand rejects modeDesired everywhere
-        // (D10 safety fix) — mode/on-off is HELD until Intesis modeSyncStatus is proven on a
-        // mode-capable unit and the confirm copy is softened (open item O-2). Re-enabling = add
-        // 'mode' back here.
-        commands: ['setpoint'],
+        // OOHDASH-82 (design §6, A3): aircon control is REMOVED from the dashboard. The commands list
+        // is EMPTY so validateCommand refuses every Intesis command server-side (defence in depth,
+        // mirroring the refrigeration monitor-only pattern) — the classifier already forces Intesis
+        // non-controllable, and aircon requests are captured and referred (aircon-referral). This
+        // REDUCES the control surface; it does not touch the write-lock.
+        // (Historic: v1 offered setpoint-only; `mode` was already dropped as a D10 safety fix.)
+        commands: [],
         deviceRange: { min: 16, max: 32 }, // SD-492 corrected range (was 16–30)
         // Vocabulary kept lowercase end-to-end (D10) so no path can emit a capitalised 'Off' — the
         // bridge treats any non-'off' mode as ON, so a stray 'Off' could switch an AC ON. Retained
