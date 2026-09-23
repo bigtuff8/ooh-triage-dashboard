@@ -2,9 +2,12 @@
 import { test, expect } from '@playwright/test';
 import { signIn, confirmSite } from './helpers.js';
 
-async function startHeatingFlow(page, zoneIndex = 0) {
+// OOHDASH-82: the heating flow's first step is now the two-area chip model (Accommodation /
+// Bar/Restaurant), not per-device `zone-N` chips. Selecting an area resolves to the coldest online
+// device in that area (the representative). Callers pass the area's testid slug.
+async function startHeatingFlow(page, areaSlug = 'bar-restaurant') {
     await page.locator('[data-testid="tile-heating"]').click();
-    await page.locator(`[data-testid="zone-${zoneIndex}"]`).click();
+    await page.locator(`[data-testid="area-${areaSlug}"]`).click();
 }
 
 test.describe('control & sync', () => {
@@ -12,7 +15,8 @@ test.describe('control & sync', () => {
 
     test('F005 setpoint raise: full chain — modal, guardrail text, pending → synced, ticket, state reset', async ({ page }) => {
         await confirmSite(page, '6832', 'Old Grey Mare');
-        await startHeatingFlow(page, 0);
+        // Bar/Restaurant → IT500-BAR-6832 (the sole Bar/Restaurant device, 17.5°C)
+        await startHeatingFlow(page, 'bar-restaurant');
         await page.locator('[data-testid="need-warm"]').click();
 
         // Target confirmation strip (second half of the F004 gate)
@@ -43,9 +47,10 @@ test.describe('control & sync', () => {
         // Protocol 5 — state reset: add another issue and reach a fresh control modal without reload
         await page.locator('[data-testid="add-another-issue"]').click();
         await expect(page.locator('[data-testid="category-tiles"]')).toBeVisible();
-        await startHeatingFlow(page, 1);
+        // Accommodation → the coldest of its two devices {IT500-RST 19.0, IT500-ACC 16.0} = IT500-ACC-6832
+        await startHeatingFlow(page, 'accommodation');
         await page.locator('[data-testid="need-cool"]').click();
-        await expect(page.locator('[data-testid="control-target"]')).toContainText('IT500-RST-6832');
+        await expect(page.locator('[data-testid="control-target"]')).toContainText('IT500-ACC-6832');
         await page.locator('button:has-text("Cancel")').last().click();
     });
 
@@ -100,7 +105,7 @@ test.describe('control & sync', () => {
 
     test('F008 failed write is reported honestly and escalates — never success (Robin Hood restaurant)', async ({ page }) => {
         await confirmSite(page, '6851', 'Robin Hood');
-        await startHeatingFlow(page, 1); // Restaurant — fixture _demo: fail
+        await startHeatingFlow(page, 'bar-restaurant'); // Restaurant IT500-RST-6851 — fixture _demo: fail
         // 17°C vs setpoint 21 → 'warmer' first shows the building-heat recommendation card
         await page.locator('[data-testid="need-warm"]').click();
         await expect(page.locator('[data-testid="reco-building-heat"]')).toContainText('Raising the setpoint won’t help');
@@ -118,7 +123,7 @@ test.describe('control & sync', () => {
 
     test('F008 IT700 slow echo: timeout state, keep-waiting, escalate (Jolly Scotchman)', async ({ page }) => {
         await confirmSite(page, '4741', 'Jolly Scotchman');
-        await startHeatingFlow(page, 0); // IT700 — fixture _demo: slow
+        await startHeatingFlow(page, 'accommodation'); // IT700-BAR-4741 — fixture _demo: slow
         await page.locator('[data-testid="need-cool"]').click();
         await page.locator('[data-testid="control-send"]').click();
         const timeout = page.locator('[data-testid="sync-timeout"]');
@@ -135,7 +140,7 @@ test.describe('control & sync', () => {
 
     test('F005 Salus turn-off: recommendation card offers frost-hold, decline records no-action', async ({ page }) => {
         await confirmSite(page, '6832', 'Old Grey Mare');
-        await startHeatingFlow(page, 0);
+        await startHeatingFlow(page, 'bar-restaurant'); // IT500-BAR-6832
         await page.locator('[data-testid="need-off"]').click();
         const reco = page.locator('[data-testid="reco-frost"]');
         await expect(reco).toContainText('no “off” switch');
@@ -148,7 +153,8 @@ test.describe('control & sync', () => {
 
     test('F005+F010 frost-hold with hold set: applied outcome shows durable revert; hold appears in Admin', async ({ page }) => {
         await confirmSite(page, '6832', 'Old Grey Mare');
-        await startHeatingFlow(page, 2); // Accommodation
+        // Accommodation → coldest of {IT500-RST 19.0, IT500-ACC 16.0} = IT500-ACC-6832
+        await startHeatingFlow(page, 'accommodation');
         await page.locator('[data-testid="need-off"]').click();
         await page.locator('[data-testid="frost-recommended"]').click();
         // frost defaults to hold until 07:00
@@ -191,18 +197,33 @@ test.describe('control & sync', () => {
         await expect(page.locator('[data-testid="outcome-applied"]')).toContainText('HW boost');
     });
 
-    test('F007 Intesis turn-off uses native mode Off (Tamar)', async ({ page }) => {
+    // OOHDASH-82 (design §6): Intesis aircon control is REMOVED. The former "Intesis turn-off uses
+    // native mode Off" behaviour no longer exists — aircon is never controllable from the dashboard.
+    // On an Intesis-only site the heating flow offers no heating and no control; the aircon request is
+    // captured and referred to the IoT team (aircon-referral) via the smart-entry keyword route.
+    test('F007→OOHDASH-82: Intesis-only site offers NO aircon control; the request is captured & referred (Tamar)', async ({ page }) => {
         await confirmSite(page, '6873', 'Tamar');
-        await startHeatingFlow(page, 0);
-        await page.locator('[data-testid="need-off"]').click();
-        // Intesis: straight to the modal with Mode → Off (no frost recommendation card)
-        await expect(page.locator('[data-testid="reco-frost"]')).toHaveCount(0);
-        await expect(page.locator('.modal')).toContainText('Mode → Off');
-        await expect(page.locator('.modal')).toContainText('Intesis native Off');
-        await page.locator('[data-testid="control-send"]').click();
-        await expect(page.locator('[data-testid="sync-applied"]')).toContainText('Mode Off', { timeout: 20000 });
-        await page.locator('[data-testid="sync-done"]').click();
-        await expect(page.locator('[data-testid="outcome-applied"]')).toContainText('Heating off (mode)');
+        // The heating flow no longer sees the Intesis units at all — no area chips, no control.
+        await page.locator('[data-testid="tile-heating"]').click();
+        await expect(page.locator('.flowbody')).toContainText('No heating on Lighthouse at this site');
+        await expect(page.locator('[data-testid="area-accommodation"]')).toHaveCount(0);
+        await expect(page.locator('[data-testid="area-bar-restaurant"]')).toHaveCount(0);
+        await expect(page.locator('[data-testid="need-warm"]')).toHaveCount(0);
+        // Cancel the heating flow (confirm() dialog) to return to the New Call smart-entry.
+        page.once('dialog', d => d.accept());
+        await page.locator('button:has-text("Cancel issue")').last().click();
+        await expect(page.locator('[data-testid="smart-entry"]')).toBeVisible();
+
+        // The aircon request is reached from the caller's words and ends in a referral capture — never a control.
+        await page.locator('[data-testid="smart-entry"]').pressSequentially('the air con is blowing warm', { delay: 25 });
+        await page.locator('[data-testid="suggest-aircon"]').click();
+        const captured = page.locator('[data-testid="outcome-captured"]');
+        await expect(captured).toContainText('Captured for the IoT team');
+        await expect(captured).toContainText(/Ticket #\d+/);
+        // No control affordance anywhere in the aircon referral.
+        await expect(page.locator('[data-testid="control-send"]')).toHaveCount(0);
+        await expect(page.locator('[data-testid="need-warm"]')).toHaveCount(0);
+        await expect(page.locator('[data-testid="need-cool"]')).toHaveCount(0);
     });
 
     test('outcome-record failure shows inline error with manual retry (Protocol 4: 500 path)', async ({ page }) => {
