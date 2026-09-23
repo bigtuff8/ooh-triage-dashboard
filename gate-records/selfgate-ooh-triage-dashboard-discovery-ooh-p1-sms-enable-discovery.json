@@ -1,0 +1,15 @@
+{
+  "run": "selfgate-ooh-triage-dashboard-discovery-ooh-p1-sms-enable",
+  "phase": "discovery",
+  "pr": 37,
+  "approvedBy": [
+    "bigtuff8"
+  ],
+  "reviewComments": [
+    "bigtuff8: - Proceed to enable the P1 escalation SMS (Twilio-reuse, secret load by Spencer, then the env flip)?: Approve — proceed to enablement\n\n(submitted via the interactive gate review)"
+  ],
+  "mergeCommit": "e305d6e92597d058fbca9238fa444624bbd0fea9",
+  "phaseBranch": "discovery/ooh-p1-sms-enable",
+  "releaseBranch": "main",
+  "stamp": 1790157962750
+}
