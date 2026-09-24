@@ -155,9 +155,37 @@ for (const siteNo of NEGATIVE_SITES) {
         }
         if (obs.empty) { t.skip(`site ${siteNo} returned no devices at run time`); return; }
         console.log(`[LIVE ${siteNo}] ${obs.rows.map(r => `${r.name}=${r.ageHours == null ? 'no-ts' : r.ageHours + 'h'}→${r.online ? 'ONLINE' : 'OFFLINE'}`).join(', ')}`);
-        // Every device at this site must be stale-beyond-threshold or have no timestamp → OFFLINE.
-        const wronglyOnline = obs.rows.filter(r => r.online);
-        assert.equal(wronglyOnline.length, 0,
-            `dead/never-reporting site ${siteNo} must not manufacture false-online; got: ${JSON.stringify(wronglyOnline)}`);
+
+        // The decisive "no false-online" guarantee (design §8.1): NO device with a missing timestamp
+        // or an age beyond its threshold may ever compute ONLINE. 6770 is a LIVE site — most devices
+        // legitimately report fresh and are correctly ONLINE; only genuinely-dead / never-reporting
+        // devices must stay OFFLINE. We assert to the design's actual claim, not a whole-site-offline one.
+        const staleOrNoTs = obs.rows.filter(
+            r => r.ageHours == null || r.ageHours > FRESHNESS_DEFAULT_MS / 3600000
+        );
+        const falseOnline = staleOrNoTs.filter(r => r.online);
+        assert.equal(falseOnline.length, 0,
+            `no stale/no-timestamp device at ${siteNo} may compute ONLINE; got false-online: ${JSON.stringify(falseOnline)}`);
+
+        // Conversely, every ONLINE device must have a present, non-null timestamp within threshold.
+        const onlineButUnfresh = obs.rows.filter(
+            r => r.online && (r.ageHours == null || r.ageHours > FRESHNESS_DEFAULT_MS / 3600000)
+        );
+        assert.equal(onlineButUnfresh.length, 0,
+            `every ONLINE device at ${siteNo} must have a fresh timestamp within threshold; got: ${JSON.stringify(onlineButUnfresh)}`);
+
+        // The named genuinely-dead / never-reporting devices (design §8.1), when present at run time,
+        // MUST be OFFLINE — proving the dead ones stay dead while the live site reports normally.
+        const KNOWN_DEAD = [
+            'gk-6770-ElecAMR-1', 'gk-6770-GasAMR-1', 'gk-6770-externallighting-1',
+            'gk-6770-extractfan-1', 'gk-6770-lwgateway', 'gk-6770-salusit700-1',
+            'gk-6770-salusit700-gateway-1'
+        ];
+        const deadPresent = obs.rows.filter(r => KNOWN_DEAD.includes(r.name));
+        assert.ok(deadPresent.length > 0,
+            `expected at least one known-dead device at ${siteNo} to be present at run time; observed names: ${JSON.stringify(obs.rows.map(r => r.name))}`);
+        const deadWronglyOnline = deadPresent.filter(r => r.online);
+        assert.equal(deadWronglyOnline.length, 0,
+            `known-dead / never-reporting devices at ${siteNo} must compute OFFLINE; got online: ${JSON.stringify(deadWronglyOnline)}`);
     });
 }
