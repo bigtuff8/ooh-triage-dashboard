@@ -1,5 +1,6 @@
 node_modules/
 .env
+credentials/
 .mcp.json
 test-results/
 playwright-report/
