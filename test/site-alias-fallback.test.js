@@ -20,9 +20,18 @@ import * as realFs from 'fs';
 
 // Fake fs: throw ENOENT for the alias overlay (as the live container did); delegate everything else
 // (config/fixture reads, etc.) to the real fs so the rest of the module loads normally.
+//
+// `constants` is held back from the spread deliberately. It is a frozen, non-configurable export on
+// newer Node builds, so re-declaring it through mock.module aborts the whole file with
+// "TypeError: Cannot redefine property: constants". That is version-dependent — it passes on
+// Node 24.11 but fails on 24.21 — which is exactly how it survived unnoticed until this suite first
+// ran in CI. Nothing under test reads fs.constants; if that ever changes, re-export it explicitly
+// via Object.defineProperty rather than the spread.
+const { constants: _fsConstants, ...realFsRest } = realFs;
+
 mock.module('fs', {
     namedExports: {
-        ...realFs,
+        ...realFsRest,
         readFileSync: (path, ...rest) => {
             if (String(path).includes('site-aliases.json')) {
                 const err = new Error("ENOENT: no such file or directory, open 'site-aliases.json'");
