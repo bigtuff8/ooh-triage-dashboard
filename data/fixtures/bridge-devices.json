@@ -121,6 +121,65 @@
         { "deviceId": "TUYA-UNREG-6901", "zone": "Kitchen — glasswash", "deviceType": "tuya", "kind": "kitchen", "online": true, "telemetry": { "switch_1": false }, "_demo": "unregistered" },
         { "deviceId": "GW-6901", "zone": "Lighthouse gateway", "deviceType": "gateway", "kind": "gateway", "online": true }
       ]
+    },
+    {
+      "_comment": "OOHDASH-91 G2 e2e — 6770-shaped MULTI-GATEWAY site: lwgateway anchor + boiler-r10a + maindb-r10a + salusit700-gateway (all kind gateway, gk-namespace deviceIds so the client anchor/label rules classify them). This variant: anchor ONLINE + every group gateway ONLINE → site reachable (GREEN). Also carries online kitchen circuits for the E kitchen-reshape happy path + both outcomes.",
+      "siteNo": "6770", "siteName": "Kestrel Court", "brand": "Greene King · Farmhouse Inns", "address": "Falcon Way, Leeds LS10", "callsLast30Days": 1,
+      "devices": [
+        { "deviceId": "gk-6770-lwgateway-1", "zone": "Lighthouse gateway", "deviceType": "gateway", "kind": "gateway", "online": true },
+        { "deviceId": "gk-6770-boiler-r10a-1", "zone": "Boiler group gateway", "deviceType": "gateway", "kind": "gateway", "online": true },
+        { "deviceId": "gk-6770-maindb-r10a-1", "zone": "Main distribution board gateway", "deviceType": "gateway", "kind": "gateway", "online": true },
+        { "deviceId": "gk-6770-salusit700-gateway-1", "zone": "Heating group gateway", "deviceType": "gateway", "kind": "gateway", "online": true },
+        { "deviceId": "gk-6770-salusit700-1", "zone": "Bar area", "deviceType": "salus-it700", "kind": "heating", "area": "Bar/Restaurant", "online": true, "telemetry": { "localTemperature": 20.0, "heatingSetpoint": 20 } },
+        { "deviceId": "gk-6770-tuya-k1", "zone": "Kitchen — fryers", "deviceType": "tuya", "kind": "kitchen", "online": true, "telemetry": { "switch_1": false }, "schedule": "07:00–22:00" },
+        { "deviceId": "gk-6770-tuya-k2", "zone": "Kitchen — grills", "deviceType": "tuya", "kind": "kitchen", "online": true, "telemetry": { "switch_1": false }, "schedule": "07:00–22:00" },
+        { "deviceId": "gk-6770-dhw", "zone": "Hot water", "deviceType": "salus-it500-dhw", "kind": "hotwater", "online": true, "telemetry": { "hwBoostHours": 0 } }
+      ]
+    },
+    {
+      "_comment": "OOHDASH-91 G2 e2e — anchor OFFLINE (hub-down / RED). lwgateway offline → site unreachable → plain-English wall-unit alert + existing outcomes. anyOffline true → offline banner offers the connection check.",
+      "siteNo": "6771", "siteName": "Merlin House", "brand": "Greene King · Flaming Grill", "address": "Kestrel Rd, Hull HU7", "callsLast30Days": 2,
+      "devices": [
+        { "deviceId": "gk-6771-lwgateway-1", "zone": "Lighthouse gateway", "deviceType": "gateway", "kind": "gateway", "online": false },
+        { "deviceId": "gk-6771-boiler-r10a-1", "zone": "Boiler group gateway", "deviceType": "gateway", "kind": "gateway", "online": true },
+        { "deviceId": "gk-6771-salusit700-1", "zone": "Accommodation", "deviceType": "salus-it700", "kind": "heating", "area": "Accommodation", "online": true, "telemetry": { "localTemperature": 19.0, "heatingSetpoint": 20 } },
+        { "deviceId": "gk-6771-tuya-k1", "zone": "Kitchen — all circuits", "deviceType": "tuya", "kind": "kitchen", "online": true, "telemetry": { "switch_1": false }, "schedule": "07:00–22:00" }
+      ]
+    },
+    {
+      "_comment": "OOHDASH-91 G2 e2e — anchor UP + ONE equipment-group gateway OFFLINE (boiler-r10a) → site stays reachable, single AMBER group-offline callout naming 'boiler'. Reached via the HEATING auto-divert: the Accommodation thermostat is offline (behind the down boiler group), so Heating→Accommodation diverts into the connectivity group-offline conclusion.",
+      "siteNo": "6772", "siteName": "Osprey Lodge", "brand": "Greene King · Farmhouse Inns", "address": "Harrier Cl, Derby DE24", "callsLast30Days": 3,
+      "devices": [
+        { "deviceId": "gk-6772-lwgateway-1", "zone": "Lighthouse gateway", "deviceType": "gateway", "kind": "gateway", "online": true },
+        { "deviceId": "gk-6772-boiler-r10a-1", "zone": "Boiler group gateway", "deviceType": "gateway", "kind": "gateway", "online": false },
+        { "deviceId": "gk-6772-maindb-r10a-1", "zone": "Main distribution board gateway", "deviceType": "gateway", "kind": "gateway", "online": true },
+        { "deviceId": "gk-6772-salusit700-gateway-1", "zone": "Heating group gateway", "deviceType": "gateway", "kind": "gateway", "online": true },
+        { "deviceId": "gk-6772-salusit700-1", "zone": "Accommodation", "deviceType": "salus-it700", "kind": "heating", "area": "Accommodation", "online": false, "telemetry": { "localTemperature": null, "heatingSetpoint": 20 } },
+        { "deviceId": "gk-6772-tuya-k1", "zone": "Kitchen — fryers", "deviceType": "tuya", "kind": "kitchen", "online": true, "telemetry": { "switch_1": false }, "schedule": "07:00–22:00" }
+      ]
+    },
+    {
+      "_comment": "OOHDASH-91 G2 e2e — anchor UP + TWO equipment-group gateways OFFLINE (boiler-r10a AND maindb-r10a) → site stays reachable, ONE combined AMBER callout enumerating both groups ('the boiler and the main distribution board') with the reassurance line once. Entered via the offline banner's connection check.",
+      "siteNo": "6773", "siteName": "Peregrine Inn", "brand": "Greene King · Flaming Grill", "address": "Swift St, Nottingham NG2", "callsLast30Days": 2,
+      "devices": [
+        { "deviceId": "gk-6773-lwgateway-1", "zone": "Lighthouse gateway", "deviceType": "gateway", "kind": "gateway", "online": true },
+        { "deviceId": "gk-6773-boiler-r10a-1", "zone": "Boiler group gateway", "deviceType": "gateway", "kind": "gateway", "online": false },
+        { "deviceId": "gk-6773-maindb-r10a-1", "zone": "Main distribution board gateway", "deviceType": "gateway", "kind": "gateway", "online": false },
+        { "deviceId": "gk-6773-salusit700-gateway-1", "zone": "Heating group gateway", "deviceType": "gateway", "kind": "gateway", "online": true },
+        { "deviceId": "gk-6773-salusit700-1", "zone": "Accommodation", "deviceType": "salus-it700", "kind": "heating", "area": "Accommodation", "online": true, "telemetry": { "localTemperature": 20.0, "heatingSetpoint": 20 } },
+        { "deviceId": "gk-6773-tuya-k1", "zone": "Kitchen — grills", "deviceType": "tuya", "kind": "kitchen", "online": true, "telemetry": { "switch_1": false }, "schedule": "07:00–22:00" }
+      ]
+    },
+    {
+      "_comment": "OOHDASH-91 G2 e2e — 5198-shaped GATEWAY-LESS site (CJ's 5198): only salusit500 thermostats in the gk-5198-* namespace, NO gateway device → no connectivity anchor. The dashboard makes NO whole-site reachability claim; neutral info line 'direct device connections' + per-device liveness + capture, with NO Lighthouse/gateway framing. One thermostat offline drives the offline banner + the 'isn't responding' per-device line.",
+      "siteNo": "5198", "siteName": "Skylark Tavern", "brand": "Greene King · Chef & Brewer", "address": "Linnet Way, Norwich NR5", "callsLast30Days": 2,
+      "devices": [
+        { "deviceId": "gk-5198-salusit500-1", "zone": "Accommodation", "deviceType": "salus-it500", "kind": "heating", "area": "Accommodation", "online": true, "telemetry": { "localTemperature": 19.0, "heatingSetpoint": 20 } },
+        { "deviceId": "gk-5198-salusit500-2", "zone": "Accommodation / flat", "deviceType": "salus-it500", "kind": "heating", "area": "Accommodation", "online": true, "telemetry": { "localTemperature": 18.0, "heatingSetpoint": 20 } },
+        { "deviceId": "gk-5198-salusit500-3", "zone": "Bar area", "deviceType": "salus-it500", "kind": "heating", "area": "Bar/Restaurant", "online": false, "telemetry": { "localTemperature": null, "heatingSetpoint": 20 } },
+        { "deviceId": "gk-5198-salusit500-4", "zone": "Restaurant", "deviceType": "salus-it500", "kind": "heating", "area": "Bar/Restaurant", "online": true, "telemetry": { "localTemperature": 20.0, "heatingSetpoint": 20 } },
+        { "deviceId": "gk-5198-salusit500-5", "zone": "Function room", "deviceType": "salus-it500", "kind": "heating", "area": "Accommodation", "online": true, "telemetry": { "localTemperature": 19.5, "heatingSetpoint": 20 } }
+      ]
     }
   ]
 }
