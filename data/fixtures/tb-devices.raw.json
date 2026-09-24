@@ -1,5 +1,5 @@
 {
-  "_comment": "TB-direct read-plane test fixture (design §5). Mirrors the shape TB returns from GET /api/tenant/devices?textSearch=... — a PageData { data:[device], hasNext, totalElements }. The plain Device entity has NO `active`/`lastActivityTime` (OOHDASH-80: the earlier /api/tenant/deviceInfos swap, PR #33, was WRONG — that endpoint does not exist on this TB and 400s, breaking all inventory). Online status is sourced per-device from SERVER_SCOPE `active` (GET /api/plugins/telemetry/DEVICE/{uuid}/values/attributes/SERVER_SCOPE?keys=active,lastActivityTime → [{key,value}]). The `active` field below feeds the test adapter's SERVER_SCOPE route (stripped from the device-list response). Plus per-device latest-telemetry { key:[{ts,value}] } from .../values/timeseries. Keyed by tbName. The 6261 set includes a bleed neighbour (gk-62611) so the anchored client-side filter is exercised; names carry realistic C4 exception classes.",
+  "_comment": "TB-direct read-plane test fixture (design §5). Mirrors the shape TB returns from GET /api/tenant/devices?textSearch=... — a PageData { data:[device], hasNext, totalElements }. The plain Device entity has NO `active`/`lastActivityTime` (OOHDASH-80: the earlier /api/tenant/deviceInfos swap, PR #33, was WRONG — that endpoint does not exist on this TB and 400s, breaking all inventory). Online status is sourced per-device from SERVER_SCOPE (GET /api/plugins/telemetry/DEVICE/{uuid}/values/attributes/SERVER_SCOPE?keys=active,lastActivityTime → [{key,value}]). OOHDASH-85: `online` is now FRESHNESS-authoritative — the adapter emits lastActivityTime = now - `lastActivityAgeMs` so tests are time-independent; `active` is corroboration only (never flips a fresh device). Fresh (age < 48h) → online; stale (age > 48h) → offline; `active` below still feeds the SERVER_SCOPE route to prove it can NOT override freshness. Plus per-device latest-telemetry { key:[{ts,value}] } from .../values/timeseries. Keyed by tbName. The 6261 set includes a bleed neighbour (gk-62611) so the anchored client-side filter is exercised; names carry realistic C4 exception classes.",
   "devices": [
     {
       "id": { "id": "uuid-6261-it700" },
@@ -7,6 +7,7 @@
       "type": "default",
       "label": "Accomodation Gateway",
       "active": true,
+      "lastActivityAgeMs": 7200000,
       "telemetry": { "temperature": 22.5, "localTemperature": 22.5, "heatingSetpoint": 6.5, "mode": "Heat", "heatingActive": false, "coolingActive": false, "hotWater": null }
     },
     {
@@ -15,6 +16,7 @@
       "type": "default",
       "label": "Cellar",
       "active": false,
+      "lastActivityAgeMs": 360000000,
       "telemetry": { "temperature": 18.0, "localTemperature": 18.0, "heatingSetpoint": 19.5, "mode": "Heat", "heatingActive": true, "coolingActive": false, "hotWater": 1 }
     },
     {
@@ -23,6 +25,7 @@
       "type": "gatewayDevice",
       "label": "Kitchen — fryers",
       "active": true,
+      "lastActivityAgeMs": 3600000,
       "telemetry": { "switchReported": true, "switchOn": true, "switch_1": false }
     },
     {
@@ -31,6 +34,7 @@
       "type": "default",
       "label": "NEIGHBOUR SITE — must be filtered out",
       "active": true,
+      "lastActivityAgeMs": 3600000,
       "telemetry": { "heatingSetpoint": 20 }
     }
   ],
@@ -41,6 +45,7 @@
       "type": "default",
       "label": "Bar area",
       "active": true,
+      "lastActivityAgeMs": 18000000,
       "telemetry": { "temperature": 21.0, "localTemperature": 21.0, "heatingSetpoint": 20.0, "mode": "Heat", "heatingActive": true, "coolingActive": false, "hotWater": null }
     }
   ]

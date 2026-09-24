@@ -28,6 +28,10 @@ const allDevices = [...tbFixture.devices, ...tbFixture.site4741];
 const telemetryByUuid = new Map(allDevices.map(d => [d.id.id, d.telemetry || {}]));
 // OOHDASH-80: `active` now comes from the per-device SERVER_SCOPE read, not the device-list entity.
 const activeByUuid = new Map(allDevices.map(d => [d.id.id, d.active]));
+// OOHDASH-85: `lastActivityTime` comes from the SAME SERVER_SCOPE read and is now AUTHORITATIVE for
+// `online`. Fixtures carry a relative `lastActivityAgeMs`; the adapter emits now-age so tests are
+// time-independent. Absent ageMs → no lastActivityTime emitted (proves missing-timestamp = offline).
+const ageByUuid = new Map(allDevices.map(d => [d.id.id, d.lastActivityAgeMs]));
 // Test seam — UUIDs whose SERVER_SCOPE read should THROW, to prove the per-device fail-safe degrades
 // that device to offline without failing the whole site query (the prod-outage regression guard).
 const serverScopeFailUuids = new Set();
@@ -65,8 +69,12 @@ function tbAdapter(cfg) {
         if (serverScopeFailUuids.has(uuid)) {
             return Promise.reject(Object.assign(new Error('SERVER_SCOPE read failed'), { response: { status: 500 } }));
         }
-        // TB attribute shape: [{ key, value, lastUpdateTs }].
+        // TB attribute shape: [{ key, value, lastUpdateTs }]. OOHDASH-85: the SERVER_SCOPE read carries
+        // BOTH `active` (corroboration) and `lastActivityTime` (authoritative). Emit lastActivityTime
+        // only when the fixture defines an age (absent → missing timestamp → offline under the new rule).
         const attrs = [{ key: 'active', value: activeByUuid.get(uuid), lastUpdateTs: Date.now() }];
+        const ageMs = ageByUuid.get(uuid);
+        if (ageMs != null) attrs.push({ key: 'lastActivityTime', value: Date.now() - ageMs, lastUpdateTs: Date.now() });
         return Promise.resolve(ok(attrs));
     }
 
@@ -141,7 +149,7 @@ test('classifies heating device against a registry key (deviceType=salus-it700, 
     assert.equal(dev.deviceType, 'salus-it700', 'deviceType must be a registry key');
     assert.equal(dev.kind, 'heating');
     assert.equal(dev.zone, 'Accomodation Gateway', 'zone comes from the TB device label');
-    assert.equal(dev.online, true);
+    assert.equal(dev.online, true, 'OOHDASH-85: fresh lastActivityTime (2h) → online');
 });
 
 test('flags combi hot-water capability from a non-null hotWater reading', async () => {
@@ -150,7 +158,14 @@ test('flags combi hot-water capability from a non-null hotWater reading', async 
     const combi = site.devices.find(d => d.deviceId === 'gk-6261-salusit500-combi-2');
     assert.equal(combi.hotWaterCapable, true, 'hotWater != null should set hotWaterCapable');
     assert.equal(combi.telemetry.hotWater, 1);
-    assert.equal(combi.online, false, 'SERVER_SCOPE active:false should map to online=false');
+    // OOHDASH-85 debounce (§5): a STALE device is held online on the FIRST poll and only asserted
+    // offline on the second consecutive stale poll. Re-poll to observe the settled verdict.
+    tb._resetCache();
+    await tb.getSitesByNumber('6261');                   // poll 1 — combi held online (first stale)
+    tb._expireCache();                                   // simulate the next 30s poll (debounce preserved)
+    const [site2] = await tb.getSitesByNumber('6261');   // poll 2 — combi asserted offline
+    const combi2 = site2.devices.find(d => d.deviceId === 'gk-6261-salusit500-combi-2');
+    assert.equal(combi2.online, false, 'OOHDASH-85: stale lastActivityTime (100h > 48h) → offline after debounce settles');
 });
 
 test('getDevice resolves one device within the resolved site by its (name) deviceId', async () => {
@@ -191,18 +206,20 @@ test('OOHDASH-80: the device-list query targets /api/tenant/devices (NOT deviceI
     }
 });
 
-test('OOHDASH-80: online:true when the device SERVER_SCOPE `active` is true (end-to-end via the site query)', async () => {
+test('OOHDASH-85: online:true when the device last reported within threshold (end-to-end, freshness authoritative)', async () => {
     tb._resetCache();
     const [site] = await tb.getSitesByNumber('6261');
-    const it700 = site.devices.find(d => d.deviceId === 'gk-6261-salusit700-1'); // active:true in fixture
-    assert.equal(it700.online, true, 'SERVER_SCOPE active:true → online:true');
+    const it700 = site.devices.find(d => d.deviceId === 'gk-6261-salusit700-1'); // fresh (2h) in fixture
+    assert.equal(it700.online, true, 'fresh lastActivityTime → online:true');
 });
 
-test('OOHDASH-80: online:false when the device SERVER_SCOPE `active` is false (end-to-end via the site query)', async () => {
+test('OOHDASH-85: online:false when the device is stale beyond threshold (end-to-end, freshness authoritative)', async () => {
     tb._resetCache();
-    const [site] = await tb.getSitesByNumber('6261');
-    const combi = site.devices.find(d => d.deviceId === 'gk-6261-salusit500-combi-2'); // active:false in fixture
-    assert.equal(combi.online, false, 'SERVER_SCOPE active:false → online:false');
+    await tb.getSitesByNumber('6261');                   // poll 1 — stale combi held online (debounce §5)
+    tb._expireCache();                                   // simulate the next 30s poll (debounce preserved)
+    const [site] = await tb.getSitesByNumber('6261');    // poll 2 — combi asserted offline
+    const combi = site.devices.find(d => d.deviceId === 'gk-6261-salusit500-combi-2'); // stale (100h) in fixture
+    assert.equal(combi.online, false, 'stale lastActivityTime → online:false (after debounce settles)');
 });
 
 test('OOHDASH-80 REGRESSION GUARD: a SERVER_SCOPE read failure for ONE device degrades it to offline but the site still returns ALL devices (no throw)', async () => {
@@ -213,26 +230,34 @@ test('OOHDASH-80 REGRESSION GUARD: a SERVER_SCOPE read failure for ONE device de
         assert.equal(sites.length, 1, 'the site query must still succeed (the outage was a single-read failure taking down the whole site)');
         assert.equal(sites[0].devices.length, 3, 'ALL 3 devices still returned despite one failing attribute read');
         const it700 = sites[0].devices.find(d => d.deviceId === 'gk-6261-salusit700-1');
-        assert.equal(it700.online, false, 'the device whose active read failed degrades to offline (fail-safe)');
-        // the other devices are unaffected — the combi (active:false) still resolves its own state
-        const combi = sites[0].devices.find(d => d.deviceId === 'gk-6261-salusit500-combi-2');
-        assert.equal(combi.online, false);
+        // OOHDASH-85: a FAILED SERVER_SCOPE read → null report time → HARD offline, asserted IMMEDIATELY
+        // (not debounced), preserving the fail-safe posture this guard protects.
+        assert.equal(it700.online, false, 'the device whose active read failed degrades to offline immediately (hard fail-safe)');
+        // The stale combi (valid but 100h-old timestamp) resolves its own state via the debounce — held
+        // online on this first stale poll, settled offline on the next. Re-poll to observe the settle.
+        tb._expireCache();
+        const [site2] = await tb.getSitesByNumber('6261');
+        const combi = site2.devices.find(d => d.deviceId === 'gk-6261-salusit500-combi-2');
+        assert.equal(combi.online, false, 'stale combi settles offline after the debounce (§5)');
     } finally {
         serverScopeFailUuids.delete('uuid-6261-it700');
     }
 });
 
-test('OOHDASH-80: mapTbDevice maps populated `active:true` → online:true', () => {
+// OOHDASH-85: when NO last-report time was observed (no `lastActivityTime` key on raw — the fixture-mode
+// / legacy caller path), mapTbDevice keeps the pre-85 `active` passthrough. The live path always
+// supplies lastActivityTime, so freshness governs there (see the §8.2 freshness suite).
+test('OOHDASH-85 fallback: no lastActivityTime key → `active:true` passthrough → online:true', () => {
     const dev = tb.mapTbDevice({ name: 'gk-6261-x', type: 'default', active: true }, {});
-    assert.equal(dev.online, true, 'active:true (from SERVER_SCOPE) must yield online:true');
+    assert.equal(dev.online, true, 'legacy/fixture path with no report time → active passthrough');
 });
 
-test('OOHDASH-80: mapTbDevice maps `active:false` → online:false', () => {
+test('OOHDASH-85 fallback: no lastActivityTime key → `active:false` passthrough → online:false', () => {
     const dev = tb.mapTbDevice({ name: 'gk-6261-x', type: 'default', active: false }, {});
-    assert.equal(dev.online, false, 'active:false must yield online:false');
+    assert.equal(dev.online, false, 'legacy/fixture path with no report time → active passthrough');
 });
 
-test('OOHDASH-80: mapTbDevice defaults online:false when `active` is absent (plain /api/tenant/devices entity shape)', () => {
+test('OOHDASH-85 fallback: no lastActivityTime and no active → online defaults false', () => {
     const dev = tb.mapTbDevice({ name: 'gk-6261-x', type: 'default' }, {});
-    assert.equal(dev.online, false, 'no active field present → online defaults to false');
+    assert.equal(dev.online, false, 'no report time, no active → online defaults to false');
 });
