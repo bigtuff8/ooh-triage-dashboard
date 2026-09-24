@@ -1,0 +1,15 @@
+{
+  "run": "selfgate-ooh-triage-dashboard-discovery-ooh-field-feedback",
+  "phase": "discovery",
+  "pr": 49,
+  "approvedBy": [
+    "bigtuff8"
+  ],
+  "reviewComments": [
+    "bigtuff8: - Purpose — This page is a TRIAGE, not a fix-everything plan. Nine pieces of field feedback from Tony and CJ have been sorted into \"real defect\", \"preference / UX choice\" and \"definition or unknown we can't answer yet\". For each one you get options and a suggested disposition — but no build is implied. This page IS the decision point.: Approve this part\n- What already shipped — v1.3.0 (OOHDASH-82) already fixed some of this feedback: the false gateway chips, the plain-English device labels, and removing broken aircon control. Reading this first stops us re-scoping work that is already done.: Approve this part\n- The nine items triaged — Each item says whether it is a defect, a preference or an unknown; how confident we are and on what evidence; the options on the table; and what it NEEDS to move (tester clarification, a Sam/Jonathan decode, a ThingsBoard expert, a live check, or a design decision). Item A (false-offline) is the worked example with live evidence from site 6770.: Approve this part\n- Questions back to CJ and Tony — The concrete questions the testers need to answer before some items can move, above all: agree what \"offline\" actually means.: Approve this part\n- Needs external confirmation — Things James cannot decide alone and neither can the testers: grouped by who owns the answer (Sam Day / Jonathan Wilkinson, or an IoT / ThingsBoard expert).: Approve this part\n- Recommended priority and your disposition menu — A suggested order and, per item, one of PROCEED / SEND BACK / PARK / NEEDS-INFO. Recommendations only — the call is yours at this gate.: Approve this part\n\n(submitted via the interactive gate review)"
+  ],
+  "mergeCommit": "90dd436353dcf6574ee717546d5b1b99f3cbd086",
+  "phaseBranch": "discovery/ooh-field-feedback",
+  "releaseBranch": "main",
+  "stamp": 1790243321728
+}
