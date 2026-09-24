@@ -1,0 +1,13 @@
+{
+  "run": "selfgate-ooh-triage-dashboard-release-oohdash-82-v1.3.0",
+  "phase": "release",
+  "pr": 47,
+  "approvedBy": [
+    "bigtuff8"
+  ],
+  "reviewComments": [],
+  "mergeCommit": "a21aeeba69f4d7e452593e14b5c93ec0617ad716",
+  "phaseBranch": "release/oohdash-82-v1.3.0",
+  "releaseBranch": "main",
+  "stamp": 1790235459190
+}
