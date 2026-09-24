@@ -186,7 +186,6 @@ function renderWorkspace() {
    ${flowHtml}
   </div>
   <div>
-   <div class="card tight"><h3>Live device status</h3>${deviceBoard(ws)}</div>
    <div class="card tight"><h3>What Lighthouse controls at this site</h3><ul class="scopelist" data-testid="scope-list">
     ${ws.scope.map(g => `<li><span${g.level === 'none' ? ' style="color:var(--text-disabled)"' : ''}>${esc(g.label)}</span>${scopeTag(g)}</li>`).join('')}
    </ul><p class="small" style="margin-top:6px">Live from the device inventory — use it to answer “isn’t that you?”</p></div>
@@ -201,21 +200,9 @@ function callSoFar() {
         `<span class="tag ${i.cls}" style="margin:0 4px 0 6px">${esc(i.label)}</span>${i.ticket ? `<span class="small">#${i.ticket}</span>` : ''}`).join(' ')}</div>`;
 }
 
-function deviceBoard(ws) {
-    if (!ws.devices.length) return '<p class="small">No Lighthouse devices found for this site — use the Something else flow for a scope check.</p>';
-    return `<table class="tbl" data-testid="device-board">${ws.devices.map(d => {
-        const t = d.telemetry || {};
-        const on = d.online ? '<span class="tag green"><span class="dot" style="background:var(--success)"></span>online</span>'
-            : '<span class="tag red"><span class="dot" style="background:var(--danger)"></span>offline</span>';
-        let rd = '—';
-        if (d.kind === 'heating' && typeof t.localTemperature === 'number') rd = `<b>${t.localTemperature}°C</b> <span class="small">set ${t.heatingSetpoint}°C${t.mode ? ' · ' + esc(t.mode) : ''}</span>`;
-        else if (d.kind === 'heating' && typeof t.roomSensor1Temp === 'number') rd = `<b>${t.roomSensor1Temp}°C</b> <span class="small">boiler panel${t.output1State ? ' · heating on' : ''}</span>`;
-        else if (d.kind === 'heating') rd = '<span class="small">no reading</span>';
-        if (d.kind === 'hotwater') rd = t.hwBoostHours ? `<b>Boost ${t.hwBoostHours}h</b>` : '<span class="small">no boost active</span>';
-        if (d.kind === 'kitchen') rd = (t.switch_1 ? '<b>On</b>' : 'Off') + (d.schedule ? ` <span class="small">${esc(d.schedule)}</span>` : '');
-        return `<tr class="${d.online ? '' : 'rowoff'}"><td style="width:52%"><b style="font-size:13px">${esc(d.zone)}</b><div class="mono" style="color:var(--text-disabled);font-size:11px">${esc(d.deviceId)}</div></td><td>${on}</td><td>${rd}</td></tr>`;
-    }).join('')}</table>`;
-}
+// OOHDASH-89/91 (E, shared decision): the always-on "Live device status" side card and its
+// `deviceBoard` table were removed. Device state is triage-question-led — it surfaces ONLY as a
+// high-assurance Q&A outcome (the flow reachability conclusions), never as a standing readout.
 
 function siteTickets(ws) {
     if (!ws.tickets.length) return '<p class="small">No tickets in the last 90 days.</p>';
