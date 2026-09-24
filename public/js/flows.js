@@ -298,6 +298,70 @@ function startSwitch(deviceId, dir) {
     openControl(dev, dir === 'on' ? 'switchon' : 'switchoff');
 }
 
+/* ------------------------ site connectivity anchor + group labels (OOHDASH-91 G2) ------------------------ */
+// NOTE (build deviation, recorded): the canonical, unit-tested rule lives in services/tb-device.js
+// (siteConnectivityAnchor / equipmentGroupLabel). These browser copies exist ONLY because public/js is
+// served as plain global scripts with no bundler/module system, so the connectivity handler here cannot
+// import the server ESM module. The algorithm is textually identical to the tb-device.js version; both
+// read the device NAME (client-side the name lives on `deviceId`, server-side on `name`). Keep the two in
+// lock-step if the rule ever changes.
+
+// normaliseName — identical to services/tb-device.js normaliseName (lower-case, strip parenthetical
+// cross-refs, `_`→`-`, collapse whitespace). Duplicated for the same no-bundler reason as above.
+function normaliseName(name) {
+    return String(name || '')
+        .toLowerCase()
+        .replace(/\([^)]*\)/g, ' ')
+        .replace(/_/g, '-')
+        .replace(/\s+/g, ' ')
+        .trim();
+}
+
+const ANCHOR_SEGMENT = 'lwgateway';
+const GATEWAY_GROUP_TOKENS = ['r10a', 'gw', 'gateway'];
+const GROUP_LABELS = { boiler: 'boiler', maindb: 'main distribution board', kitchen: 'kitchen', salusit700: 'heating' };
+
+function deviceNameSegments(d) {
+    return normaliseName(d && (d.name != null ? d.name : d.deviceId)).split(/[-\s]+/).filter(Boolean);
+}
+
+/**
+ * siteConnectivityAnchor(devices) -> device | null. Pure, read-only. The site connectivity anchor is the
+ * LoRaWAN hub: the device whose normalised name has a segment EXACTLY equal to `lwgateway` (segment-
+ * equality, NOT substring, so no -r10a/Salus gateway can pose as it). 0 candidates → null (gateway-less
+ * site). >1 (pathological) → first by sorted normalised name. Reads only the name; derives no liveness.
+ */
+function siteConnectivityAnchor(devices) {
+    const candidates = (devices || []).filter(d => deviceNameSegments(d).includes(ANCHOR_SEGMENT));
+    if (!candidates.length) return null;
+    if (candidates.length === 1) return candidates[0];
+    const nm = d => normaliseName(d && (d.name != null ? d.name : d.deviceId));
+    return [...candidates].sort((a, b) => { const na = nm(a), nb = nm(b); return na < nb ? -1 : na > nb ? 1 : 0; })[0];
+}
+
+/**
+ * equipmentGroupLabel(device) -> string | null. Pure, read-only. Resolves a non-anchor gateway's
+ * equipment group to its natural-English operator label on the SAME split-segment basis as the anchor
+ * rule: find the gateway token (r10a/gw/gateway) segment, take the segment IMMEDIATELY preceding it, map
+ * via GROUP_LABELS. Unknown token → the safe generic 'the equipment group' (NEVER the raw token). Returns
+ * null when no gateway token segment exists (fronts no group — e.g. a spare lwgateway), excluding it.
+ */
+function equipmentGroupLabel(device) {
+    const segs = deviceNameSegments(device);
+    const i = segs.findIndex(s => GATEWAY_GROUP_TOKENS.includes(s));
+    if (i <= 0) return null;
+    return GROUP_LABELS[segs[i - 1]] || 'the equipment group';
+}
+
+const NUM_WORDS = ['zero', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'ten'];
+
+/** Grammatical join: "A" · "A and B" · "A, B and C". */
+function grammaticalList(items) {
+    if (items.length <= 1) return items[0] || '';
+    if (items.length === 2) return items[0] + ' and ' + items[1];
+    return items.slice(0, -1).join(', ') + ' and ' + items[items.length - 1];
+}
+
 /* ------------------------ flow renderers ------------------------ */
 const FLOWR = {
     heating(ws, f) {
@@ -484,16 +548,16 @@ const FLOWR = {
         const ks = ws.devices.filter(d => d.kind === 'kitchen');
         if (f.stage === 0) {
             if (!ks.length) return '<div class="alert info">No kitchen circuits on Lighthouse here.</div>' + otherShortcut();
+            // OOHDASH-89 (E): the static "Live read:" strip and the per-circuit rows are gone. The offline
+            // auto-divert stays FIRST and unchanged — any offline circuit re-enters the connection check and
+            // never reaches the reshaped happy path. When every circuit is online the backend is confident,
+            // so the flow states ONE high-assurance assessment line and goes straight to the deciding question
+            // (individual-appliance picking is subsumed by the assessment, never a picker). Only assert
+            // "reachable" when confident; otherwise the divert above handles it.
             const off = ks.some(k => !k.online);
-            doneLine('Live read: ' + ks.map(k => `${esc(k.zone.replace('Kitchen — ', ''))} <b>${k.online ? (k.telemetry?.switch_1 ? 'On' : 'Off — schedule ' + (k.schedule || 'unknown')) : 'OFFLINE'}</b>`).join(' · '));
             if (off) { f.cat = 'connectivity'; f.stage = 0; return FLOWR.connectivity(ws, f); }
-            // D10: per-circuit Turn ON/OFF when the device is switch-capable + online + registered.
-            // Otherwise the circuit falls back to the capture path (unchanged) — capture is never lost.
-            const anySwitch = ks.some(k => canSwitch(k));
-            const rows = ks.map((k, i) => `<div class="zoneread"><span style="font-size:20px">🍳</span><div><div><b>${esc(k.zone)}</b> — ${k.telemetry?.switch_1 ? 'currently ON' : 'currently OFF'}</div><div class="small">${k.schedule ? 'Schedule ' + esc(k.schedule) + ' · ' : ''}${esc(k.deviceId)}</div></div>${switchButtons(k, `kitchen-switch-${i}`)}<span class="tag ${k.telemetry?.switch_1 ? 'green' : 'grey'}">${k.telemetry?.switch_1 ? 'on' : 'off'}</span></div>`).join('');
-            return rows +
-                `<div class="alert info">${anySwitch ? 'Switchable circuits can be turned on/off directly above — the change only counts once the device confirms. ' : 'Kitchen circuits can’t be switched remotely from here yet (that control path is on the priority list with our platform team). '}If it’s simply outside the schedule window, the schedule explains it — otherwise capture it.</div>
-   <div class="stepq">Is the kitchen needed for service <b>right now</b> (food being served / hotel breakfast)?</div>
+            doneLine('The kitchen circuits are reachable.');
+            return `<div class="stepq">Is the kitchen needed for service <b>right now</b> (food being served / hotel breakfast)?</div>
    <div class="chips"><button class="chip" data-testid="kitchen-critical" onclick="flowStep({crit:1})">Yes — business critical now</button><button class="chip" data-testid="kitchen-notcritical" onclick="flowStep({crit:0})">No — needed later / tomorrow</button></div>`;
         }
         if (f.stage === 1) {
@@ -604,27 +668,105 @@ const FLOWR = {
     },
 
     connectivity(ws, f) {
-        const gw = ws.devices.find(d => d.kind === 'gateway');
-        const off = ws.devices.filter(d => !d.online);
+        // OOHDASH-91 G2: the site-reachability conclusion is anchored on the LoRaWAN hub (lwgateway), the
+        // one device every remote command reaches the site through — NOT an arbitrary `find(kind==='gateway')`,
+        // which could narrate an equipment-group gateway's state as "the site". The -r10a / Salus-hub
+        // gateways are equipment-group gateways: their state maps to their own group, never the whole site.
+        const anchor = siteConnectivityAnchor(ws.devices);
+        // Group gateways = non-anchor gateway-kind devices that front an equipment group (resolve to a label;
+        // this excludes any spare lwgateway, which fronts no group → equipmentGroupLabel returns null).
+        const groupGateways = ws.devices.filter(d => d.kind === 'gateway' && d !== anchor && equipmentGroupLabel(d) !== null);
+        const offlineGroups = groupGateways.filter(d => !d.online);
+
+        // gback/dback are recovery re-checks: clear the answer and re-run the read (reflecting any recovery).
+        if (f.data.ofq === 'gback' || f.data.ofq === 'dback') f.data.ofq = null;
+
         if (!f.data.ofq) {
             if (!f.data._cline) {
-                doneLine('Connection check: ' + (gw && !gw.online ? '<b>Lighthouse gateway OFFLINE</b>' : off.length ? off.length + ' device(s) offline' : 'all equipment online'));
+                let cl;
+                if (anchor === null) cl = 'direct-connection site (no site hub)';
+                else if (!anchor.online) cl = '<b>the wall-mounted Lighthouse unit is offline</b>';
+                else if (offlineGroups.length) cl = `site reachable · ${offlineGroups.length} equipment group${offlineGroups.length > 1 ? 's' : ''} not responding`;
+                else cl = 'the site is reachable';
+                doneLine('Connection check: ' + cl);
                 f.data._cline = 1;
             }
-            if (gw && gw.online && !off.length) {
-                return `<div class="alert ok">Everything at this site is showing <b>online</b> — the Lighthouse equipment looks healthy. If the caller says nothing is working, it may be a different fault.</div><div class="chips"><button class="chip" onclick="flowStep({ofq:'cap'})">Capture what the caller reports</button></div>`;
+
+            // Gateway-less site (e.g. 5198): no anchor and no equipment-group gateway to assess. Make NO
+            // whole-site reachability claim; defer to per-device liveness for the flow's own equipment. NO
+            // Lighthouse-unit / gateway / fuse-board framing anywhere.
+            if (anchor === null) {
+                const fromKind = f.data.from;
+                const equip = ws.devices.filter(d => d.kind !== 'gateway' && (!fromKind || d.kind === fromKind));
+                const live = !equip.length ? ''
+                    : `<p style="margin:8px 0">The equipment you’re calling about ${equip.every(d => d.online) ? 'is responding' : 'isn’t responding right now'}.</p>`;
+                return `<div class="alert info" data-testid="connectivity-gwless">This site uses direct device connections — we’ll check the equipment directly.</div>
+   ${live}
+   <div class="stepq">We check this site’s equipment directly. Log it for the IoT team, or re-check if the caller says it’s working again.</div>
+   <div class="chips"><button class="chip" data-testid="gwless-capture" onclick="flowStep({ofq:'dcap'})">Log it for the IoT team</button><button class="chip" data-testid="gwless-back" onclick="flowStep({ofq:'dback'})">The caller says it’s working again</button></div>`;
             }
-            return `<div class="alert err" data-testid="connectivity-alert"><b>${gw && !gw.online ? 'The Lighthouse gateway at this site is offline.' : 'Some Lighthouse equipment is offline.'}</b> The gateway is the wall-mounted Lighthouse unit that connects the site — no remote command can reach the site while it’s down. This is usually power or internet at the site.</div>
+
+            // Anchor OFFLINE → site unreachable → existing plain-English wall-unit outcome (verbatim, unchanged).
+            if (!anchor.online) {
+                return `<div class="alert err" data-testid="connectivity-alert"><b>The Lighthouse gateway at this site is offline.</b> The gateway is the wall-mounted Lighthouse unit that connects the site — no remote command can reach the site while it’s down. This is usually power or internet at the site.</div>
    <div class="script">“The Lighthouse unit on your wall isn’t responding, which normally means it’s lost power or internet. Could you check the fuse board hasn’t tripped, that the unit has lights on, and the router is up? I’ll stay on the line.”</div>
    <div class="stepq">After the caller checks:</div>
    <div class="chips"><button class="chip" onclick="flowStep({ofq:'back'})">It’s back online / lights on</button><button class="chip" data-testid="connectivity-stilldead" onclick="flowStep({ofq:'cap'})">Still dead — capture &amp; escalate</button></div>`;
+            }
+
+            // Anchor ONLINE + one or more equipment-group gateways OFFLINE → site stays reachable, amber
+            // group-offline callout (ONE combined callout for 2+ groups). No anchor-down question; drop-to-
+            // capture (NO remote-control affordance — the group gateway is down, no command can land).
+            if (offlineGroups.length) {
+                const labels = offlineGroups.map(equipmentGroupLabel);
+                const groupPhrase = l => l === 'the equipment group' ? 'the equipment group' : `the <b>${l}</b> equipment group`;
+                const listItem = l => l === 'the equipment group' ? 'the equipment group' : `the <b>${l}</b>`;
+                let callout, stepq;
+                if (labels.length === 1) {
+                    callout = `The site is reachable, but ${groupPhrase(labels[0])} isn’t responding — its own connection is down. Other equipment at this site can still be reached.`;
+                    stepq = `${groupPhrase(labels[0]).charAt(0).toUpperCase() + groupPhrase(labels[0]).slice(1)} can’t be reached remotely while its connection is down. Log it for the IoT team, or re-check if the caller says it’s working again.`;
+                } else {
+                    const n = NUM_WORDS[labels.length] || String(labels.length);
+                    callout = `The site is reachable, but ${n} of its equipment groups aren’t responding — ${grammaticalList(labels.map(listItem))} — because each has lost its own connection. Other equipment at this site can still be reached.`;
+                    stepq = `These equipment groups can’t be reached remotely while their connection is down. Log it for the IoT team, or re-check if the caller says it’s working again.`;
+                }
+                return `<div class="alert warn" data-testid="connectivity-group-offline">${callout}</div>
+   <div class="stepq">${stepq}</div>
+   <div class="chips"><button class="chip" data-testid="group-offline-capture" onclick="flowStep({ofq:'gcap'})">Log it for the IoT team</button><button class="chip" data-testid="group-offline-back" onclick="flowStep({ofq:'gback'})">The caller says it’s working again</button></div>`;
+            }
+
+            // Anchor ONLINE, no group gateway offline → site reachable (green, existing all-good callout).
+            return `<div class="alert ok">Everything at this site is showing <b>online</b> — the Lighthouse equipment looks healthy. If the caller says nothing is working, it may be a different fault.</div><div class="chips"><button class="chip" onclick="flowStep({ofq:'cap'})">Capture what the caller reports</button></div>`;
         }
+
+        // ---- outcome stage ----
         if (f.data.ofq === 'back') {
             doneLine('Site restored power/connection');
             return outcomeCaptured(f, 'back', {
                 subject: 'Lighthouse gateway offline — restored on the call',
                 detail: 'Gateway was offline; caller checked fuse board/power and it recovered. Logged for the IoT team to verify overnight stability.',
                 script: 'That’s it back online. Give it ten minutes to settle — I’ve logged it so the team check it stayed healthy overnight.',
+                OohCaptureClass: 'connectivity'
+            });
+        }
+        // Group-offline capture (anchor up): carries the group context; no remote action possible.
+        if (f.data.ofq === 'gcap') {
+            const plain = offlineGroups.map(equipmentGroupLabel);
+            const labelStr = grammaticalList(plain);
+            const multi = plain.length > 1;
+            return outcomeCaptured(f, 'gcap', {
+                subject: `Equipment group gateway offline — ${labelStr} unreachable`,
+                detail: `Site reachable, but the ${labelStr} equipment group gateway${multi ? 's are' : ' is'} offline; that equipment cannot be reached remotely. No remote action possible; needs IoT connectivity investigation${f.data.from ? ` (raised from ${f.data.from} flow)` : ''}.`,
+                script: 'The site itself is online, but the unit that runs that equipment has lost its connection, so I can’t reach it remotely tonight. I’ve logged it as a priority for the IoT team.',
+                OohCaptureClass: 'connectivity'
+            });
+        }
+        // Gateway-less capture: per-device unreachable at a direct-connection site; NO gateway framing.
+        if (f.data.ofq === 'dcap') {
+            return outcomeCaptured(f, 'dcap', {
+                subject: 'Equipment unreachable — direct-connection site',
+                detail: `This site uses direct device connections (no site hub). The equipment the caller reported is not responding on its own connection. No remote action possible; needs IoT connectivity investigation${f.data.from ? ` (raised from ${f.data.from} flow)` : ''}.`,
+                script: 'This site’s equipment connects directly rather than through a single hub, and the unit you’re calling about isn’t responding, so I can’t reach it remotely tonight. I’ve logged it as a priority for the IoT team.',
                 OohCaptureClass: 'connectivity'
             });
         }

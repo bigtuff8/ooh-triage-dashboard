@@ -174,6 +174,53 @@ export function siteNameFilter(brand, tokens) {
 }
 
 /* ------------------------------------------------------------------ */
+/* Site connectivity anchor + equipment-group label (OOHDASH-91 G2)     */
+/* ------------------------------------------------------------------ */
+// Pure, read-only selection rule consumed by the connectivity flow. This is the CANONICAL, unit-tested
+// expression of the rule; public/js/flows.js carries a textually-identical browser copy only because
+// public/js is served as plain global scripts and cannot import this ESM module. Neither touches
+// liveness (deriveFreshnessOnline / the `online:` assignment) — G2 CONSUMES the corrected `d.online`.
+
+const ANCHOR_SEGMENT = 'lwgateway';                          // the LoRaWAN site hub token — segment-equality only
+const GATEWAY_GROUP_TOKENS = ['r10a', 'gw', 'gateway'];      // a non-anchor gateway fronts a group via one of these
+const GROUP_LABELS = { boiler: 'boiler', maindb: 'main distribution board', kitchen: 'kitchen', salusit700: 'heating' };
+
+// Split a device's normalised NAME into segments (client devices carry the name on `deviceId`).
+function deviceNameSegments(d) {
+    return normaliseName(d && (d.name != null ? d.name : d.deviceId)).split(/[-\s]+/).filter(Boolean);
+}
+
+/**
+ * siteConnectivityAnchor(devices) -> device | null. Pure, read-only. The site connectivity anchor is the
+ * LoRaWAN hub: the device whose normalised name has a segment EXACTLY equal to `lwgateway` (segment-
+ * equality, NOT substring, so no -r10a/Salus gateway can pose as it). 0 candidates → null (gateway-less
+ * site). Exactly 1 → it. >1 (pathological, not in the swept estate) → the first by sorted normalised name
+ * (deterministic tie-break). Reads only the device name; derives no liveness; mutates nothing.
+ */
+export function siteConnectivityAnchor(devices) {
+    const candidates = (devices || []).filter(d => deviceNameSegments(d).includes(ANCHOR_SEGMENT));
+    if (!candidates.length) return null;
+    if (candidates.length === 1) return candidates[0];
+    const nm = d => normaliseName(d && (d.name != null ? d.name : d.deviceId));
+    return [...candidates].sort((a, b) => { const na = nm(a), nb = nm(b); return na < nb ? -1 : na > nb ? 1 : 0; })[0];
+}
+
+/**
+ * equipmentGroupLabel(device) -> string | null. Pure, read-only. Resolves a non-anchor gateway's
+ * equipment group to its natural-English operator label on the SAME split-segment basis as the anchor
+ * rule: find the gateway token (r10a/gw/gateway) segment, take the segment IMMEDIATELY preceding it, map
+ * via GROUP_LABELS. Unknown token → the safe generic 'the equipment group' (NEVER the raw namespace
+ * token). Returns null when no gateway token segment exists (fronts no group — e.g. a spare lwgateway),
+ * so such a device is excluded from the group-offline enumeration.
+ */
+export function equipmentGroupLabel(device) {
+    const segs = deviceNameSegments(device);
+    const i = segs.findIndex(s => GATEWAY_GROUP_TOKENS.includes(s));
+    if (i <= 0) return null;
+    return GROUP_LABELS[segs[i - 1]] || 'the equipment group';
+}
+
+/* ------------------------------------------------------------------ */
 /* Device classification (D2) — capability-first, typo-tolerant        */
 /* ------------------------------------------------------------------ */
 
