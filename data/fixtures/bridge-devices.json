@@ -1,12 +1,12 @@
 {
-  "_comment": "Fixture device inventory for DATA_MODE=fixture (local dev + Playwright). Mirrors the design prototype dataset drawn from OOH_ISSUE_RESOLUTION_REGISTER.md. _demo flags drive simulated sync outcomes so failure/timeout paths are testable: 'fail' => vendor-rejected write, 'slow' => IT700 slow echo timeout.",
+  "_comment": "Fixture device inventory for DATA_MODE=fixture (local dev + Playwright). Mirrors the design prototype dataset drawn from OOH_ISSUE_RESOLUTION_REGISTER.md. _demo flags drive simulated sync outcomes so failure/timeout paths are testable: 'fail' => vendor-rejected write, 'slow' => IT700 slow echo timeout. OOHDASH-82: heating devices carry a pre-derived `area` (Accommodation | Bar/Restaurant | null) exactly as mapTbDevice's deriveArea sets it on the live path — the fixture path serves devices verbatim, so the area chip model (public/js/flows.js heatingAreasPresent) is only exercisable when the fixture supplies `area`. Site 6218 is the design §10.2 mixed-estate site for the OOHDASH-82 e2e coverage (two areas + unmapped fallback + gateway + Intesis aircon).",
   "sites": [
     {
       "siteNo": "6832", "siteName": "Old Grey Mare", "brand": "Greene King · Farmhouse Inns", "address": "Stockton Ln, York YO31", "callsLast30Days": 2,
       "devices": [
-        { "deviceId": "IT500-BAR-6832", "zone": "Bar area", "deviceType": "salus-it500", "kind": "heating", "online": true, "telemetry": { "localTemperature": 17.5, "heatingSetpoint": 18 } },
-        { "deviceId": "IT500-RST-6832", "zone": "Restaurant", "deviceType": "salus-it500", "kind": "heating", "online": true, "telemetry": { "localTemperature": 19.0, "heatingSetpoint": 19 } },
-        { "deviceId": "IT500-ACC-6832", "zone": "Accommodation / flat", "deviceType": "salus-it500", "kind": "heating", "online": true, "telemetry": { "localTemperature": 16.0, "heatingSetpoint": 16 } },
+        { "deviceId": "IT500-BAR-6832", "zone": "Bar area", "deviceType": "salus-it500", "kind": "heating", "area": "Bar/Restaurant", "online": true, "telemetry": { "localTemperature": 17.5, "heatingSetpoint": 18 } },
+        { "deviceId": "IT500-RST-6832", "zone": "Restaurant", "deviceType": "salus-it500", "kind": "heating", "area": "Accommodation", "online": true, "telemetry": { "localTemperature": 19.0, "heatingSetpoint": 19 } },
+        { "deviceId": "IT500-ACC-6832", "zone": "Accommodation / flat", "deviceType": "salus-it500", "kind": "heating", "area": "Accommodation", "online": true, "telemetry": { "localTemperature": 16.0, "heatingSetpoint": 16 } },
         { "deviceId": "IT500-DHW-6832", "zone": "Hot water", "deviceType": "salus-it500-dhw", "kind": "hotwater", "online": true, "telemetry": { "hwBoostHours": 0 } },
         { "deviceId": "TUYA-K1-6832", "zone": "Kitchen — pot wash", "deviceType": "tuya", "kind": "kitchen", "online": true, "telemetry": { "switch_1": false }, "schedule": "07:00–23:00" },
         { "deviceId": "TUYA-K2-6832", "zone": "Kitchen — fryers", "deviceType": "tuya", "kind": "kitchen", "online": true, "telemetry": { "switch_1": false }, "schedule": "07:00–21:30" },
@@ -14,10 +14,21 @@
       ]
     },
     {
+      "siteNo": "6218", "siteName": "Kings Head", "brand": "Greene King · Farmhouse Inns", "address": "Mixed estate — OOHDASH-82 area-model e2e (design §10.2)", "callsLast30Days": 1,
+      "devices": [
+        { "deviceId": "gk-6218-salusit700", "zone": "gk-6218-salusit700", "deviceType": "salus-it700", "kind": "heating", "area": "Accommodation", "online": true, "telemetry": { "localTemperature": 19.0, "heatingSetpoint": 21 } },
+        { "deviceId": "gk-6218-salusit500-2", "zone": "gk-6218-salusit500-2", "deviceType": "salus-it500", "kind": "heating", "area": "Accommodation", "online": true, "telemetry": { "localTemperature": 17.0, "heatingSetpoint": 20 } },
+        { "deviceId": "gk-6218-salusit500-3", "zone": "gk-6218-salusit500-3", "deviceType": "salus-it500", "kind": "heating", "area": "Bar/Restaurant", "online": true, "telemetry": { "localTemperature": 21.0, "heatingSetpoint": 20 } },
+        { "deviceId": "gk-6218-salusit500-4", "zone": "gk-6218-salusit500-4", "deviceType": "salus-it500", "kind": "heating", "area": null, "online": true, "telemetry": { "localTemperature": 18.0, "heatingSetpoint": 20 } },
+        { "deviceId": "gk-6218-intesis-1", "zone": "gk-6218-intesis-1", "deviceType": "intesis", "kind": "aircon", "area": null, "online": true, "telemetry": { "localTemperature": 24.0, "heatingSetpoint": 24 } },
+        { "deviceId": "gk-6218-salusit700-gateway-1", "zone": "gk-6218-salusit700-gateway-1", "deviceType": "gateway", "kind": "gateway", "area": null, "online": false }
+      ]
+    },
+    {
       "siteNo": "6851", "siteName": "Robin Hood", "brand": "Greene King · Flaming Grill", "address": "Rayleigh Rd, Essex SS6", "callsLast30Days": 4,
       "devices": [
-        { "deviceId": "IT500-BAR-6851", "zone": "Bar area", "deviceType": "salus-it500", "kind": "heating", "online": true, "telemetry": { "localTemperature": 18.5, "heatingSetpoint": 19 } },
-        { "deviceId": "IT500-RST-6851", "zone": "Restaurant", "deviceType": "salus-it500", "kind": "heating", "online": true, "telemetry": { "localTemperature": 17.0, "heatingSetpoint": 21 }, "_demo": "fail" },
+        { "deviceId": "IT500-BAR-6851", "zone": "Bar area", "deviceType": "salus-it500", "kind": "heating", "area": "Accommodation", "online": true, "telemetry": { "localTemperature": 18.5, "heatingSetpoint": 19 } },
+        { "deviceId": "IT500-RST-6851", "zone": "Restaurant", "deviceType": "salus-it500", "kind": "heating", "area": "Bar/Restaurant", "online": true, "telemetry": { "localTemperature": 17.0, "heatingSetpoint": 21 }, "_demo": "fail" },
         { "deviceId": "TUYA-K1-6851", "zone": "Kitchen — grills", "deviceType": "tuya", "kind": "kitchen", "online": true, "telemetry": { "switch_1": true }, "schedule": "06:30–22:00" },
         { "deviceId": "FAN-6851", "zone": "Extractor fans", "deviceType": "tb-rulechain", "kind": "fan", "online": true },
         { "deviceId": "GW-6851", "zone": "Lighthouse gateway", "deviceType": "gateway", "kind": "gateway", "online": true }
@@ -34,7 +45,7 @@
     {
       "siteNo": "4741", "siteName": "Jolly Scotchman", "brand": "Greene King · Chef & Brewer", "address": "Holdingham, Sleaford NG34", "callsLast30Days": 2,
       "devices": [
-        { "deviceId": "IT700-BAR-4741", "zone": "Bar area", "deviceType": "salus-it700", "kind": "heating", "online": true, "telemetry": { "localTemperature": 22.5, "heatingSetpoint": 21 }, "_demo": "slow" },
+        { "deviceId": "IT700-BAR-4741", "zone": "Bar area", "deviceType": "salus-it700", "kind": "heating", "area": "Accommodation", "online": true, "telemetry": { "localTemperature": 22.5, "heatingSetpoint": 21 }, "_demo": "slow" },
         { "deviceId": "FAN-4741", "zone": "Extractor fans", "deviceType": "tb-rulechain", "kind": "fan", "online": true },
         { "deviceId": "GW-4741", "zone": "Lighthouse gateway", "deviceType": "gateway", "kind": "gateway", "online": true }
       ]
@@ -42,8 +53,8 @@
     {
       "siteNo": "6360", "siteName": "Mill House", "brand": "Greene King · Farmhouse Inns", "address": "Chester Rd, CH4", "callsLast30Days": 4,
       "devices": [
-        { "deviceId": "IT500-BAR-6360", "zone": "Bar area", "deviceType": "salus-it500", "kind": "heating", "online": true, "telemetry": { "localTemperature": 21.0, "heatingSetpoint": 21 } },
-        { "deviceId": "IT500-ACC-6360", "zone": "Accommodation", "deviceType": "salus-it500", "kind": "heating", "online": true, "telemetry": { "localTemperature": 15.5, "heatingSetpoint": 21 } },
+        { "deviceId": "IT500-BAR-6360", "zone": "Bar area", "deviceType": "salus-it500", "kind": "heating", "area": "Bar/Restaurant", "online": true, "telemetry": { "localTemperature": 21.0, "heatingSetpoint": 21 } },
+        { "deviceId": "IT500-ACC-6360", "zone": "Accommodation", "deviceType": "salus-it500", "kind": "heating", "area": "Accommodation", "online": true, "telemetry": { "localTemperature": 15.5, "heatingSetpoint": 21 } },
         { "deviceId": "LGT-6360", "zone": "External lighting", "deviceType": "tb-rulechain", "kind": "lighting", "online": false },
         { "deviceId": "GW-6360", "zone": "Lighthouse gateway", "deviceType": "gateway", "kind": "gateway", "online": true }
       ]
@@ -52,14 +63,14 @@
       "siteNo": "6234", "siteName": "Ship Inn", "brand": "Greene King · Farmhouse Inns", "address": "Fore St, Exmouth EX8", "callsLast30Days": 3,
       "devices": [
         { "deviceId": "IT500-DHW-6234", "zone": "Hot water", "deviceType": "salus-it500-dhw", "kind": "hotwater", "online": true, "telemetry": { "hwBoostHours": 0 } },
-        { "deviceId": "IT500-BAR-6234", "zone": "Bar area", "deviceType": "salus-it500", "kind": "heating", "online": true, "telemetry": { "localTemperature": 20, "heatingSetpoint": 20 } },
+        { "deviceId": "IT500-BAR-6234", "zone": "Bar area", "deviceType": "salus-it500", "kind": "heating", "area": "Bar/Restaurant", "online": true, "telemetry": { "localTemperature": 20, "heatingSetpoint": 20 } },
         { "deviceId": "GW-6234", "zone": "Lighthouse gateway", "deviceType": "gateway", "kind": "gateway", "online": true }
       ]
     },
     {
       "siteNo": "6883", "siteName": "Water Tower", "brand": "Greene King · Farmhouse Inns", "address": "Tower Rd, Birkenhead CH42", "callsLast30Days": 1,
       "devices": [
-        { "deviceId": "BLR-6883", "zone": "Pub heating (boiler panel)", "deviceType": "boiler-panel", "kind": "heating", "online": true, "telemetry": { "roomSensor1Temp": 19.5, "output1State": true } },
+        { "deviceId": "BLR-6883", "zone": "Pub heating (boiler panel)", "deviceType": "boiler-panel", "kind": "heating", "area": null, "online": true, "telemetry": { "roomSensor1Temp": 19.5, "output1State": true } },
         { "deviceId": "IT500-DHW-6883", "zone": "Hot water", "deviceType": "salus-it500-dhw", "kind": "hotwater", "online": true, "telemetry": { "hwBoostHours": 0 } },
         { "deviceId": "GW-6883", "zone": "Lighthouse gateway", "deviceType": "gateway", "kind": "gateway", "online": true }
       ]
@@ -68,14 +79,14 @@
       "siteNo": "6750", "siteName": "Bay Horse", "brand": "Greene King · Flaming Grill", "address": "Green Ln, Middlesbrough TS5", "callsLast30Days": 2,
       "devices": [
         { "deviceId": "TUYA-K1-6750", "zone": "Kitchen — glass/dishwash", "deviceType": "tuya", "kind": "kitchen", "online": false, "telemetry": { "switch_1": false }, "schedule": "07:00–22:00" },
-        { "deviceId": "IT500-BAR-6750", "zone": "Bar area", "deviceType": "salus-it500", "kind": "heating", "online": false, "telemetry": { "localTemperature": null, "heatingSetpoint": 20 } },
+        { "deviceId": "IT500-BAR-6750", "zone": "Bar area", "deviceType": "salus-it500", "kind": "heating", "area": "Bar/Restaurant", "online": false, "telemetry": { "localTemperature": null, "heatingSetpoint": 20 } },
         { "deviceId": "GW-6750", "zone": "Lighthouse gateway", "deviceType": "gateway", "kind": "gateway", "online": false }
       ]
     },
     {
       "siteNo": "6749", "siteName": "Angel Inn", "brand": "Greene King · Farmhouse Inns", "address": "Main St, Wetherby LS22", "callsLast30Days": 2,
       "devices": [
-        { "deviceId": "IT500-BAR-6749", "zone": "Bar area", "deviceType": "salus-it500", "kind": "heating", "online": true, "telemetry": { "localTemperature": 20, "heatingSetpoint": 20 } },
+        { "deviceId": "IT500-BAR-6749", "zone": "Bar area", "deviceType": "salus-it500", "kind": "heating", "area": "Bar/Restaurant", "online": true, "telemetry": { "localTemperature": 20, "heatingSetpoint": 20 } },
         { "deviceId": "LGT-6749", "zone": "External lighting", "deviceType": "tb-rulechain", "kind": "lighting", "online": true },
         { "deviceId": "GW-6749", "zone": "Lighthouse gateway", "deviceType": "gateway", "kind": "gateway", "online": true }
       ]
@@ -83,7 +94,7 @@
     {
       "siteNo": "7971", "siteName": "Shuttle & Loom", "brand": "Greene King · Flaming Grill", "address": "Union Rd, Oswaldtwistle BB5", "callsLast30Days": 1,
       "devices": [
-        { "deviceId": "IT500-BAR-7971", "zone": "Bar area", "deviceType": "salus-it500", "kind": "heating", "online": true, "telemetry": { "localTemperature": 20.0, "heatingSetpoint": 26 } },
+        { "deviceId": "IT500-BAR-7971", "zone": "Bar area", "deviceType": "salus-it500", "kind": "heating", "area": "Bar/Restaurant", "online": true, "telemetry": { "localTemperature": 20.0, "heatingSetpoint": 26 } },
         { "deviceId": "GW-7971", "zone": "Lighthouse gateway", "deviceType": "gateway", "kind": "gateway", "online": true }
       ]
     },
@@ -96,7 +107,7 @@
     {
       "siteNo": "6759", "siteName": "Brentwood", "brand": "Greene King · Farmhouse Inns", "address": "Brook St, Brentwood CM14", "callsLast30Days": 2,
       "devices": [
-        { "deviceId": "IT500-BAR-6759", "zone": "Bar area", "deviceType": "salus-it500", "kind": "heating", "online": true, "telemetry": { "localTemperature": 19, "heatingSetpoint": 19 } },
+        { "deviceId": "IT500-BAR-6759", "zone": "Bar area", "deviceType": "salus-it500", "kind": "heating", "area": "Bar/Restaurant", "online": true, "telemetry": { "localTemperature": 19, "heatingSetpoint": 19 } },
         { "deviceId": "TUYA-K1-6759", "zone": "Kitchen — all circuits", "deviceType": "tuya", "kind": "kitchen", "online": true, "telemetry": { "switch_1": false }, "schedule": "07:00–22:00" },
         { "deviceId": "GW-6759", "zone": "Lighthouse gateway", "deviceType": "gateway", "kind": "gateway", "online": true }
       ]
