@@ -1,0 +1,15 @@
+{
+  "run": "selfgate-ooh-triage-dashboard-discovery-oohdash-85-false-offline",
+  "phase": "discovery",
+  "pr": 50,
+  "approvedBy": [
+    "bigtuff8"
+  ],
+  "reviewComments": [
+    "bigtuff8: - Adopt the freshness-based definition of \"offline\" (48-hour threshold, active flag as corroboration only) as the basis for the design stage?: Yes, adopt it\n\n(submitted via the interactive gate review)"
+  ],
+  "mergeCommit": "9a021dd77b2a8de59b633bdeaa258be43c9b691d",
+  "phaseBranch": "discovery/oohdash-85-false-offline",
+  "releaseBranch": "main",
+  "stamp": 1790251183864
+}
