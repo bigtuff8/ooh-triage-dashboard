@@ -12,7 +12,7 @@ Anchor online with all groups up reads as reachable in green. Anchor offline fir
 SECTION: Capture outcomes and routing, verified
 The group-offline log-it chip raised a captured ticket carrying the group context and a "raised from heating flow" note under the connectivity class; the gateway-less log-it chip raised a captured ticket with no gateway framing. Operators reach the group-offline conclusion through the existing kitchen, heating and hot-water auto-diverts; lighting and fan correctly keep their existing inline "not responding" wording and do not show the new callout, which is the recorded out-of-scope boundary for their own tickets.
 SECTION: Result and evidence
-Every scenario in both designs' end-to-end testing scope passed with no defect and no discrepancy against the specified copy, severity colours, test ids and label values. The unit suite is 280 passed, 0 failed, 1 skipped. Eight screenshots covering the reshaped kitchen, the removed side card, the layout, and all four G2 states are collected in a single mobile-friendly evidence page linked in the body below. The required CI check remains unit tests; e2e is not required and its known failures are out of scope.
+Every scenario in both designs' end-to-end testing scope passed with no defect and no discrepancy against the specified copy, severity colours, test ids and label values. The unit suite is 280 passed, 0 failed, 1 skipped. Eight screenshots covering the reshaped kitchen, the removed side card, the layout, and all four G2 states are embedded directly in this review as the evidence card (self-contained, committed in-repo, no external host) and every scenario is also described in prose, so the verdict stands on the text alone. The required CI check remains unit tests; e2e is not required and its known failures are out of scope.
 SECTION: What approving this does
 Approving confirms the test phase and merges the added end-to-end fixtures to main. It does not deploy and does not change the write-lock. The change under test is already on main; this gate certifies it. After approval the themes can move to done and any remaining follow-ups (the scoped-out lighting and fan group-offline work, and the gk-namespace live re-check when new site types are commissioned) are carried on their own tickets.
 DECISION: Approve the test phase for E + G1 + G2 — every end-to-end scenario in both signed-off designs verified in the running app at the operator viewport with no defect, unit suite green, and the firm kitchen-readability item met visually — and merge the added test fixtures? | Yes — approve the test phase | Request changes
@@ -25,11 +25,9 @@ DECISION: Approve the test phase for E + G1 + G2 — every end-to-end scenario i
 
 The merged E + G1 + G2 change was walked end-to-end on the running app in fixture mode at a 390px operator viewport, plus a desktop layout check, with zero console errors across the session.
 
-## Visual evidence (open on your phone)
+## Visual evidence (embedded in this review)
 
-https://home-desktop-jb-new.tail30d2e6.ts.net/review/ooh-e-g-test-evidence.html
-
-Eight screenshots: the reshaped kitchen step, the removed side card, the intact desktop layout, and all four G2 site-reachability states (reachable, hub-down with the G1 label, single group-offline reached via the heating divert, combined two-group callout, and the gateway-less site).
+The eight screenshots are embedded directly in this gate review as the evidence card, rendered inline and committed in-repo at `mockups/ooh-e-g-test-evidence.html` (self-contained, no external host — durable in the PR record). They cover the reshaped kitchen step, the removed side card, the intact desktop layout, and all four G2 site-reachability states: reachable, hub-down with the G1 label, single group-offline reached via the heating divert, the combined two-group callout, and the gateway-less site. Every scenario is also described in prose below, so the verdict stands on the text alone.
 
 ## Fixtures added to close the UI gap
 
