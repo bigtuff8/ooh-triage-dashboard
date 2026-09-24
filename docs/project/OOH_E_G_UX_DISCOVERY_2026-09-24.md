@@ -1,11 +1,13 @@
 <!-- gate:contract
-SECTION: Purpose and scope. Why this coordinated discovery exists, the one governing principle it serves, the OOHDASH-85 scope boundary, and the read-only context.
-SECTION: The shared principle. Plain-English statement of the triage-question-led principle that both items must honour, so the operator reads it once.
-SECTION: Item E — kitchen equipment flow and readability. What the code does today, why the cramped strip is a problem in operator terms, the target behaviour, the options, and what design would build.
-SECTION: Item G — Lighthouse gateway meaning and device-health. What the code does today, the plain-English label already shipped, the target for any device-health surfacing, the open lwgateway-meaning question, and its dependency on OOHDASH-85.
-SECTION: Design-stage shape. The shared shape both items hand to design, including the customer-experience steer.
-SECTION: Recommendation. The one-line steer for the panel.
-DECISION: Approve removing the static kitchen live-read strip (E) and confirming the plain-English gateway label as the short-term answer for G, both re-shaped so device state surfaces only as a high-assurance Q&A outcome; or ask for a different direction.
+SECTION: The shared question
+Both items are really one question: how much raw device detail should the dashboard put in front of an out-of-hours operator, and when. The dashboard is triage-question-led — the machine assesses the device data in the background and presents the next step; static device detail is low value to the operator and can pull them off-script. So device state should surface as a high-assurance outcome of the Q&A, not as raw panels to read.
+SECTION: E — kitchen readability
+Today the kitchen step shows a cramped, overflowing "live read" strip plus a row per circuit, with the deciding question buried underneath; the flow already auto-diverts to the connectivity check when a circuit is offline. Recommendation: remove the static strip and let a single backend-assessment line lead into the deciding question. Picking an individual appliance ("fryer 2") is handled by that backend assessment, not by a static device picker. Near design-ready.
+SECTION: G — gateway meaning and device-health
+The v1.3.0 fix already stopped gateways being mis-shown as heating chips, and the plain-English "wall-mounted Lighthouse unit" wording already ships in the connectivity flow — so the short-term ask is largely done. The broader "what devices exist / what is online" view should be very simple and appear only as a high-assurance outcome, and it depends on OOHDASH-85's corrected liveness rather than re-deriving it. One thing code cannot answer: what "Lighthouse gateway" physically means and whether it equals the lwgateway — that needs Sam or Jonathan Wilkinson.
+SECTION: What design would build
+For E, the removal of the static strip and the single backend-assessment line before the question. For G, confirming the plain-English label as the short-term answer and holding the broader reachability view behind OOHDASH-85. Both keep device state as a triage outcome, never a raw pill.
+DECISION: Approve removing the static kitchen strip (E) and confirming the plain-English gateway label as G's short-term answer, both reshaped so device state surfaces only as a high-assurance Q&A outcome? | Yes, approve | Request changes
 -->
 
 # OOH E and G — UX discovery (kitchen flow and readability; Lighthouse gateway meaning and device-health)
