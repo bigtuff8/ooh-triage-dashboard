@@ -75,6 +75,33 @@ const perSiteCache = new Map();     // siteNo -> { sites, at }
 let lastReadOk = config.dataMode === 'fixture';
 let lastReadError = null;
 
+/* ------------------------------------------------------------------ */
+/* OOHDASH-85 (design §4): freshness threshold — how recently a device */
+/* must have reported to count as ONLINE.                              */
+/* ------------------------------------------------------------------ */
+
+// Global default: 48h. Provisional/conservative pending IoT per-type cadence (design §7, Sam Day).
+const FRESHNESS_DEFAULT_MS = 48 * 60 * 60 * 1000;
+
+// Per-deviceType override hook (design §4). Keyed by the same `cls.deviceType` registry keys the
+// classifier emits. Deliberately EMPTY until IoT confirms real per-type cadence — do NOT invent
+// numbers. When Sam's answer arrives, each slower/faster type gets a one-line entry here with no
+// change to the derivation, the seam, or any consumer.
+const FRESHNESS_BY_TYPE = { /* deviceType: ms — awaiting IoT cadence (design §7) */ };
+
+// Resolver (design §4): a type's threshold is its override if present, else the global default.
+function freshnessThresholdFor(deviceType) {
+    return FRESHNESS_BY_TYPE[deviceType] ?? FRESHNESS_DEFAULT_MS;
+}
+
+// OOHDASH-85 (design §5): server-side anti-flicker debounce state. Map<deviceUuid, { staleSince }>.
+// A device is only ASSERTED offline once it has read stale across two consecutive polls; the first
+// stale read still reports the prior (online) value. Because freshness only ever moves forward, a
+// device that reports again drops back under threshold and its entry clears naturally. State MUST
+// live here (server-side), never the browser, because the 30s workspace refresh re-fetches
+// /workspace and would lose any client-side memory on every poll (design §5).
+const freshnessDebounce = new Map();    // deviceUuid -> { staleSince: epochMs }
+
 const TB_PAGE_SIZE = 200;
 const TB_PAGE_CAP = 50;             // safety valve — a single site never spans 50 pages (>200 devices max sampled = 138)
 
@@ -458,6 +485,65 @@ function pickSwitch(t) {
 }
 
 /* ------------------------------------------------------------------ */
+/* OOHDASH-85 (design §3.2): freshness-authoritative online derivation. */
+/* ------------------------------------------------------------------ */
+
+/**
+ * The authoritative online rule (design §3.2). Freshness is the source of truth; `active` is pure
+ * corroboration that can only STRENGTHEN a genuinely-stale "dead" case — it can never turn a fresh
+ * device offline and can never rescue a stale/missing one.
+ *
+ *   1. lastMs null (missing/unparseable) → OFFLINE. Full stop — active cannot rescue it.
+ *   2. age <= threshold                  → ONLINE. Fresh; `active` is IGNORED (the core false-offline fix).
+ *   3. age > threshold                   → OFFLINE (stale). `active` only corroborates "dead" here.
+ *
+ * @param {number|null} lastMs   parsed last-report epoch-ms (null when missing/unparseable)
+ * @param {boolean}     active   SERVER_SCOPE `active` — corroboration only
+ * @param {number}      threshold freshness window in ms for this device's type
+ * @param {number}      now      current epoch-ms (injectable for deterministic tests)
+ * @returns {boolean}   truthful online
+ */
+export function deriveFreshnessOnline(lastMs, active, threshold, now = Date.now()) {
+    if (lastMs == null) return false;                 // (1) missing/unparseable timestamp = offline
+    const ageMs = now - lastMs;
+    if (ageMs <= threshold) return true;              // (2) fresh → online (active ignored)
+    return false;                                     // (3) stale → offline (active corroborates "dead")
+}
+
+/**
+ * Anti-flicker debounce for the boundary case (design §5). Given the RAW freshness verdict for a
+ * device on this poll, returns the value to actually report:
+ *   - rawOnline true  → clear any stale record and report ONLINE (recovery resets naturally, because
+ *                       freshness only moves forward and age has dropped back under threshold).
+ *   - rawOnline false + hardOffline → assert OFFLINE immediately (no hold). A missing/unparseable
+ *                       report time (or a failed SERVER_SCOPE read) is a hard fail-safe offline, NOT a
+ *                       boundary flicker — debouncing it would mask a genuinely-unknown device.
+ *   - rawOnline false + stale (had a valid, but old, timestamp), first such read → record it and report
+ *                       the PRIOR value (ONLINE) for this one poll — offline is not asserted yet.
+ *   - rawOnline false + stale, already recorded on a previous poll → assert OFFLINE.
+ * Because a workspace read is one "poll" (LIVE_CACHE_TTL ≈ the 30s browser refresh), "two consecutive
+ * polls" == two consecutive reads that both computed stale. State is server-side (module Map), so it
+ * survives the browser's re-fetch on every 30s refresh.
+ */
+export function applyFreshnessDebounce(uuid, rawOnline, now = Date.now(), hardOffline = false) {
+    if (!uuid) return rawOnline;                      // no identity to debounce against — pass through
+    if (rawOnline) {
+        freshnessDebounce.delete(uuid);               // fresh again → reset
+        return true;
+    }
+    if (hardOffline) {
+        freshnessDebounce.delete(uuid);               // missing ts / failed read → assert offline now
+        return false;
+    }
+    const prior = freshnessDebounce.get(uuid);
+    if (!prior) {
+        freshnessDebounce.set(uuid, { staleSince: now });   // first stale read — hold online one poll
+        return true;
+    }
+    return false;                                     // second consecutive stale read — assert offline
+}
+
+/* ------------------------------------------------------------------ */
 /* TB device → canonical device shape (§2.2)                            */
 /* ------------------------------------------------------------------ */
 
@@ -465,6 +551,13 @@ function pickSwitch(t) {
  * Maps one TB device entity (+ its latest telemetry) to the canonical device shape. deviceId is the
  * TB NAME (corrective fix, C8). `zone` is the human location label the device carries (TB `label`
  * or a `zone`/`site` attribute), matching the old per-device zone semantics.
+ *
+ * OOHDASH-85 (design §3): `online` is now derived FROM report freshness at this single seam. The
+ * caller passes the parsed last-report time on `raw.lastActivityTime` (epoch-ms or null); `raw.active`
+ * is demoted to corroboration only. When `raw.lastActivityTime` is undefined (the pure fixture-mode
+ * path / entities with no telemetry read), we fall back to the pre-85 `active` passthrough so the
+ * fixture data path and non-live callers are unchanged — the freshness rule engages whenever a
+ * last-report time was actually read (the live path always supplies it, even as null).
  */
 export function mapTbDevice(raw, telemetryBag, clientScope) {
     const name = raw.name ?? raw.deviceId ?? '';
@@ -482,7 +575,16 @@ export function mapTbDevice(raw, telemetryBag, clientScope) {
         // deviceType + the CLIENT_SCOPE attributes and consumed opaquely by the flow (never re-derived).
         area: deriveArea(cls.deviceType, clientScope),
         hotWaterCapable: telemetry.hotWater != null,
-        online: raw.isOnline ?? raw.active ?? false,
+        // OOHDASH-85 (design §3.2): freshness-authoritative online. The live path always supplies
+        // `lastActivityTime` (epoch-ms, or null when the SERVER_SCOPE read had no/unparseable value),
+        // so the freshness rule is the source of truth there. `active` is corroboration only and can
+        // never flip a fresh device. The `isOnline` short-circuit is intentionally dropped.
+        // Fixture-mode / legacy callers that never read a last-report time (no `lastActivityTime` key
+        // on `raw`) keep the pre-85 `active` passthrough — the freshness rule only engages when a
+        // report time was actually observed.
+        online: ('lastActivityTime' in raw)
+            ? deriveFreshnessOnline(raw.lastActivityTime, raw.active ?? false, freshnessThresholdFor(cls.deviceType))
+            : (raw.isOnline ?? raw.active ?? false),
         telemetry,
         schedule: null,
         // additive (design-permitted):
@@ -528,6 +630,20 @@ function parseActive(attrs) {
 }
 
 /**
+ * SERVER_SCOPE `lastActivityTime` → epoch-ms number, or null (OOHDASH-85 design §3.1). Read from the
+ * SAME `activeRes.value` map that carries `active` — ThingsBoard returns it as a millisecond epoch.
+ * Accepts a numeric string too. Absent, non-numeric, NaN, or <= 0 ⇒ null. null is the fail-safe:
+ * downstream, a null last-report time is treated as OFFLINE (missing timestamp = offline).
+ */
+function parseLastActivity(attrs) {
+    const v = attrs ? attrs.lastActivityTime : undefined;
+    if (v == null) return null;
+    const n = typeof v === 'number' ? v : Number(v);
+    if (!Number.isFinite(n) || n <= 0) return null;
+    return n;
+}
+
+/**
  * Bulk latest telemetry for a set of TB devices, PLUS the per-device online state (OOHDASH-80). Uses
  * per-device latest-timeseries reads over the read session AND a per-device SERVER_SCOPE `active`
  * read (the Device entity from /api/tenant/devices has no `active`/`lastActivityTime`; SERVER_SCOPE
@@ -562,10 +678,15 @@ async function fetchTelemetry(devices) {
         }
         if (activeRes.status === 'fulfilled') {
             bag.__active = parseActive(activeRes.value);
+            // OOHDASH-85 (design §3.1): read `lastActivityTime` from the SAME SERVER_SCOPE map. This is
+            // the truthful liveness signal the code already fetched (`active,lastActivityTime`) and
+            // previously discarded. null when absent/unparseable → treated as offline downstream.
+            bag.__lastActivityTime = parseLastActivity(activeRes.value);
         } else {
             // Fail-safe: a SERVER_SCOPE read failure degrades this device to offline, never the site.
             console.error(`[TB] SERVER_SCOPE active read failed for device ${uuid}: ${activeRes.reason?.message}`);
             bag.__active = false;
+            bag.__lastActivityTime = null;      // OOHDASH-85: no report time → offline (fail-safe)
         }
         // OOHDASH-82 (design §4): stash the CLIENT_SCOPE map under a private key. A failed read degrades
         // THIS device to no client-scope (area falls back to the §7.2 rule), never the whole site.
@@ -604,15 +725,29 @@ async function fetchLiveSitesByNumber(siteNo) {
     // Latest telemetry for the matched set.
     const telemetryById = await fetchTelemetry(matched);
 
+    const now = Date.now();
     const devices = matched.map(d => {
         const uuid = d?.id?.id || d?.id;
         const bag = telemetryById.get(uuid) || {};
-        // OOHDASH-80: source `online` from the SERVER_SCOPE `active` read stashed in the bag, then
-        // strip the private key so it never leaks into the canonical telemetry{} shape.
+        // OOHDASH-80: source liveness from the SERVER_SCOPE read stashed in the bag, then strip the
+        // private keys so they never leak into the canonical telemetry{} shape.
         // OOHDASH-82 (design §4): strip the private `__clientScope` map the same way and pass it into
         // mapTbDevice so deriveArea can consume the iT500 `site` code / iT700 `salusLocation`.
-        const { __active, __clientScope, ...telemetryBag } = bag;
-        return mapTbDevice({ ...d, active: __active ?? false }, telemetryBag, __clientScope || {});
+        // OOHDASH-85 (design §3): strip `__lastActivityTime` and pass it as `lastActivityTime` so the
+        // freshness rule at mapTbDevice becomes the source of truth for `online`.
+        const { __active, __clientScope, __lastActivityTime, ...telemetryBag } = bag;
+        const dev = mapTbDevice(
+            { ...d, active: __active ?? false, lastActivityTime: __lastActivityTime ?? null },
+            telemetryBag,
+            __clientScope || {}
+        );
+        // OOHDASH-85 (design §5): server-side anti-flicker debounce. `dev.online` is the raw freshness
+        // verdict; the debounce holds a device online for one extra poll on its FIRST *stale* read, so
+        // offline is only asserted after two consecutive stale polls. A missing/unparseable report time
+        // (or a failed SERVER_SCOPE read) is a HARD offline — asserted immediately, never debounced.
+        const hardOffline = (__lastActivityTime ?? null) == null;
+        dev.online = applyFreshnessDebounce(uuid, dev.online, now, hardOffline);
+        return dev;
     });
 
     if (!devices.length) {
@@ -761,7 +896,24 @@ export function bridgeStatus() {
     };
 }
 
-/** Test/ops helper — clears the per-site live cache (test isolation; no bridge.js equivalent used). */
+/** Test/ops helper — clears the per-site live cache (test isolation; no bridge.js equivalent used).
+ *  OOHDASH-85: also clears the freshness debounce state so poll-sequence tests start clean. */
 export function _resetCache() {
     perSiteCache.clear();
+    freshnessDebounce.clear();
+}
+
+/** Test helper (OOHDASH-85) — expires ONLY the per-site live cache, PRESERVING freshness-debounce
+ *  state, so a test can simulate a subsequent 30s poll (fresh read) across which the debounce carries. */
+export function _expireCache() {
+    perSiteCache.clear();
+}
+
+/**
+ * Test/introspection helper (OOHDASH-85 design §4): the resolved freshness threshold for a deviceType
+ * and the default, so the unit test can pin the per-type resolution without reaching into module
+ * internals. FRESHNESS_BY_TYPE stays private (empty until IoT cadence lands, design §7).
+ */
+export function _freshness() {
+    return { defaultMs: FRESHNESS_DEFAULT_MS, thresholdFor: freshnessThresholdFor };
 }

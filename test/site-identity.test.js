@@ -29,6 +29,8 @@ const tbFixture = JSON.parse(
 const allDevices = [...tbFixture.devices, ...tbFixture.site4741];
 const telemetryByUuid = new Map(allDevices.map(d => [d.id.id, d.telemetry || {}]));
 const activeByUuid = new Map(allDevices.map(d => [d.id.id, d.active]));
+// OOHDASH-85: `online` is freshness-authoritative — the SERVER_SCOPE read must carry lastActivityTime.
+const ageByUuid = new Map(allDevices.map(d => [d.id.id, d.lastActivityAgeMs]));
 
 // Intercept the TB read session (login + textSearch device query + per-device timeseries + SERVER_SCOPE active).
 axios.defaults.adapter = (cfg) => {
@@ -44,7 +46,11 @@ axios.defaults.adapter = (cfg) => {
     }
     if (url.includes('/values/attributes/SERVER_SCOPE')) {
         const um = url.match(/DEVICE\/([^/]+)\/values\/attributes\/SERVER_SCOPE/);
-        return Promise.resolve(ok([{ key: 'active', value: activeByUuid.get(um ? um[1] : null), lastUpdateTs: Date.now() }]));
+        const uuid = um ? um[1] : null;
+        const attrs = [{ key: 'active', value: activeByUuid.get(uuid), lastUpdateTs: Date.now() }];
+        const ageMs = ageByUuid.get(uuid);   // OOHDASH-85: emit lastActivityTime so freshness governs online
+        if (ageMs != null) attrs.push({ key: 'lastActivityTime', value: Date.now() - ageMs, lastUpdateTs: Date.now() });
+        return Promise.resolve(ok(attrs));
     }
     if (url.includes('/values/timeseries')) {
         const um = url.match(/DEVICE\/([^/]+)\/values\/timeseries/);
