@@ -122,9 +122,12 @@ test.describe('tonight & callback', () => {
         expect(consoleErrors).toEqual([]);
     });
 
-    test('connection-check banner appears automatically for an offline site (Bay Horse) and flow captures', async ({ page }) => {
+    test('connection-check banner appears automatically for a hub-down site (Merlin House) and flow captures', async ({ page }) => {
+        // OOHDASH-91 G2: the site-hub-offline branch anchors on the LoRaWAN hub (a `lwgateway`-named
+        // device). 6771 (Merlin House) is the purpose-built fixture with its lwgateway anchor OFFLINE.
+        // (The legacy 6750 is now classified direct-connection — a generic `GW-` device is not a site hub.)
         await signIn(page, 'Test Handler');
-        await confirmSite(page, '6750', 'Bay Horse');
+        await confirmSite(page, '6771', 'Merlin House');
         const banner = page.locator('[data-testid="offline-banner"]');
         await expect(banner).toContainText('not responding');
         await banner.locator('button:has-text("Run connection check")').click();
@@ -142,8 +145,11 @@ test.describe('tonight & callback', () => {
         await page.locator('[data-testid="contractor-escalate"]').click();
         const p1 = page.locator('[data-testid="outcome-p1"]');
         await expect(p1).toContainText('Escalated — P1');
-        await expect(p1).toContainText('text message');
-        await expect(p1).toContainText('on-duty escalation manager');
+        // OOHDASH-72 honesty (Test 11c): in log mode no SMS is actually sent, so the outcome must say
+        // "Text not sent — phone the on-duty manager now", NOT the old "a text message has been sent"
+        // false claim. The e2e server runs the default 'log' provider → dispatchOk false → this branch.
+        await expect(p1).toContainText('Text not sent');
+        await expect(p1).toContainText('phone the on-duty manager');
         await expect(p1).toContainText('IoT Support dashboard');
         // the standardised register: the word "paged" is not used
         await expect(p1).not.toContainText('paged');

@@ -238,7 +238,9 @@ test.describe('control & sync', () => {
         await page.locator('[data-testid="fridge-risk"]').click(); // P1 path
         await expect(page.locator('.flowbody')).toContainText('Couldn’t record the outcome: Zendesk exploded');
         await page.locator('button:has-text("Try again")').click();
-        await expect(page.locator('[data-testid="outcome-p1"]')).toContainText('text message', { timeout: 15000 });
-        await expect(page.locator('[data-testid="outcome-p1"]')).toContainText('on-duty escalation manager');
+        // OOHDASH-72 honesty: log-mode dispatch is never a send, so the retried outcome shows the honest
+        // "Text not sent — phone the on-duty manager now" branch (dispatchOk false), not a "sent" claim.
+        await expect(page.locator('[data-testid="outcome-p1"]')).toContainText('Text not sent', { timeout: 15000 });
+        await expect(page.locator('[data-testid="outcome-p1"]')).toContainText('phone the on-duty manager');
     });
 });
