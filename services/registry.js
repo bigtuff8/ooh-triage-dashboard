@@ -24,6 +24,20 @@ const REGISTRY = {
         stepC: 0.5,
         slowEcho: true // slow to echo *SyncStatus — timeout handling applies (CR-03)
     },
+    // OOHDASH-108: old-convention ("bare-salus") thermostats — a name carrying the bare `salus`
+    // token with no 500/700 qualifier. Area resolves by site-code letter (like iT500), but the
+    // CONTROL contract is kept IDENTICAL to the existing Salus types so no command/range/dispatch
+    // behaviour changes — the only delta is deriveArea typing (see services/tb-device.js). The
+    // slow-echo grace is retained conservatively (matching iT700) because the hardware model of
+    // these old-convention units is unknown, guaranteeing NO control-path regression.
+    'salus': {
+        label: 'Salus thermostat',
+        commands: ['setpoint', 'frost'],
+        deviceRange: { min: 5, max: 35 },
+        frostSetpoint: 5,
+        stepC: 0.5,
+        slowEcho: true // conservative: assume slow echo (hardware model unknown)
+    },
     'salus-it500-dhw': {
         label: 'Salus IT500 DHW',
         commands: ['hwboost'],
