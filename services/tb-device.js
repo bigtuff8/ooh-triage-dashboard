@@ -245,7 +245,12 @@ const ASSET_INTENT = [
     { tokens: ['gateway', 'r10a', 'dragino', 'gw'], kind: 'gateway', deviceType: 'gateway', label: 'Lighthouse gateway' },
     { tokens: ['salusit700', 'it700', 'salus700'], kind: 'heating', deviceType: 'salus-it700', label: 'Salus iT700' },
     { tokens: ['salusit500', 'it500', 'salus500'], kind: 'heating', deviceType: 'salus-it500', label: 'Salus iT500' },
-    { tokens: ['salus'], kind: 'heating', deviceType: 'salus-it700', label: 'Salus thermostat' },
+    // OOHDASH-108: repurposed from the dead generic-salus row (was deviceType 'salus-it700', shadowed
+    // by the glued-iT700 contained-by bleed). It now assigns the explicit old-convention `salus` type so
+    // deriveArea resolves its area by the site-code letter instead of defaulting to Accommodation. Stays
+    // positioned AFTER the glued iT700/iT500 rows so a glued name still matches its specific row first;
+    // this catches a BARE `salus` token only once the contained-by bleed is closed in matchAssetIntent.
+    { tokens: ['salus'], kind: 'heating', deviceType: 'salus', label: 'Salus thermostat (area by site code)' },
     { tokens: ['intesis', 'ac', 'aircon'], kind: 'aircon', deviceType: 'intesis', label: 'Intesis AC' },
     { tokens: ['fryer', 'grill', 'bainmarie', 'potwash', 'kitchen', 'oven', 'dishwash'], kind: 'kitchen', deviceType: 'tuya', label: 'Kitchen circuit' },
     { tokens: ['powerpause', 'tongou', 'owon', 'contactor', 'switch', 'relay'], kind: 'kitchen', deviceType: 'tuya', label: 'Power circuit' },
@@ -377,7 +382,9 @@ export function classifyDevice(name, profile, telemetry) {
             // it agrees on a control family (heating→salus/intesis; switch→tuya).
             if (intent.deviceType === 'tuya' && nameIntent.deviceType === 'tuya') {
                 intent = { ...intent, kind: nameIntent.kind, label: nameIntent.label };
-            } else if (intent.control?.attribute === 'setpointDesired' && ['salus-it700', 'salus-it500', 'intesis'].includes(nameIntent.deviceType)) {
+            } else if (intent.control?.attribute === 'setpointDesired' && ['salus-it700', 'salus-it500', 'salus', 'intesis'].includes(nameIntent.deviceType)) {
+                // OOHDASH-108: a setpoint-bearing bare-salus thermostat is refined from the iT700
+                // default to the new `salus` type by its name, so its area letter-resolves.
                 intent = { ...intent, deviceType: nameIntent.deviceType, kind: nameIntent.kind, label: nameIntent.label };
                 if (nameIntent.deviceType === 'intesis') intent.label = 'Intesis AC';
             }
@@ -415,6 +422,20 @@ export function classifyDevice(name, profile, telemetry) {
     };
 }
 
+// OOHDASH-108: the long glued Salus asset tokens must match FORWARD-ONLY (or by exact equality).
+// The contained-by direction (asset token CONTAINS the name token) is the bleed that pulled a bare
+// `salus` name token into the glued iT700/iT500 rows (`salusit700`.includes(`salus`)), typing the
+// device iT700 and force-mapping it to Accommodation. Excluding these tokens from the contained-by
+// direction lets a bare `salus` fall through to the repurposed generic row (deviceType 'salus').
+// Safe: a GLUED name token (`salusit700`) still matches by exact equality, and a longer name that
+// CONTAINS the asset token still matches by the forward `t.includes(at)` direction — no glued match
+// is lost. Only these specific long tokens are restricted; every other row keeps the contained-by
+// direction intact (so e.g. `extractfan`→`fan` forward and short-form matches are unaffected).
+// NOTE: this covers EVERY long iT700/iT500 token that CONTAINS `salus` as a prefix — both the glued
+// `salusit700`/`salusit500` AND the alias forms `salus700`/`salus500` — otherwise `salus700`.includes
+// (`salus`) re-opens the identical bleed via the alias token.
+const FORWARD_ONLY_TOKENS = new Set(['salusit700', 'salusit500', 'salus700', 'salus500']);
+
 /** Matches name tokens to an ASSET_INTENT row — exact substring, typo-map, then bounded fuzzy. */
 function matchAssetIntent(tokens) {
     const corrected = tokens.map(t => TYPO_MAP[t] || t);
@@ -423,13 +444,16 @@ function matchAssetIntent(tokens) {
     for (const row of ASSET_INTENT) {
         for (const at of row.tokens) {
             const exactOnly = at.length <= 3;
+            // OOHDASH-108: the long glued Salus tokens match forward/exact-only (no contained-by) —
+            // see FORWARD_ONLY_TOKENS above. This closes the bare-`salus` bleed.
+            const forwardOnly = FORWARD_ONLY_TOKENS.has(at);
             // OOHDASH-82: the `at.includes(t)` direction (asset token CONTAINS the name token) is
             // guarded to name tokens of ≥3 chars. Without this, a 1-2 char device-instance suffix
             // (e.g. the `1` in `gk-6261-cellar-fan-1`) spuriously matches an asset token that merely
             // contains that digit (`r10a`.includes(`1`)). This surfaced once the gateway row — which
             // carries `r10a` — was reordered to the front (design §5); it is a latent bleed the fix
             // closes without weakening the glued-form `t.includes(at)` direction.
-            if (corrected.some(t => t === at || (!exactOnly && (t.includes(at) || (t.length >= 3 && at.includes(t)))))) return row;
+            if (corrected.some(t => t === at || (!exactOnly && (t.includes(at) || (!forwardOnly && t.length >= 3 && at.includes(t)))))) return row;
         }
     }
     // Bounded fuzzy pass (Levenshtein ≤2), never across a control boundary (each row is one family).
@@ -461,20 +485,42 @@ export function parseSiteCodeLetter(siteCode) {
 }
 
 /**
- * deriveArea(deviceType, clientScope) — the caller-meaningful heating area for a device (design §3).
- * Returns the string `Accommodation`, the string `Bar/Restaurant`, or null ("not an area device" —
- * gateways, temp sensors, aircon, and any unmapped case; null is the safe default).
+ * deriveArea(deviceType, clientScope, rawName) — the caller-meaningful heating area for a device
+ * (design §3; OOHDASH-108 extended). Returns the string `Accommodation`, the string `Bar/Restaurant`,
+ * or null ("not an area device" — gateways, temp sensors, aircon, and any unmapped case; null is the
+ * safe default).
  *
  *   - salus-it700 → Accommodation unconditionally (the one-per-site accommodation controller maps
  *     100%; no attribute needed, so the default `IT700` salusLocation label is handled correctly).
- *   - salus-it500 → parse the CLIENT_SCOPE `site` letter: s (Staff)/f (Flats) → Accommodation;
- *     r (Restaurant)/b (Bar) → Bar/Restaurant; any other/missing letter → null (fallback, §7.2).
+ *     OOHDASH-108: the glued-iT700 100% rule is DELIBERATELY unchanged (DECISION 2 kept).
+ *   - salus-it500 AND salus (old-convention / "bare-salus", OOHDASH-108) → letter-resolved: parse
+ *     the CLIENT_SCOPE `site` letter: s (Staff)/f (Flats) → Accommodation; r (Restaurant)/b (Bar) →
+ *     Bar/Restaurant; any other/missing letter → null (fallback chip, §7.2). When no usable
+ *     CLIENT_SCOPE letter is present, fall back to the site-code letter parsed from the RAW device
+ *     name's trailing parenthetical (OOHDASH-108 DECISION 1, parenthetical fallback — the raw name
+ *     is required because normaliseName strips parentheticals before tokenising). A present
+ *     CLIENT_SCOPE letter ALWAYS wins over the parenthetical.
  *   - every other deviceType (intesis, gateway, tuya, refrigeration, boiler-panel, unknown) → null.
+ *
+ * @param {string}      deviceType  a registry.js key from classifyDevice
+ * @param {object|null} clientScope the CLIENT_SCOPE attribute map (carries `site`)
+ * @param {string}      [rawName]   the RAW device name (before normaliseName) — OOHDASH-108
+ *                                  parenthetical fallback source; optional/back-compatible
  */
-export function deriveArea(deviceType, clientScope) {
+export function deriveArea(deviceType, clientScope, rawName) {
     if (deviceType === 'salus-it700') return 'Accommodation';
-    if (deviceType === 'salus-it500') {
-        const letter = parseSiteCodeLetter(clientScope && clientScope.site);
+    // OOHDASH-108: salus-it500 and the new old-convention `salus` type share ONE letter-resolve branch.
+    if (deviceType === 'salus-it500' || deviceType === 'salus') {
+        // Primary source: CLIENT_SCOPE `site` letter. A present letter ALWAYS wins over the parenthetical.
+        let letter = parseSiteCodeLetter(clientScope && clientScope.site);
+        // OOHDASH-108 (DECISION 1): parenthetical fallback — when CLIENT_SCOPE has no usable letter,
+        // parse it from the RAW device name's trailing parenthetical group (e.g. a name ending
+        // `(5197-r-1)`). parseSiteCodeLetter rejects malformed/non-sfrb/reversed shapes → null, so this
+        // is bleed-safe.
+        if (!letter && rawName) {
+            const m = String(rawName).match(/\(([^)]*)\)\s*$/);   // trailing parenthetical group
+            if (m) letter = parseSiteCodeLetter(m[1]);
+        }
         if (letter === 's' || letter === 'f') return 'Accommodation';
         if (letter === 'r' || letter === 'b') return 'Bar/Restaurant';
         return null;
@@ -620,7 +666,9 @@ export function mapTbDevice(raw, telemetryBag, clientScope) {
         kind: cls.kind,
         // OOHDASH-82 (design §3/§4): the caller-meaningful heating area, derived once server-side from
         // deviceType + the CLIENT_SCOPE attributes and consumed opaquely by the flow (never re-derived).
-        area: deriveArea(cls.deviceType, clientScope),
+        // OOHDASH-108: the RAW name is threaded in as the parenthetical-fallback site-letter source
+        // (DECISION 1) — normaliseName strips parentheticals, so deriveArea needs the unnormalised name.
+        area: deriveArea(cls.deviceType, clientScope, name),
         hotWaterCapable: telemetry.hotWater != null,
         // OOHDASH-85 (design §3.2): freshness-authoritative online. The live path always supplies
         // `lastActivityTime` (epoch-ms, or null when the SERVER_SCOPE read had no/unparseable value),
