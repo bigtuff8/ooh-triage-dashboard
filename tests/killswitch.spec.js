@@ -21,12 +21,13 @@ test.describe.serial('F016 kill-switch', () => {
         await expect(h.locator('[data-testid="kill-banner"]')).toContainText('switched off globally');
         await expect(h.locator('[data-testid="kill-banner"]')).toContainText('vendor cloud incident');
         await confirmSite(h, '6832', 'Old Grey Mare'); // reads continue (F016 verification)
-        await expect(h.locator('[data-testid="device-board"]')).toContainText('17.5°C');
 
         // Control modal never opens — blocked with explanation; server also rejects (423)
         // OOHDASH-82: heating first step is the two-area chip model. Bar/Restaurant → IT500-BAR-6832.
         await h.locator('[data-testid="tile-heating"]').click();
         await h.locator('[data-testid="area-bar-restaurant"]').click();
+        // F016 reads-continue: even with writes killed, the live zone temperature still resolves.
+        await expect(h.locator('.zoneread')).toContainText('17.5°C');
         await h.locator('[data-testid="need-warm"]').click();
         await expect(h.locator('[data-testid="control-blocked"]')).toContainText('switched off globally');
         await h.locator('.modal button:has-text("OK")').click();

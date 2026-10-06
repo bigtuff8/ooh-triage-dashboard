@@ -31,7 +31,7 @@ test.describe('OOHDASH-82 heating area model', () => {
         await expect(bar).toBeVisible();
 
         // AC3 (structural, seen here too): no gateway / serial ever surfaces as a chip. The flow panel
-        // holds the chip step; the device board (which legitimately lists the gateway) is elsewhere.
+        // holds the chip step; the gateway lives in the raw inventory but is never surfaced to the handler.
         const flow = page.locator('[data-testid="flow-panel"]');
         await expect(flow).not.toContainText('gateway');
         await expect(flow).not.toContainText('salusit700');
@@ -78,7 +78,7 @@ test.describe('OOHDASH-82 heating area model', () => {
 
     test('AC3: the paired gateway is absent from the chips AND from the live device set for an area', async ({ page }) => {
         await confirmSite(page, '6218', 'Kings Head');
-        // The gateway is present in the raw inventory (device board), but never as an area chip.
+        // The gateway is present in the raw inventory, but never as an area chip.
         await page.locator('[data-testid="tile-heating"]').click();
         await expect(page.locator('[data-testid="flow-panel"]')).not.toContainText('gateway');
         // Choosing an area never resolves to the gateway (no gateway id appears in the read).

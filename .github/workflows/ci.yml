@@ -34,15 +34,16 @@ jobs:
       - run: npm run test:unit
 
   e2e:
-    # NOT a required check yet — see below. Reports honestly so the failures stay visible
-    # rather than being hidden behind continue-on-error.
+    # REQUIRED CHECK (OOHDASH-109, 2026-10-06). The browser suite is the only end-to-end safety
+    # net over the confirm-gate → triage-flow → control/escalate chain.
     #
-    # As of 2026-09-24 two specs fail on a clean main and have done for some time:
-    #   tests/control.spec.js:229          outcome-record failure / 500 path
-    #   tests/tonight-callback.spec.js:136 P1 contractor "text message" wording
-    # Both reproduce on an untouched origin/main checkout, so they are pre-existing, not a
-    # regression. Once they are fixed, add "e2e" to the required status checks on main.
-    name: e2e (playwright, not yet required)
+    # It had rotted while non-required: OOHDASH-89/91 removed the `device-board` test id (device
+    # state is now triage-question-led), which broke the shared confirmSite helper and took 30 of
+    # the specs down at the confirm step — invisible because e2e was not gating. The older
+    # 2026-09-24 pair (control.spec.js:229 500-path, tonight-callback.spec.js:136 P1 wording) were
+    # the same class of stale-harness drift against the OOHDASH-72 log-mode honesty copy. All fixed
+    # in OOHDASH-109; the suite is green on a clean main, so e2e now gates like the unit check.
+    name: e2e (playwright)
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:

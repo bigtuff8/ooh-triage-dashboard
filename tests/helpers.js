@@ -21,5 +21,8 @@ export async function confirmSite(page, query, siteName) {
     await openSiteByKeyboard(page, query);
     await expect(page.locator('[data-testid="confirm-gate"]')).toContainText(siteName);
     await page.locator('[data-testid="confirm-site"]').click();
-    await expect(page.locator('[data-testid="device-board"]')).toBeVisible();
+    // The workspace is ready once the triage-question entry renders. The old always-on
+    // `device-board` readout was removed in OOHDASH-89/91 (device state is now surfaced as a
+    // triage-question outcome, not a standing board) — `category-tiles` is the stable anchor.
+    await expect(page.locator('[data-testid="category-tiles"]')).toBeVisible();
 }

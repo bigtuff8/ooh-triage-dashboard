@@ -34,7 +34,7 @@ test.describe('F004 resolution', () => {
         await expect(card).toContainText('Bowman');
         // no confirm button, no workspace
         await expect(page.locator('[data-testid="confirm-site"]')).toHaveCount(0);
-        await expect(page.locator('[data-testid="device-board"]')).toHaveCount(0);
+        await expect(page.locator('[data-testid="category-tiles"]')).toHaveCount(0);
         // capture path produces a ticket
         await page.locator('[data-testid="ambiguous-capture"]').click();
         await expect(page.locator('.toast')).toContainText('Captured as ticket');
@@ -44,11 +44,14 @@ test.describe('F004 resolution', () => {
         await openSiteByKeyboard(page, '6832');
         // gate visible, workspace data NOT loaded
         await expect(page.locator('[data-testid="confirm-gate"]')).toContainText('site number 6832');
-        await expect(page.locator('[data-testid="device-board"]')).toHaveCount(0);
+        await expect(page.locator('[data-testid="scope-list"]')).toHaveCount(0);
         await expect(page.locator('[data-testid="category-tiles"]')).toHaveCount(0);
         await page.locator('[data-testid="confirm-site"]').click();
-        await expect(page.locator('[data-testid="device-board"]')).toContainText('Bar area');
-        await expect(page.locator('[data-testid="device-board"]')).toContainText('17.5°C');
+        // After confirm the triage workspace renders: the Q&A entry tiles and the site scope card.
+        // (Live device readings moved out of the removed device-board into the triage-flow outcomes —
+        //  covered by area-model.spec.js / killswitch.spec.js.)
+        await expect(page.locator('[data-testid="category-tiles"]')).toBeVisible();
+        await expect(page.locator('[data-testid="scope-list"]')).toBeVisible();
     });
 
     test('server refuses a dispatch without a valid confirmation token (409)', async ({ page }) => {
