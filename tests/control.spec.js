@@ -238,9 +238,10 @@ test.describe('control & sync', () => {
         await page.locator('[data-testid="fridge-risk"]').click(); // P1 path
         await expect(page.locator('.flowbody')).toContainText('Couldn’t record the outcome: Zendesk exploded');
         await page.locator('button:has-text("Try again")').click();
-        // OOHDASH-72 honesty: log-mode dispatch is never a send, so the retried outcome shows the honest
-        // "Text not sent — phone the on-duty manager now" branch (dispatchOk false), not a "sent" claim.
-        await expect(page.locator('[data-testid="outcome-p1"]')).toContainText('Text not sent', { timeout: 15000 });
-        await expect(page.locator('[data-testid="outcome-p1"]')).toContainText('phone the on-duty manager');
+        // Approach B: OOH tags the ticket ooh_p1; the IoT Support Dashboard pages the manager.
+        // The dispatch-status must show the honest fixed line — not the old false Approach-A warning.
+        await expect(page.locator('[data-testid="outcome-p1"]')).toContainText('logged as ticket', { timeout: 15000 });
+        await expect(page.locator('[data-testid="outcome-p1"]')).toContainText('pages the on-duty manager');
+        await expect(page.locator('[data-testid="outcome-p1"]')).not.toContainText('Text not sent');
     });
 });

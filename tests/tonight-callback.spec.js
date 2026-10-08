@@ -145,14 +145,14 @@ test.describe('tonight & callback', () => {
         await page.locator('[data-testid="contractor-escalate"]').click();
         const p1 = page.locator('[data-testid="outcome-p1"]');
         await expect(p1).toContainText('Escalated — P1');
-        // OOHDASH-72 honesty (Test 11c): in log mode no SMS is actually sent, so the outcome must say
-        // "Text not sent — phone the on-duty manager now", NOT the old "a text message has been sent"
-        // false claim. The e2e server runs the default 'log' provider → dispatchOk false → this branch.
-        await expect(p1).toContainText('Text not sent');
-        await expect(p1).toContainText('phone the on-duty manager');
+        // Approach B: OOH tags ooh_p1 and the IoT Support Dashboard pages the on-duty manager.
+        // The dispatch-status line is always the honest fixed sentence — no conditional send/not-sent branch.
+        await expect(p1).toContainText('logged as ticket');
         await expect(p1).toContainText('IoT Support dashboard');
-        // the standardised register: the word "paged" is not used
-        await expect(p1).not.toContainText('paged');
+        await expect(p1).toContainText('pages the on-duty manager');
+        // Old Approach-A false warnings must be absent
+        await expect(p1).not.toContainText('Text not sent');
+        await expect(p1).not.toContainText('text message has been sent');
     });
 
     test('scope check answers with site-scoped certainty (Something else → boiler)', async ({ page }) => {

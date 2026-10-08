@@ -243,9 +243,7 @@ function outcomeP1(f, key, { subject, detail, script, p1Summary }) {
     return finishOutcome(f, key,
         { type: 'escalate-p1', subject, detail, p1Summary, issueLabel: subject, issueCls: 'red' },
         res => `<div class="outcome p1" data-testid="outcome-p1"><h3>🚨 Escalated — P1</h3><p>${detail}</p>
-  <p style="margin-top:4px" data-testid="p1-dispatch-status">${res.p1 && res.p1.dispatchOk
-      ? `A <b>text message</b> has been sent to the <b>on-duty escalation manager</b> at ${esc(new Date(res.p1.dispatchedAt || Date.now()).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }))}, with a direct link to ticket <b>#${res.ticket.id}</b> in the IoT Support dashboard.`
-      : `<span class="tag red">Text not sent — phone the on-duty manager now.</span> The P1 is logged as ticket <b>#${res.ticket.id}</b> in the IoT Support dashboard.`}</p>
+  <p style="margin-top:4px" data-testid="p1-dispatch-status">The P1 is logged as ticket <b>#${res.ticket.id}</b> in the IoT Support dashboard, which pages the on-duty manager.</p>
   <div class="script">“${script}”</div><p class="small">Ticket <b>#${res.ticket.id}</b></p></div>`);
 }
 
