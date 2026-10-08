@@ -1,0 +1,25 @@
+{
+  "run": "selfgate-ooh-triage-dashboard-gate-oohdash-111-112-discovery",
+  "phase": "discovery",
+  "pr": 66,
+  "approvedBy": [
+    "bigtuff8"
+  ],
+  "reviewComments": [
+    "bigtuff8: - For OOHDASH-111 — which lighting outcome escalates to P1?: \"Still not working\" only\n- For OOHDASH-112 — approve the draft script wording for handler read-aloud?: Approve as drafted\n\n(submitted via the interactive gate review)\n\n<!-- gate:selected [{\"question\":\"For OOHDASH-111 — which lighting outcome escalates to P1?\",\"answer\":\"\\\"Still not working\\\" only\"},{\"question\":\"For OOHDASH-112 — approve the draft script wording for handler read-aloud?\",\"answer\":\"Approve as drafted\"}] -->"
+  ],
+  "mergeCommit": "5d41cf8b31fc784e0ce95aa0b30cc5529cd41447",
+  "phaseBranch": "gate/oohdash-111-112-discovery",
+  "releaseBranch": "main",
+  "stamp": 1791470167136,
+  "selectedOptions": [
+    {
+      "question": "For OOHDASH-111 — which lighting outcome escalates to P1?",
+      "answer": "\"Still not working\" only"
+    },
+    {
+      "question": "For OOHDASH-112 — approve the draft script wording for handler read-aloud?",
+      "answer": "Approve as drafted"
+    }
+  ]
+}
