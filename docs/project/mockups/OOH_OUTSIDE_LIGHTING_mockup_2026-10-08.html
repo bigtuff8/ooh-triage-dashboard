@@ -1,0 +1,268 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>OOH Outside Lighting — 111/112 mockup</title>
+<style>
+/* ===== Live tokens + classes lifted verbatim from public/css/styles.css (light theme — the app is not theme-aware) ===== */
+:root{
+  --primary:#594AE2;--primary-dark:#4338CA;--primary-light:#EEF2FF;
+  --success:#10B981;--success-light:#D1FAE5;
+  --warning:#F59E0B;--warning-light:#FEF3C7;
+  --danger:#EF4444;--danger-light:#FEE2E2;
+  --info:#3B82F6;--info-light:#DBEAFE;
+  --surface:#FFFFFF;--surface-variant:#F8FAFC;--background:#F1F5F9;
+  --text-primary:#1E293B;--text-secondary:#64748B;--text-disabled:#94A3B8;
+  --border:#E2E8F0;
+  --urgency-critical:#DC2626;--urgency-critical-bg:#FEF2F2;
+  --radius-sm:6px;--radius-md:8px;--radius-lg:12px;
+  --shadow-sm:0 1px 2px rgba(0,0,0,.05);--shadow-md:0 4px 6px -1px rgba(0,0,0,.1);--shadow-lg:0 10px 15px -3px rgba(0,0,0,.1);
+  --mono:ui-monospace,Consolas,'Cascadia Mono',monospace;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:Inter,system-ui,-apple-system,'Segoe UI',sans-serif;font-size:14px;line-height:22px;color:var(--text-primary);background:var(--background)}
+.mono{font-family:var(--mono);font-size:12.5px;font-weight:500}
+.small{font-size:12.5px;line-height:17px;color:var(--text-secondary)}
+.alert{border-radius:var(--radius-md);padding:11px 14px;font-size:13.5px;margin:10px 0;line-height:20px}
+.alert.info{background:var(--info-light);color:#1E40AF}
+.flowpanel{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);box-shadow:var(--shadow-md);overflow:hidden}
+.flowhead{padding:12px 18px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px;background:var(--surface-variant)}
+.flowbody{padding:18px}
+.flowfoot{padding:8px 18px;border-top:1px solid var(--border);display:flex;align-items:center;gap:12px;font-size:12px;color:var(--text-secondary)}
+.stepdone{display:flex;gap:8px;align-items:center;color:var(--text-secondary);font-size:13px;padding:5px 0;border-bottom:1px dashed var(--surface-variant)}
+.stepdone .tick{color:var(--success);font-weight:700}
+.stepq{font-size:15px;font-weight:600;margin:14px 0 10px}
+.chips{display:flex;flex-wrap:wrap;gap:8px}
+.chip{border:1.5px solid var(--border);background:var(--surface);border-radius:var(--radius-md);padding:9px 16px;font-size:14px;font-weight:500;cursor:pointer;min-height:40px}
+.chip:hover{border-color:var(--primary);color:var(--primary)}
+.zoneread{border:1px solid var(--border);border-radius:var(--radius-md);padding:10px 14px;margin:8px 0;display:flex;align-items:center;gap:14px;flex-wrap:wrap}
+.script{background:var(--surface-variant);border-left:3px solid var(--primary);border-radius:0 var(--radius-md) var(--radius-md) 0;padding:11px 14px;font-size:14px;font-style:italic;margin:10px 0;line-height:21px}
+.outcome{border-radius:var(--radius-lg);padding:16px;margin-top:14px}
+.outcome.captured{background:var(--info-light)}
+.outcome.p1{background:var(--urgency-critical-bg);border:1px solid #FECACA}
+.outcome h3{margin-bottom:6px;font-size:15px}
+.outbtns{display:flex;gap:10px;margin-top:12px;flex-wrap:wrap}
+.btn{border:1px solid var(--border);background:var(--surface);color:var(--text-primary);border-radius:var(--radius-md);padding:8px 16px;font-weight:500;font-size:14px}
+.btn.primary{background:var(--primary);border-color:var(--primary);color:#fff}
+.btn.link{border:none;background:none;color:var(--primary);padding:4px 6px}
+.tag{display:inline-flex;align-items:center;gap:5px;font-size:11.5px;font-weight:600;border-radius:var(--radius-sm);padding:1px 7px;line-height:17px;white-space:nowrap}
+.tag.green{background:var(--success-light);color:#065F46}
+.tag.grey{background:#F1F5F9;color:var(--text-secondary)}
+.tag.red{background:var(--danger-light);color:#991B1B}
+/* a small inline switch pair, faithful to switchButtons' look */
+.swbtns{display:flex;gap:6px}
+.swbtns .btn{padding:6px 12px;font-size:13px}
+
+/* ===== annotation chrome — deliberately NOT product styling, so it can't be mistaken for the app ===== */
+.pagewrap{max-width:1300px;margin:0 auto;padding:28px 20px 60px}
+.pagehead{margin-bottom:8px}
+.pagehead h1{font-size:20px;font-weight:700;color:var(--text-primary)}
+.pagehead p{color:var(--text-secondary);font-size:13.5px;margin-top:4px;max-width:70ch}
+.legend{display:flex;flex-wrap:wrap;gap:14px;margin:14px 0 24px;font-size:12.5px;color:var(--text-secondary)}
+.legend b{color:var(--text-primary)}
+.section-label{font-size:12px;font-weight:700;letter-spacing:.6px;text-transform:uppercase;color:var(--primary-dark);margin:34px 0 4px}
+.cap{font-size:13px;color:var(--text-secondary);margin:0 0 12px;max-width:72ch}
+.cap .pill{display:inline-block;background:var(--primary-light);color:var(--primary-dark);font-weight:700;font-size:11px;border-radius:999px;padding:1px 9px;margin-right:6px;vertical-align:1px}
+.frames{display:flex;gap:28px;align-items:flex-start;flex-wrap:wrap}
+.frame{flex:1 1 520px;min-width:300px}
+.frame > .fcap{font-size:12px;font-weight:600;color:var(--text-secondary);margin-bottom:8px}
+.frame.mobile{flex:0 0 390px;max-width:390px}
+.frame.mobile .viewport{width:390px;max-width:100%;border:1px solid var(--border);border-radius:16px;padding:10px;background:#fff;box-shadow:var(--shadow-sm)}
+.viewport{border-radius:var(--radius-lg)}
+hr.div{border:0;border-top:1px dashed var(--border);margin:40px 0}
+@media(max-width:1100px){.frame{flex-basis:100%}}
+</style>
+</head>
+<body>
+<div class="pagewrap">
+
+  <div class="pagehead">
+    <h1>Outside Lighting — OOHDASH-111 + OOHDASH-112 design mockup</h1>
+    <p>Pixel-faithful render of the Outside Lighting triage flow using the live app's own CSS classes and tokens (<span class="mono">public/css/styles.css</span>). Example site: <b>The Wheatsheaf, Ilkley</b> · <span class="mono">6412</span>. The boxed sections below are the real product component; the coloured captions around them are mockup annotation only.</p>
+  </div>
+  <div class="legend">
+    <span><b>112</b> = revised read-aloud script (text-only)</span>
+    <span><b>111</b> = "still not working" becomes a P1 escalation</span>
+    <span>Rendered at desktop width and at a ≤1100px (mobile) viewport.</span>
+  </div>
+
+  <!-- =========================== 112: ONLINE SCRIPT =========================== -->
+  <div class="section-label">OOHDASH-112 · read-aloud script — device ONLINE</div>
+  <p class="cap"><span class="pill">112</span>What the handler reads when the lighting controller is responding. Stage 0 of the flow. The live switch, info alert, and chips are unchanged — only the <span class="mono">.script</span> block's words change.</p>
+  <div class="frames">
+    <div class="frame">
+      <div class="fcap">Desktop</div>
+      <div class="viewport">
+        <div class="flowpanel">
+          <div class="flowhead"><span style="font-size:18px">💡</span><b>External Lighting</b><span class="small" style="margin-left:6px">guided flow</span><button class="btn link" style="margin-left:auto">Cancel issue</button></div>
+          <div class="flowbody">
+            <div class="stepdone"><span>💬</span>Caller’s words: “car park lights aren’t on, it’s pitch black out front”</div>
+            <div class="stepdone"><span class="tick">✓</span>Live read: external lighting device online</div>
+            <div class="zoneread"><span style="font-size:20px">💡</span><div><div><b>Car Park &amp; Frontage</b> — currently OFF</div><div class="small mono">gk-6412-ext-lighting</div></div><div class="swbtns"><button class="btn">Turn ON</button><button class="btn">Turn OFF</button></div><span class="tag grey">off</span></div>
+            <div class="alert info">This lighting circuit can be switched on/off directly above — the change only counts once the device confirms.</div>
+            <div class="script">“The outside lights have a sensor that brings them on automatically at dusk — so they should usually look after themselves. If tonight’s an exception, flip the Lighthouse lighting switch to override and they’ll come on. That only affects tonight; the sensor picks everything back up automatically from tomorrow, so there’s nothing to reset.”</div>
+            <div class="chips"><button class="chip">Caller sorted it with the override</button><button class="chip">Still not working — capture &amp; escalate</button></div>
+          </div>
+          <div class="flowfoot"><span>Operator: <b>A. Parkinson</b></span><span style="margin-left:auto">Everything here is recorded to the Zendesk ticket automatically</span></div>
+        </div>
+      </div>
+    </div>
+    <div class="frame mobile">
+      <div class="fcap">Mobile ≤1100px</div>
+      <div class="viewport">
+        <div class="flowpanel">
+          <div class="flowhead"><span style="font-size:18px">💡</span><b>External Lighting</b><span class="small" style="margin-left:6px">guided flow</span></div>
+          <div class="flowbody">
+            <div class="stepdone"><span class="tick">✓</span>Live read: external lighting device online</div>
+            <div class="zoneread"><span style="font-size:20px">💡</span><div><div><b>Car Park &amp; Frontage</b> — OFF</div><div class="small mono">gk-6412-ext-lighting</div></div><span class="tag grey">off</span></div>
+            <div class="alert info">This lighting circuit can be switched on/off directly above — the change only counts once the device confirms.</div>
+            <div class="script">“The outside lights have a sensor that brings them on automatically at dusk — so they should usually look after themselves. If tonight’s an exception, flip the Lighthouse lighting switch to override and they’ll come on. That only affects tonight; the sensor picks everything back up automatically from tomorrow, so there’s nothing to reset.”</div>
+            <div class="chips"><button class="chip">Caller sorted it</button><button class="chip">Still not working</button></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- =========================== 112: OFFLINE SCRIPT =========================== -->
+  <div class="section-label">OOHDASH-112 · read-aloud script — device OFFLINE</div>
+  <p class="cap"><span class="pill">112</span>When the controller isn't responding, the script leads with the fuse-board / tripped-breaker check before the override. Remote switching isn't offered (no switch row); the info alert notes the controller is not responding.</p>
+  <div class="frames">
+    <div class="frame">
+      <div class="fcap">Desktop</div>
+      <div class="viewport">
+        <div class="flowpanel">
+          <div class="flowhead"><span style="font-size:18px">💡</span><b>External Lighting</b><span class="small" style="margin-left:6px">guided flow</span><button class="btn link" style="margin-left:auto">Cancel issue</button></div>
+          <div class="flowbody">
+            <div class="stepdone"><span class="tick">✓</span>Live read: external lighting device NOT responding</div>
+            <div class="alert info">External lighting can’t be switched remotely from here yet (on the priority list with our platform team). The lighting controller is also <b>not responding</b>, which often means a tripped fuse board.</div>
+            <div class="script">“The outside lights have a sensor that brings them on automatically at dusk, so they should usually look after themselves. The lighting controller isn’t responding at the moment — it’s worth checking your fuse board first, as a tripped breaker is the usual cause. If everything looks clear, flip the Lighthouse lighting switch to override — that only covers tonight, and the sensor picks everything back up automatically from tomorrow.”</div>
+            <div class="chips"><button class="chip">Caller sorted it with the override</button><button class="chip">Still not working — capture &amp; escalate</button></div>
+          </div>
+          <div class="flowfoot"><span>Operator: <b>A. Parkinson</b></span><span style="margin-left:auto">Everything here is recorded to the Zendesk ticket automatically</span></div>
+        </div>
+      </div>
+    </div>
+    <div class="frame mobile">
+      <div class="fcap">Mobile ≤1100px</div>
+      <div class="viewport">
+        <div class="flowpanel">
+          <div class="flowhead"><span style="font-size:18px">💡</span><b>External Lighting</b><span class="small" style="margin-left:6px">guided flow</span></div>
+          <div class="flowbody">
+            <div class="stepdone"><span class="tick">✓</span>Live read: device NOT responding</div>
+            <div class="alert info">External lighting can’t be switched remotely from here yet. The lighting controller is also <b>not responding</b>, which often means a tripped fuse board.</div>
+            <div class="script">“The outside lights have a sensor that brings them on automatically at dusk, so they should usually look after themselves. The lighting controller isn’t responding at the moment — it’s worth checking your fuse board first, as a tripped breaker is the usual cause. If everything looks clear, flip the Lighthouse lighting switch to override — that only covers tonight, and the sensor picks everything back up automatically from tomorrow.”</div>
+            <div class="chips"><button class="chip">Caller sorted it</button><button class="chip">Still not working</button></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <hr class="div">
+
+  <!-- =========================== 111: P1 CARD — DISPATCH SENT =========================== -->
+  <div class="section-label">OOHDASH-111 · "still not working" → P1 escalation (SMS sent)</div>
+  <p class="cap"><span class="pill">111</span>The new outcome. Clicking <b>"Still not working — capture &amp; escalate"</b> now renders the red <span class="mono">.outcome.p1</span> card — the same visual language as the Kitchen, Fridge and Contractor P1 outcomes already live in the app — instead of the old blue capture. Shown with the on-duty-manager text successfully sent.</p>
+  <div class="frames">
+    <div class="frame">
+      <div class="fcap">Desktop</div>
+      <div class="viewport">
+        <div class="flowpanel">
+          <div class="flowhead"><span style="font-size:18px">💡</span><b>External Lighting</b><span class="small" style="margin-left:6px">guided flow</span><button class="btn link" style="margin-left:auto">Cancel issue</button></div>
+          <div class="flowbody">
+            <div class="stepdone"><span class="tick">✓</span>Live read: external lighting device online</div>
+            <div class="stepdone"><span class="tick">✓</span>Override did not resolve — P1</div>
+            <div class="stepdone small"><span>💬</span>Recorded from the caller: “car park lights aren’t on, it’s pitch black out front”</div>
+            <div class="outcome p1">
+              <h3>🚨 Escalated — P1</h3>
+              <p>Manual override did not resolve the outside lights; possible tripped supply or failed controller. Remote switching not available — needs immediate IoT/electrical follow-up.</p>
+              <p style="margin-top:4px">A <b>text message</b> has been sent to the <b>on-duty escalation manager</b> at 21:47, with a direct link to ticket <b>#48217</b> in the IoT Support dashboard.</p>
+              <div class="script">“I’ve escalated this as urgent — a text has gone to our on-duty manager and someone will call you back shortly. If the dark frontage is a safety concern right now, your site’s duty-manager procedure for calling out an electrician still applies, as this may be an electrical supply issue rather than the lighting control.”</div>
+              <p class="small">Ticket <b>#48217</b></p>
+            </div>
+            <div class="outbtns"><button class="btn">➕ Add another issue</button><button class="btn primary">✔ End call</button></div>
+          </div>
+          <div class="flowfoot"><span>Operator: <b>A. Parkinson</b></span><span style="margin-left:auto">Everything here is recorded to the Zendesk ticket automatically</span></div>
+        </div>
+      </div>
+    </div>
+    <div class="frame mobile">
+      <div class="fcap">Mobile ≤1100px</div>
+      <div class="viewport">
+        <div class="flowpanel">
+          <div class="flowhead"><span style="font-size:18px">💡</span><b>External Lighting</b><span class="small" style="margin-left:6px">guided flow</span></div>
+          <div class="flowbody">
+            <div class="stepdone"><span class="tick">✓</span>Override did not resolve — P1</div>
+            <div class="outcome p1">
+              <h3>🚨 Escalated — P1</h3>
+              <p>Manual override did not resolve the outside lights; possible tripped supply or failed controller. Remote switching not available — needs immediate IoT/electrical follow-up.</p>
+              <p style="margin-top:4px">A <b>text message</b> has been sent to the <b>on-duty escalation manager</b> at 21:47, with a direct link to ticket <b>#48217</b> in the IoT Support dashboard.</p>
+              <div class="script">“I’ve escalated this as urgent — a text has gone to our on-duty manager and someone will call you back shortly. If the dark frontage is a safety concern right now, your site’s duty-manager procedure for calling out an electrician still applies.”</div>
+              <p class="small">Ticket <b>#48217</b></p>
+            </div>
+            <div class="outbtns"><button class="btn">➕ Add another</button><button class="btn primary">✔ End call</button></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- =========================== 111: P1 CARD — LOG-MODE FALLBACK =========================== -->
+  <div class="section-label">OOHDASH-111 · P1 unhappy path — SMS in log mode (D2 not yet confirmed)</div>
+  <p class="cap"><span class="pill">111</span>Honest fallback (existing behaviour, now inherited by the lighting path). If the SMS provider is in log mode / the send fails, the card does not pretend a text went out — it tells the handler to phone the manager directly. This is why gate condition D2 matters.</p>
+  <div class="frames">
+    <div class="frame">
+      <div class="fcap">Desktop</div>
+      <div class="viewport">
+        <div class="flowpanel">
+          <div class="flowhead"><span style="font-size:18px">💡</span><b>External Lighting</b><span class="small" style="margin-left:6px">guided flow</span><button class="btn link" style="margin-left:auto">Cancel issue</button></div>
+          <div class="flowbody">
+            <div class="stepdone"><span class="tick">✓</span>Override did not resolve — P1</div>
+            <div class="outcome p1">
+              <h3>🚨 Escalated — P1</h3>
+              <p>Manual override did not resolve the outside lights; possible tripped supply or failed controller. Remote switching not available — needs immediate IoT/electrical follow-up.</p>
+              <p style="margin-top:4px"><span class="tag red">Text not sent — phone the on-duty manager now.</span> The P1 is logged as ticket <b>#48217</b> in the IoT Support dashboard.</p>
+              <div class="script">“I’ve escalated this as urgent — a text has gone to our on-duty manager and someone will call you back shortly. If the dark frontage is a safety concern right now, your site’s duty-manager procedure for calling out an electrician still applies, as this may be an electrical supply issue rather than the lighting control.”</div>
+              <p class="small">Ticket <b>#48217</b></p>
+            </div>
+            <div class="outbtns"><button class="btn">➕ Add another issue</button><button class="btn primary">✔ End call</button></div>
+          </div>
+          <div class="flowfoot"><span>Operator: <b>A. Parkinson</b></span><span style="margin-left:auto">Everything here is recorded to the Zendesk ticket automatically</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <hr class="div">
+
+  <!-- =========================== OVERRIDE-RESOLVED (UNCHANGED) =========================== -->
+  <div class="section-label">Unchanged for contrast · "caller sorted it with the override" stays a capture</div>
+  <p class="cap">Proof of the D1 decision: the resolved branch is <b>not</b> escalated. It still renders the blue <span class="mono">.outcome.captured</span> card — no P1, no SMS, no <span class="mono">ooh_p1</span> tag.</p>
+  <div class="frames">
+    <div class="frame">
+      <div class="fcap">Desktop</div>
+      <div class="viewport">
+        <div class="flowpanel">
+          <div class="flowhead"><span style="font-size:18px">💡</span><b>External Lighting</b><span class="small" style="margin-left:6px">guided flow</span><button class="btn link" style="margin-left:auto">Cancel issue</button></div>
+          <div class="flowbody">
+            <div class="stepdone"><span class="tick">✓</span>Resolved via on-site override</div>
+            <div class="outcome captured">
+              <h3>📥 Captured for the IoT team</h3>
+              <p>Caller used the manual override successfully after guidance. Logged so the IoT team can check why the schedule/automation didn’t fire.</p>
+              <p style="margin-top:4px">This will be actioned on the <b>next working day</b> — it is logged, not lost.</p>
+              <div class="script">“Great — that’s them on. I’ve still logged it so the team can check why they didn’t come on automatically.”</div>
+              <p class="small">Ticket <b>#48216</b></p>
+            </div>
+            <div class="outbtns"><button class="btn">➕ Add another issue</button><button class="btn primary">✔ End call</button></div>
+          </div>
+          <div class="flowfoot"><span>Operator: <b>A. Parkinson</b></span><span style="margin-left:auto">Everything here is recorded to the Zendesk ticket automatically</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+</body>
+</html>
