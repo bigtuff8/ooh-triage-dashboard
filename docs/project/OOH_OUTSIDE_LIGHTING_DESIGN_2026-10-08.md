@@ -24,6 +24,8 @@ DECISION: D3 — Sam Day signs off the 112 wording (three questions in the doc).
 **Source of truth (discovery):** `docs/project/DISCOVERY_oohdash-111-112-outside-lighting.md` (gate-cleared)
 **Design owner:** Design doer
 
+> **Presentation note.** Code is shown as inline `code` chips (not fenced blocks) so the artefact renders cleanly in the gate review card; the strings are verbatim and copy-pasteable token-by-token for build.
+
 ---
 
 ## 1. Problem recap
@@ -40,24 +42,20 @@ One line changes: the `div.script` read-aloud at `public/js/flows.js:594`. Today
 
 ### 2.2 Before → after
 
-**BEFORE (current `flows.js:594`):**
+**BEFORE (current `flows.js:594`)** — one line, a mid-sentence ternary inside the `div.script` template literal:
 
-```js
-   <div class="script">“There’s a manual override for the outside lights${lg.online ? '' : ' — but first it’s worth checking your fuse board, because the lighting controller isn’t responding'}. If you have the Lighthouse lighting switch, flick it to override and they’ll come on.”</div>
-```
+- `<div class="script">“There's a manual override for the outside lights${lg.online ? '' : ' — but first it's worth checking your fuse board, because the lighting controller isn't responding'}. If you have the Lighthouse lighting switch, flick it to override and they'll come on.”</div>`
 
 The two interpolated forms this produces today:
 
-- **Online (ternary → `''`):** "There's a manual override for the outside lights. If you have the Lighthouse lighting switch, flick it to override and they'll come on."
+- **Online (ternary → empty string):** "There's a manual override for the outside lights. If you have the Lighthouse lighting switch, flick it to override and they'll come on."
 - **Offline (ternary → clause):** "There's a manual override for the outside lights — but first it's worth checking your fuse board, because the lighting controller isn't responding. If you have the Lighthouse lighting switch, flick it to override and they'll come on."
 
-**AFTER (proposed `flows.js:594`):**
+**AFTER (proposed `flows.js:594`)** — promote the ternary to select the whole sentence per state (inside the same `div.script` template literal):
 
-```js
-   <div class="script">“${lg.online
-       ? 'The outside lights have a sensor that brings them on automatically at dusk — so they should usually look after themselves. If tonight’s an exception, flip the Lighthouse lighting switch to override and they’ll come on. That only affects tonight; the sensor picks everything back up automatically from tomorrow, so there’s nothing to reset.'
-       : 'The outside lights have a sensor that brings them on automatically at dusk, so they should usually look after themselves. The lighting controller isn’t responding at the moment — it’s worth checking your fuse board first, as a tripped breaker is the usual cause. If everything looks clear, flip the Lighthouse lighting switch to override — that only covers tonight, and the sensor picks everything back up automatically from tomorrow.'}”</div>
-```
+- `<div class="script">“${lg.online`
+- `    ? 'The outside lights have a sensor that brings them on automatically at dusk — so they should usually look after themselves. If tonight's an exception, flip the Lighthouse lighting switch to override and they'll come on. That only affects tonight; the sensor picks everything back up automatically from tomorrow, so there's nothing to reset.'`
+- `    : 'The outside lights have a sensor that brings them on automatically at dusk, so they should usually look after themselves. The lighting controller isn't responding at the moment — it's worth checking your fuse board first, as a tripped breaker is the usual cause. If everything looks clear, flip the Lighthouse lighting switch to override — that only covers tonight, and the sensor picks everything back up automatically from tomorrow.'}”</div>`
 
 The two interpolated forms this produces (Writer's verbatim copy):
 
@@ -69,7 +67,7 @@ The two interpolated forms this produces (Writer's verbatim copy):
 
 ### 2.3 Design note on punctuation
 
-The wording is the Writer's copy, verbatim. In the code form above, apostrophes and the spaced dash are rendered with the file's existing typographic convention (curly `'`, em dash `—`) so the new line matches every other `div.script` in `flows.js` — this is house-style punctuation normalisation only, not a wording change. Build must keep the file UTF-8 (the file already contains curly quotes throughout). The surrounding `"…"` display quotes are the existing `.script` wrapper and are unchanged.
+The wording is the Writer's copy, verbatim. In the code form above, apostrophes and the spaced dash are rendered with the file's existing typographic convention (curly apostrophe, em dash) so the new line matches every other `div.script` in `flows.js` — this is house-style punctuation normalisation only, not a wording change. Build must keep the file UTF-8 (the file already contains curly quotes throughout). The surrounding display quotes are the existing `.script` wrapper and are unchanged.
 
 ### 2.4 Coverage check (discovery 112-R1..R5)
 
@@ -89,14 +87,12 @@ The wording is the Writer's copy, verbatim. In the code form above, apostrophes 
 
 All three existing auto-P1 outcomes call the same `outcomeP1(f, key, {...})` helper. K3 (Kitchen) is the cleanest template — `flows.js:566`:
 
-```js
-return outcomeP1(f, 'crit', {
-    subject: 'Kitchen equipment off during service — P1',
-    detail: 'Kitchen circuits off while the site is actively serving. Remote switching not available; needs immediate IoT action.',
-    script: 'This is urgent so I’ve escalated it right now — a text has gone to our on-duty manager and someone will call you back shortly. In the meantime the on-site override switch, if you have one, is safe to use.',
-    p1Summary: 'Kitchen equipment off during service'
-});
-```
+- `return outcomeP1(f, 'crit', {`
+- `    subject: 'Kitchen equipment off during service — P1',`
+- `    detail: 'Kitchen circuits off while the site is actively serving. Remote switching not available; needs immediate IoT action.',`
+- `    script: 'This is urgent so I've escalated it right now — a text has gone to our on-duty manager and someone will call you back shortly. In the meantime the on-site override switch, if you have one, is safe to use.',`
+- `    p1Summary: 'Kitchen equipment off during service'`
+- `});`
 
 The shape is four fields: `subject`, `detail`, `script`, `p1Summary`. Note it carries **no** `OohCaptureClass` — that field belongs only to `outcomeCaptured`. `outcomeP1` (`flows.js:242`) posts `type:'escalate-p1'`, which `routes/api.js:253` detects and routes to `priority:'urgent'` + `extraTags:['ooh_p1']` + `escalation.escalateP1(..., origin:'ooh-dashboard')`. The lighting change needs **no** server edit — it reuses this path exactly as K3/FR1/CTR1 do.
 
@@ -104,26 +100,22 @@ The shape is four fields: `subject`, `detail`, `script`, `p1Summary`. Note it ca
 
 **BEFORE (current `flows.js:607–612` — the "still not working" branch):**
 
-```js
-            return outcomeCaptured(f, 'cap', {
-                subject: 'External lighting not working',
-                detail: 'Manual override did not resolve; possible tripped supply or failed controller. Needs IoT/electrical follow-up.',
-                script: 'I’ve logged this for the IoT team to investigate first thing. If the pub frontage being dark is a safety concern tonight, your own electrician or duty manager procedure applies — this may be an electrical supply issue rather than the lighting control.',
-                OohCaptureClass: 'lighting'
-            });
-```
+- `return outcomeCaptured(f, 'cap', {`
+- `    subject: 'External lighting not working',`
+- `    detail: 'Manual override did not resolve; possible tripped supply or failed controller. Needs IoT/electrical follow-up.',`
+- `    script: 'I've logged this for the IoT team to investigate first thing. If the pub frontage being dark is a safety concern tonight, your own electrician or duty manager procedure applies — this may be an electrical supply issue rather than the lighting control.',`
+- `    OohCaptureClass: 'lighting'`
+- `});`
 
 **AFTER (proposed — escalate to P1):**
 
-```js
-            doneLine('Override did not resolve — P1');
-            return outcomeP1(f, 'cap', {
-                subject: 'External lighting not working — P1',
-                detail: 'Manual override did not resolve the outside lights; possible tripped supply or failed controller. Remote switching not available — needs immediate IoT/electrical follow-up.',
-                script: 'I’ve escalated this as urgent — a text has gone to our on-duty manager and someone will call you back shortly. If the dark frontage is a safety concern right now, your site’s duty-manager procedure for calling out an electrician still applies, as this may be an electrical supply issue rather than the lighting control.',
-                p1Summary: 'External lighting not responding'
-            });
-```
+- `doneLine('Override did not resolve — P1');`
+- `return outcomeP1(f, 'cap', {`
+- `    subject: 'External lighting not working — P1',`
+- `    detail: 'Manual override did not resolve the outside lights; possible tripped supply or failed controller. Remote switching not available — needs immediate IoT/electrical follow-up.',`
+- `    script: 'I've escalated this as urgent — a text has gone to our on-duty manager and someone will call you back shortly. If the dark frontage is a safety concern right now, your site's duty-manager procedure for calling out an electrician still applies, as this may be an electrical supply issue rather than the lighting control.',`
+- `    p1Summary: 'External lighting not responding'`
+- `});`
 
 **Changes, line by line:**
 - `outcomeCaptured` → `outcomeP1` (the whole behaviour switch: tag, priority, SMS, audit).
@@ -137,17 +129,15 @@ The shape is four fields: `subject`, `detail`, `script`, `p1Summary`. Note it ca
 
 The `r:'ok'` branch at `flows.js:600–605` is **not touched**. It remains `outcomeCaptured`, blue card, no SMS, no `ooh_p1` tag:
 
-```js
-            if (f.data.r === 'ok') {
-                doneLine('Resolved via on-site override');
-                return outcomeCaptured(f, 'ok', {
-                    subject: 'External lighting — resolved with on-site override',
-                    detail: 'Caller used the manual override successfully after guidance. Logged so the IoT team can check why the schedule/automation didn’t fire.',
-                    script: 'Great — that’s them on. I’ve still logged it so the team can check why they didn’t come on automatically.',
-                    OohCaptureClass: 'lighting'
-                });
-            }
-```
+- `if (f.data.r === 'ok') {`
+- `    doneLine('Resolved via on-site override');`
+- `    return outcomeCaptured(f, 'ok', {`
+- `        subject: 'External lighting — resolved with on-site override',`
+- `        detail: 'Caller used the manual override successfully after guidance. Logged so the IoT team can check why the schedule/automation didn't fire.',`
+- `        script: 'Great — that's them on. I've still logged it so the team can check why they didn't come on automatically.',`
+- `        OohCaptureClass: 'lighting'`
+- `    });`
+- `}`
 
 ### 3.4 Proposed `p1Summary` string
 
