@@ -591,7 +591,9 @@ const FLOWR = {
                 ? `<div class="zoneread"><span style="font-size:20px">💡</span><div><div><b>${esc(lg.zone)}</b> — ${lg.telemetry?.switch_1 ? 'currently ON' : 'currently OFF'}</div><div class="small">${esc(lg.deviceId)}</div></div>${switchButtons(lg, 'lighting-switch')}<span class="tag ${lg.telemetry?.switch_1 ? 'green' : 'grey'}">${lg.telemetry?.switch_1 ? 'on' : 'off'}</span></div>`
                 : '';
             return lgSwitch + `<div class="alert info">${canSwitch(lg) ? 'This lighting circuit can be switched on/off directly above — the change only counts once the device confirms.' : `External lighting can’t be switched remotely from here yet (on the priority list with our platform team).${lg.online ? '' : ' The lighting controller is also <b>not responding</b>, which often means a tripped fuse board.'}`}</div>
-   <div class="script">“There’s a manual override for the outside lights${lg.online ? '' : ' — but first it’s worth checking your fuse board, because the lighting controller isn’t responding'}. If you have the Lighthouse lighting switch, flick it to override and they’ll come on.”</div>
+   <div class="script">“${lg.online
+   ? 'The outside lights have a sensor that brings them on automatically at dusk — so they should usually look after themselves. If tonight’s an exception, flip the Lighthouse lighting switch to override and they’ll come on. That only affects tonight; the sensor picks everything back up automatically from tomorrow, so there’s nothing to reset.'
+   : 'The outside lights have a sensor that brings them on automatically at dusk, so they should usually look after themselves. The lighting controller isn’t responding at the moment — it’s worth checking your fuse board first, as a tripped breaker is the usual cause. If everything looks clear, flip the Lighthouse lighting switch to override — that only covers tonight, and the sensor picks everything back up automatically from tomorrow.'}”</div>
    <div class="chips"><button class="chip" onclick="flowStep({r:'ok'})">Caller sorted it with the override</button><button class="chip" onclick="flowStep({r:'cap'})">Still not working — capture &amp; escalate</button></div>`;
         }
         if (f.stage === 1) {
@@ -604,11 +606,12 @@ const FLOWR = {
                     OohCaptureClass: 'lighting'
                 });
             }
-            return outcomeCaptured(f, 'cap', {
-                subject: 'External lighting not working',
-                detail: 'Manual override did not resolve; possible tripped supply or failed controller. Needs IoT/electrical follow-up.',
-                script: 'I’ve logged this for the IoT team to investigate first thing. If the pub frontage being dark is a safety concern tonight, your own electrician or duty manager procedure applies — this may be an electrical supply issue rather than the lighting control.',
-                OohCaptureClass: 'lighting'
+            doneLine('Override did not resolve — P1');
+            return outcomeP1(f, 'cap', {
+                subject: 'External lighting not working — P1',
+                detail: 'Manual override did not resolve the outside lights; possible tripped supply or failed controller. Remote switching not available — needs immediate IoT/electrical follow-up.',
+                script: 'I’ve escalated this as urgent — a text has gone to our on-duty manager and someone will call you back shortly. If the dark frontage is a safety concern right now, your site’s duty-manager procedure for calling out an electrician still applies, as this may be an electrical supply issue rather than the lighting control.',
+                p1Summary: 'External lighting not responding'
             });
         }
         return '';
