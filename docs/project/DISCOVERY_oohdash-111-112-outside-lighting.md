@@ -58,14 +58,14 @@ The flow has two stages:
 Neither lighting branch currently calls `outcomeP1`. Outside Lighting is not in the auto-P1 set. Verified by reading lines 597–614: both branches call `outcomeCaptured(...)`.
 
 **Current alert text (stage 0), lines 593–595:**
-```
-div.alert.info:
-  If switchable: "This lighting circuit can be switched on/off directly above — the change only counts once the device confirms."
-  If not switchable: "External lighting can't be switched remotely from here yet (on the priority list with our platform team). [+ 'lighting controller not responding' suffix if offline]"
 
-div.script (handler read-aloud):
-  "There's a manual override for the outside lights [+ fuse board check if offline]. If you have the Lighthouse lighting switch, flick it to override and they'll come on."
-```
+`div.alert.info`:
+> If switchable: This lighting circuit can be switched on/off directly above — the change only counts once the device confirms.
+>
+> If not switchable: External lighting can't be switched remotely from here yet (on the priority list with our platform team). [+ "lighting controller not responding" suffix if offline]
+
+`div.script` (handler read-aloud):
+> There's a manual override for the outside lights [+ fuse board check if offline]. If you have the Lighthouse lighting switch, flick it to override and they'll come on.
 
 **Current `OohCaptureClass` for both branches:** `'lighting'`
 
@@ -90,10 +90,7 @@ All three live P1 outcomes are in `public/js/flows.js`:
 7. `escalation.js:69` validates `origin === OOH_ORIGIN` (fail-closed guard). Verified origin → SMS sent via Twilio or logged
 8. `addP1DispatchNote(...)` posts corrective dispatch-result comment on the ticket — `routes/api.js:280`
 
-The `ooh_p1` tag is applied at `routes/api.js:267`:
-```js
-extraTags: isP1 ? ['ooh_p1'] : []
-```
+The `ooh_p1` tag is applied at `routes/api.js:267`: `extraTags: isP1 ? ['ooh_p1'] : []`
 This is the only place `ooh_p1` is set. No config, no array, no separate registry — adding a new P1 outcome requires only calling `outcomeP1(...)` in the flow renderer.
 
 ### 2.4 Supporting-text rendering path
@@ -217,9 +214,8 @@ Single-file change. In `public/js/flows.js`, stage 1 of `FLOWR.lighting`, replac
 Single-file change. In `public/js/flows.js:593–595`, update the `div.script` template literal in `FLOWR.lighting` stage 0. Update both conditional branches (online and offline). No logic change — text only.
 
 **Draft wording for review (not final):**
-```
-"There's a manual override for the outside lights [+ fuse-board check if offline]. If you have the Lighthouse lighting switch, flick it to override — this is a temporary, one-off action. The lights will come back onto their normal schedule automatically from tomorrow evening. All units have a built-in light sensor so they should come on at dusk and go off at dawn based on the available light."
-```
+
+> There's a manual override for the outside lights [+ fuse-board check if offline]. If you have the Lighthouse lighting switch, flick it to override — this is a temporary, one-off action. The lights will come back onto their normal schedule automatically from tomorrow evening. All units have a built-in light sensor so they should come on at dusk and go off at dawn based on the available light.
 
 ---
 
