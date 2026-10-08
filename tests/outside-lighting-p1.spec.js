@@ -8,10 +8,10 @@
  *   6360 Mill House — lighting device OFFLINE (LGT-6360, tb-rulechain, no switch capability)
  *   6832 Old Grey Mare — no lighting device
  *
- * The server runs SMS_PROVIDER=log (default) so every P1 outcome in this suite produces
- * dispatchOk:false and the "Text not sent — phone the on-duty manager now" fallback.
- * Server-side tag/priority behaviour (ooh_p1 tag, priority:urgent) is covered by the
- * unit suite (p1-dispatch-honesty.test.js). This suite exercises the client↔server join.
+ * Approach B: OOH tags the ticket ooh_p1; the IoT Support Dashboard pages the on-duty manager.
+ * SMS_PROVIDER setting on this app is irrelevant — there is no conditional dispatch-status branch.
+ * Server-side tag/priority behaviour (ooh_p1 tag, priority:urgent) is exercised in 111-E/F/G.
+ * This suite exercises the full client↔server join for the lighting P1 path.
  */
 import { test, expect } from '@playwright/test';
 import { signIn, confirmSite } from './helpers.js';
@@ -54,16 +54,18 @@ test.describe('OOHDASH-111 & 112 — outside lighting P1 + script text', () => {
         await expect(page.locator('[data-testid="outcome-p1"]')).toHaveCount(0);
     });
 
-    test('111-C log-mode honesty: lighting P1 card shows "Text not sent" fallback (not false send claim)', async ({ page }) => {
+    test('111-C dispatch-status honesty: lighting P1 card shows Approach-B honest line — IoT Support Dashboard pages manager', async ({ page }) => {
         await confirmSite(page, '6749', 'Angel Inn');
         await page.locator('[data-testid="tile-lighting"]').click();
         await page.locator('.chip:has-text("Still not working")').click();
 
         const status = page.locator('[data-testid="p1-dispatch-status"]');
-        await expect(status).toContainText('Text not sent');
-        await expect(status).toContainText('phone the on-duty manager');
-        // Must NOT falsely claim a text was sent
+        await expect(status).toContainText('logged as ticket');
+        await expect(status).toContainText('pages the on-duty manager');
+        // Old Approach-A false warnings must be absent
+        await expect(status).not.toContainText('Text not sent');
         await expect(status).not.toContainText('text message has been sent');
+        await expect(status).not.toContainText('phone the on-duty manager now');
     });
 
     test('111-D no-device guard: site with no lighting device shows scope message; P1 path unreachable', async ({ page }) => {
