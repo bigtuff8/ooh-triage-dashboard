@@ -150,6 +150,24 @@ export async function readClientScopeAttributes(uuid, keys) {
     return out;
 }
 
+
+/**
+ * Reads SHARED_SCOPE attributes for a device by TB UUID (read plane, OOHDASH-114-F1).
+ * Used by tb-device.js to source V1 boilerControl output1OutputMask from SHARED_SCOPE.
+ * Read-only by contract; no write session touched.
+ */
+export async function readSharedScopeAttributes(uuid, keys) {
+    const attrs = await readSession.request(
+        "GET",
+        `/api/plugins/telemetry/DEVICE/${uuid}/values/attributes/SHARED_SCOPE?keys=${encodeURIComponent(keys)}`
+    );
+    const out = {};
+    for (const row of Array.isArray(attrs) ? attrs : []) {
+        if (row && row.key !== undefined) out[row.key] = row.value;
+    }
+    return out;
+}
+
 const deviceUuidCache = new Map();
 
 async function tbDeviceUuid(deviceName) {

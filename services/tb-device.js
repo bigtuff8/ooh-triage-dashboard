@@ -60,6 +60,15 @@ async function readClientScopeAttributes(uuid, keys) {
 }
 
 /**
+ * Lazily resolves tb-client.readSharedScopeAttributes (OOHDASH-114-F1).
+ * Used to read V1 boilerControl output1OutputMask from SHARED_SCOPE.
+ */
+async function readSharedScopeAttributes(uuid, keys) {
+    const mod = await import('./tb-client.js');
+    return mod.readSharedScopeAttributes(uuid, keys);
+}
+
+/**
  * Lazily resolves zendesk.siteDirectory ONLY on the live search/directory path (same rationale as
  * readRequest above — it is a NEW export, so a static import would break every fixture-mode test
  * that mock.module()'s zendesk.js without re-declaring it). Never called in fixture mode.
@@ -507,6 +516,30 @@ export function parseSiteCodeLetter(siteCode) {
  * @param {string}      [rawName]   the RAW device name (before normaliseName) — OOHDASH-108
  *                                  parenthetical fallback source; optional/back-compatible
  */
+export function deriveBoilerControl(sharedScope, clientScope, deviceName) {
+    if (!sharedScope && !clientScope) {
+        return { present: false, isV1: false, isV2: false, heatingControllable: false, dhwControllable: false, deviceId: null };
+    }
+    const hasOutputMask = sharedScope != null && 'output1OutputMask' in sharedScope;
+    const hasDhwUseBoiler = clientScope != null && 'DHW.use_boiler' in clientScope;
+    const isV1 = hasOutputMask && !hasDhwUseBoiler;
+    const isV2 = hasDhwUseBoiler && !hasOutputMask;
+    let dhwControllable = false;
+    if (isV2) {
+        const dhwAttr = clientScope['DHW.use_boiler'];
+        dhwControllable = dhwAttr === true || dhwAttr === 'true' || dhwAttr === 1 || dhwAttr === '1';
+    } else if (isV1) {
+        let mask = sharedScope.output1OutputMask;
+        if (typeof mask === 'string') {
+            try { mask = JSON.parse(mask); } catch { mask = null; }
+        }
+        if (Array.isArray(mask) && mask.length >= 4) {
+            dhwControllable = !!mask[3];
+        }
+    }
+    return { present: true, isV1, isV2, deviceId: deviceName ?? null, heatingControllable: true, dhwControllable };
+}
+
 export function deriveArea(deviceType, clientScope, rawName) {
     if (deviceType === 'salus-it700') return 'Accommodation';
     // OOHDASH-108: salus-it500 and the new old-convention `salus` type share ONE letter-resolve branch.
@@ -757,11 +790,18 @@ async function fetchTelemetry(devices) {
         // others. OOHDASH-82 (design §4): the CLIENT_SCOPE read is added as a THIRD concurrent settled
         // read (no extra serial round-trip) to source the iT500 `site` code / iT700 `salusLocation`
         // for area derivation.
-        const [tsRes, activeRes, clientScopeRes] = await Promise.allSettled([
+        const isBoilerControl = (d.type ?? d.profile) === 'boilerControl';
+        const reads = [
             readRequest('GET', `/api/plugins/telemetry/DEVICE/${uuid}/values/timeseries`),
             readServerScopeAttributes(uuid, 'active,lastActivityTime'),
-            readClientScopeAttributes(uuid, 'site,salusLocation')
-        ]);
+            isBoilerControl
+                ? readClientScopeAttributes(uuid, 'site,salusLocation,DHW.use_boiler')
+                : readClientScopeAttributes(uuid, 'site,salusLocation'),
+            isBoilerControl
+                ? readSharedScopeAttributes(uuid, 'output1OutputMask')
+                : Promise.resolve(null)
+        ];
+        const [tsRes, activeRes, clientScopeRes, sharedScopeRes] = await Promise.allSettled(reads);
         const bag = {};
         if (tsRes.status === 'fulfilled') {
             // TB shape: { key: [{ ts, value }] } → flatten to { key: value }.
@@ -790,6 +830,17 @@ async function fetchTelemetry(devices) {
         } else {
             console.error(`[TB] CLIENT_SCOPE read failed for device ${uuid}: ${clientScopeRes.reason?.message}`);
             bag.__clientScope = {};
+        }
+        // OOHDASH-114-F1: stash boilerControl SHARED_SCOPE.
+        if (isBoilerControl) {
+            if (sharedScopeRes.status === 'fulfilled' && sharedScopeRes.value !== null) {
+                bag.__sharedScope = sharedScopeRes.value || {};
+            } else {
+                console.error(`[TB] SHARED_SCOPE read failed for boilerControl ${uuid}: ${sharedScopeRes.reason?.message}`);
+                bag.__sharedScope = {};
+            }
+        } else {
+            bag.__sharedScope = null;
         }
         out.set(uuid, bag);
     }));
@@ -830,7 +881,7 @@ async function fetchLiveSitesByNumber(siteNo) {
         // mapTbDevice so deriveArea can consume the iT500 `site` code / iT700 `salusLocation`.
         // OOHDASH-85 (design §3): strip `__lastActivityTime` and pass it as `lastActivityTime` so the
         // freshness rule at mapTbDevice becomes the source of truth for `online`.
-        const { __active, __clientScope, __lastActivityTime, ...telemetryBag } = bag;
+        const { __active, __clientScope, __lastActivityTime, __sharedScope, ...telemetryBag } = bag;
         const dev = mapTbDevice(
             { ...d, active: __active ?? false, lastActivityTime: __lastActivityTime ?? null },
             telemetryBag,
@@ -858,6 +909,24 @@ async function fetchLiveSitesByNumber(siteNo) {
     } catch (err) {
         console.error(`[TB] Site name enrichment failed for ${key}: ${err.message}`);
     }
+    // OOHDASH-114-F1: derive boilerControl field.
+    const boilerControlRaw = matched
+        .filter(d => (d.type ?? d.profile) === 'boilerControl')
+        .sort((a, b) => String(a.name || '').localeCompare(String(b.name || '')))[0] ?? null;
+    let boilerControlField;
+    if (boilerControlRaw) {
+        if (matched.filter(d => (d.type ?? d.profile) === 'boilerControl').length > 1) {
+            console.warn(`[TB] Multiple boilerControl devices for site ${key}; using ${boilerControlRaw.name}`);
+        }
+        const bcUuid = boilerControlRaw?.id?.id || boilerControlRaw?.id;
+        const bcBag = telemetryById.get(bcUuid) || {};
+        boilerControlField = deriveBoilerControl(bcBag.__sharedScope ?? null, bcBag.__clientScope ?? null, boilerControlRaw.name ?? null);
+        if (!boilerControlField.isV1 && !boilerControlField.isV2) {
+            console.warn(`[TB] boilerControl at site ${key} has no V1/V2 discriminator — dhwControllable=false`);
+        }
+    } else {
+        boilerControlField = { present: false, isV1: false, isV2: false, heatingControllable: false, dhwControllable: false, deviceId: null };
+    }
     const accountId = `${brand}-${key}`;
     const site = {
         siteNo: key,
@@ -867,7 +936,8 @@ async function fetchLiveSitesByNumber(siteNo) {
         brand: undefined,       // not sourced from TB — stays undefined pre-B2 (parity with bridge.js)
         address: undefined,
         callsLast30Days: undefined,
-        devices
+        devices,
+        boilerControl: boilerControlField
     };
     const sites = [site];
     perSiteCache.set(key, { sites, at: Date.now() });
@@ -925,6 +995,9 @@ export async function getSitesByNumber(siteNo) {
             sites = await fetchLiveSitesByNumber(siteNo);
         } else {
             sites = loadFixture().sites.filter(s => s.siteNo === String(siteNo));
+            // OOHDASH-114-F1: ensure every fixture site has the boilerControl field.
+            const defaultBc = { present: false, isV1: false, isV2: false, heatingControllable: false, dhwControllable: false, deviceId: null };
+            sites = sites.map(s => ({ ...s, boilerControl: s.boilerControl ?? defaultBc }));
         }
         lastReadOk = true;
         lastReadError = null;

@@ -112,13 +112,13 @@ function deviceSummary(site) {
     return bits.length ? `On Lighthouse: ${bits.join(' · ')}` : 'No Lighthouse devices found for this site.';
 }
 
-// A DHW device is CONTROLLABLE only if live inventory carries a device whose
-// registry contract actually exposes a hot-water control command (`hwboost`) —
-// presence-driven, NOT a name-match on `salus-it500-dhw` (which live bridge data
-// never emits, bridge.js:57-67). This keeps R7 open: if a real controllable DHW
-// device ever appears in live inventory the tile flips to `ctl` with no code change.
+// OOHDASH-114-F1: DHW controllability is now derived from the boilerControl device's TB shared
+// attributes (Sam Day spec). The old registry-capability path tested for 'salus-it500-dhw'
+// which live TB never emits. The new path reads the authoritative TB attributes:
+// V2 = DHW.use_boiler (CLIENT_SCOPE); V1 = output1OutputMask[3] (SHARED_SCOPE).
+// Fail-closed: returns false when boilerControl field is absent or dhwControllable is false.
 export function hasControllableDhw(site) {
-    return site.devices.some(d => (registry.capabilitiesFor(d.deviceType)?.commands || []).includes('hwboost'));
+    return !!(site.boilerControl?.dhwControllable);
 }
 // A combi carries the DHW demand signal (hotWaterCapable / telemetry.hotWater)
 // but is observed-not-controllable — enough to say "monitored, not adjustable".
@@ -134,7 +134,9 @@ const switchControllable = (s, kind) => s.devices.some(d =>
     d.kind === kind && (registry.capabilitiesFor(d.deviceType)?.commands || []).includes('switch'));
 
 export const SCOPE_GROUPS = [
-    { key: 'heating', label: 'Heating', level: s => s.devices.some(d => d.kind === 'heating' && d.deviceType !== 'boiler-panel') ? 'ctl' : s.devices.some(d => d.kind === 'heating') ? 'mon' : 'none' },
+    // OOHDASH-114-F1: heating is controllable when the site has a boilerControl device present.
+    // The old 'boiler-panel' exclusion was unreachable in production (that deviceType is never emitted).
+    { key: 'heating', label: 'Heating', level: s => s.boilerControl?.heatingControllable ? 'ctl' : s.devices.some(d => d.kind === 'heating') ? 'mon' : 'none' },
     { key: 'hotwater', label: 'Hot water', level: s => hasControllableDhw(s) ? 'ctl' : hasHotWaterSignal(s) ? 'mon' : 'none' },
     { key: 'kitchen', label: 'Kitchen equipment', level: s => switchControllable(s, 'kitchen') ? 'ctl' : s.devices.some(d => d.kind === 'kitchen') ? 'mon' : 'none' },
     { key: 'lighting', label: 'External lighting', level: s => switchControllable(s, 'lighting') ? 'ctl' : s.devices.some(d => d.kind === 'lighting') ? 'mon' : 'none' },
@@ -159,10 +161,17 @@ async function workspacePayload(site) {
             registered: d._demo !== 'unregistered',
             setpointWindow: typeof d.telemetry?.heatingSetpoint === 'number' ? registry.setpointWindow(d.deviceType, d.telemetry.heatingSetpoint) : null
         })),
-        scope: SCOPE_GROUPS.map(g => ({ key: g.key, label: g.label, level: g.level(site) })),
+        // OOHDASH-115-F2: C&B sites (boilerControl.present) show 5 scope rows; non-C&B shows all 7.
+        // subBrand is NOT used — it does not exist in TB (live verified 2026-10-09, 7 sites).
+        scope: (site.boilerControl?.present
+            ? SCOPE_GROUPS.filter(g => ['heating','hotwater','kitchen','lighting','fan'].includes(g.key))
+            : SCOPE_GROUPS
+        ).map(g => ({ key: g.key, label: g.label, level: g.level(site) })),
         anyOffline: site.devices.some(d => !d.online),
         tickets,
-        degraded: !bridge.bridgeStatus().healthy
+        degraded: !bridge.bridgeStatus().healthy,
+        // OOHDASH-114-F1: expose boilerControl to the frontend.
+        boilerControl: site.boilerControl ?? { present: false, isV1: false, isV2: false, heatingControllable: false, dhwControllable: false, deviceId: null }
     };
 }
 
