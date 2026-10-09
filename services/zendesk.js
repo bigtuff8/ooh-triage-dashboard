@@ -522,6 +522,11 @@ export async function callbackLookup(siteNo) {
             id: t.id,
             subject: t.subject,
             status: { raw: t.status, name: statusInfo.name, agent: statusInfo.agent, caller: statusInfo.caller },
+            tags: Array.isArray(t.tags) ? t.tags : [],
+            updatedAt: t.updated_at ?? null,
+            zendeskUrl: live()
+                ? `https://${config.zendesk.subdomain}.zendesk.com/agent/tickets/${t.id}`
+                : `#fixture-ticket-${t.id}`,
             createdFriendly: friendlyTimeElapsed(t.created_at),
             updatedFriendly: friendlyTimeElapsed(t.updated_at),
             visit,
@@ -595,6 +600,28 @@ export function seedFixtureCallTicket({ id, subject, siteHint, recordingUrl, ans
 
 /** FIXTURE ONLY — resets seeded call tickets (test isolation). */
 export function resetFixtureCallTickets() { fixtureCallTickets = []; }
+
+/**
+ * FIXTURE ONLY — seeds a ticket into the base fixture store.
+ * Accepts all raw Zendesk ticket fields. Appends to fixtureTickets.
+ * Returns the seeded ticket. No-op in live mode.
+ */
+export function seedFixtureTicket(ticket) {
+    if (live()) return null;
+    fixtureTickets.push({ ...ticket, id: ticket.id ?? ++fixtureSeq });
+    return fixtureTickets[fixtureTickets.length - 1];
+}
+
+/**
+ * FIXTURE ONLY — removes tickets added by seedFixtureTicket (those with id > initial set).
+ * Call in afterEach to prevent cross-test contamination.
+ */
+export function resetSeededFixtureTickets() {
+    if (live()) return;
+    // The initial fixture set ends at id 45115. Remove anything seeded above that.
+    const seededIds = new Set(fixtureTickets.filter(t => t.id > 45115).map(t => t.id));
+    fixtureTickets.splice(0, fixtureTickets.length, ...fixtureTickets.filter(t => !seededIds.has(t.id)));
+}
 
 /** FIXTURE ONLY — returns a seeded call ticket by id (test assertions). */
 export function getFixtureCallTicket(id) { return fixtureCallTickets.find(c => c.id === Number(id)) || null; }

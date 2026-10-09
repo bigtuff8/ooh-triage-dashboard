@@ -112,13 +112,13 @@ function deviceSummary(site) {
     return bits.length ? `On Lighthouse: ${bits.join(' · ')}` : 'No Lighthouse devices found for this site.';
 }
 
-// A DHW device is CONTROLLABLE only if live inventory carries a device whose
-// registry contract actually exposes a hot-water control command (`hwboost`) —
-// presence-driven, NOT a name-match on `salus-it500-dhw` (which live bridge data
-// never emits, bridge.js:57-67). This keeps R7 open: if a real controllable DHW
-// device ever appears in live inventory the tile flips to `ctl` with no code change.
+// OOHDASH-114-F1: DHW controllability is now derived from the boilerControl device's TB shared
+// attributes (Sam Day spec). The old registry-capability path tested for 'salus-it500-dhw'
+// which live TB never emits. The new path reads the authoritative TB attributes via
+// deriveBoilerControl: V2 = DHW.use_boiler (CLIENT_SCOPE); V1 = output1OutputMask[3] (SHARED_SCOPE).
+// Fail-closed: returns false when boilerControl field is absent or dhwControllable is false.
 export function hasControllableDhw(site) {
-    return site.devices.some(d => (registry.capabilitiesFor(d.deviceType)?.commands || []).includes('hwboost'));
+    return !!(site.boilerControl?.dhwControllable);
 }
 // A combi carries the DHW demand signal (hotWaterCapable / telemetry.hotWater)
 // but is observed-not-controllable — enough to say "monitored, not adjustable".
@@ -134,7 +134,10 @@ const switchControllable = (s, kind) => s.devices.some(d =>
     d.kind === kind && (registry.capabilitiesFor(d.deviceType)?.commands || []).includes('switch'));
 
 export const SCOPE_GROUPS = [
-    { key: 'heating', label: 'Heating', level: s => s.devices.some(d => d.kind === 'heating' && d.deviceType !== 'boiler-panel') ? 'ctl' : s.devices.some(d => d.kind === 'heating') ? 'mon' : 'none' },
+    // OOHDASH-114-F1: heating is controllable when the site has a boilerControl device present.
+    // The old 'boiler-panel' exclusion was unreachable in production (that deviceType is never
+    // emitted by the live classifier). Falls back to device-presence for non-boilerControl sites.
+    { key: 'heating', label: 'Heating', level: s => s.boilerControl?.heatingControllable ? 'ctl' : s.devices.some(d => d.kind === 'heating') ? 'mon' : 'none' },
     { key: 'hotwater', label: 'Hot water', level: s => hasControllableDhw(s) ? 'ctl' : hasHotWaterSignal(s) ? 'mon' : 'none' },
     { key: 'kitchen', label: 'Kitchen equipment', level: s => switchControllable(s, 'kitchen') ? 'ctl' : s.devices.some(d => d.kind === 'kitchen') ? 'mon' : 'none' },
     { key: 'lighting', label: 'External lighting', level: s => switchControllable(s, 'lighting') ? 'ctl' : s.devices.some(d => d.kind === 'lighting') ? 'mon' : 'none' },
@@ -147,6 +150,28 @@ async function workspacePayload(site) {
     let tickets = [];
     try { tickets = await zendesk.ticketsForSite(site.siteNo); }
     catch (err) { console.error(`[API] Site tickets unavailable: ${err.message}`); }
+
+    const P1_WINDOW_MS = 24 * 60 * 60 * 1000;
+    const activeP1Tickets = tickets.filter(t =>
+        Array.isArray(t.tags) &&
+        t.tags.includes('ooh_p1') &&
+        !['solved', 'closed'].includes(t.status?.raw ?? t.status) &&
+        t.updatedAt &&
+        (Date.now() - new Date(t.updatedAt).getTime()) < P1_WINDOW_MS
+    );
+
+    // OOHDASH-115-F2: C&B sites (identified by boilerControl device presence) show only 5 scope rows.
+    // The two excluded rows ('electrics', 'boiler') are hardcoded-none and add no triage value for C&B.
+    // Non-C&B sites (hotels, FHI) continue to show all 7 rows unchanged.
+    // subBrand is NOT used — it does not exist in TB (live verified 2026-10-09, 7 sites).
+    const CB_SCOPE_KEYS = ['heating', 'hotwater', 'kitchen', 'lighting', 'fan'];
+    const isCandB = !!(site.boilerControl?.present);
+    const scopeGroups = isCandB
+        ? SCOPE_GROUPS.filter(g => CB_SCOPE_KEYS.includes(g.key))
+        : SCOPE_GROUPS;
+    // OOHDASH-114-F1: safe default for boilerControl when field is absent (legacy fixture sites, bridge path).
+    const defaultBc = { present: false, isV1: false, isV2: false, heatingControllable: false, dhwControllable: false, deviceId: null };
+
     return {
         site: { siteNo: site.siteNo, siteName: site.siteName, nameUnverified: site.nameUnverified, accountId: site.accountId, brand: site.brand, address: site.address, callsLast30Days: site.callsLast30Days },
         devices: site.devices.map(d => ({
@@ -159,10 +184,12 @@ async function workspacePayload(site) {
             registered: d._demo !== 'unregistered',
             setpointWindow: typeof d.telemetry?.heatingSetpoint === 'number' ? registry.setpointWindow(d.deviceType, d.telemetry.heatingSetpoint) : null
         })),
-        scope: SCOPE_GROUPS.map(g => ({ key: g.key, label: g.label, level: g.level(site) })),
+        scope: scopeGroups.map(g => ({ key: g.key, label: g.label, level: g.level(site) })),
         anyOffline: site.devices.some(d => !d.online),
         tickets,
-        degraded: !bridge.bridgeStatus().healthy
+        activeP1Tickets,
+        degraded: !bridge.bridgeStatus().healthy,
+        boilerControl: site.boilerControl ?? defaultBc
     };
 }
 
@@ -389,6 +416,13 @@ if (config.dataMode !== 'live') {
     }));
     router.get('/test/call-tickets/:id', wrap(async (req, res) => {
         res.json({ ticket: zendesk.getFixtureCallTicket(req.params.id) });
+    }));
+    router.post('/test/tickets', wrap(async (req, res) => {
+        res.json({ ticket: zendesk.seedFixtureTicket(req.body || {}) });
+    }));
+    router.post('/test/tickets/reset', wrap(async (req, res) => {
+        zendesk.resetSeededFixtureTickets();
+        res.json({ ok: true });
     }));
 }
 

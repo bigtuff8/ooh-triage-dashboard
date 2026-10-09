@@ -76,4 +76,65 @@ test.describe('F004 resolution', () => {
         await expect(scope).toContainText('Not on Lighthouse here');
         await expect(page.locator('.tag.amber:has-text("calls this month")')).toContainText('2 calls');
     });
+
+    // OOHDASH-117 F4a — P1 escalation banner tests
+    test.describe('F4a P1 escalation banner', () => {
+        test.afterEach(async ({ request }) => {
+            await request.post('/api/test/tickets/reset');
+        });
+
+        test('workspace shows P1 escalation banner when an active ooh_p1 ticket exists for the site', async ({ page, request }) => {
+            const now = Date.now();
+            await request.post('/api/test/tickets', {
+                data: {
+                    id: 49001,
+                    siteNo: '6832',
+                    subject: 'Gas boiler — no heating, ambulance called',
+                    status: 'open',
+                    custom_status_id: 25999053444508,
+                    priority: 'urgent',
+                    created_at: new Date(now - 2 * 60 * 60 * 1000).toISOString(),
+                    updated_at: new Date(now - 30 * 60 * 1000).toISOString(),
+                    tags: ['ooh', 'ooh_p1'],
+                    visit: false,
+                    comments: []
+                }
+            });
+            await confirmSite(page, '6832', 'Old Grey Mare');
+            const banner = page.locator('[data-testid="p1-escalation-banner"]');
+            await expect(banner).toBeVisible();
+            await expect(banner).toContainText('Active P1 escalation on record for this site');
+            await expect(banner).toContainText('review before advising');
+            await expect(banner.locator('a')).toContainText('View ticket #49001');
+            await expect(page.locator('[data-testid="category-tiles"]')).toBeVisible();
+        });
+
+        test('workspace shows no P1 banner when site has no ooh_p1 tickets', async ({ page }) => {
+            await confirmSite(page, '6832', 'Old Grey Mare');
+            await expect(page.locator('[data-testid="p1-escalation-banner"]')).toHaveCount(0);
+            await expect(page.locator('[data-testid="category-tiles"]')).toBeVisible();
+        });
+
+        test('workspace shows no P1 banner for a stale ooh_p1 ticket (updated >24h ago)', async ({ page, request }) => {
+            const now = Date.now();
+            await request.post('/api/test/tickets', {
+                data: {
+                    id: 49002,
+                    siteNo: '6832',
+                    subject: 'Stale escalation — now resolved via site visit',
+                    status: 'open',
+                    custom_status_id: 25999053444508,
+                    priority: 'urgent',
+                    created_at: new Date(now - 3 * 24 * 60 * 60 * 1000).toISOString(),
+                    updated_at: new Date(now - 25 * 60 * 60 * 1000).toISOString(),
+                    tags: ['ooh', 'ooh_p1'],
+                    visit: true,
+                    comments: []
+                }
+            });
+            await confirmSite(page, '6832', 'Old Grey Mare');
+            await expect(page.locator('[data-testid="p1-escalation-banner"]')).toHaveCount(0);
+            await expect(page.locator('[data-testid="category-tiles"]')).toBeVisible();
+        });
+    });
 });
