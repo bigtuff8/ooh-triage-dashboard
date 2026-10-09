@@ -79,6 +79,10 @@ test.describe('F004 resolution', () => {
 
     // OOHDASH-117 F4a — P1 escalation banner tests
     test.describe('F4a P1 escalation banner', () => {
+        test.beforeEach(async ({ request }) => {
+            await request.post('/api/test/tickets/reset');
+        });
+
         test.afterEach(async ({ request }) => {
             await request.post('/api/test/tickets/reset');
         });
