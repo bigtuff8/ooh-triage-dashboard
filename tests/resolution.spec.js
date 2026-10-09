@@ -79,17 +79,17 @@ test.describe('F004 resolution', () => {
 
     // OOHDASH-117 F4a — P1 escalation banner tests
     test.describe('F4a P1 escalation banner', () => {
-        test.beforeEach(async ({ request }) => {
-            await request.post('/api/test/tickets/reset');
+        test.beforeEach(async ({ page }) => {
+            await page.request.post('/api/test/tickets/reset');
         });
 
-        test.afterEach(async ({ request }) => {
-            await request.post('/api/test/tickets/reset');
+        test.afterEach(async ({ page }) => {
+            await page.request.post('/api/test/tickets/reset');
         });
 
-        test('workspace shows P1 escalation banner when an active ooh_p1 ticket exists for the site', async ({ page, request }) => {
+        test('workspace shows P1 escalation banner when an active ooh_p1 ticket exists for the site', async ({ page }) => {
             const now = Date.now();
-            await request.post('/api/test/tickets', {
+            await page.request.post('/api/test/tickets', {
                 data: {
                     id: 49001,
                     siteNo: '6832',
@@ -119,9 +119,9 @@ test.describe('F004 resolution', () => {
             await expect(page.locator('[data-testid="category-tiles"]')).toBeVisible();
         });
 
-        test('workspace shows no P1 banner for a stale ooh_p1 ticket (updated >24h ago)', async ({ page, request }) => {
+        test('workspace shows no P1 banner for a stale ooh_p1 ticket (updated >24h ago)', async ({ page }) => {
             const now = Date.now();
-            await request.post('/api/test/tickets', {
+            await page.request.post('/api/test/tickets', {
                 data: {
                     id: 49002,
                     siteNo: '6832',
