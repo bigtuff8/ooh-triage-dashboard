@@ -15,14 +15,20 @@ exist in the live device inventory (`boiler-panel`), but more critically neither
 attributes — which Sam Day has specified as the correct check for approximately 209 sites.
 
 This design replaces both predicates with Sam's authoritative V1/V2 logic: detect the `boilerControl`
-device via its `toRestaurant` relation, read `subBrand`, `output1OutputMask`, and `DHW.use_boiler`
-from its TB shared attributes, and expose a `boilerControl` summary object on the workspace payload
-that both server-side scope functions and the frontend DHW flow consume.
+device via its `toRestaurant` relation, read `output1OutputMask` (V1, SHARED_SCOPE) and `DHW.use_boiler`
+(V2, CLIENT_SCOPE) from its TB attributes, and expose a `boilerControl` summary object on the workspace
+payload that both server-side scope functions and the frontend DHW flow consume.
 
-**Cost/token-efficiency:** All changes are request-time reads on an already-open TB read session (one
-additional `SHARED_SCOPE` read per workspace fetch for the `boilerControl` device). No polling, no
-background work, no new processes. Token spend: zero (no LLM calls involved). Marginal cost: one
-extra HTTP GET to ThingsBoard per site confirm/refresh, which is negligible alongside the existing
+**Note on `subBrand`:** Live TB verification across 7 sites confirmed that `subBrand` does NOT exist
+as an attribute on any `boilerControl` device in any scope. Sam's email referenced it, but it is not
+present in production. This design does NOT use `subBrand`. V1/V2 detection is attribute-presence-based
+(see "Live TB Verification Findings" section below).
+
+**Cost/token-efficiency:** All changes are request-time reads on an already-open TB read session. Two
+additional scope reads per workspace fetch for the `boilerControl` device: one SHARED_SCOPE read
+(for V1 `output1OutputMask`) and one CLIENT_SCOPE read (for V2 `DHW.use_boiler`). No polling, no
+background work, no new processes. Token spend: zero (no LLM calls involved). Marginal cost: two
+extra HTTP GETs to ThingsBoard per site confirm/refresh, negligible alongside the existing
 per-device telemetry fan-out.
 
 **Silent running:** Nothing in this change is continuous or background. The workspace refresh already
@@ -117,11 +123,16 @@ Each is read via the existing `readServerScopeAttributes` and `readClientScopeAt
 in `tb-client.js`. These fold the TB array response `[{ key, value, lastUpdateTs }]` into a plain
 `{ key: value }` map.
 
-### What is needed: SHARED_SCOPE
+### What is needed: SHARED_SCOPE and CLIENT_SCOPE
 
-`subBrand`, `output1OutputMask`, and `DHW.use_boiler` live in ThingsBoard **SHARED_SCOPE** (shared
-attributes). These are distinct from SERVER_SCOPE (server-set) and CLIENT_SCOPE (device-set). The
-existing `readDesiredState` in `tb-client.js` (line 312) already reads SHARED_SCOPE for a single
+Live TB verification confirmed the following attribute locations on `boilerControl` devices:
+
+- **V1 sites:** `output1OutputMask` is in **SHARED_SCOPE** (4-element boolean array). No `DHW.use_boiler`, no `heating_scenario`.
+- **V2 sites:** `DHW.use_boiler` is in **CLIENT_SCOPE**. `heating_scenario` is also in CLIENT_SCOPE (contains `separate_dhw` integer). No `output1OutputMask`.
+
+Both SHARED_SCOPE and CLIENT_SCOPE must be queried for the `boilerControl` device. `subBrand` does not exist in any scope — it is absent from all 7 verified sites. Do not query for it.
+
+The existing `readDesiredState` in `tb-client.js` (line 312) already reads SHARED_SCOPE for a single
 key; it uses:
 
 ```
@@ -150,16 +161,23 @@ export async function readSharedScopeAttributes(uuid, keys) {
 ### Where it is called
 
 In `tb-device.js`, the `fetchTelemetry` function runs a `Promise.allSettled` fan-out per device.
-For the `boilerControl` device specifically, a fourth concurrent read is added to this fan-out:
+For the `boilerControl` device specifically, two additional concurrent reads are added to this fan-out:
 
 ```js
-readSharedScopeAttributes(uuid, 'subBrand,output1OutputMask,DHW.use_boiler')
+// V1 discriminator — SHARED_SCOPE
+readSharedScopeAttributes(uuid, 'output1OutputMask')
+
+// V2 discriminator — CLIENT_SCOPE (appended to the existing clientScope read, or a second read
+// targeting only DHW.use_boiler if the existing read keys are not extended)
+// Simplest approach: extend the existing CLIENT_SCOPE keys to include 'DHW.use_boiler'
+readClientScopeAttributes(uuid, 'site,salusLocation,DHW.use_boiler')
 ```
 
-This is gated: the extra read fires ONLY when the device's TB `type` (profile) is `boilerControl`,
-so no extra round trip is added for any of the other 20+ devices at a site. The result is stashed
-under `__sharedScope` in the bag alongside `__active`, `__clientScope`, etc., and stripped before
-passing to `mapTbDevice`.
+These are gated: the extra reads fire ONLY when the device's TB `type` (profile) is `boilerControl`,
+so no extra round trips are added for any of the other 20+ devices at a site. SHARED_SCOPE results
+are stashed under `__sharedScope` in the bag alongside `__active`, `__clientScope`, etc., and
+stripped before passing to `mapTbDevice`. `DHW.use_boiler` arrives via the extended CLIENT_SCOPE
+read and is accessible on `__clientScope`.
 
 **Alternative considered:** Do the boilerControl shared-attribute read inside `workspacePayload`
 (routes/api.js) rather than in the tb-device fetch fan-out. This is simpler but breaks the
@@ -177,8 +195,9 @@ The fan-out approach is architecturally consistent and adds no serial latency.
 ```js
 /**
  * Reads SHARED_SCOPE attributes for a device by TB UUID (read plane, OOHDASH-114-F1).
- * Used by tb-device.js to source boilerControl controllability attributes:
- * `subBrand`, `output1OutputMask`, and `DHW.use_boiler`.
+ * Used by tb-device.js to source V1 boilerControl controllability attribute:
+ * `output1OutputMask` (4-element boolean array, index 3 = DHW relay).
+ * V2 attribute `DHW.use_boiler` is in CLIENT_SCOPE — use readClientScopeAttributes for that.
  * Read-only by contract; no write session touched.
  */
 export async function readSharedScopeAttributes(uuid, keys) {
@@ -226,9 +245,16 @@ const isBoilerControl = (d.type ?? d.profile) === 'boilerControl';
 const reads = [
     readRequest('GET', `/api/plugins/telemetry/DEVICE/${uuid}/values/timeseries`),
     readServerScopeAttributes(uuid, 'active,lastActivityTime'),
-    readClientScopeAttributes(uuid, 'site,salusLocation'),
+    // For boilerControl devices, extend CLIENT_SCOPE read to include DHW.use_boiler (V2 discriminator,
+    // confirmed CLIENT_SCOPE by live TB verification). For all other devices, read as before.
     isBoilerControl
-        ? readSharedScopeAttributes(uuid, 'subBrand,output1OutputMask,DHW.use_boiler')
+        ? readClientScopeAttributes(uuid, 'site,salusLocation,DHW.use_boiler')
+        : readClientScopeAttributes(uuid, 'site,salusLocation'),
+    // SHARED_SCOPE read for V1 output1OutputMask (confirmed SHARED_SCOPE by live TB verification).
+    // output1OutputMask is NOT in CLIENT_SCOPE on V1 sites (site 6769: CLIENT has [false,true,true,false],
+    // SHARED has [false,true,true,true] — SHARED_SCOPE is authoritative for capability).
+    isBoilerControl
+        ? readSharedScopeAttributes(uuid, 'output1OutputMask')
         : Promise.resolve(null)
 ];
 const [tsRes, activeRes, clientScopeRes, sharedScopeRes] = await Promise.allSettled(reads);
@@ -274,60 +300,88 @@ const boilerControlEntry = matched
     .map((d, i) => {
         const uuid = d?.id?.id || d?.id;
         const bag = telemetryById.get(uuid) || {};
-        return { d, sharedScope: bag.__sharedScope };
+        return { d, sharedScope: bag.__sharedScope, clientScope: bag.__clientScope };
     })
     .find(({ d }) => (d.type ?? d.profile) === 'boilerControl');
 
-const boilerControlField = deriveBoilerControl(boilerControlEntry?.sharedScope ?? null);
+// Pass both SHARED_SCOPE (for V1 output1OutputMask) and CLIENT_SCOPE (for V2 DHW.use_boiler).
+// Also pass the device name for the deviceId field.
+const boilerControlField = deriveBoilerControl(
+    boilerControlEntry?.sharedScope ?? null,
+    boilerControlEntry?.clientScope ?? null,
+    boilerControlEntry?.d?.name ?? null
+);
 ```
 
 And the `site` object gains `boilerControl: boilerControlField`.
 
 #### 2d. New pure function `deriveBoilerControl` (add near `deriveArea`)
 
+V1/V2 detection is attribute-presence-based, not subBrand-based. `subBrand` does not exist in TB.
+
 ```js
 /**
- * Derives the boilerControl workspace field from the boilerControl device's SHARED_SCOPE attributes.
+ * Derives the boilerControl workspace field from the boilerControl device's TB attributes.
  * Called once per site assembly; returns a plain object consumed by routes/api.js scope functions
  * and workspacePayload. Pure and side-effect-free.
  *
- * Sam Day spec (2026-10, OOHDASH-114-F1):
- *   subBrand 'flaming_grill'     → V1 (~137 Flaming Grill sites)
- *   subBrand 'chef'|'brewer'    → V2 (~72 Café & Bar sites)
- *   heatingControllable (both)  → boilerControl device present (implied by being called with non-null)
- *   dhwControllable V2          → DHW.use_boiler === true
- *   dhwControllable V1          → output1OutputMask[3] === true (4-element array, index 3 = DHW relay)
+ * Live TB verification (2026-10-09, OOHDASH-114-F1, 7 sites):
+ *   V1 sites: have `output1OutputMask` in SHARED_SCOPE (4-element boolean array); NO DHW.use_boiler, NO heating_scenario.
+ *   V2 sites: have `DHW.use_boiler` in CLIENT_SCOPE and `heating_scenario` in CLIENT_SCOPE; NO output1OutputMask.
+ *   `subBrand` does NOT exist on any boilerControl device in any scope — do not query for it.
  *
- * @param {object|null} shared  the SHARED_SCOPE { key: value } map for the boilerControl device,
- *                              or null when no boilerControl device is present at this site.
- * @returns {{ present: boolean, subBrand: string|null, heatingControllable: boolean, dhwControllable: boolean }}
+ * Detection logic:
+ *   if output1OutputMask present in sharedScope → V1
+ *   if DHW.use_boiler present in clientScope    → V2
+ *   if neither present                          → unknown variant (heating still controllable, DHW unknown → false)
+ *
+ *   dhwControllable V1: output1OutputMask[3] === true (SHARED_SCOPE is authoritative — site 6769 confirmed
+ *                        CLIENT_SCOPE copy is [false,true,true,false] while SHARED is [false,true,true,true])
+ *   dhwControllable V2: DHW.use_boiler === true (CLIENT_SCOPE); Sam Day confirms this is the better signal
+ *                        over heating_scenario.separate_dhw
+ *
+ * @param {object|null} sharedScope  the SHARED_SCOPE { key: value } map for the boilerControl device.
+ * @param {object|null} clientScope  the CLIENT_SCOPE { key: value } map for the boilerControl device
+ *                                   (includes DHW.use_boiler for V2 sites).
+ * @param {string|null} deviceName   the TB device name (e.g. "gk-6123-boilercontrol-1") for the deviceId field.
+ * @returns {{ present: boolean, isV1: boolean, isV2: boolean, heatingControllable: boolean, dhwControllable: boolean }}
  */
-export function deriveBoilerControl(shared) {
-    if (!shared) {
-        return { present: false, subBrand: null, heatingControllable: false, dhwControllable: false };
+export function deriveBoilerControl(sharedScope, clientScope, deviceName) {
+    if (!sharedScope && !clientScope) {
+        return { present: false, isV1: false, isV2: false, heatingControllable: false, dhwControllable: false, deviceId: null };
     }
-    const subBrand = shared.subBrand ?? null;
-    const isV2 = subBrand === 'chef' || subBrand === 'brewer';
-    const isV1 = subBrand === 'flaming_grill';
+
+    // V1/V2 discrimination by attribute presence (not subBrand — subBrand does not exist in TB)
+    const hasOutputMask = sharedScope && 'output1OutputMask' in sharedScope;
+    const hasDhwUseBoiler = clientScope && 'DHW.use_boiler' in clientScope;
+    const isV1 = hasOutputMask && !hasDhwUseBoiler;
+    const isV2 = hasDhwUseBoiler && !hasOutputMask;
 
     let dhwControllable = false;
     if (isV2) {
-        // V2: DHW.use_boiler shared attribute must be truthy
-        const dhwAttr = shared['DHW.use_boiler'];
+        // V2: DHW.use_boiler in CLIENT_SCOPE must be truthy (Sam Day: preferred over heating_scenario.separate_dhw)
+        const dhwAttr = clientScope['DHW.use_boiler'];
         dhwControllable = dhwAttr === true || dhwAttr === 'true' || dhwAttr === 1 || dhwAttr === '1';
     } else if (isV1) {
-        // V1: output1OutputMask[3] must be truthy (4-element array, index 3 = DHW relay)
-        const mask = shared.output1OutputMask;
+        // V1: output1OutputMask[3] in SHARED_SCOPE must be truthy
+        // SHARED_SCOPE is authoritative (site 6769: SHARED=[false,true,true,true], CLIENT=[false,true,true,false])
+        let mask = sharedScope.output1OutputMask;
+        if (typeof mask === 'string') {
+            // Guard: TB may return as JSON-encoded string — parse if so
+            try { mask = JSON.parse(mask); } catch { mask = null; }
+        }
         if (Array.isArray(mask) && mask.length >= 4) {
             dhwControllable = !!mask[3];
         }
     }
-    // Unknown subBrand: heatingControllable remains true (boilerControl device IS present),
-    // dhwControllable defaults false (safest: don't offer a control we can't verify).
+    // Unknown variant (neither V1 nor V2): heatingControllable remains true (device IS present),
+    // dhwControllable defaults false (fail-closed — do not offer DHW boost when variant is unknown).
 
     return {
         present: true,
-        subBrand,
+        isV1,
+        isV2,
+        deviceId: deviceName ?? null,
         heatingControllable: true,   // presence of the boilerControl device implies heating is controllable
         dhwControllable
     };
@@ -353,7 +407,7 @@ in `getSitesByNumber` for fixture mode:
 // Fixture: ensure every site has the boilerControl field (absent from legacy fixture JSON)
 sites = sites.map(s => ({
     ...s,
-    boilerControl: s.boilerControl ?? { present: false, subBrand: null, heatingControllable: false, dhwControllable: false }
+    boilerControl: s.boilerControl ?? { present: false, isV1: false, isV2: false, deviceId: null, heatingControllable: false, dhwControllable: false }
 }));
 ```
 
@@ -413,7 +467,7 @@ change to line 138 itself.
 **After the `scope` line**, add:
 
 ```js
-boilerControl: site.boilerControl ?? { present: false, subBrand: null, heatingControllable: false, dhwControllable: false },
+boilerControl: site.boilerControl ?? { present: false, isV1: false, isV2: false, deviceId: null, heatingControllable: false, dhwControllable: false },
 ```
 
 The `workspacePayload` return object becomes:
@@ -426,7 +480,7 @@ return {
     anyOffline: ...,
     tickets,
     degraded: ...,
-    boilerControl: site.boilerControl ?? { present: false, subBrand: null, heatingControllable: false, dhwControllable: false }
+    boilerControl: site.boilerControl ?? { present: false, isV1: false, isV2: false, deviceId: null, heatingControllable: false, dhwControllable: false }
 };
 ```
 
@@ -475,7 +529,7 @@ hotwater(ws, f) {
             return `<div class="alert info">Hot water is not controllable from here — it's boiler-side, not on a boostable Lighthouse device. Capture the details and escalate.</div><div class="chips"><button class="chip" onclick="flowStep({cap:1})">Capture &amp; escalate</button><button class="chip" onclick="flowStep({sc:1})">Scope guidance (boiler fault?)</button></div>`;
         }
         doneLine('Live read: boiler DHW controllable via Lighthouse');
-        return `<div class="zoneread"><span style="font-size:22px">🚿</span><div><div><b>Hot water control</b> — DHW boost available</div><div class="small">${dhw.subBrand === 'flaming_grill' ? 'V1 — Flaming Grill boiler panel' : 'V2 — Café &amp; Bar boiler panel'}</div></div><span class="tag green">controllable</span></div>
+        return `<div class="zoneread"><span style="font-size:22px">🚿</span><div><div><b>Hot water control</b> — DHW boost available</div><div class="small">${dhw.isV1 ? 'V1 — boiler panel (output relay)' : dhw.isV2 ? 'V2 — boiler panel (DHW.use_boiler)' : 'Boiler panel (variant unknown)'}</div></div><span class="tag green">controllable</span></div>
 <div class="stepq">Boost the hot water now?</div><div class="chips"><button class="chip" data-testid="hw-boost-yes" onclick="flowStep({boost:1})">Yes — set a boost</button><button class="chip" onclick="flowStep({cap:1})">No — capture &amp; escalate</button></div>`;
     }
     // stage 1 — boost dispatch or capture
@@ -508,46 +562,48 @@ to the `boilerControl` workspace field (see schema below).
 boilerControl: {
     present:             boolean    — true when a boilerControl-profile device was found for this site
     deviceId:            string     — the TB device name (e.g. "gk-6123-boilercontrol-1"), or null when present=false
-    subBrand:            string     — "flaming_grill" | "chef" | "brewer" | null (null = unknown/absent)
+    isV1:                boolean    — true when output1OutputMask present in SHARED_SCOPE (and DHW.use_boiler absent)
+    isV2:                boolean    — true when DHW.use_boiler present in CLIENT_SCOPE (and output1OutputMask absent)
     heatingControllable: boolean    — true when present=true (presence implies heating control)
     dhwControllable:     boolean    — true when V2 DHW.use_boiler=true, OR V1 output1OutputMask[3]=true
 }
 ```
 
+`subBrand` is NOT included in this field — it does not exist in TB. V1/V2 identity is expressed via
+`isV1` / `isV2` booleans derived from attribute presence. The frontend uses these for display
+labelling (e.g. "V1 — Flaming Grill boiler panel" vs "V2 — Café & Bar boiler panel").
+
 The `deviceId` field allows the frontend to call `openControl` with the boilerControl device if the
 boost path is ever wired up. It is also useful for diagnostics and future extension.
 
-### `deriveBoilerControl` updated signature
+### `deriveBoilerControl` signature
 
-`deriveBoilerControl(shared, deviceName)` — add `deviceName` as the second parameter (the raw TB
-device `name` field, from the matched device entry). This is the same name already in scope during
-`fetchLiveSitesByNumber` assembly.
+`deriveBoilerControl(sharedScope, clientScope, deviceName)` — three parameters:
+- `sharedScope`: SHARED_SCOPE attribute map (for V1 `output1OutputMask`)
+- `clientScope`: CLIENT_SCOPE attribute map (for V2 `DHW.use_boiler`)
+- `deviceName`: the raw TB device `name` field (becomes `deviceId` in the returned object)
 
 ---
 
 ## Build Prerequisite — Spencer TB Verification
 
-**Before any build work begins**, Spencer Thompson must verify that the following shared attributes
-exist and are populated on the `boilerControl` device at the four reference sites:
+Live TB verification (2026-10-09, 7 sites) has already confirmed the core attribute locations and
+presence pattern. The following open items remain for Spencer to confirm before or during build:
 
-| Site | Expected subBrand | Attributes to verify |
-|------|------------------|----------------------|
-| 6097 | tbc              | `subBrand`, `output1OutputMask` (if V1) or `DHW.use_boiler` (if V2) |
-| 6769 | tbc              | `subBrand`, `output1OutputMask` (if V1) or `DHW.use_boiler` (if V2) |
-| 5208 | tbc              | `subBrand`, `output1OutputMask` (if V1) or `DHW.use_boiler` (if V2) |
-| 6164 | tbc              | `subBrand`, `output1OutputMask` (if V1) or `DHW.use_boiler` (if V2) |
+| Item | Question |
+|------|----------|
+| OQ-2 | Is `output1OutputMask` always stored as a native JSON array, or can it arrive as a JSON-encoded string `"[false,false,false,true]"`? The design guards against both; Spencer can narrow the test surface. |
+| OQ-3 | Is `DHW.use_boiler` stored as a boolean, string, or integer in TB CLIENT_SCOPE? (`toBool` normalisation handles all three; confirming the type narrows coverage.) |
+| OQ-1 | Is profile-match (`type === 'boilerControl'`) sufficient to uniquely identify the boilerControl device, or is the `toRestaurant` relation check also required? |
 
-Spencer should also confirm:
-1. The attribute key spelling `output1OutputMask` is exactly as written (not camelCase variations).
-2. `DHW.use_boiler` with a dot in the key name is correct — ThingsBoard supports dots in attribute
-   keys but the URL-encoded form must be `DHW.use_boiler` (not `DHW_use_boiler` or similar).
-3. Whether the `toRestaurant` relation check is necessary to uniquely identify the `boilerControl`
-   device, or whether `type === 'boilerControl'` within the site's device set is sufficient.
-4. The `output1OutputMask` value format: is it stored as a JSON array (`[false, false, false, true]`)
-   or as a comma-separated string (`"false,false,false,true"`)? The parse logic must match.
+**`subBrand` verification is no longer required** — live TB sweep confirmed it does not exist on any
+boilerControl device. Do not add it to any scope read.
 
-**Build is blocked on this verification.** Do not implement the shared-attribute read until Spencer
-confirms the attribute names and formats are live on at least one of the four sites.
+**The attribute key spellings are verified:** `output1OutputMask` (SHARED_SCOPE, V1 sites) and
+`DHW.use_boiler` with a literal dot (CLIENT_SCOPE, V2 sites) are confirmed correct.
+
+Build may proceed on the attribute-presence logic. The OQ items above can be resolved during
+implementation without blocking the start of build.
 
 ---
 
@@ -560,17 +616,17 @@ These use the same vm-sandbox and bridge-intercept pattern as the existing hotwa
 **Test BC-1: V2 site with DHW.use_boiler = true → hotwater scope level is 'ctl'**
 
 Setup: inject a fixture site that carries a `boilerControl` field with
-`{ present: true, deviceId: 'gk-9001-boilercontrol-1', subBrand: 'chef', heatingControllable: true, dhwControllable: true }`.
+`{ present: true, deviceId: 'gk-9001-boilercontrol-1', isV1: false, isV2: true, heatingControllable: true, dhwControllable: true }`.
 Assert: `SCOPE_GROUPS.find(g => g.key === 'hotwater').level(site) === 'ctl'`.
 
 **Test BC-2: V1 site with output1OutputMask[3] = true → hotwater scope level is 'ctl'**
 
-Setup: inject a fixture site with `boilerControl: { present: true, deviceId: 'gk-9002-boilercontrol-1', subBrand: 'flaming_grill', heatingControllable: true, dhwControllable: true }`.
+Setup: inject a fixture site with `boilerControl: { present: true, deviceId: 'gk-9002-boilercontrol-1', isV1: true, isV2: false, heatingControllable: true, dhwControllable: true }`.
 Assert: `SCOPE_GROUPS.find(g => g.key === 'hotwater').level(site) === 'ctl'`.
 
 **Test BC-3: site with no boilerControl device → hotwater scope level is 'none' (or 'mon' if combi)**
 
-Setup: fixture site with `boilerControl: { present: false, subBrand: null, heatingControllable: false, dhwControllable: false }` and no `hotWaterCapable` devices.
+Setup: fixture site with `boilerControl: { present: false, isV1: false, isV2: false, deviceId: null, heatingControllable: false, dhwControllable: false }` and no `hotWaterCapable` devices.
 Assert: `level === 'none'`.
 
 **Test BC-4: site with boilerControl present → heating scope level is 'ctl'**
@@ -583,42 +639,47 @@ Assert: `SCOPE_GROUPS.find(g => g.key === 'heating').level(site) === 'ctl'`.
 Setup: fixture site with no `boilerControl` but with salus-it500 heating devices.
 Assert: `level === 'mon'`.
 
-**Test BC-6: `deriveBoilerControl` unit — V1 mask parsing**
+**Test BC-6: `deriveBoilerControl` unit — V1 mask parsing (SHARED_SCOPE)**
 
-Direct unit test of `deriveBoilerControl`. Input: `{ subBrand: 'flaming_grill', output1OutputMask: [false, false, false, true] }`. Assert: `dhwControllable === true`.
-Input: `{ subBrand: 'flaming_grill', output1OutputMask: [false, false, false, false] }`. Assert: `dhwControllable === false`.
-Input: `{ subBrand: 'flaming_grill', output1OutputMask: [true, true, true] }` (only 3 elements). Assert: `dhwControllable === false` (array too short).
+Direct unit test of `deriveBoilerControl(sharedScope, clientScope, deviceName)`.
 
-**Test BC-7: `deriveBoilerControl` unit — V2 DHW flag parsing**
+Input: `sharedScope = { output1OutputMask: [false, false, false, true] }`, `clientScope = {}`. Assert: `isV1 === true`, `isV2 === false`, `dhwControllable === true`.
+Input: `sharedScope = { output1OutputMask: [false, false, false, false] }`, `clientScope = {}`. Assert: `dhwControllable === false`.
+Input: `sharedScope = { output1OutputMask: [true, true, true] }`, `clientScope = {}` (only 3 elements). Assert: `dhwControllable === false` (array too short).
+Input: `sharedScope = { output1OutputMask: '[false,false,false,true]' }` (JSON string), `clientScope = {}`. Assert: `dhwControllable === true` (JSON.parse guard fires).
 
-Input: `{ subBrand: 'chef', 'DHW.use_boiler': true }`. Assert: `dhwControllable === true`.
-Input: `{ subBrand: 'brewer', 'DHW.use_boiler': false }`. Assert: `dhwControllable === false`.
-Input: `{ subBrand: 'chef', 'DHW.use_boiler': 'true' }` (string). Assert: `dhwControllable === true` (toBool normalisation).
+**Test BC-7: `deriveBoilerControl` unit — V2 DHW flag parsing (CLIENT_SCOPE)**
 
-**Test BC-8: `deriveBoilerControl` unit — unknown subBrand defaults to dhwControllable=false**
+Input: `sharedScope = {}`, `clientScope = { 'DHW.use_boiler': true }`. Assert: `isV2 === true`, `isV1 === false`, `dhwControllable === true`.
+Input: `sharedScope = {}`, `clientScope = { 'DHW.use_boiler': false }`. Assert: `dhwControllable === false`.
+Input: `sharedScope = {}`, `clientScope = { 'DHW.use_boiler': 'true' }` (string). Assert: `dhwControllable === true` (toBool normalisation).
 
-Input: `{ subBrand: 'unknown_brand' }`. Assert: `dhwControllable === false`, `heatingControllable === true`, `present === true`.
+**Test BC-8: `deriveBoilerControl` unit — neither attribute present → unknown variant, dhwControllable=false**
 
-**Test BC-9: null input → all-false output**
+Input: `sharedScope = {}`, `clientScope = { site: '6999' }` (no discriminator attributes).
+Assert: `isV1 === false`, `isV2 === false`, `dhwControllable === false`, `heatingControllable === true`, `present === true`.
 
-Input: `null`. Assert: `{ present: false, subBrand: null, heatingControllable: false, dhwControllable: false }`.
+**Test BC-9: null inputs → all-false output**
+
+Input: `sharedScope = null`, `clientScope = null`. Assert: `{ present: false, isV1: false, isV2: false, deviceId: null, heatingControllable: false, dhwControllable: false }`.
 
 ### Playwright e2e tests (new `tests/boilercontrol.spec.js`)
 
 Three fixture sites are needed (add to `data/fixtures/bridge-devices.json`):
 
-**Fixture site 9001** — V2 site (Chef & Brewer), DHW controllable:
+**Fixture site 9001** — V2 site (boilerControl present, DHW.use_boiler detected), DHW controllable:
 ```json
 {
   "siteNo": "9001",
-  "siteName": "Test Chef Brewer (V2 DHW)",
+  "siteName": "Test BoilerControl V2 (DHW)",
   "brand": "Greene King · Chef & Brewer",
   "address": "Test fixture",
   "callsLast30Days": 0,
   "boilerControl": {
     "present": true,
     "deviceId": "gk-9001-boilercontrol-1",
-    "subBrand": "chef",
+    "isV1": false,
+    "isV2": true,
     "heatingControllable": true,
     "dhwControllable": true
   },
@@ -629,18 +690,19 @@ Three fixture sites are needed (add to `data/fixtures/bridge-devices.json`):
 }
 ```
 
-**Fixture site 9002** — V1 site (Flaming Grill), DHW controllable:
+**Fixture site 9002** — V1 site (boilerControl present, output1OutputMask detected), DHW controllable:
 ```json
 {
   "siteNo": "9002",
-  "siteName": "Test Flaming Grill (V1 DHW)",
+  "siteName": "Test BoilerControl V1 (DHW)",
   "brand": "Greene King · Flaming Grill",
   "address": "Test fixture",
   "callsLast30Days": 0,
   "boilerControl": {
     "present": true,
     "deviceId": "gk-9002-boilercontrol-1",
-    "subBrand": "flaming_grill",
+    "isV1": true,
+    "isV2": false,
     "heatingControllable": true,
     "dhwControllable": true
   },
@@ -662,7 +724,8 @@ Three fixture sites are needed (add to `data/fixtures/bridge-devices.json`):
   "boilerControl": {
     "present": false,
     "deviceId": null,
-    "subBrand": null,
+    "isV1": false,
+    "isV2": false,
     "heatingControllable": false,
     "dhwControllable": false
   },
@@ -677,7 +740,7 @@ Three fixture sites are needed (add to `data/fixtures/bridge-devices.json`):
 ```js
 test('BC-E1: V2 site with DHW.use_boiler=true shows hotwater as ctl', async ({ page }) => {
     await signIn(page, 'Test Handler');
-    await confirmSite(page, '9001', 'Test Chef Brewer (V2 DHW)');
+    await confirmSite(page, '9001', 'Test BoilerControl V2 (DHW)');
     await expect(page.locator('[data-testid="tile-hotwater"]')).toContainText('Controllable from here');
 });
 ```
@@ -687,7 +750,7 @@ test('BC-E1: V2 site with DHW.use_boiler=true shows hotwater as ctl', async ({ p
 ```js
 test('BC-E2: V1 site with output1OutputMask[3]=true shows hotwater as ctl', async ({ page }) => {
     await signIn(page, 'Test Handler');
-    await confirmSite(page, '9002', 'Test Flaming Grill (V1 DHW)');
+    await confirmSite(page, '9002', 'Test BoilerControl V1 (DHW)');
     await expect(page.locator('[data-testid="tile-hotwater"]')).toContainText('Controllable from here');
 });
 ```
@@ -707,7 +770,7 @@ test('BC-E3: site with no boilerControl shows hotwater as none', async ({ page }
 ```js
 test('BC-E4: V2 site with boilerControl present shows heating as ctl', async ({ page }) => {
     await signIn(page, 'Test Handler');
-    await confirmSite(page, '9001', 'Test Chef Brewer (V2 DHW)');
+    await confirmSite(page, '9001', 'Test BoilerControl V2 (DHW)');
     await expect(page.locator('[data-testid="tile-heating"]')).toContainText('Controllable from here');
 });
 ```
@@ -717,7 +780,7 @@ test('BC-E4: V2 site with boilerControl present shows heating as ctl', async ({ 
 ```js
 test('BC-E5: hotwater flow shows DHW boost chip when dhwControllable=true', async ({ page }) => {
     await signIn(page, 'Test Handler');
-    await confirmSite(page, '9001', 'Test Chef Brewer (V2 DHW)');
+    await confirmSite(page, '9001', 'Test BoilerControl V2 (DHW)');
     await page.locator('[data-testid="tile-hotwater"]').click();
     await expect(page.locator('[data-testid="hw-boost-yes"]')).toBeVisible();
 });
@@ -729,16 +792,17 @@ test('BC-E5: hotwater flow shows DHW boost chip when dhwControllable=true', asyn
 
 ### No boilerControl device at the site
 
-`deriveBoilerControl(null)` returns `{ present: false, subBrand: null, heatingControllable: false, dhwControllable: false }`.
+`deriveBoilerControl(null, null, null)` returns `{ present: false, isV1: false, isV2: false, deviceId: null, heatingControllable: false, dhwControllable: false }`.
 `hasControllableDhw` returns `false`. `hotwater` scope falls back to `hasHotWaterSignal` (combi
 signal path) → `mon`, or `none` if no signal.
 
-### Unknown or absent `subBrand`
+### Neither V1 nor V2 attribute present (unknown variant)
 
-`subBrand` is `null`, an empty string, or an unrecognised value (not `flaming_grill`, `chef`, or
-`brewer`). In this case: `heatingControllable` remains `true` (the device IS present, so heating IS
-controllable), `dhwControllable` is `false` (cannot determine V1 vs V2, so fail-closed — do not
-offer DHW boost when variant is unknown). Log a warning: `[TB] boilerControl at site {siteNo} has unknown subBrand: {subBrand}`.
+The boilerControl device is present but neither `output1OutputMask` (SHARED_SCOPE) nor `DHW.use_boiler`
+(CLIENT_SCOPE) is found. `isV1 = false`, `isV2 = false`. `heatingControllable` remains `true` (the
+device IS present, so heating IS controllable); `dhwControllable` is `false` (cannot determine
+variant, so fail-closed — do not offer DHW boost when variant is unknown).
+Log a warning: `[TB] boilerControl at site {siteNo} has no V1/V2 discriminator attribute — defaulting dhwControllable=false`.
 
 ### `output1OutputMask` as a string rather than array
 
@@ -766,7 +830,7 @@ states. This is consistent with the existing heating scope level design.
 
 ### `SHARED_SCOPE` read fails for boilerControl device
 
-Degrade to `{ present: true, deviceId: '...', subBrand: null, heatingControllable: true, dhwControllable: false }`.
+Degrade to `{ present: true, deviceId: '...', isV1: false, isV2: false, heatingControllable: true, dhwControllable: false }`.
 The device IS present (we found it), so heating remains controllable; DHW defaults false (fail-closed).
 Log the error (already in the error branch of `fetchTelemetry`).
 
@@ -786,28 +850,62 @@ legacy fixture sites that pre-date this design.
 | `boilerControl` | `site` (server-side) and `workspacePayload` (client-facing) | object | Derived controllability summary for the site's boiler control panel device. Always present; `present: false` when no boilerControl device found. | In-memory, per workspace fetch. Not persisted. | None — no PII |
 | `boilerControl.present` | `workspacePayload.boilerControl` | boolean | True when a `boilerControl`-profile TB device exists for this site. | — | — |
 | `boilerControl.deviceId` | `workspacePayload.boilerControl` | string or null | TB device name (e.g. `gk-6123-boilercontrol-1`). Null when `present=false`. | — | — |
-| `boilerControl.subBrand` | `workspacePayload.boilerControl` | `"flaming_grill"` or `"chef"` or `"brewer"` or null | Brand variant read from TB SHARED_SCOPE `subBrand`. Null when absent or unrecognised. | — | — |
+| `boilerControl.isV1` | `workspacePayload.boilerControl` | boolean | True when `output1OutputMask` is present in SHARED_SCOPE and `DHW.use_boiler` is absent. V1 sites use relay-mask DHW control. | — | — |
+| `boilerControl.isV2` | `workspacePayload.boilerControl` | boolean | True when `DHW.use_boiler` is present in CLIENT_SCOPE and `output1OutputMask` is absent. V2 sites use a named DHW flag. | — | — |
 | `boilerControl.heatingControllable` | `workspacePayload.boilerControl` | boolean | True when `present=true`. Drives the `heating` scope level function. | — | — |
 | `boilerControl.dhwControllable` | `workspacePayload.boilerControl` | boolean | True when V2 `DHW.use_boiler=true` or V1 `output1OutputMask[3]=true`. Drives `hotwater` scope level and the DHW flow stage 0. | — | — |
-| `subBrand` | TB SHARED_SCOPE on `boilerControl` device | string | Brand variant set by IoT team in ThingsBoard. Read-only from dashboard's perspective. | TB attribute (persistent in TB). | None |
-| `output1OutputMask` | TB SHARED_SCOPE on `boilerControl` device | JSON array (4 boolean elements) | V1 relay output mask. Index 3 = DHW relay. Read-only. | TB attribute. | None |
-| `DHW.use_boiler` | TB SHARED_SCOPE on `boilerControl` device | boolean | V2 flag — true when DHW is served via the boiler (boost controllable). Read-only. | TB attribute. | None |
+| `output1OutputMask` | TB SHARED_SCOPE on `boilerControl` device | JSON array (4 boolean elements) | V1 relay output mask. Index 3 = DHW relay. Present on V1 sites only (confirmed by live sweep). SHARED_SCOPE is authoritative (CLIENT_SCOPE copy on site 6769 differed on index 3). Read-only. | TB attribute. | None |
+| `DHW.use_boiler` | TB CLIENT_SCOPE on `boilerControl` device | boolean | V2 flag — true when DHW is served via the boiler (boost controllable). Present on V2 sites only (confirmed by live sweep). Sam Day confirms this is the preferred signal over `heating_scenario.separate_dhw`. Read-only. | TB attribute. | None |
+
+---
+
+## Live TB Verification Findings
+
+Verified against 7 production sites on 2026-10-09. These findings are authoritative; they supersede
+any prior design assumptions based on Sam Day's email references.
+
+1. **`subBrand` does not exist** on any `boilerControl` device in any scope (SERVER, CLIENT, or SHARED).
+   It is absent from all 7 verified sites. Do not query for it, reference it, or store it.
+
+2. **V1/V2 discrimination is attribute-presence-based:**
+   - V1 sites: `output1OutputMask` present in SHARED_SCOPE; `DHW.use_boiler` absent; `heating_scenario` absent.
+   - V2 sites: `DHW.use_boiler` present in CLIENT_SCOPE; `heating_scenario` present in CLIENT_SCOPE; `output1OutputMask` absent.
+   - These are mutually exclusive: no site had both.
+
+3. **Scope locations confirmed:**
+   - `output1OutputMask` — SHARED_SCOPE on V1 sites.
+   - `DHW.use_boiler` — CLIENT_SCOPE on V2 sites.
+   - `heating_scenario` — CLIENT_SCOPE on V2 sites (contains `separate_dhw` integer 0/1). Sam Day says `DHW.use_boiler` is the better signal; use that, not `separate_dhw`.
+
+4. **Site 6769 (V1) SHARED vs CLIENT discrepancy:** `output1OutputMask` in SHARED_SCOPE = `[false,true,true,true]`;
+   CLIENT_SCOPE copy = `[false,true,true,false]`. The values differ on index 3 (DHW relay). SHARED_SCOPE is
+   the configured capability and is authoritative. Always read SHARED_SCOPE for `output1OutputMask`.
+
+5. **C&B detection (for F2):** Since `subBrand` is absent, C&B identity is determined by boilerControl device
+   presence — `ws.boilerControl.present === true` means the site is C&B. Site 5208 had NO boilerControl device
+   and is non-C&B. All other tested sites that had a boilerControl device are C&B.
 
 ---
 
 ## Open Questions
 
-**OQ-1 (Spencer, pre-build):** Is profile-match (`type === 'boilerControl'`) within the site's device
+**OQ-1 (Spencer, during build):** Is profile-match (`type === 'boilerControl'`) within the site's device
 set sufficient to uniquely identify the boilerControl device, or is the `toRestaurant` relation check
 also required? If a site could have a `boilerControl`-profile device that is NOT the restaurant boiler
 panel, the relation check is necessary.
 
-**OQ-2 (Spencer, pre-build):** What is the exact stored format of `output1OutputMask` in TB SHARED_SCOPE?
-Native JSON array, or a serialised string? Are the values booleans, integers (0/1), or strings?
+**OQ-2 (Spencer, during build):** What is the exact stored format of `output1OutputMask` in TB SHARED_SCOPE?
+Native JSON array, or a serialised string? Live sweep on site 6769 returned `[false,true,true,true]` as an
+array; confirm whether this is always the case or whether TB can return it as a JSON-encoded string.
+The design guards against the string form with a `JSON.parse` guard — Spencer can confirm if that guard
+is needed or dead code.
 
-**OQ-3 (Spencer, pre-build):** Is `DHW.use_boiler` stored as a boolean, string, or integer in TB?
-(The `toBool` normalisation covers boolean, string, and integer forms; confirming the actual type
-narrows the test surface.)
+**OQ-3 (Spencer, during build):** Is `DHW.use_boiler` stored as a boolean, string, or integer in TB
+CLIENT_SCOPE? (The `toBool` normalisation covers all three; confirming the actual type narrows the test surface.)
+
+**RESOLVED — subBrand:** Live TB verification confirmed `subBrand` does NOT exist on any `boilerControl`
+device in any scope (7 sites checked). It is not queried, not stored, and not exposed. V1/V2 is detected
+entirely by attribute presence (`output1OutputMask` vs `DHW.use_boiler`).
 
 **OQ-4 (design):** The existing `hotwater` flow stage-1 dispatches `openControl(dhwDev, 'boost')` where
 `dhwDev` is expected to be a full device object with a `deviceId` for the control path. With the new
