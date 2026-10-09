@@ -380,7 +380,15 @@
           "kind": "gateway",
           "online": true
         }
-      ]
+      ],
+      "boilerControl": {
+        "present": true,
+        "isV1": true,
+        "isV2": false,
+        "heatingControllable": false,
+        "dhwControllable": true,
+        "deviceId": "IT500-DHW-6234"
+      }
     },
     {
       "siteNo": "6883",

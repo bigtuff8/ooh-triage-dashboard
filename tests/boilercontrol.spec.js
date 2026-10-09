@@ -17,24 +17,24 @@ import { signIn, confirmSite } from './helpers.js';
 test.describe('OOHDASH-114-F1 boilerControl controllability', () => {
     test.beforeEach(async ({ page }) => { await signIn(page, 'Test Handler'); });
 
-    test('BC-E1: V2 site (9001) — hotwater tile shows Controllable from here', async ({ page }) => {
+    test('BC-E1: V2 site (9001) — hotwater scope row shows Controllable from here', async ({ page }) => {
         await confirmSite(page, '9001', 'Test BoilerControl V2 (DHW)');
-        await expect(page.locator('[data-testid="tile-hotwater"]')).toContainText('Controllable from here');
+        await expect(page.locator('[data-testid="scope-list"] li:has-text("Hot water")')).toContainText('Controllable from here');
     });
 
-    test('BC-E2: V1 site (9002) — hotwater tile shows Controllable from here', async ({ page }) => {
+    test('BC-E2: V1 site (9002) — hotwater scope row shows Controllable from here', async ({ page }) => {
         await confirmSite(page, '9002', 'Test BoilerControl V1 (DHW)');
-        await expect(page.locator('[data-testid="tile-hotwater"]')).toContainText('Controllable from here');
+        await expect(page.locator('[data-testid="scope-list"] li:has-text("Hot water")')).toContainText('Controllable from here');
     });
 
-    test('BC-E3: no boilerControl (9003) — hotwater tile shows not controllable here', async ({ page }) => {
+    test('BC-E3: no boilerControl (9003) — hotwater scope row shows Not controllable here', async ({ page }) => {
         await confirmSite(page, '9003', 'Test No BoilerControl');
-        await expect(page.locator('[data-testid="tile-hotwater"]')).toContainText('not controllable here');
+        await expect(page.locator('[data-testid="scope-list"] li:has-text("Hot water")')).toContainText('Not controllable here');
     });
 
-    test('BC-E4: V2 site (9001) — heating tile shows Controllable from here', async ({ page }) => {
+    test('BC-E4: V2 site (9001) — heating scope row shows Controllable from here', async ({ page }) => {
         await confirmSite(page, '9001', 'Test BoilerControl V2 (DHW)');
-        await expect(page.locator('[data-testid="tile-heating"]')).toContainText('Controllable from here');
+        await expect(page.locator('[data-testid="scope-list"] li:has-text("Heating")')).toContainText('Controllable from here');
     });
 
     test('BC-E5: V2 site (9001) — hotwater flow stage 0 shows DHW boost chip when dhwControllable=true', async ({ page }) => {
