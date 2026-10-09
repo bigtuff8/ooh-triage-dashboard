@@ -239,9 +239,9 @@ function outcomeCaptured(f, key, { subject, detail, script, OohCaptureClass }) {
   <div class="script">“${script}”</div><p class="small">Ticket <b>#${res.ticket.id}</b></p></div>`);
 }
 
-function outcomeP1(f, key, { subject, detail, script, p1Summary }) {
+function outcomeP1(f, key, { subject, detail, script, p1Summary, OohCaptureClass }) {
     return finishOutcome(f, key,
-        { type: 'escalate-p1', subject, detail, p1Summary, issueLabel: subject, issueCls: 'red' },
+        { type: 'escalate-p1', subject, detail, p1Summary, OohCaptureClass: OohCaptureClass || null, issueLabel: subject, issueCls: 'red' },
         res => `<div class="outcome p1" data-testid="outcome-p1"><h3>🚨 Escalated — P1</h3><p>${detail}</p>
   <p style="margin-top:4px" data-testid="p1-dispatch-status">The P1 is logged as ticket <b>#${res.ticket.id}</b> in the IoT Support dashboard, which pages the on-duty manager.</p>
   <div class="script">“${script}”</div><p class="small">Ticket <b>#${res.ticket.id}</b></p></div>`);
@@ -784,9 +784,102 @@ const FLOWR = {
             return `<div class="alert warn"><b>Contractor on site</b> calls are always treated as urgent — an engineer is standing there waiting.</div>
    <div class="formrow"><label>Contractor / company</label><input id="cn" data-testid="contractor-name" placeholder="e.g. the attending engineer’s name and company"></div>
    <div class="formrow"><label>What do they need?</label><input id="cw" data-testid="contractor-need" placeholder="e.g. needs BMS access to the heating"></div>
-   <div class="chips"><button class="chip" data-testid="contractor-escalate" onclick="flowStep({cn:document.getElementById('cn').value||'(name not given)',cw:document.getElementById('cw').value||'(not specified)'})">Escalate now — P1</button></div>`;
+   <div class="chips"><button class="chip" data-testid="contractor-next" onclick="flowStep({cn:document.getElementById('cn').value||'(name not given)',cw:document.getElementById('cw').value||'(not specified)'})">Next — review need</button></div>`;
         }
-        doneLine('Contractor: ' + esc(f.data.cn) + ' — ' + esc(f.data.cw));
+        // Stage 1: PowerPause guidance branch (OOHDASH-118 F5)
+        if (f.stage === 1 && !f.data.ppguidance) {
+            if (!f.data._cline) { doneLine('Contractor: ' + esc(f.data.cn) + ' — ' + esc(f.data.cw)); f.data._cline = 1; }
+            return `<div class="stepq">Does the contractor need PowerPause override guidance?</div>
+   <div class="chips">
+    <button class="chip" data-testid="contractor-pp-yes" onclick="flowStep({ppguidance:'yes'})">Yes — show override procedure</button>
+    <button class="chip" data-testid="contractor-pp-no" onclick="flowStep({ppguidance:'no'})">No — escalate now</button>
+   </div>`;
+        }
+        // No path: fall straight through to P1 outcome (unchanged behaviour)
+        if (f.data.ppguidance === 'no') {
+            return outcomeP1(f, 'p1', {
+                subject: 'Contractor on site needs IoT support — P1',
+                detail: `Contractor ${f.data.cn} on site now: ${f.data.cw}. Escalated immediately.`,
+                script: 'I’ve sent an urgent text to our on-duty manager and they’ll ring the site straight back — usually within a few minutes. Please ask the engineer to hold on.',
+                p1Summary: `Contractor on site: ${f.data.cw}`
+            });
+        }
+        // Yes path: site 6786 (Donkey Derby) exception
+        const isDonkeyDerby = Number(ws.site.siteNo) === 6786;
+        if (f.data.ppguidance === 'yes' && isDonkeyDerby) {
+            if (f.data.ppesc) {
+                return outcomeP1(f, 'ppesc', {
+                    subject: 'PowerPause override — Donkey Derby (site 6786) — IoT team escalation',
+                    detail: `Contractor ${f.data.cn} on site at Donkey Derby (6786). Local PowerPause override not available at this site. Escalated to IoT team.`,
+                    script: 'I’ve escalated this as a priority — the IoT team will be in touch shortly. IoT direct: 023 814 0228.',
+                    p1Summary: 'Contractor: PowerPause — Donkey Derby — IoT escalation',
+                    OohCaptureClass: 'kitchen-powerpause'
+                });
+            }
+            if (!f.data._ddline) { doneLine('PowerPause override: Donkey Derby exception — escalate to IoT team'); f.data._ddline = 1; }
+            return `<div class="alert warn">
+   <b>Donkey Derby (site 6786) — local override not available.</b>
+   This site uses a different container type; the local override button does not apply.
+  </div>
+  <div class="script">
+   "I’m sorry — this site can’t be overridden locally. I’m escalating to the IoT team
+   right now and they’ll contact the site directly.
+   IoT team direct line: <b>023 814 0228</b> — email: <b>iot@airedale-group.co.uk</b>."
+  </div>
+  <div class="chips">
+   <button class="chip" data-testid="contractor-pp-escalate" onclick="flowStep({ppesc:1})">Escalate as P1</button>
+  </div>`;
+        }
+        // Yes path: standard sites — device-type picker then override instruction
+        if (f.data.ppguidance === 'yes' && !f.data.pptype) {
+            if (!f.data._ppgline) { doneLine('PowerPause override guidance given to contractor'); f.data._ppgline = 1; }
+            return `<div class="alert ok">
+   <b>PowerPause local override — read to the contractor:</b>
+  </div>
+  <div class="script">
+   <p><b>Step 1 — Locate the panel.</b>
+   "The PowerPause panel is usually near the kitchen distribution boards, behind a
+   major appliance, or mounted on the ceiling nearby. It will be labelled."</p>
+   <p><b>Step 2 — Identify the device type.</b>
+   "There should be a label on the unit. It will say either <b>Tongou</b> or
+   <b>Owon</b>. Which does it say?"</p>
+  </div>
+  <div class="formrow"><label>Device type</label></div>
+  <div class="chips">
+   <button class="chip" data-testid="contractor-pp-tongou" onclick="flowStep({pptype:'tongou'})">Tongou</button>
+   <button class="chip" data-testid="contractor-pp-owon" onclick="flowStep({pptype:'owon'})">Owon</button>
+  </div>`;
+        }
+        // Device type confirmed: show override instruction then log chip
+        if (f.data.pptype && !f.data.ppdone) {
+            if (!f.data._pptline) { doneLine('PowerPause override: device type ' + f.data.pptype + ' — button procedure given'); f.data._pptline = 1; }
+            const devLabel = f.data.pptype === 'tongou' ? 'Tongou' : 'Owon';
+            return `<div class="script">
+   <p><b>${devLabel} override:</b>
+   "Press the override button on the front of the ${devLabel} unit <b>once</b> — do not
+   hold it. The override stays active until the device’s next scheduled change. The
+   equipment should power on within a few seconds."</p>
+  </div>
+  <div class="alert info">
+   This is a temporary override only. The ${devLabel} device will return to its normal
+   schedule at the next programmed event.
+  </div>
+  <div class="chips">
+   <button class="chip" data-testid="contractor-pp-done" onclick="flowStep({ppdone:1})">Override done — log the call</button>
+  </div>`;
+        }
+        // Override done: log the P1 outcome
+        if (f.data.ppdone) {
+            return outcomeP1(f, 'ppdone', {
+                subject: 'PowerPause contractor override — guidance given on site',
+                detail: `Contractor ${f.data.cn} given PowerPause override procedure (${f.data.pptype} device). Override active until next scheduled event.`,
+                script: 'I’ve logged this call. The override will hold until the device’s next scheduled change — if the issue returns, ring back and we’ll escalate further.',
+                p1Summary: `Contractor on site: PowerPause override given (${f.data.pptype})`,
+                OohCaptureClass: 'kitchen-powerpause'
+            });
+        }
+        // Fallback: should not be reached in normal flow
+        if (!f.data._cline) { doneLine('Contractor: ' + esc(f.data.cn) + ' — ' + esc(f.data.cw)); f.data._cline = 1; }
         return outcomeP1(f, 'p1', {
             subject: 'Contractor on site needs IoT support — P1',
             detail: `Contractor ${f.data.cn} on site now: ${f.data.cw}. Escalated immediately.`,
@@ -794,7 +887,6 @@ const FLOWR = {
             p1Summary: `Contractor on site: ${f.data.cw}`
         });
     },
-
     other(ws, f) {
         if (f.stage === 0) {
             return `<div class="stepq">Describe the issue in the caller’s words</div>
