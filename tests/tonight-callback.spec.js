@@ -142,7 +142,12 @@ test.describe('tonight & callback', () => {
         await page.locator('[data-testid="tile-contractor"]').click();
         await page.locator('[data-testid="contractor-name"]').pressSequentially('Test Contractor, ExampleCo', { delay: 15 });
         await page.locator('[data-testid="contractor-need"]').pressSequentially('needs BMS access to the heating', { delay: 15 });
-        await page.locator('[data-testid="contractor-escalate"]').click();
+        await page.locator('[data-testid="contractor-next"]').click();
+        // F5: new stage 1 asks whether contractor needs PowerPause override guidance
+        await expect(page.locator('[data-testid="contractor-pp-yes"]')).toBeVisible();
+        await expect(page.locator('[data-testid="contractor-pp-no"]')).toBeVisible();
+        // No-guidance path: direct escalation (same P1 outcome as before)
+        await page.locator('[data-testid="contractor-pp-no"]').click();
         const p1 = page.locator('[data-testid="outcome-p1"]');
         await expect(p1).toContainText('Escalated — P1');
         // Approach B: OOH tags ooh_p1 and the IoT Support Dashboard pages the on-duty manager.
