@@ -167,7 +167,7 @@ function renderWorkspace() {
     const ws = state.workspace;
     const s = ws.site;
     const flowHtml = state.flow ? renderFlow() : `
-   ${ws.anyOffline ? `<div class="alert err" data-testid="offline-banner" style="display:flex;align-items:center;gap:10px;margin:0 0 10px">📡 <b>Some Lighthouse equipment at this site is not responding.</b><button class="btn" style="margin-left:auto" onclick="startFlow('connectivity')">Run connection check</button></div>` : ''}
+   ${ws.anyOffline ? `<div class="alert err" data-testid="offline-banner" style="display:flex;flex-direction:column;gap:6px;margin:0 0 10px"><div style="display:flex;align-items:center;gap:10px">📡 <b>Some Lighthouse equipment at this site is not responding.</b><button class="btn" style="margin-left:auto" onclick="startFlow('connectivity')">Run connection check</button></div><p class="small" data-testid="offline-banner-optional-hint" style="margin:0">This step is optional — you can go straight to the issue.</p></div>` : ''}
    ${ws.degraded ? `<div class="alert warn" data-testid="degraded-banner">⚠️ Live reads are unavailable — flows will capture &amp; escalate rather than make changes.</div>` : ''}
    <div class="card">
    ${callSoFar()}

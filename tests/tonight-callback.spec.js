@@ -130,6 +130,7 @@ test.describe('tonight & callback', () => {
         await confirmSite(page, '6771', 'Merlin House');
         const banner = page.locator('[data-testid="offline-banner"]');
         await expect(banner).toContainText('not responding');
+        await expect(page.locator('[data-testid="offline-banner-optional-hint"]')).toBeVisible();
         await banner.locator('button:has-text("Run connection check")').click();
         await expect(page.locator('[data-testid="connectivity-alert"]')).toContainText('gateway at this site is offline');
         await page.locator('[data-testid="connectivity-stilldead"]').click();
