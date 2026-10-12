@@ -126,22 +126,29 @@ test('server: live-shaped combi (salus-it500 + hotWater, no salus-it500-dhw) →
     assert.notEqual(hw.level, 'ctl', 'a live combi must NEVER read as controllable');
 });
 
-test('server: presence predicate is registry-driven, not a name-match on salus-it500-dhw', async () => {
+test('server: OOHDASH-114-F1 — hasControllableDhw is driven by boilerControl field, not registry capabilities', async () => {
     const [site] = await bridge.getSitesByNumber('6261');
-    // No live device exposes hwboost → not controllable.
+    // 6261 has no boilerControl device → dhwControllable=false (already defaulted by fixture shim).
     assert.equal(api.hasControllableDhw(site), false);
-    // Inject a device NAMED salus-it500-dhw would be controllable ONLY because the
-    // registry contract for it exposes hwboost — prove it is the CONTRACT that flips it:
-    const withRealDhw = { devices: [...site.devices, syntheticControllableDhw()] };
-    assert.equal(api.hasControllableDhw(withRealDhw), true, 'a device whose registry contract exposes hwboost is controllable');
+    // Injecting a salus-it500-dhw device (old path) no longer changes the result — it's not capability-driven.
+    const withOldDhw = { ...site, devices: [...site.devices, syntheticControllableDhw()] };
+    assert.equal(api.hasControllableDhw(withOldDhw), false, 'old hwboost device no longer flips dhwControllable — it is now driven by boilerControl field');
+    // A site with boilerControl.dhwControllable=true IS controllable.
+    const withBoilerControl = { ...site, boilerControl: { present: true, dhwControllable: true, heatingControllable: true } };
+    assert.equal(api.hasControllableDhw(withBoilerControl), true, 'boilerControl.dhwControllable=true flips dhwControllable');
 });
 
-test('server R7-ready flip (presence-driven, NO code change): synthetic controllable DHW device flips the tile to ctl', async () => {
+test('server OOHDASH-114-F1: hotwater scope is driven by boilerControl field — boilerControl.dhwControllable=true flips tile to ctl', async () => {
     const [site] = await bridge.getSitesByNumber('6261');
-    assert.equal(scopeOf(site).find(g => g.key === 'hotwater').level, 'mon', 'baseline: out-of-scope-with-context');
-    const flipped = { ...site, devices: [...site.devices, syntheticControllableDhw()] };
-    assert.equal(scopeOf(flipped).find(g => g.key === 'hotwater').level, 'ctl',
-        'injecting a genuinely controllable DHW device flips the SAME level fn to ctl with no code change');
+    assert.equal(scopeOf(site).find(g => g.key === 'hotwater').level, 'mon', 'baseline: 6261 combi with hotWater signal but no boilerControl → mon');
+    // Old hwboost device injection no longer changes the scope level.
+    const withOldDhw = { ...site, devices: [...site.devices, syntheticControllableDhw()] };
+    assert.equal(scopeOf(withOldDhw).find(g => g.key === 'hotwater').level, 'mon',
+        'old hwboost device injection no longer flips the tile — OOHDASH-114-F1 replaced the device-capability path');
+    // The boilerControl field IS the flip: a site with boilerControl.dhwControllable=true shows ctl.
+    const withBoilerControl = { ...site, boilerControl: { present: true, dhwControllable: true, heatingControllable: true } };
+    assert.equal(scopeOf(withBoilerControl).find(g => g.key === 'hotwater').level, 'ctl',
+        'boilerControl.dhwControllable=true flips the hotwater tile to ctl');
 });
 
 test('view: out-of-scope-with-context (mon) hot-water tile reads "monitored — not adjustable from here", not a bare "Not on Lighthouse here"', async () => {
@@ -191,17 +198,23 @@ test('flow: capture-and-escalate outcome logs a hot-water class ticket (OohCaptu
     assert.equal(captured[0].type, 'capture');
 });
 
-test('flow R7-ready flip (presence-driven, NO code change): a synthetic controllable DHW device makes the boost/compose chip reappear', async () => {
+test('flow OOHDASH-114-F1: hw-boost-yes chip renders when ws.boilerControl.dhwControllable=true', async () => {
     const [site] = await bridge.getSitesByNumber('6261');
-    const flippedSite = { ...site, devices: [...site.devices, syntheticControllableDhw()] };
-    const ws = { site: { siteName: site.siteName }, devices: workspaceDevices(flippedSite), scope: scopeOf(flippedSite) };
-    const { ctx, state, opened } = loadClient(ws);
+    // Workspace with boilerControl.dhwControllable=true makes the boost chip appear.
+    const ws = {
+        site: { siteName: site.siteName },
+        devices: workspaceDevices(site),
+        scope: scopeOf({ ...site, boilerControl: { present: true, dhwControllable: true } }),
+        boilerControl: { present: true, dhwControllable: true, isV1: false, isV2: true, deviceId: 'gk-6261-boilercontrol-1' }
+    };
+    const { ctx, state } = loadClient(ws);
     state.flow = { stage: 0, done: [], data: {} };
     const html = ctx.FLOWR.hotwater(ws, state.flow);
-    assert.match(html, /hw-boost-yes/, 'the compose chip reappears once a genuinely controllable DHW device is present — no code change');
-    // and the boost branch now reaches openControl against that device.
-    state.flow = { stage: 1, done: [], data: { boost: 1 } };
-    ctx.FLOWR.hotwater(ws, state.flow);
-    assert.equal(opened.length, 1, 'the boost/openControl path is reachable only when a controllable device is present');
-    assert.equal(opened[0].cmd, 'boost');
+    assert.match(html, /hw-boost-yes/, 'the boost chip renders when boilerControl.dhwControllable=true');
+    // No boost chip when dhwControllable=false.
+    const wsOff = { site: { siteName: site.siteName }, devices: workspaceDevices(site), scope: scopeOf(site), boilerControl: { present: false, dhwControllable: false } };
+    const { ctx: ctx2, state: state2 } = loadClient(wsOff);
+    state2.flow = { stage: 0, done: [], data: {} };
+    const html2 = ctx2.FLOWR.hotwater(wsOff, state2.flow);
+    assert.doesNotMatch(html2, /hw-boost-yes/, 'no boost chip when dhwControllable=false');
 });

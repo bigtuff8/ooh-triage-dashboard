@@ -167,7 +167,7 @@ function renderWorkspace() {
     const ws = state.workspace;
     const s = ws.site;
     const flowHtml = state.flow ? renderFlow() : `
-   ${ws.anyOffline ? `<div class="alert err" data-testid="offline-banner" style="display:flex;align-items:center;gap:10px;margin:0 0 10px">📡 <b>Some Lighthouse equipment at this site is not responding.</b><button class="btn" style="margin-left:auto" onclick="startFlow('connectivity')">Run connection check</button></div>` : ''}
+   ${ws.anyOffline ? `<div class="alert err" data-testid="offline-banner" style="display:flex;flex-direction:column;gap:6px;margin:0 0 10px"><div style="display:flex;align-items:center;gap:10px">📡 <b>Some Lighthouse equipment at this site is not responding.</b><button class="btn" style="margin-left:auto" onclick="startFlow('connectivity')">Run connection check</button></div><p class="small" data-testid="offline-banner-optional-hint" style="margin:0">This step is optional — you can go straight to the issue.</p></div>` : ''}
    ${ws.degraded ? `<div class="alert warn" data-testid="degraded-banner">⚠️ Live reads are unavailable — flows will capture &amp; escalate rather than make changes.</div>` : ''}
    <div class="card">
    ${callSoFar()}
@@ -183,6 +183,7 @@ function renderWorkspace() {
     ${s.callsLast30Days >= 2 ? `<span class="tag amber" title="OOH tickets in the last 30 days">🔁 ${s.callsLast30Days} calls this month</span>` : ''}
     <button class="btn link" style="margin-left:auto" onclick="endCall()">End call</button>
    </div>
+   ${renderP1Banner(ws)}
    ${flowHtml}
   </div>
   <div>
@@ -198,6 +199,20 @@ function callSoFar() {
     if (!state.call || !state.call.issues.length) return '';
     return `<div class="callsofar" data-testid="call-so-far"><b>This call so far:</b> ${state.call.issues.map(i =>
         `<span class="tag ${i.cls}" style="margin:0 4px 0 6px">${esc(i.label)}</span>${i.ticket ? `<span class="small">#${i.ticket}</span>` : ''}`).join(' ')}</div>`;
+}
+
+// OOHDASH-117 F4a — P1 escalation banner (safety-critical pre-triage signal)
+function renderP1Banner(ws) {
+    const tickets = ws.activeP1Tickets;
+    if (!tickets || tickets.length === 0) return '';
+    const first = tickets[0];
+    const linkHtml = first.zendeskUrl
+        ? ` <a href="${esc(first.zendeskUrl)}" target="_blank" rel="noopener" style="color:inherit;font-weight:600;text-decoration:underline">View ticket #${esc(String(first.id))}</a>`
+        : '';
+    return `<div class="alert err p1-banner" data-testid="p1-escalation-banner" style="display:flex;align-items:flex-start;gap:10px;margin:0 0 10px">
+  <span style="font-size:1.2em;flex-shrink:0">🚨</span>
+  <div><b>Active P1 escalation on record for this site — review before advising.</b>${linkHtml}${tickets.length > 1 ? ` <span class="small">(${tickets.length} active P1 tickets)</span>` : ''}</div>
+</div>`;
 }
 
 // OOHDASH-89/91 (E, shared decision): the always-on "Live device status" side card and its
