@@ -498,26 +498,22 @@ const FLOWR = {
     },
 
     hotwater(ws, f) {
-        // Presence-driven: a controllable DHW device is one whose registry
-        // capabilities actually expose a hot-water boost command — NOT a name-match
-        // on `salus-it500-dhw` (live bridge data never emits it, bridge.js:57-67).
-        // Out-of-scope is the DETERMINISTIC R1 default; the boost/compose affordance
-        // only appears if live inventory genuinely carries a controllable DHW device
-        // (R7-ready: flips on presence with no code change).
-        const dhw = ws.devices.find(d => (d.capabilities || []).includes('hwboost'));
+        // OOHDASH-114-F1: DHW controllability is now determined by the boilerControl workspace field
+        // (Sam Day spec - V1/V2 shared-attribute check). The old devices.find was testing for a device
+        // type that live inventory never emits. ws.boilerControl is always present (defaulted server-side).
+        const dhw = ws.boilerControl?.dhwControllable ? ws.boilerControl : null;
         if (f.stage === 0) {
             if (!dhw) {
                 doneLine('Hot water not controllable here — capture & escalate');
                 return `<div class="alert info">Hot water is not controllable from here — it’s boiler-side, not on a boostable Lighthouse device. Capture the details and escalate.</div><div class="chips"><button class="chip" onclick="flowStep({cap:1})">Capture &amp; escalate</button><button class="chip" onclick="flowStep({sc:1})">Scope guidance (boiler fault?)</button></div>`;
             }
-            if (!dhw.online) { f.cat = 'connectivity'; f.stage = 0; return FLOWR.connectivity(ws, f); }
-            const boost = dhw.telemetry?.hwBoostHours || 0;
-            doneLine(`Live read: hot-water unit online${boost ? ' · boost ' + boost + 'h active' : ''}`);
-            return `<div class="zoneread"><span style="font-size:22px">🚿</span><div><div><b>${esc(dhw.deviceId)}</b> — online${boost ? ', boost ' + boost + 'h already running' : ''}</div><div class="small">Salus IT500 hot-water unit</div></div><span class="tag green">online</span></div>
-   <div class="stepq">Boost the hot water now?</div><div class="chips"><button class="chip" data-testid="hw-boost-yes" onclick="flowStep({boost:1})">Yes — set a boost</button><button class="chip" onclick="flowStep({cap:1})">No — capture &amp; escalate</button></div>`;
+            // OOHDASH-114-F1: online check removed - boilerControl is a summary object, not a live device.
+            doneLine('Live read: boiler DHW controllable via Lighthouse');
+            return '<div class="zoneread"><div><div><b>Hot water control</b> - DHW boost available via boiler panel</div><div class="small">' + (dhw.isV1 ? 'V1 - boiler panel (output relay)' : dhw.isV2 ? 'V2 - boiler panel (DHW.use_boiler)' : 'Boiler panel (variant unknown)') + '</div></div><span class="tag green">controllable</span></div>' +
+                '<div class="stepq">Boost the hot water now?</div><div class="chips"><button class="chip" data-testid="hw-boost-yes" onclick="flowStep({boost:1})">Yes \u2014 set a boost</button><button class="chip" onclick="flowStep({cap:1})">No \u2014 capture &amp; escalate</button></div>';
         }
         if (f.stage === 1) {
-            const dhwDev = ws.devices.find(d => (d.capabilities || []).includes('hwboost'));
+            const dhwDev = ws.boilerControl?.dhwControllable ? ws.boilerControl : null;
             // Presence-guarded: the compose/boost path is reachable ONLY when a genuinely
             // controllable DHW device is present. Without one, a boost intent falls through
             // to the deterministic capture-and-escalate default (never openControl on nothing).
