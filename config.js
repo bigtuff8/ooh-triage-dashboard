@@ -131,6 +131,11 @@ export const config = {
         healthProbeTtlMs: parseInt(env('HEALTH_PROBE_TTL_MS', '60000'), 10)
     },
 
+    // OOHDASH-119: optional additional notes. One shared constant so the limit is changed in one place.
+    notes: {
+        maxChars: 1000
+    },
+
     // Call-ticket reconciliation (F003). Thresholds are the numbers James tunes at the Design Gate
     // (locked: auto-merge ≥0.80 / link-only 0.50–0.79); env-overridable so they can be retuned
     // without a code change. operatorAgentMap maps operator email → Zendesk agent id for the

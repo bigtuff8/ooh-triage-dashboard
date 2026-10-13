@@ -50,7 +50,9 @@ router.get('/me', wrap(async (req, res) => {
         // R11/C7: panel-pinned client-config delivery path — the client has no other server→client
         // config channel, so client knobs ride /me. midWaitPromptMs arms the mid-wait decision
         // prompt (control.js); the R8 controlLive signal joins this object on the same surface.
-        control: { midWaitPromptMs: config.control.midWaitPromptMs }
+        control: { midWaitPromptMs: config.control.midWaitPromptMs },
+        // OOHDASH-119: notes limit delivered to client so the textarea maxlength is set from config.
+        notes: { maxChars: config.notes.maxChars }
     });
 }));
 
@@ -273,7 +275,7 @@ export function buildOutcomeTranscript({ action, type, siteNo, siteName, detail,
 
 router.post('/outcomes', wrap(async (req, res) => {
     const op = req.session.operator;
-    const { type, siteNo, siteName, subject, detail, callerWords, OohCaptureClass, actionId, holdText, p1Summary } = req.body;
+    const { type, siteNo, siteName, subject, detail, callerWords, OohCaptureClass, actionId, holdText, p1Summary, additionalNotes } = req.body;
     if (!type || !siteNo || !subject || !detail) {
         return res.status(400).json({ error: 'type, siteNo, subject and detail are required' });
     }
@@ -291,7 +293,9 @@ router.post('/outcomes', wrap(async (req, res) => {
         callerWords,
         outcomeType: type,
         priority: isP1 ? 'urgent' : 'normal',
-        extraTags: isP1 ? ['ooh_p1'] : []
+        extraTags: isP1 ? ['ooh_p1'] : [],
+        // OOHDASH-119: additional notes ride alongside but are NOT written to the P1 SMS or audit log.
+        additionalNotes: additionalNotes || null
     });
 
     let p1 = null;
@@ -377,6 +381,19 @@ router.get('/tickets/:id/thread', wrap(async (req, res) => {
 }));
 
 router.post('/tickets/:id/notes', wrap(async (req, res) => {
+    // OOHDASH-119: kind='additional-notes' writes a labelled [OOH NOTE] comment from the post-submit
+    // notes box. Without kind the existing drawer-notes behaviour is byte-for-byte unchanged.
+    if (req.body.kind === 'additional-notes') {
+        const normalised = zendesk.normaliseAdditionalNotes(req.body.body);
+        if (!normalised) return res.status(400).json({ error: 'Note is empty' });
+        const labelledBody = `Additional notes from OOH agent: "${normalised}"`;
+        await zendesk.addFeedbackNote(req.params.id, req.session.operator, labelledBody);
+        await audit.logAction({
+            actionType: 'note', operator: req.session.operator,
+            detail: `Note added to ticket #${req.params.id}`, outcome: 'note', ticketId: Number(req.params.id)
+        });
+        return res.json({ ok: true });
+    }
     if (!req.body.body?.trim()) return res.status(400).json({ error: 'Note body is required' });
     await zendesk.addFeedbackNote(req.params.id, req.session.operator, req.body.body.trim());
     await audit.logAction({
@@ -388,7 +405,12 @@ router.post('/tickets/:id/notes', wrap(async (req, res) => {
 
 router.post('/query', wrap(async (req, res) => {
     if (!req.body.text?.trim()) return res.status(400).json({ error: 'Query text is required' });
-    const ticket = await zendesk.raiseQuery(req.session.operator, req.body.siteNo, req.body.text.trim());
+    const ticket = await zendesk.raiseQuery(
+        req.session.operator,
+        req.body.siteNo,
+        req.body.text.trim(),
+        req.body.additionalNotes || null // OOHDASH-119
+    );
     await audit.logAction({
         actionType: 'query', operator: req.session.operator, siteNo: req.body.siteNo || null,
         detail: `Query raised: ${req.body.text.trim()}`, outcome: 'query', ticketId: ticket.id

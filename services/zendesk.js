@@ -224,6 +224,42 @@ export function hhmm(iso) {
 }
 
 /**
+ * OOHDASH-119 — normalises the agent's additional notes before they land on a ticket.
+ *
+ * Rules (in order, plan §5 WU1 D7):
+ *  1. Non-string / null / undefined → return null (never a 400; the field is optional).
+ *  2. Replace runs of line breaks with " / " so the note stays one line in the IoT step view.
+ *  3. oneLine (trim + collapse whitespace).
+ *  4. Delimiter-injection defences (prevents forging IoT-parser anchor fields or step timestamps):
+ *     a. /\bOperator:\s*/gi  → "Operator - "
+ *     b. /\bOutcome:\s*/gi   → "Outcome - "
+ *     c. /Caller'?s words\s*:/gi → "caller's words -"
+ *     d. /(\b\d{1,2}:\d{2}\s*)[|–—]/g → "$1-"  (neutralise HH:MM| step-lookalikes)
+ *  5. Empty after defences → return null.
+ *  6. Over maxChars (UTF-16 code units): slice, drop lone high surrogate, append "…".
+ */
+export function normaliseAdditionalNotes(raw, cfg = config) {
+    if (typeof raw !== 'string' || !raw) return null;
+    let s = raw.replace(/[\r\n]+/g, ' / ');
+    s = oneLine(s);
+    // Delimiter-injection defences
+    s = s.replace(/\bOperator:\s*/gi, 'Operator - ');
+    s = s.replace(/\bOutcome:\s*/gi, 'Outcome - ');
+    s = s.replace(/Caller'?s words\s*:/gi, "caller's words -");
+    s = s.replace(/(\b\d{1,2}:\d{2}\s*)[|–—]/g, '$1-');
+    if (!s) return null;
+    const max = cfg?.notes?.maxChars ?? 1000;
+    if (s.length > max) {
+        s = s.slice(0, max);
+        // Drop lone high surrogate at the cut boundary (surrogate-safe truncation)
+        if (/[\uD800-\uDBFF]$/.test(s)) s = s.slice(0, -1);
+        s = s + '…'; // …
+        console.warn(`[ZD] Additional notes truncated to ${max} chars`);
+    }
+    return s;
+}
+
+/**
  * The consumer's server parser captures Outcome with /Outcome:\s*([\w-]+)/ — a bare hyphenated
  * code only. A space silently truncates the capture, so coerce anything non-conforming to a safe
  * code (design-spec §4 note 2). App outcome types are already raw codes; this is defence-in-depth.
@@ -240,7 +276,7 @@ function sanitizeOutcomeCode(outcomeType) {
  * the (unbounded) transcript so they survive Zendesk's ~1500-char description truncation (CT-I1),
  * which is what the consumer's oversight parser reads.
  */
-function buildTrgBody({ operator, summary, callerWords, outcomeType, transcript, defaultTime, dataQualityNote }) {
+function buildTrgBody({ operator, summary, callerWords, outcomeType, transcript, defaultTime, dataQualityNote, additionalNotes }) {
     const lines = [`[TRG] ${oneLine(summary).slice(0, 180)}`];
     lines.push(`Operator: ${oneLine(operator?.name) || 'OOH'} (OOH)`);
     if (callerWords) lines.push(`Caller's words: "${oneLine(callerWords)}"`);
@@ -254,6 +290,11 @@ function buildTrgBody({ operator, summary, callerWords, outcomeType, transcript,
             lines.push(`${time} | ${oneLine(s.text)}`);
         }
     }
+    // OOHDASH-119 E1: notes appear as the final timed transcript step (after the loop) so the IoT
+    // step regex (`^\s*(\d{1,2}:\d{2})\s*[|–—-]\s*(.+?)`) picks them up in the detail view.
+    if (additionalNotes) {
+        lines.push(`${defaultTime} | Additional notes from OOH agent: "${additionalNotes}"`);
+    }
     if (dataQualityNote) lines.push('', dataQualityNote);
     return lines.join('\n');
 }
@@ -264,7 +305,7 @@ function buildTrgBody({ operator, summary, callerWords, outcomeType, transcript,
  * and the full timestamped action transcript (the ticket requester is the API service account,
  * so identity always lives in the comment body).
  */
-export async function createOutcomeTicket({ operator, siteNo, siteName, subject, summary, transcript = [], detail, callerWords, outcomeType, priority = 'normal', extraTags = [] }) {
+export async function createOutcomeTicket({ operator, siteNo, siteName, subject, summary, transcript = [], detail, callerWords, outcomeType, priority = 'normal', extraTags = [], additionalNotes: rawNotes }) {
     const summaryLine = summary || subject || detail || 'OOH outcome';
     const defaultTime = hhmm(new Date().toISOString());
     // If no structured transcript was supplied but a detail string exists, keep at least one step
@@ -272,8 +313,12 @@ export async function createOutcomeTicket({ operator, siteNo, siteName, subject,
     let steps = Array.isArray(transcript) ? transcript.filter(s => s && s.text) : [];
     if (!steps.length && detail) steps = [{ time: defaultTime, text: detail }];
 
+    // OOHDASH-119: normalise once; pass to buildTrgBody. Normalisation is idempotent so calling
+    // it here (server) means tests can exercise the full path with a raw string.
+    const additionalNotes = normaliseAdditionalNotes(rawNotes);
+
     const buildBody = dataQualityNote =>
-        buildTrgBody({ operator, summary: summaryLine, callerWords, outcomeType, transcript: steps, defaultTime, dataQualityNote });
+        buildTrgBody({ operator, summary: summaryLine, callerWords, outcomeType, transcript: steps, defaultTime, dataQualityNote, additionalNotes });
 
     // F002 — Ticket Category is set on every OOH outcome ticket (Explore reporting only).
     const categoryField = { id: config.zendesk.categoryFieldId, value: config.zendesk.categoryValue };
@@ -557,7 +602,7 @@ export async function ticketsForSite(siteNo) {
 /**
  * "Raise a query" from the Tonight view — lands on a ticket for the IoT team.
  */
-export async function raiseQuery(operator, siteNo, text) {
+export async function raiseQuery(operator, siteNo, text, additionalNotes) {
     const subject = `OOH query${siteNo ? ` — site ${siteNo}` : ''}`;
     return createOutcomeTicket({
         operator,
@@ -566,7 +611,8 @@ export async function raiseQuery(operator, siteNo, text) {
         summary: subject,
         transcript: [{ time: hhmm(new Date().toISOString()), text: `Query raised: ${text}` }],
         outcomeType: 'query',
-        extraTags: ['ooh_query']
+        extraTags: ['ooh_query'],
+        additionalNotes
     });
 }
 
