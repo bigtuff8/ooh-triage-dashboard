@@ -269,14 +269,14 @@ window.submitPendingOutcome = function submitPendingOutcome(key) {
         siteNo: ws.site.siteNo,
         siteName: ws.site.siteName,
         callerWords: f.data.freeText || null,
-        additionalNotes: f.data.additionalNotes || null, // OOHDASH-119
+        additionalNotes: (f.data.additionalNotes || '').trim() || null, // OOHDASH-119; DF-01: trim so whitespace-only → null
         ...payload
     }).then(res => {
         notesDraftClear(); // OOHDASH-119: clear sessionStorage draft on success
         const echo = f.data.freeText
             ? `<div class="stepdone small" data-testid="outcome-callerwords"><span>💬</span>Recorded from the caller: “${esc(f.data.freeText)}”</div>`
             : '';
-        const notesEcho = f.data.additionalNotes
+        const notesEcho = (f.data.additionalNotes || '').trim()
             ? (() => {
                 const isP1 = payload.type === 'escalate-p1';
                 const tid = res?.ticket?.id ?? null; // guard: id may be absent on degraded response

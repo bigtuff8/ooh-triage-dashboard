@@ -174,6 +174,21 @@ test('normaliseAdditionalNotes: N_adv3 (HH:MM |) pipe neutralised', () => {
     assert.doesNotMatch(r, /12:34\s*\|/, 'HH:MM | pipe neutralised');
 });
 
+// CT fix #2: free-text pipe must be replaced with broken bar (U+00A6)
+test('normaliseAdditionalNotes: free-text pipe replaced with broken bar (¦)', () => {
+    const r = normaliseAdditionalNotes('bar area | caller says very cold', testCfg);
+    assert.ok(r !== null, 'result is not null');
+    assert.ok(!r.includes('|'), 'no literal pipe in output');
+    assert.ok(r.includes('¦'), 'broken bar (U+00A6) present in output');
+});
+
+test('normaliseAdditionalNotes: multiple free-text pipes all replaced', () => {
+    const r = normaliseAdditionalNotes('zone A | zone B | zone C', testCfg);
+    assert.ok(r !== null);
+    assert.ok(!r.includes('|'), 'no literal pipes remain');
+    assert.equal((r.match(/¦/g) || []).length, 2, 'two broken bars (one per original pipe)');
+});
+
 test('normaliseAdditionalNotes: N5 (whitespace-only) returns null', () => {
     assert.equal(normaliseAdditionalNotes(N5, testCfg), null);
 });

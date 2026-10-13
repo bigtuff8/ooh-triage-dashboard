@@ -248,6 +248,10 @@ export function normaliseAdditionalNotes(raw, cfg = config) {
     s = s.replace(/\bOutcome:\s*/gi, 'Outcome - ');
     s = s.replace(/Caller'?s words\s*:/gi, "caller's words -");
     s = s.replace(/(\b\d{1,2}:\d{2}\s*)[|–—]/g, '$1-');
+    // CT fix #2: replace every remaining literal '|' with '¦' (U+00A6, BROKEN BAR).
+    // The TRG-STEP line uses '|' as a field separator; a free-text '|' inside the note
+    // (e.g. "bar area | caller says very cold") must not reach the IoT-parser as a field boundary.
+    s = s.replace(/\|/g, '¦');
     if (!s) return null;
     const max = cfg?.notes?.maxChars ?? 1000;
     if (s.length > max) {

@@ -274,9 +274,8 @@ test('E15: whitespace-only notes sends null in POST (not empty string)', async (
     await page.locator('[data-testid="record-outcome"]').click();
     const req = await postPromise;
     const body = JSON.parse(req.postData());
-    // Server normalises whitespace-only to null; client should send either '' or null
-    // (server-side normaliseAdditionalNotes will return null for whitespace)
-    expect(body.additionalNotes === null || body.additionalNotes === '' || body.additionalNotes === '   ').toBeTruthy();
+    // DF-01 fix: client trims before sending; whitespace-only must arrive as null, not '   ' or ''.
+    expect(body.additionalNotes).toBeNull();
 });
 
 // ─── E16: notes on lighting P1 escalation ────────────────────────────────────
@@ -589,4 +588,24 @@ test('E25: server 500 on first save does not deduplicate the retry — note is w
     expect(callCount).toBe(2);
 
     await page.unroute('**/api/tickets/*/notes');
+});
+
+// ─── E26: whitespace-only notes → null in POST, no addnotes-echo rendered (DF-01) ──
+test('E26: whitespace-only notes sends null (DF-01 trim fix) and no echo is shown', async ({ page }) => {
+    // DF-01: '   ' was truthy — passed to server and rendered an empty echo div.
+    // After the fix, the client trims before testing; whitespace-only → null in POST, no echo.
+    await signIn(page, 'Test Handler');
+    await confirmSite(page, '6832', 'Old Grey Mare');
+    await page.locator('[data-testid="tile-other"]').click();
+    await page.locator('[data-testid="other-text"]').pressSequentially('DF-01 whitespace test', { delay: 20 });
+    await page.locator('#addnotes').fill('   ');
+    await page.locator('[data-testid="other-capture"]').click();
+    const postPromise = page.waitForRequest(r => r.url().includes('/api/outcomes') && r.method() === 'POST');
+    await page.locator('[data-testid="record-outcome"]').click();
+    const req = await postPromise;
+    const body = JSON.parse(req.postData());
+    // Client must send null (not '   ')
+    expect(body.additionalNotes).toBeNull();
+    // No echo element in the outcome confirmation
+    await expect(page.locator('[data-testid="addnotes-echo"]')).toHaveCount(0);
 });
