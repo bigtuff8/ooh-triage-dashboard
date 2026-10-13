@@ -1,0 +1,21 @@
+{
+  "run": "selfgate-ooh-triage-dashboard-oohdash-119-additional-notes",
+  "phase": "test",
+  "pr": 84,
+  "approvedBy": [
+    "bigtuff8"
+  ],
+  "reviewComments": [
+    "bigtuff8: - Approve this feature for release?: Approve — release to production\n\n(submitted via the interactive gate review)\n\n<!-- gate:selected [{\"question\":\"Approve this feature for release?\",\"answer\":\"Approve — release to production\"}] -->"
+  ],
+  "mergeCommit": "64b32fc241115e00e64cae25be93da2ba1fee54a",
+  "phaseBranch": "test/oohdash-119-additional-notes",
+  "releaseBranch": "build/oohdash-119-additional-notes",
+  "stamp": 1791925511669,
+  "selectedOptions": [
+    {
+      "question": "Approve this feature for release?",
+      "answer": "Approve — release to production"
+    }
+  ]
+}
