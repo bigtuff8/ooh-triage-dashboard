@@ -490,3 +490,52 @@ test('E23: XSS payload in notes field is escaped — no element or script create
 
     await page.unroute('**/api/tickets/*/notes');
 });
+
+// ─── E24: second note within 60 s on same ticket gets fresh token (not dropped) ─
+
+test('E24: two different notes saved sequentially on the same ticket — both written (fresh token per save)', async ({ page }) => {
+    // E24 verifies that clearing _postNotesToken on success means a second,
+    // distinct note within the server 60-second dedup window is NOT dropped.
+    const NOTE_A = 'First additional note E24A';
+    const NOTE_B = 'Second additional note E24B — should not be deduplicated';
+
+    await signIn(page, 'Test Handler');
+    await confirmSite(page, '6832', 'Old Grey Mare');
+
+    // Complete the flow so the post-submit box is available.
+    await page.locator('[data-testid="tile-other"]').click();
+    await page.locator('[data-testid="other-text"]').pressSequentially('e24 idempotency test', { delay: 20 });
+    await page.locator('[data-testid="other-capture"]').click();
+    await page.locator('[data-testid="record-outcome"]').click();
+    await expect(page.locator('[data-testid="outcome-captured"]')).toBeVisible({ timeout: 8000 });
+    await expect(page.locator('[data-testid="addnotes-post-open"]')).toBeVisible({ timeout: 4000 });
+
+    const tokens = [];
+    await page.route('**/api/tickets/*/notes', async route => {
+        let body = {};
+        try { body = route.request().postDataJSON() ?? {}; } catch { /* ignore */ }
+        if (body.idempotencyKey) tokens.push(body.idempotencyKey);
+        await route.continue();
+    });
+
+    // Save note A.
+    await page.locator('[data-testid="addnotes-post-open"]').click();
+    await page.locator('[data-testid="addnotes-post-input"]').fill(NOTE_A);
+    await page.locator('[data-testid="addnotes-post-save"]').click();
+    await expect(page.locator('[data-testid="addnotes-post-saved"]')).toBeVisible({ timeout: 6000 });
+
+    // Click "Add another note" to reset the box with a fresh state.
+    await page.locator('[data-testid="addnotes-post-another"]').click();
+    await expect(page.locator('[data-testid="addnotes-post-open"]')).toBeVisible({ timeout: 3000 });
+
+    // Save note B (within 60 s of note A — same ticket).
+    await page.locator('[data-testid="addnotes-post-input"]').fill(NOTE_B);
+    await page.locator('[data-testid="addnotes-post-save"]').click();
+    await expect(page.locator('[data-testid="addnotes-post-saved"]')).toBeVisible({ timeout: 6000 });
+
+    // Both POSTs must have fired with DIFFERENT idempotency tokens.
+    expect(tokens.length).toBe(2);
+    expect(tokens[0]).not.toBe(tokens[1]);
+
+    await page.unroute('**/api/tickets/*/notes');
+});

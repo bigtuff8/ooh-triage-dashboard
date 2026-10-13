@@ -29,7 +29,7 @@ function notesField({ id = 'addnotes', bind = null, value = '', helperText } = {
     // content cannot break out of the textarea tag or forge surrounding HTML. esc() is in app.js.
     const safeValue = typeof esc === 'function' ? esc(value || '') : String(value || '')
         .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
-    const maxChars = (typeof state !== 'undefined' && state?.me?.notes?.maxChars) || 1000;
+    const maxChars = (typeof state !== 'undefined' ? state?.me?.notes?.maxChars : undefined) ?? 1000;
     const warnAt = Math.floor(maxChars * 0.9); // amber from 90% (900 for 1000 cap) per design §6
     const currentLen = (value || '').length;
     const counterText = currentLen >= maxChars
@@ -164,6 +164,7 @@ function notesPostBox(ticketId, { expanded = false } = {}) {
     if (ps === 'saved') {
         return `<div class="notes-group" style="margin-top:8px" data-testid="addnotes-post-saved">
   <span class="small" style="color:var(--success,green)">✓ Note saved to ticket #${ticketId}</span>
+  <button class="btn link" data-testid="addnotes-post-another" onclick="window._postNotesOpen()" style="margin-left:8px;font-size:0.85em">Add another note</button>
 </div>`;
     }
     if (ps === 'saving') {
