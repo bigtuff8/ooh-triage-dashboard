@@ -189,7 +189,7 @@ function normaliseNotes(raw){
   var s=raw.replace(/(\r?\n)+/g,' / ').replace(/\s+/g,' ').trim();
   s=s.replace(/caller'?s words\s*:/gi,"caller's words -");
   if(!s)return null;
-  if(s.length>ME.notes.maxChars)s=s.slice(0,ME.notes.maxChars)+'…';
+  if(s.length>ME.notes.maxChars){var c=s.slice(0,ME.notes.maxChars);if(/[\uD800-\uDBFF]$/.test(c))c=c.slice(0,-1);s=c+'…';}
   return s;
 }
 
@@ -200,7 +200,7 @@ function notesField(id,value){
     '<label for="'+id+'">Additional notes for the IoT team (optional)</label>'+
     '<textarea id="'+id+'" data-testid="'+id+'" rows="2" maxlength="'+max+'" oninput="notesInput(this)" '+
     'placeholder="Anything the caller or site told you that isn\'t captured above, e.g. engineer due at 7am">'+esc(value||'')+'</textarea>'+
-    '<div class="meta"><span class="help small">Goes on the ticket with this outcome. Keep it factual and operational, no personal details.</span>'+
+    '<div class="meta"><span class="help small">For the ticket and the IoT team&rsquo;s morning review. Not sent in urgent P1 texts. Keep it factual, no personal details.</span>'+
     '<span class="count'+countCls(len)+'" id="'+id+'-counter" data-testid="'+id+'-counter">'+countTxt(len)+'</span></div></div>';
 }
 function countCls(n){return n>=ME.notes.maxChars?' full':(n>=ME.notes.maxChars*0.9?' near':'');}
@@ -210,8 +210,8 @@ function notesInput(el){
   c.textContent=countTxt(n);c.className='count'+countCls(n);
   if(el.id==='addnotes')S.notes=el.value; else S.postDraft=el.value;
 }
-function notesEcho(t,id){
-  return t?'<div class="notesecho" data-testid="addnotes-echo">📝<span>Your notes are on ticket <b>#'+id+'</b>: <q>'+esc(t)+'</q></span></div>':'';
+function notesEcho(t,id,p1){
+  return t?'<div class="notesecho" data-testid="addnotes-echo">📝<span>Your notes are on ticket <b>#'+id+'</b>'+(p1?' for the morning review':'')+': <q>'+esc(t)+'</q>'+(p1?' <span class="small">(not in the urgent text)</span>':'')+'</span></div>':'';
 }
 function notesPostBox(id,expandedDefault){
   var p=S.post;
@@ -307,7 +307,7 @@ function outcomeCard(){
   if(o.kind==='p1')h+='<p style="margin-top:4px">The P1 is logged as ticket <b>#'+id+'</b> in the IoT Support dashboard, which pages the on-duty manager.</p>';
   if(o.kind==='captured')h+='<p style="margin-top:4px">This will be actioned on the <b>next working day</b> — it is logged, not lost.</p>';
   h+='<div class="script">“'+o.script+'”</div><p class="small">Ticket <b>#'+id+'</b></p>';
-  h+=notesEcho(t.notes,id);
+  h+=notesEcho(t.notes,id,o.kind==='p1');
   h+=notesPostBox(id,(o.kind==='applied'||o.kind==='escalated')&&o.expanded);
   h+='<div class="outbtns"><button class="btn" onclick="resetSc()">➕ Add another issue</button><button class="btn primary" onclick="resetSc()">✔ End call</button></div></div>';
   return h;

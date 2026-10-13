@@ -6,7 +6,7 @@ SECTION: Where the box appears
 All 27 submit points from discovery are covered, plus two more the code inspection found (a second heating no-action outcome and a contractor fallback outcome), which come for free because they share the same code. For the 25 guided-flow outcomes the box sits at the bottom of the guided flow from the first step, because the dashboard records the outcome the moment the agent clicks the final choice; there is no pause before recording to put a box in. Whatever is in the box at that moment goes onto the ticket when it is created. After the outcome, a small "Add a note to ticket" link lets the agent add anything they remember late. The ambiguous-site card and the Tonight "Raise a query" window each get the same box above their send button. The two device-control outcomes carry anything typed before the change, and also show an "Add a note" box on the result card, as the operator decided. A clickable mockup of all of this, including phone width, is at OOH_ADDITIONAL_NOTES_MOCKUP_2026-10-13.html in the same folder as this document.
 
 SECTION: What the IoT team will see
-In Zendesk the notes are on the ticket from the moment it is created. The design found one thing discovery got wrong: the IoT Support Dashboard ticket view does not show the raw ticket text. It rebuilds an OOH ticket from four recognised pieces (operator, caller's words, the timed steps, outcome) and silently drops anything else. A plain notes line would therefore be invisible there. The fix needs no change to the IoT dashboard: the notes are written as the final timed step, for example a step timed 21:42 reading "Additional notes from OOH agent: ...", so they show as the last line of the action list the IoT team already reads. The morning queue row is unchanged, as agreed. P1 texts to the on-duty manager are unchanged: they never read the ticket text.
+In Zendesk the notes are on the ticket from the moment it is created. The design found one thing discovery got wrong: the IoT Support Dashboard ticket view does not show the raw ticket text. It rebuilds an OOH ticket from four recognised pieces (operator, caller's words, the timed steps, outcome) and silently drops anything else. A plain notes line would therefore be invisible there. The fix needs no change to the IoT dashboard: the notes are written as the final timed step, for example a step timed 21:42 reading "Additional notes from OOH agent: ...", so they show as the last line of the action list the IoT team already reads. The morning queue row is unchanged, as agreed. A note added after the outcome is saved as a separate internal note; the IoT code was traced and its ticket view shows every such note in full, so late notes are visible too. P1 texts to the on-duty manager are unchanged: they never read the ticket text, so a note typed on a P1 call reaches the ticket and the morning review but not the urgent text. The screen says so plainly (see the P1 decision below).
 
 SECTION: How it will be proven
 Unit tests check the ticket text with and without notes, the 1000-character limit, line breaks, and that the IoT dashboard's own recognition rules still read the operator, outcome and caller's words exactly as before. A guard test fails the build if any ticket-creating call in the code forgets to send the notes, which is what keeps coverage at every submit point. Browser tests walk one of each outcome kind, the ambiguous site, the Tonight query and both control results, on desktop and phone size. The live proof is a real ticket on ooh.airedale-group.io, checked in Zendesk and in the IoT dashboard ticket view, on desktop and on a phone. We will not raise a live P1 or send a live device change just to prove this; those two are proven in the test environment.
@@ -25,6 +25,9 @@ DETAIL: Recommend the slash. Notes must stay on one line to show in the IoT view
 
 DECISION: If more than 1000 characters reach the server, what should it do? | Keep the first 1000 characters, mark it as cut, and still create the ticket | Refuse the whole submit with an error
 DETAIL: Recommend keep-and-mark. The screen already stops typing at 1000, and a ticket must never fail to be created because of an optional note.
+
+DECISION: Notes on a P1 call reach the ticket and the morning IoT review but never the urgent text to the on-duty manager. What should the screen do on P1 calls? | Keep the box on P1 calls, with wording that says plainly the notes are for the ticket and morning review and are not sent in the urgent text | Hide the box on flows that can end in a P1
+DETAIL: Recommend keeping the box with the clear wording. The box is on screen before the agent knows the call will be a P1, so hiding it would also remove notes from the non-P1 outcomes of the kitchen, lighting, fridge and contractor flows, or silently throw away what was typed.
 -->
 
 # OOHDASH-119 Additional Notes before ticket submit: Design
@@ -51,7 +54,7 @@ DETAIL: Recommend keep-and-mark. The screen already stops typing at 1000, and a 
 | D4 | Control paths: post-submit box via `POST /api/tickets/:id/notes` | Post-submit box on both control outcome cards; endpoint behaviour confirmed in section 5.4 |
 | D5 | 1000 characters, one shared constant | **Decided: 1000.** `config.notes.maxChars` on the server, delivered to the client through `/api/me`; no literal 1000 anywhere in client code |
 | D6 | Label "Additional notes from OOH agent:" | Used verbatim in the [TRG] line and in the post-submit [OOH NOTE] comment |
-| D7 | Sanitise like callerWords | Same `oneLine` collapse, line breaks become " / " first (DECISION 3); escaping stays at render time, see 5.5 |
+| D7 | Sanitise like callerWords | Same `oneLine` collapse, line breaks become " / " first (DECISION 3); escaping stays at render time, see 5.6 |
 
 ---
 
@@ -64,6 +67,15 @@ DETAIL: Recommend keep-and-mark. The screen already stops typing at 1000, and a 
 **F3. There are 25 guided outcome call sites, not 23.** Discovery missed `outcomeNoAction(f, 'noact')` at `flows.js:432` (pub heating query, no action possible) and the fallback `outcomeP1(f, 'p1')` at `flows.js:879` (contractor, normally unreachable). Both route through `finishOutcome`, so the shared injection covers them with no extra work. They appear as rows 1a and 18a in the coverage table.
 
 **F4. The server-side late-sync ticket** (`services/zendesk.js:375`) is created automatically by the server with no agent at a screen. It is not a submit end point and is out of scope.
+
+**F6. A late [OOH NOTE] comment IS shown in full in the IoT ticket detail view (code trace, iot-support-dashboard `b217f34`, `public/js/app.js`).**
+
+1. Every Zendesk comment on the ticket is fetched (`app.js:10114`, `/comments.json`) and mapped one-for-one at `app.js:10179` with `body`, `htmlBody` and `internal`; nothing is filtered by author or visibility.
+2. `classifyComment` (`app.js:218` to `251`, assigned at `app.js:10197`) returns `OOH` only when the body starts with `[TRG]`. An `[OOH NOTE]` body matches none of its branches (no `[ACT:]` prefix; `via.channel` is `api`, not voice or email; not `[System]`; not `[MANAGER`; the survey branch depends only on ticket status) and returns null.
+3. The only filter before display is `isRedactedComment` (`app.js:10958`, defined at `app.js:9343`), which hides bodies made only of redaction blocks.
+4. Because `activityCode` is not `OOH`, `trgParsed` is null (`app.js:10982`), so the comment is rendered by `sanitizeHtml(htmlBody)` (`app.js:11023`, used when Zendesk supplies an HTML body, which it does for API comments) or else `renderCommentBody(body)` (`app.js:11024`, defined at `app.js:14804`). Both render the whole text, with the Internal badge.
+
+**Consequence for the design:** the late note must keep the `[OOH NOTE]` prefix and must never start with `[TRG]`. If it did, step 4 would route it to `parseOohTrgComment`, which would find the `Operator:` footer, return a non-null result with no steps, and render only the operator line, silently dropping the note. Unit test U12 locks this in. No redesign of the late-note path is needed.
 
 **F5. Static assets carry a hard-coded cache marker** (`public/index.html` lines 15 to 19, `?v=1.0.2`). The release must bump these, otherwise agents' browsers may run the old `flows.js` with no notes box (risk R4).
 
@@ -156,7 +168,7 @@ Wiring:
 - `renderFlow()`: append `notesField({ bind: 'flow', value: f.data.additionalNotes })` inside `.flowbody` after the step body when `f.stage !== 99`. At `stage === 99`, replace the `%%NOTESPOST%%` marker in `f.data._outcomeHtml` with `notesPostBox(f.data._ticketId, ...)`.
 - `finishOutcome()`: add `additionalNotes` to the payload; on success store `f.data._ticketId = res.ticket.id`; add a notes echo (`data-testid="addnotes-echo"`) below the existing callerWords echo when notes were sent; insert `%%NOTESPOST%%` before `outButtons()`. The `_pend_` double-fire guard is untouched.
 - `ctlFinish()` / `ctlEscalate()`: add `additionalNotes: state.flow?.data?.additionalNotes || null` beside the existing `callerWords`; on success set `_ticketId`, add the echo, insert the marker before `outButtons()`. Post box is expanded by default here when no notes were sent at creation (D4 primary capture), collapsed otherwise. On the error branches (no ticket id) no box is shown.
-- `startFlow(k, freeText)`: carry `state.flow?.data?.additionalNotes` into the new flow so the aircon and "Something else" shortcuts do not lose typed notes. `anotherIssue()` and `cancelFlow()` still clear them (notes belong to one ticket).
+- `startFlow(k, freeText, opts)`: new optional `opts.carryNotes`. Notes are carried only when `opts.carryNotes` is true **and** the current flow has no recorded ticket (`!state.flow?.data?._ticketId`). Only the two in-flow shortcuts pass it (`flows.js:265` otherShortcut, `flows.js:381` aircon shortcut). Every other entry point starts with empty notes. Full lifecycle in 5.5.
 - `render()` in `app.js`: if `document.activeElement` is a notes textarea, capture its id and selection before replacing `innerHTML` and restore focus and caret after. This protects typing against async re-renders.
 - `renderAmbiguous()` and `raiseQuery()`: insert `notesField` above the action button; `ambiguousCapture()` and `sendQuery()` send `additionalNotes: notesValue(...)`.
 - Bump every `?v=` marker in `index.html` to the release version.
@@ -170,7 +182,7 @@ Wiring:
   2. replace each run of line breaks with " / ", then `oneLine` (collapse whitespace, trim);
   3. replace `/caller'?s words\s*:/gi` with `caller's words -` (protects the consumer's unanchored regex);
   4. empty: return null;
-  5. longer than `config.notes.maxChars`: keep the first maxChars characters plus "…" and `console.warn` with ticket context (DECISION 4).
+  5. longer than `config.notes.maxChars` UTF-16 code units (the same unit the browser `maxlength` and the counter use): take `s.slice(0, max)`; if the last code unit is a high surrogate (`/[\uD800-\uDBFF]$/`), drop it so no lone surrogate is ever emitted; append "…"; `console.warn` with ticket context (DECISION 4). The result is at most max code units plus the marker and is always well-formed Unicode (U4b).
 - `buildTrgBody`: new `additionalNotes` argument; after the transcript loop and before the data-quality footer, `if (additionalNotes)` push the TRG-STEP line (section 4).
 - `createOutcomeTicket`: accept `additionalNotes`, normalise once, pass to `buildBody`. Fixture and live branches both use it.
 - `raiseQuery(operator, siteNo, text, additionalNotes)`: pass through.
@@ -190,7 +202,31 @@ Wiring:
 
 `routes/api.js:379`: requires a non-blank `body`, trims it, calls `zendesk.addFeedbackNote(id, operator, body)`, which writes the internal (non-public) comment shown above, then writes an audit entry `actionType: 'note'`, `detail: Note added to ticket #<id>` (the note text itself is not audited). It has no length cap today; the cap applies only to the new `kind` (no regression to drawer notes).
 
-### 5.5 Sanitisation position (D7)
+### 5.5 Notes lifecycle: every place the value is set or cleared
+
+The notes value lives only in `state.flow.data.additionalNotes`, so it lives and dies with `state.flow`. Every site that creates, replaces or clears `state.flow` (grep of `state.flow =` and `startFlow(` across `public/js`):
+
+| Site | File:line | What happens to notes | Can a note reach the next ticket? |
+|---|---|---|---|
+| `notesInput` (new) | `notes.js` | Sets the value on each keystroke | n/a |
+| `finishOutcome`, `ctlFinish`, `ctlEscalate` success | `flows.js:206`, `control.js:353`, `control.js:390` | Sent once; `_ticketId` recorded; box replaced by the echo | No: the box is gone at stage 99 and carry is refused once `_ticketId` exists |
+| `startFlow` (new flow object) | `flows.js:76` | Fresh `data`, empty notes unless the carry rule applies | No |
+| `startSuggestedFlow`, `startTileFlow` | `flows.js:61`, `flows.js:71` | New flow, no carry | No |
+| Something-else shortcut | `flows.js:265` | Carried (same issue, no ticket yet) | No: refused if a ticket exists |
+| Aircon shortcut | `flows.js:381` | Carried (same issue, no ticket yet) | No: refused if a ticket exists |
+| Run connection check (workspace banner) | `views.js:170` | New flow, no carry | No |
+| In-flow hand-off to connectivity | `flows.js:395`, `flows.js:404`, `flows.js:552` | Same `f.data`, kept (same issue, no ticket yet) | No: same ticket |
+| `cancelFlow` | `flows.js:82` | Flow nulled, notes discarded | No |
+| `anotherIssue` | `flows.js:185` | Flow nulled, notes discarded | No |
+| `endCall` | `views.js:230` | Flow nulled | No |
+| `go` to home (nav, logout path) | `app.js:165` | Flow nulled | No |
+| `openSite` | `views.js:53` | Flow nulled | No |
+| `openControl` when writes are disabled | `control.js:54` | Flow nulled, typed notes discarded with it | No (loss accepted, risk R10) |
+| Ambiguous card, query modal | `views.js:80`, `views.js:390` | Own textarea, read once by `notesValue`, rebuilt empty each time the card or modal opens | No |
+
+Tests E15 and E16 prove no note carries onto a following ticket.
+
+### 5.6 Sanitisation position (D7)
 
 The callerWords pattern in practice is: `oneLine` on the server, and HTML escaping at display time (`esc()` in the OOH dashboard, `escapeHtml()` in the IoT transcript renderer at `app.js:744`). There is no server-side HTML escape, and adding one would show `&amp;` literally in Zendesk. Notes follow the same pattern exactly. The only additions are the " / " line-break rule and the caller's-words neutraliser, both explained above.
 
@@ -202,9 +238,10 @@ The callerWords pattern in practice is: `oneLine` on the server, and HTML escapi
 |---|---|
 | Label | Additional notes for the IoT team (optional) |
 | Placeholder | Anything the caller or site told you that isn't captured above, e.g. engineer due at 7am |
-| Helper text | Goes on the ticket with this outcome. Keep it factual and operational, no personal details. |
+| Helper text | For the ticket and the IoT team's morning review. Not sent in urgent P1 texts. Keep it factual, no personal details. |
 | Counter | `0 / 1000`; amber from 900; at the limit `1000 / 1000, limit reached` and typing stops |
 | Echo after creation | 📝 Your notes are on ticket #N: "…" |
+| Echo on a P1 outcome | 📝 Your notes are on ticket #N for the morning review: "…" (not in the urgent text) |
 | Post-submit link (collapsed) | + Add a note to ticket #N |
 | Post-submit box label | Add a note to ticket #N (optional) |
 | Save button | Save note |
@@ -260,12 +297,15 @@ Fixture sites as already used by `tests/helpers.js`; the ambiguous house ID fixt
 | U2 | `test/zendesk.test.js` | null, '', N5, a number and an object all give a body identical to the no-argument call |
 | U3 | `test/zendesk.test.js` | N2 produces " / " and a single line |
 | U4 | `test/zendesk.test.js` | N4 gives exactly 1000 characters plus "…" |
+| U4b | `test/zendesk.test.js` | Boundary: 999 times "a", then "🔥", then "more" (the 1000th code unit is the high half of the emoji). Result is the 999 "a" plus "…", contains no lone surrogate (neither `[\uD800-\uDBFF](?![\uDC00-\uDFFF])` nor `(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]` matches) and survives a UTF-8 encode and decode unchanged. Control case: 998 "a" then "🔥" keeps the emoji whole |
 | U5 | `test/zendesk.test.js` | N3 with callerWords null: neutralised text present, no line containing `Caller's words:` from the notes |
 | U6 | new `test/iot-consumer-parse.test.js` | Vendored copies of `parseTrgDescription` and `parseOohTrgComment` regexes (pinned to iot-support-dashboard `b217f34`): for bodies with and without notes (and with N3, N7), operator, outcome, callerWords and summary are identical; detail steps equal the old steps plus exactly one notes step |
 | U7 | `test/p1-dispatch-honesty.test.js` | P1 with notes: tags, priority, `escalateP1` summary and dispatch note unchanged; notes only in the [TRG] body |
 | U8 | new `test/additional-notes-routes.test.js` | `/api/query` with notes writes TRG-STEP; audit detail unchanged |
 | U9 | same | `/api/tickets/:id/notes` with `kind` writes the labelled OOH-NOTE and caps; without `kind` the existing body is written unchanged |
 | U10 | same | `/api/me` returns `notes.maxChars` equal to `config.notes.maxChars` |
+| U12 | `test/iot-consumer-parse.test.js` | Late-note visibility: vendored `classifyComment` (body-prefix branches, `app.js:218` to `251`), `isRedactedComment` (`app.js:9343`) and `parseOohTrgComment` (`app.js:713`). For the exact body `addFeedbackNote` writes with `kind: additional-notes` and N1: classify returns null (not `OOH`) and redacted is false, so the comment takes the full-text render path. Negative control: the same body prefixed `[TRG]` gives a parse result that does not contain the note text, which proves why the prefix must stay `[OOH NOTE]` |
+| U13 | `test/iot-consumer-parse.test.js` | Drift check: when `IOT_REPO_PATH` (default `../iot-support-dashboard`) exists, read its `services/ooh-review.js` and `public/js/app.js` and assert the vendored regex sources and comment-classification prefixes still appear verbatim; skipped with a visible notice when the folder is absent (CI) |
 | U11 | new `test/notes-coverage-guard.test.js` | Scans `public/js/*.js`: every `api.post('/api/outcomes'` and `api.post('/api/query'` call object contains `additionalNotes`; expected count of such calls is 5 (flows, ambiguous, query, ctlFinish, ctlEscalate) so a new unguarded call fails the build |
 
 ### 8.3 Browser tests (`npx playwright test`, new `tests/additional-notes.spec.js`, extend `tests/tonight-callback.spec.js` and `tests/control.spec.js`)
@@ -286,6 +326,9 @@ Fixture sites as already used by `tests/helpers.js`; the ambiguous house ID fixt
 | E12 | Aircon shortcut from Heating after typing N1 | Notes carried into the aircon outcome |
 | E13 | Phone viewport 390 x 844, E1 journey | Box visible, no horizontal scroll, textarea computed font-size at least 16px |
 | E14 | Double-fire | Exactly one ticket per outcome with notes |
+| E15 | No carry-over: type N1, record a capture, then Add another issue, start any flow and record an outcome | New box is empty; second ticket body has no notes line. Repeat via End call then a new call, and via Cancel issue |
+| E16 | Carry rule at the aircon shortcut | Before any outcome the shortcut keeps N1 (same issue); after an outcome no new flow starts with N1 |
+| E17 | P1 wording | On a kitchen P1, helper text includes "Not sent in urgent P1 texts" and the P1 echo shows the morning-review wording |
 
 All existing unit and Playwright suites must stay green (`zendesk`, `outcome-callerwords`, `p1-dispatch-honesty`, `tonight-callback`, `control`).
 
@@ -336,6 +379,9 @@ Live P1 and live device-control proofs are deliberately not run (they page the o
 | R5 | Re-render steals focus mid-typing | Low to medium | Focus and caret restore in `render()`; E11 |
 | R6 | Notes containing "Caller's words:" pollute the IoT queue | Low | Neutraliser; U5, U6 |
 | R7 | Late notes lost if the page reloads before saving | Low | Accepted for the stop-gap (ticket still exists) |
+| R9 | Vendored IoT regexes go stale: U6 and U12 test copies are pinned to iot-support-dashboard `b217f34`, so a future IoT change could break visibility while our tests stay green | Low (the IoT consumer is frozen) | **Accepted risk.** Mitigations: U13 drift check fails locally as soon as the real IoT source differs; the pin commit is named in the test header; the section 12 handoff asks the IoT team to treat the step-line format and the `[OOH NOTE]` prefix as part of the OOH contract and to rerun OOH tests U6, U12 and U13 before changing `parseOohTrgComment` or `classifyComment`; a follow-up ticket records the same on the IoT backlog |
+| R10 | Typed notes lost when a control action is blocked by the kill switch (`control.js:54` clears the flow) | Very low | Accepted: existing behaviour clears the whole flow; the agent restarts the issue |
+| R11 | A note on a P1 call is mistaken for something the on-duty manager will see | Medium | Helper text and P1 echo say it is for the ticket and morning review, not the urgent text (DECISION 5); E17 |
 
 Rollback: the change is additive and needs no data migration. `scripts/release.sh` prints the rollback command; the target is v1.3.6, image `080ccab` (`kubectl -n <ns> set image deployment/<deploy> <deploy>=<registry>/...:080ccab`). Tickets already carrying notes remain valid plain text under v1.3.6 and in the IoT dashboard.
 
@@ -345,4 +391,5 @@ Rollback: the change is additive and needs no data migration. `scripts/release.s
 
 - Contract: sections 3 to 7. Load-bearing CX moments: the always-visible box (do not move it into the outcome card), the echo, and the TRG-STEP line format (do not change it to a plain line).
 - Do not touch `C:\repos\iot-support-dashboard` (D3).
-- Open flags: DECISIONS 1 to 4 above (recommended defaults assumed); F3 extra call sites. Visual and behavioural reference: the mockup linked at the top.
+- For the IoT team (R9): the `Additional notes from OOH agent:` step line and the `[OOH NOTE]` prefix are now part of the OOH-to-IoT contract; rerun OOH tests U6, U12 and U13 before changing `parseOohTrgComment` or `classifyComment`.
+- Open flags: DECISIONS 1 to 5 above (recommended defaults assumed); F3 extra call sites. Visual and behavioural reference: the mockup linked at the top.
