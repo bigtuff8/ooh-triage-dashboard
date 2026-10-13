@@ -231,17 +231,18 @@ export function hhmm(iso) {
  *  2. Replace runs of line breaks with " / " so the note stays one line in the IoT step view.
  *  3. oneLine (trim + collapse whitespace).
  *  4. Delimiter-injection defences (prevents forging IoT-parser anchor fields or step timestamps):
- *     a. /\bOperator:\s*/gi  → "Operator - "
- *     b. /\bOutcome:\s*/gi   → "Outcome - "
- *     c. /Caller'?s words\s*:/gi → "caller's words -"
- *     d. /(\b\d{1,2}:\d{2}\s*)[|–—]/g → "$1-"  (neutralise HH:MM| step-lookalikes)
+ *     a. \bOperator:\s* (gi) -> "Operator - "
+ *     b. \bOutcome:\s* (gi)  -> "Outcome - "
+ *     c. Caller'?s words\s*: (gi) -> "caller's words -"
+ *     d. (\b\d{1,2}:\d{2}\s*)[|en-dash|em-dash] (g) -> "$1-" (neutralise HH:MM| step-lookalikes)
  *  5. Empty after defences → return null.
  *  6. Over maxChars (UTF-16 code units): slice, drop lone high surrogate, append "…".
  */
 export function normaliseAdditionalNotes(raw, cfg = config) {
     if (typeof raw !== 'string' || !raw) return null;
-    let s = raw.replace(/[\r\n]+/g, ' / ');
-    s = oneLine(s);
+    // Join non-empty trimmed lines with " / " (filter-first avoids a lone "/" from whitespace-only input)
+    const parts = raw.split(/[\r\n]+/).map(l => l.trim()).filter(l => l.length > 0);
+    let s = oneLine(parts.join(' / '));
     // Delimiter-injection defences
     s = s.replace(/\bOperator:\s*/gi, 'Operator - ');
     s = s.replace(/\bOutcome:\s*/gi, 'Outcome - ');

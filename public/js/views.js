@@ -74,14 +74,14 @@ function vSite() {
 
 function renderAmbiguous() {
     const a = state.ambiguous;
-    $(‘#view’).innerHTML = `<div class=”content narrow”><div class=”card” style=”border-color:var(--warning)” data-testid=”ambiguous-card”>
+    $('#view').innerHTML = `<div class=”content narrow”><div class=”card” style=”border-color:var(--warning)” data-testid=”ambiguous-card”>
    <h2>⚠️ House ID ${esc(a.siteNo)} is ambiguous</h2>
-   <p class=”sub” style=”margin:8px 0”>This ID matches more than one site (${a.matches.map(m => `<b>${esc(m.siteName)}</b>`).join(‘ and ‘)}). To protect against changing the wrong site, remote control is blocked for ambiguous IDs.</p>
-   <div class=”script”>”I can’t safely make changes for this site number tonight — I’ll log this for the IoT team as a priority and they’ll pick it up.”</div>
-   ${notesField({ id: ‘addnotes-amb’ })}
+   <p class=”sub” style=”margin:8px 0”>This ID matches more than one site (${a.matches.map(m => `<b>${esc(m.siteName)}</b>`).join(' and ')}). To protect against changing the wrong site, remote control is blocked for ambiguous IDs.</p>
+   <div class=”script”>”I can't safely make changes for this site number tonight — I'll log this for the IoT team as a priority and they'll pick it up.”</div>
+   ${notesField({ id: 'addnotes-amb' })}
    <div style=”margin-top:10px”>
     <button class=”btn primary” data-testid=”ambiguous-capture” onclick=”ambiguousCapture()”>Capture &amp; escalate to IoT</button>
-    <button class=”btn” onclick=”go(‘home’)” style=”margin-left:8px”>Search again</button>
+    <button class=”btn” onclick=”go('home')” style=”margin-left:8px”>Search again</button>
    </div>
   </div></div>`;
 }
@@ -89,20 +89,20 @@ function renderAmbiguous() {
 async function ambiguousCapture() {
     const a = state.ambiguous;
     try {
-        const { ticket } = await api.post(‘/api/outcomes’, {
-            type: ‘capture’,
+        const { ticket } = await api.post('/api/outcomes', {
+            type: 'capture',
+            additionalNotes: notesValue('addnotes-amb'), // OOHDASH-119
             siteNo: a.siteNo,
-            siteName: `Ambiguous (${a.matches.map(m => m.siteName).join(‘ / ‘)})`,
+            siteName: `Ambiguous (${a.matches.map(m => m.siteName).join(' / ')})`,
             subject: `Ambiguous house ID ${a.siteNo} — caller could not be resolved to one site`,
-            detail: `OOH could not safely resolve house ID ${a.siteNo} (matches ${a.matches.map(m => m.siteName).join(‘ and ‘)}). Captured for IoT priority review.`,
-            OohCaptureClass: ‘data-quality’,
-            additionalNotes: notesValue(‘addnotes-amb’) // OOHDASH-119
+            detail: `OOH could not safely resolve house ID ${a.siteNo} (matches ${a.matches.map(m => m.siteName).join(' and ')}). Captured for IoT priority review.`,
+            OohCaptureClass: 'data-quality'
         });
         toast(`✅ Captured as ticket <b>#${ticket.id}</b> — IoT team will resolve the duplicate ID`);
     } catch (err) {
         toast(`⚠️ ${esc(err.message)}`);
     }
-    go(‘home’);
+    go('home');
 }
 
 function renderConfirmGate() {
@@ -113,7 +113,7 @@ function renderConfirmGate() {
    ${siteSubline(s)}
    ${unverifiedNotice(s)}
    <p style="margin:10px 0 4px">${esc(s.deviceSummary)}</p>
-   <div class="script">“Can I just confirm — you’re calling from <b>${esc(s.siteName)}</b>, site number <b>${esc(s.siteNo)}</b>?”</div>
+   <div class="script">“Can I just confirm — you're calling from <b>${esc(s.siteName)}</b>, site number <b>${esc(s.siteNo)}</b>?”</div>
    <div style="display:flex;gap:10px;margin-top:16px">
     <button class="btn primary big" data-testid="confirm-site" onclick="confirmSite()">✓ This is the right site</button>
     <button class="btn big" onclick="go('home')">Search again</button>
@@ -390,25 +390,25 @@ function paintTonight() {
 
 function raiseQuery() {
     openModal(`<div class="mh">Raise a query with the IoT team<button class="btn link" onclick="closeModal()">✕</button></div><div class="mb">
-  <p class="sub" style="margin-bottom:10px">For anything older than tonight, or anything you’re unsure about — this goes straight onto a ticket for the team.</p>
+  <p class="sub" style="margin-bottom:10px">For anything older than tonight, or anything you're unsure about — this goes straight onto a ticket for the team.</p>
   <div class="formrow"><label>Site (if known)</label><input id="qsite" data-testid="query-site" placeholder="e.g. 6832"></div>
-  <div class="formrow"><label>Your query</label><textarea id="qtxt" data-testid="query-text" rows="3" placeholder="e.g. Caller says they rang two nights ago about fryers — can’t see it tonight"></textarea></div>
-  ${notesField({ id: ‘addnotes-q’ })}
+  <div class="formrow"><label>Your query</label><textarea id="qtxt" data-testid="query-text" rows="3" placeholder="e.g. Caller says they rang two nights ago about fryers — can't see it tonight"></textarea></div>
+  ${notesField({ id: 'addnotes-q' })}
  </div><div class="mf"><button class="btn" onclick="closeModal()">Cancel</button><button class="btn primary" data-testid="query-send" onclick="sendQuery()">Send query</button></div>`);
 }
 
 async function sendQuery() {
-    const text = $(‘#qtxt’)?.value?.trim();
-    if (!text) { toast(‘⚠️ Describe the query first’); return; }
+    const text = $('#qtxt')?.value?.trim();
+    if (!text) { toast('⚠️ Describe the query first'); return; }
     try {
-        const { ticket } = await api.post(‘/api/query’, {
-            siteNo: $(‘#qsite’)?.value?.trim() || null,
+        const { ticket } = await api.post('/api/query', {
+            siteNo: $('#qsite')?.value?.trim() || null,
             text,
-            additionalNotes: notesValue(‘addnotes-q’) // OOHDASH-119
+            additionalNotes: notesValue('addnotes-q') // OOHDASH-119
         });
         closeModal();
         toast(`✅ Query sent to the IoT team — ticket <b>#${ticket.id}</b>`);
-        if (state.view === ‘tonight’) vTonight();
+        if (state.view === 'tonight') vTonight();
     } catch (err) {
         toast(`⚠️ ${esc(err.message)}`);
     }

@@ -354,14 +354,14 @@ async function ctlFinish() {
     try {
         const res = await api.post('/api/outcomes', {
             type: c.action.actionType,
+            additionalNotes, // OOHDASH-119
             actionId: c.action.actionId,
             siteNo: state.workspace.site.siteNo,
             siteName: state.workspace.site.siteName,
             subject: `${what} — ${c.device.zone}`,
             detail: `${what} to ${ctlValTxt(c)} on ${c.device.deviceId}, device-confirmed (synced).`,
             callerWords: state.flow?.data?.freeText || null,
-            holdText: holdTxt,
-            additionalNotes // OOHDASH-119
+            holdText: holdTxt
         });
         notesDraftClear(); // OOHDASH-119: clear sessionStorage draft on success
         if (state.flow?.data) { state.flow.data._ticketId = res.ticket.id; }
@@ -391,33 +391,35 @@ async function ctlEscalate() {
     window.ctl = null;
     closeModal();
     const what = CTL_WHAT[c.mode];
-    const why = c.action?.state === ‘timeout’ ? ‘no sync confirmation (timeout)’ : `write ${c.action?.state || ‘failed’} (vendor ${c.action?.state || ‘failed’})`;
-    const isTimeout = c.action?.state === ‘timeout’;
+    const why = c.action?.state === 'timeout' ? 'no sync confirmation (timeout)' : `write ${c.action?.state || 'failed'} (vendor ${c.action?.state || 'failed'})`;
+    const isTimeout = c.action?.state === 'timeout';
     // OOHDASH-119: carry any notes typed before the control was attempted
     const additionalNotes = state.flow?.data?.additionalNotes || null;
     let html;
     try {
-        const res = await api.post(‘/api/outcomes’, {
-            type: ‘capture’,
-            actionId: c.action?.actionId, // links the failed dispatch’s audit entry + late-sync ticket updates
+        const res = await api.post('/api/outcomes', {
+            type: 'capture',
+            additionalNotes, // OOHDASH-119
+            actionId: c.action?.actionId, // links the failed dispatch's audit entry + late-sync ticket updates
             siteNo: state.workspace.site.siteNo,
             siteName: state.workspace.site.siteName,
             subject: `${what} — NOT applied, escalated`,
             detail: `Attempted ${what} (${ctlValTxt(c)}) on ${c.device.deviceId} but ${why}. Change must be treated as not applied.`,
             callerWords: state.flow?.data?.freeText || null,
-            OohCaptureClass: ‘control-failure’,
-            additionalNotes // OOHDASH-119
+            OohCaptureClass: 'control-failure'
         });
         notesDraftClear(); // OOHDASH-119
         if (state.flow?.data) { state.flow.data._ticketId = res.ticket.id; }
-        registerIssue(`${what} — NOT applied`, ‘blue’, res.ticket.id);
+        registerIssue(`${what} — NOT applied`, 'blue', res.ticket.id);
         html = `<div class=”outcome captured” data-testid=”outcome-escalated”><h3>📥 Captured for the IoT team</h3>
   <p>Attempted ${what} (${ctlValTxt(c)}) on <span class=”mono”>${esc(c.device.deviceId)}</span> but ${esc(why)}. <b>The change must be treated as not applied.</b></p>
-  <div class=”script”>”I tried to make that change remotely but the device hasn’t confirmed it, so I’m not going to tell you it’s done when it may not be. I’ve logged it as a priority instead${isTimeout ? ‘ — it may still land, and the team will check’ : ‘’}.”</div>
+  <div class=”script”>”I tried to make that change remotely but the device hasn't confirmed it, so I'm not going to tell you it's done when it may not be. I've logged it as a priority instead${isTimeout ? ' — it may still land, and the team will check' : ''}.”</div>
   <p class=”small”>Ticket <b>#${res.ticket.id}</b></p>%%NOTESPOST%%${outButtons()}</div>`;
     } catch (err) {
-        html = `<div class=”alert err”>Couldn’t record the escalation: ${esc(err.message)} — raise it via Tonight → Raise a query so it isn’t lost.</div>${outButtons()}`;
+        html = `<div class=”alert err”>Couldn't record the escalation: ${esc(err.message)} — raise it via Tonight → Raise a query so it isn't lost.</div>${outButtons()}`;
     }
     if (state.flow) { state.flow.stage = 99; state.flow.data._outcomeHtml = html; }
     render();
 }
+
+

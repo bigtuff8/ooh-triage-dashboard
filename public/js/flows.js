@@ -180,10 +180,10 @@ function areaRepresentative(devices) {
 function renderFlow() {
     const f = state.flow;
     const c = catOf(f.cat);
-    let body = ‘’;
+    let body = '';
     if (f.stage === 99 && f.data._outcomeHtml) {
         // OOHDASH-119: replace %%NOTESPOST%% placeholder with the rendered post-submit box
-        body = f.data._outcomeHtml.replace(‘%%NOTESPOST%%’, notesPostBox(f.data._ticketId));
+        body = f.data._outcomeHtml.replace('%%NOTESPOST%%', notesPostBox(f.data._ticketId));
     } else {
         try { body = FLOWR[f.cat](state.workspace, f); }
         catch (e) { body = `<div class=”alert err”>Flow error: ${esc(e.message)}</div>`; }
@@ -191,11 +191,11 @@ function renderFlow() {
     // OOHDASH-119 FLOW-BOX: inject the notes textarea into every active step (stage < 99).
     // At stage 99 the notes post-box is already embedded in the outcome HTML above.
     const notesBox = f.stage !== 99
-        ? notesField({ id: ‘addnotes’, bind: ‘flow’, value: f.data.additionalNotes || ‘’ })
-        : ‘’;
+        ? notesField({ id: 'addnotes', bind: 'flow', value: f.data.additionalNotes || '' })
+        : '';
     return `<div class=”flowpanel” data-testid=”flow-panel”>
   <div class=”flowhead”><span style=”font-size:18px”>${c.ic}</span><b>${c.t}</b><span class=”small” style=”margin-left:6px”>guided flow</span><button class=”btn link” style=”margin-left:auto” onclick=”cancelFlow()”>Cancel issue</button></div>
-  <div class=”flowbody”>${f.data.freeText ? `<div class=”stepdone”><span>💬</span>Caller’s words: “${esc(f.data.freeText)}”</div>` : ‘’}${f.done.map(d => `<div class=”stepdone”><span class=”tick”>✓</span>${d}</div>`).join(‘’)}${body}${notesBox}</div>
+  <div class=”flowbody”>${f.data.freeText ? `<div class=”stepdone”><span>💬</span>Caller's words: “${esc(f.data.freeText)}”</div>` : ''}${f.done.map(d => `<div class=”stepdone”><span class=”tick”>✓</span>${d}</div>`).join('')}${body}${notesBox}</div>
   <div class=”flowfoot”><span>Operator: <b>${esc(state.me.operator.name)}</b></span><span style=”margin-left:auto”>Everything here is recorded to the Zendesk ticket automatically</span></div>
  </div>`;
 }
@@ -223,30 +223,30 @@ function registerIssue(label, cls, ticketId) {
  */
 function finishOutcome(f, key, payload, renderCard) {
     // Already succeeded — return the cached card HTML
-    if (f.data[‘_out_’ + key]) return f.data[‘_out_’ + key];
+    if (f.data['_out_' + key]) return f.data['_out_' + key];
     // Error state — show inline retry
-    if (f.data[‘_err_’ + key]) {
-        const msg = f.data[‘_err_’ + key];
-        return `<div class=”alert err”>Couldn’t record the outcome: ${esc(msg)}
-   <button class=”chip” style=”margin-left:8px” onclick=”state.flow.data[‘_err_${key}’]=null;state.flow.data[‘_pend_${key}’]=null;state.flow.data[‘_conf_${key}’]=null;render()”>Try again</button></div>`;
+    if (f.data['_err_' + key]) {
+        const msg = f.data['_err_' + key];
+        return `<div class=”alert err”>Couldn't record the outcome: ${esc(msg)}
+   <button class=”chip” style=”margin-left:8px” onclick=”state.flow.data['_err_${key}']=null;state.flow.data['_pend_${key}']=null;state.flow.data['_conf_${key}']=null;render()”>Try again</button></div>`;
     }
     // Store the payload and renderCard idempotently on first visit
-    if (!f.data[‘_conf_’ + key]) {
-        f.data[‘_conf_’ + key] = { ...payload };
-        f.data[‘_renderCard_’ + key] = renderCard;
+    if (!f.data['_conf_' + key]) {
+        f.data['_conf_' + key] = { ...payload };
+        f.data['_renderCard_' + key] = renderCard;
     }
     // Submitting — loading state
-    if (f.data[‘_pend_’ + key]) {
-        return ‘<div class=”alert info”>Recording the outcome…</div>’;
+    if (f.data['_pend_' + key]) {
+        return '<div class=”alert info”>Recording the outcome…</div>';
     }
     // Confirm step: show outcome description + Record outcome button
     // (The FLOW-BOX is injected by renderFlow outside this function so it stays live during the step)
     return `<div class=”confirm-step” data-testid=”confirm-step”>
   <div class=”alert info” style=”margin-bottom:8px”>
    <b>${esc(payload.subject)}</b>
-   ${payload.detail ? `<div style=”margin-top:4px;font-size:0.9em”>${esc(payload.detail)}</div>` : ‘’}
+   ${payload.detail ? `<div style=”margin-top:4px;font-size:0.9em”>${esc(payload.detail)}</div>` : ''}
   </div>
-  <button class=”btn primary” data-testid=”record-outcome” style=”margin-top:4px” onclick=”submitPendingOutcome(‘${key}’)”>Record outcome</button>
+  <button class=”btn primary” data-testid=”record-outcome” style=”margin-top:4px” onclick=”submitPendingOutcome('${key}')”>Record outcome</button>
  </div>`;
 }
 
@@ -257,15 +257,15 @@ function finishOutcome(f, key, payload, renderCard) {
 window.submitPendingOutcome = function submitPendingOutcome(key) {
     const f = state.flow;
     if (!f) return;
-    const payload = f.data[‘_conf_’ + key];
+    const payload = f.data['_conf_' + key];
     if (!payload) return;
     // Retrieve the renderCard stored on the closure captured in the outcome helper.
     // We stored it alongside the payload at _renderCard_ when the confirm step was first built.
-    const renderCard = f.data[‘_renderCard_’ + key];
-    f.data[‘_pend_’ + key] = 1;
+    const renderCard = f.data['_renderCard_' + key];
+    f.data['_pend_' + key] = 1;
     render(); // shows the loading state immediately
     const ws = state.workspace;
-    api.post(‘/api/outcomes’, {
+    api.post('/api/outcomes', {
         siteNo: ws.site.siteNo,
         siteName: ws.site.siteName,
         callerWords: f.data.freeText || null,
@@ -275,21 +275,21 @@ window.submitPendingOutcome = function submitPendingOutcome(key) {
         notesDraftClear(); // OOHDASH-119: clear sessionStorage draft on success
         const echo = f.data.freeText
             ? `<div class=”stepdone small” data-testid=”outcome-callerwords”><span>💬</span>Recorded from the caller: “${esc(f.data.freeText)}”</div>`
-            : ‘’;
+            : '';
         const notesEcho = f.data.additionalNotes
             ? `<div class=”stepdone small” data-testid=”addnotes-echo”><span>📝</span>Note added — for the ticket and morning review: “${esc(f.data.additionalNotes)}”</div>`
-            : ‘’;
-        const card = renderCard ? renderCard(res) : ‘’;
-        const html = echo + notesEcho + card + ‘%%NOTESPOST%%’ + outButtons();
-        f.data[‘_out_’ + key] = html;
+            : '';
+        const card = renderCard ? renderCard(res) : '';
+        const html = echo + notesEcho + card + '%%NOTESPOST%%' + outButtons();
+        f.data['_out_' + key] = html;
         f.data._ticketId = res.ticket.id;
-        registerIssue(payload.issueLabel || payload.subject, payload.issueCls || ‘blue’, res.ticket.id);
+        registerIssue(payload.issueLabel || payload.subject, payload.issueCls || 'blue', res.ticket.id);
         f.stage = 99;
         f.data._outcomeHtml = html;
         render();
     }).catch(err => {
-        f.data[‘_err_’ + key] = err.message;
-        f.data[‘_pend_’ + key] = null;
+        f.data['_err_' + key] = err.message;
+        f.data['_pend_' + key] = null;
         render();
     });
 };
