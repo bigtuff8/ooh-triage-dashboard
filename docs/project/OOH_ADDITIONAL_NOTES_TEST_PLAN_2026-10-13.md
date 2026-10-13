@@ -23,7 +23,7 @@ A check passes only when it produces observable evidence matching the expected o
 **Date:** 2026-10-13
 **Ticket:** OOHDASH-119
 **Tester:** Independent (test-stage, not the builder)
-**Branch under test:** build/oohdash-119-additional-notes @ 32a0aa6 (rework R2)
+**Branch under test:** build/oohdash-119-additional-notes @ b726b69 (rework R3b)
 **Test branch:** test/oohdash-119-additional-notes
 **Script:** tests/tester/oohdash-119.tester.spec.js
 
@@ -41,22 +41,22 @@ The U11 test must be removed from the suite. It must not be used as evidence of 
 
 Note: the build plan itself specified U11 in this form. The design regression is in the plan (plan asked for a source-check); the code bug is that the builder implemented it as specified. This finding routes both to the author (remove the test file) and to the design stage (the plan must not specify source-check tests in future).
 
-### F-02 — Copy deviations from design section 6 (updated after rework R2 @ 32a0aa6)
+### F-02 — Copy deviations from design section 6 (resolved 8/8 after rework R3 @ b726b69)
 
-Rework R2 corrected 7 of the 8 original deviations. The table below shows the full status. One deviation remains open and routes to the author as a code bug.
+All 8 original deviations are now resolved. The table below is the final status.
 
-| Element | Design says | Status after R2 |
+| Element | Design says | Status after R3 |
 |---------|-------------|-----------------|
-| Label | Additional notes for the IoT team (optional) | RESOLVED — now matches exactly |
-| Placeholder | Anything the caller or site told you that isn't captured above, e.g. engineer due at 7am | RESOLVED — now matches exactly |
-| Helper text | For the ticket and the IoT team's morning review. Not sent in urgent P1 texts. Keep it factual, no personal details. | RESOLVED — typographic apostrophe in "team's" is acceptable |
+| Label | Additional notes for the IoT team (optional) | RESOLVED — matches exactly |
+| Placeholder | Anything the caller or site told you that isn't captured above, e.g. engineer due at 7am | RESOLVED — matches exactly |
+| Helper text | For the ticket and the IoT team's morning review. Not sent in urgent P1 texts. Keep it factual, no personal details. | RESOLVED |
 | Echo (non-P1) | 📝 Your notes are on ticket #N: "…" (curly quotes) | RESOLVED — ticket ID present, curly quotes U+201C/U+201D used |
-| Echo (P1 outcome) | 📝 Your notes are on ticket #N for the morning review: "…" (not in the urgent text) | RESOLVED — distinct P1 branch now in submitPendingOutcome using payload.type === 'escalate-p1' |
-| Post-submit box label | Add a note to ticket #N (optional) | RESOLVED — "optional" now present |
-| Saved confirmation | ✓ Note saved to ticket #N | RESOLVED — ticket number now included |
-| Counter amber threshold | amber from 900 | OPEN — implementation goes grey to red only at 1000; no amber/warning colour at 900. Code bug, routes to author. |
+| Echo (P1 outcome) | 📝 Your notes are on ticket #N for the morning review: "…" (not in the urgent text) | RESOLVED — distinct P1 branch in submitPendingOutcome |
+| Post-submit box label | Add a note to ticket #N (optional) | RESOLVED |
+| Saved confirmation | ✓ Note saved to ticket #N | RESOLVED — ticket number included |
+| Counter amber threshold | amber from 900 | RESOLVED — R3 adds warnAt = floor(maxChars * 0.9); var(--warning,#f80) applied |
 
-The one remaining open item (counter amber at 900) is a code bug: `notesInput` sets `counter.style.color` to `var(--danger,#c00)` at limit and `var(--text-muted,#666)` otherwise; there is no intermediate warning colour at 900. TF-05 in the tester spec asserts for this behaviour and will flag it as a failure.
+F-02 is closed. Sam Day copy sign-off is still required before Stage B (the copy is now correct; sign-off is the gate on that, not a deviation finding).
 
 ### F-03 — Builder's spec E1 does not cover the plan's E1 (code-bug exposure risk, informational)
 
@@ -161,6 +161,9 @@ Note on shared-path endpoints: endpoints 1a, 2, 3, 5, 6, 8, 11, 13, 15, 16, 17, 
 | TF-28 | Mobile 390x844: E1 journey — notes box visible, no horizontal scroll, textarea computed font-size >= 16px | Data fidelity |
 | TF-29 | Desktop 1280x900: E1 journey — counter visible, label visible, box does not cause layout shift | Data fidelity |
 | TF-30 | Empty notes: POST body additionalNotes is null; after outcome card, no "Additional notes" text in fixture ticket response body | Data fidelity, removal assertion |
+| TF-31 | Two different notes saved on the same ticket: first save succeeds, "Add another note" link visible, second save carries a NEW idempotency key and also succeeds; both PATCHes reach the server | State-reset, data fidelity |
+| TF-32 | Amber counter at 900: type 900 chars, assert counter colour resolves to the warning/amber CSS variable (--warning or #f80), not muted and not danger | Data fidelity |
+| TF-33 | Single-quote escaping: note value containing "it's fine" is escaped to &#39; in the textarea value attribute on sessionStorage restore; esc() covers single-quote breakout | Data fidelity |
 
 ---
 

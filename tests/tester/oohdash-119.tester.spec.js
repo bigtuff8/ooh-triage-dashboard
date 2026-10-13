@@ -225,28 +225,7 @@ test('TF-05a: 1100-char input capped at 1000; counter shows limit reached', asyn
     await expect(counter).toHaveText('1000 / 1000, limit reached');
 });
 
-test('TF-05b: counter colour is amber/warning at 900 chars (design §6 — expected to fail until fix)', async ({ page }) => {
-    await signIn(page, 'Test Handler');
-    await confirmSite(page, '6832', 'Old Grey Mare');
-    await page.locator('[data-testid="tile-other"]').click();
-
-    const notesBox = page.locator('#addnotes');
-    // Type exactly 900 chars — should trigger amber warning per design §6
-    await notesBox.fill('A'.repeat(900));
-
-    const counterColor = await page.evaluate(() => {
-        const el = document.getElementById('addnotes-counter');
-        if (!el) return '';
-        return window.getComputedStyle(el).color;
-    });
-    // Design says amber from 900; acceptable amber values include orange, amber, or a warning CSS var.
-    // Red/danger (#c00) at exactly 900 chars is a failure — should only appear at 1000.
-    // This assertion documents the expected behaviour; it will fail if only red/grey are implemented.
-    const isDanger = counterColor.includes('204, 0, 0') || counterColor.includes('cc0000') || counterColor.includes('#c00');
-    const isMuted = counterColor.includes('102, 102, 102') || counterColor.includes('666');
-    // Neither danger nor muted — must be an intermediate amber/warning colour
-    expect(isDanger || isMuted).toBe(false); // EXPECTED TO FAIL until amber threshold added
-});
+// TF-05b is now TF-32 (moved to end of file with the R3 additions).
 
 // ─────────────────────────────────────────────────────────────────────────────
 // TF-06: Fridge P1 family — POST body has additionalNotes, echo visible.
@@ -1051,4 +1030,137 @@ test('TF-30: empty notes produces null in POST and no TRG-STEP in ticket body', 
     await expect(page.locator('[data-testid="addnotes-echo"]')).toHaveCount(0);
     // Post-submit link still present (feature always shows it)
     await expect(page.locator('[data-testid="addnotes-post-open"]')).toBeVisible();
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// TF-31: Two different notes saved on the same ticket are BOTH written.
+//        The idempotency token is reset after the first save (token deleted on
+//        success in R3b), so the second save carries a distinct token and the
+//        server writes it independently. Verifies the operator condition that
+//        the override allows multiple notes per ticket.
+// ─────────────────────────────────────────────────────────────────────────────
+test('TF-31: two sequential post-submit notes on the same ticket both reach the server', async ({ page }) => {
+    await signIn(page, 'Test Handler');
+    await confirmSite(page, '6832', 'Old Grey Mare');
+    await page.locator('[data-testid="tile-other"]').click();
+    await page.locator('[data-testid="other-text"]').pressSequentially('two-note test', { delay: 20 });
+    await page.locator('[data-testid="other-capture"]').click();
+    await page.locator('[data-testid="record-outcome"]').click();
+    await expect(page.locator('[data-testid="outcome-captured"]')).toBeVisible();
+
+    // Collect all notes POSTs
+    const noteRequests = [];
+    page.on('request', req => {
+        if (req.url().includes('/api/tickets/') && req.url().includes('/notes') && req.method() === 'POST') {
+            try { noteRequests.push(JSON.parse(req.postData())); } catch { /* ignore */ }
+        }
+    });
+
+    // First save
+    await page.locator('[data-testid="addnotes-post-open"]').click();
+    await page.locator('[data-testid="addnotes-post-input"]').fill('First late note from TF-31');
+    await page.locator('[data-testid="addnotes-post-save"]').click();
+    await expect(page.locator('[data-testid="addnotes-post-saved"]')).toBeVisible();
+
+    // Intermediate: "Add another note" link must appear after first save
+    const anotherLink = page.locator('[data-testid="addnotes-post-another"]');
+    await expect(anotherLink).toBeVisible();
+
+    // Second save — box must reset for fresh input
+    await anotherLink.click();
+    const secondInput = page.locator('[data-testid="addnotes-post-input"]');
+    await expect(secondInput).toBeVisible();
+    await expect(secondInput).toHaveValue('');
+    await secondInput.fill('Second late note from TF-31');
+    await page.locator('[data-testid="addnotes-post-save"]').click();
+    await expect(page.locator('[data-testid="addnotes-post-saved"]')).toBeVisible();
+
+    // Both requests must have reached the server
+    expect(noteRequests.length).toBe(2);
+    expect(noteRequests[0].body).toContain('First late note from TF-31');
+    expect(noteRequests[1].body).toContain('Second late note from TF-31');
+
+    // Idempotency keys must be distinct (token regenerated after first save)
+    const key1 = noteRequests[0].idempotencyKey;
+    const key2 = noteRequests[1].idempotencyKey;
+    expect(key1).toBeTruthy();
+    expect(key2).toBeTruthy();
+    expect(key1).not.toBe(key2);
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// TF-32: Amber counter at 900 chars — R3 fix: warnAt = floor(maxChars * 0.9).
+//        At exactly 900 chars the counter must use the warning CSS variable,
+//        not the muted colour and not the danger colour.
+// ─────────────────────────────────────────────────────────────────────────────
+test('TF-32: counter colour is amber/warning at 900 chars, not muted and not danger', async ({ page }) => {
+    await signIn(page, 'Test Handler');
+    await confirmSite(page, '6832', 'Old Grey Mare');
+    await page.locator('[data-testid="tile-other"]').click();
+
+    await page.locator('#addnotes').fill('A'.repeat(900));
+
+    const counterInfo = await page.evaluate(() => {
+        const el = document.getElementById('addnotes-counter');
+        if (!el) return { color: '', style: '', text: '' };
+        return {
+            color: window.getComputedStyle(el).color,
+            style: el.style.color,
+            text: el.textContent
+        };
+    });
+
+    expect(counterInfo.text).toContain('900 / 1000');
+
+    // Not danger (only at 1000)
+    const isDanger = counterInfo.style.includes('danger') || counterInfo.style.includes('#c00');
+    expect(isDanger).toBe(false);
+
+    // Not muted (only below 900)
+    const isMuted = counterInfo.style.includes('text-muted') || counterInfo.style.includes('#666');
+    expect(isMuted).toBe(false);
+
+    // Must use the warning variable
+    const isWarning = counterInfo.style.includes('warning') || counterInfo.style.includes('#f80');
+    expect(isWarning).toBe(true);
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// TF-33: Single-quote escaping — esc() R3b now escapes ' to &#39;.
+//        A note with a single quote is stored raw in sessionStorage and
+//        correctly decoded back to the original string via the DOM value
+//        property; the HTML attribute form uses &#39; to prevent breakout.
+// ─────────────────────────────────────────────────────────────────────────────
+test('TF-33: single-quote in note is escaped in HTML attribute on sessionStorage restore', async ({ page }) => {
+    const NOTE_WITH_QUOTE = "it's a problem with the boiler's thermostat";
+
+    await signIn(page, 'Test Handler');
+    await confirmSite(page, '6832', 'Old Grey Mare');
+    await page.locator('[data-testid="tile-other"]').click();
+    await page.locator('#addnotes').fill(NOTE_WITH_QUOTE);
+    await page.waitForTimeout(700); // debounce flush
+
+    // sessionStorage stores the raw unescaped value
+    const stored = await page.evaluate(() => {
+        try { return JSON.parse(sessionStorage.getItem('ooh_note_draft')); } catch { return null; }
+    });
+    expect(stored?.value).toBe(NOTE_WITH_QUOTE);
+
+    // Reload to force sessionStorage restore path through notesField()
+    await page.reload();
+    await confirmSite(page, '6832', 'Old Grey Mare');
+    await page.locator('[data-testid="tile-other"]').click();
+
+    const notesBox = page.locator('#addnotes');
+    await expect(notesBox).toBeVisible();
+
+    // DOM .value must equal the original string (browser decodes &#39; back to ')
+    await expect(notesBox).toHaveValue(NOTE_WITH_QUOTE);
+
+    // The rendered HTML must contain &#39; not a bare apostrophe inside the attribute
+    const outerHtml = await page.evaluate(() => {
+        const el = document.getElementById('addnotes');
+        return el ? el.outerHTML : '';
+    });
+    expect(outerHtml).toContain('&#39;');
 });
