@@ -296,6 +296,10 @@ test('E16: notes carried in POST for lighting P1 escalation', async ({ page }) =
     const body = JSON.parse(req.postData());
     expect(body.additionalNotes).toBe(NOTE);
     expect(body.type).toBe('escalate-p1');
+    // Negative: note must NOT appear in the P1 SMS summary payload sent to escalateP1.
+    // p1Summary is what escalateP1 uses as the pager message body.
+    expect(body.p1Summary ?? '').not.toContain(NOTE);
+    expect(body.subject ?? '').not.toContain(NOTE);
 });
 
 // ─── E17: P1 wording — helper text and echo on a P1 outcome ─────────────────
@@ -536,6 +540,53 @@ test('E24: two different notes saved sequentially on the same ticket — both wr
     // Both POSTs must have fired with DIFFERENT idempotency tokens.
     expect(tokens.length).toBe(2);
     expect(tokens[0]).not.toBe(tokens[1]);
+
+    await page.unroute('**/api/tickets/*/notes');
+});
+
+// ─── E25: server 500 on first save → Try again succeeds → note written once ──
+
+test('E25: server 500 on first save does not deduplicate the retry — note is written exactly once', async ({ page }) => {
+    const NOTE = 'E25 retry after 500 note';
+    await signIn(page, 'Test Handler');
+    await confirmSite(page, '6832', 'Old Grey Mare');
+
+    await page.locator('[data-testid="tile-other"]').click();
+    await page.locator('[data-testid="other-text"]').pressSequentially('e25 retry test', { delay: 20 });
+    await page.locator('[data-testid="other-capture"]').click();
+    await page.locator('[data-testid="record-outcome"]').click();
+    await expect(page.locator('[data-testid="outcome-captured"]')).toBeVisible({ timeout: 8000 });
+    await expect(page.locator('[data-testid="addnotes-post-open"]')).toBeVisible({ timeout: 4000 });
+
+    // Count how many times the route is actually called.
+    let callCount = 0;
+    let firstDone = false;
+    await page.route('**/api/tickets/*/notes', async route => {
+        callCount++;
+        if (!firstDone) {
+            firstDone = true;
+            // Return 500 on first attempt.
+            await route.fulfill({ status: 500, body: JSON.stringify({ error: 'simulated server error' }), contentType: 'application/json' });
+        } else {
+            await route.continue();
+        }
+    });
+
+    await page.locator('[data-testid="addnotes-post-open"]').click();
+    await page.locator('[data-testid="addnotes-post-input"]').fill(NOTE);
+    await page.locator('[data-testid="addnotes-post-save"]').click();
+
+    // First attempt → error state shown (server returned 500).
+    await expect(page.locator('[data-testid="addnotes-post-error"]')).toBeVisible({ timeout: 6000 });
+
+    // Retry — same token — server must NOT deduplicate (token was never committed).
+    await page.locator('[data-testid="addnotes-post-save"]').click();
+
+    // Retry succeeds → saved state.
+    await expect(page.locator('[data-testid="addnotes-post-saved"]')).toBeVisible({ timeout: 6000 });
+
+    // Route was called exactly twice (first fail + one retry).
+    expect(callCount).toBe(2);
 
     await page.unroute('**/api/tickets/*/notes');
 });

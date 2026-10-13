@@ -153,3 +153,34 @@ test('U14: notesField() escapes XSS payload — no raw <img> or </textarea> or <
     assert.ok(html.includes('&lt;/textarea&gt;'), '</textarea> is escaped');
     assert.ok(html.includes('&lt;script&gt;'), '<script> is escaped');
 });
+
+/* ------------------------------------------------------------------ */
+/* U15 — idempotency write-then-commit: failed write allows retry      */
+/* ------------------------------------------------------------------ */
+
+test('U15: _notesIdempCheck / _notesIdempCommit — failed write does not block retry with same token', async () => {
+    // Import the test-only exports directly.
+    const { _notesIdempCheckForTest: check, _notesIdempCommitForTest: commit, _notesIdempMapForTest: map } = await import('../routes/api.js');
+
+    const ticketId = 'u15-ticket-' + Date.now();
+    const token = 'u15-tok-' + Math.random().toString(36).slice(2);
+
+    // Precondition: token is not in the Map.
+    assert.equal(check(ticketId, token), false, 'first check: not a duplicate');
+
+    // Simulate: write fails — do NOT commit. Retry with the same token.
+    assert.equal(check(ticketId, token), false, 'retry after failure: still not a duplicate (token was never committed)');
+
+    // Simulate: write succeeds — commit.
+    commit(ticketId, token);
+
+    // Now the same token IS a duplicate (second client re-send after the ACK).
+    assert.equal(check(ticketId, token), true, 'after commit: a subsequent same-token call is deduplicated');
+
+    // Different token on same ticket is still NOT a duplicate.
+    const token2 = token + '-b';
+    assert.equal(check(ticketId, token2), false, 'different token: never a duplicate');
+
+    // Cleanup so TTL entries do not pollute other tests.
+    map.delete(`${ticketId}:${token}`);
+});

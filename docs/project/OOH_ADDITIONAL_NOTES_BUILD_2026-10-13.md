@@ -2,7 +2,7 @@
 
 <!-- gate:contract
 SECTION: Overview
-Rework round 3 (final targeted fixes) of OOHDASH-119 "Additional notes before ticket submit" on branch build/oohdash-119-additional-notes. Nine technical and security fixes applied per operator-approved rework mandate. Full unit (348/349) and e2e (90/90) suites pass. Zero CR bytes in all changed files. Quote-only diff remains zero.
+Panel-approved defect fixes on OOHDASH-119 "Additional notes before ticket submit", branch build/oohdash-119-additional-notes. Real defect (idempotency write-then-commit) fixed; P1 negative assertion added; all test counts reconciled to a single consistent run. Unit 349/350, e2e 92/92. Zero CR bytes.
 
 SECTION: What changed and why (rework round 3)
 The build-completion committee blocked a second time on technical issues (CRLF line endings producing spurious diffs) and security issues (XSS evidence gap, IDOR disclosure, missing idempotency on retry). Nine targeted fixes address every blocking item.
@@ -22,8 +22,8 @@ The route accepts any authenticated operator's note against any ticket ID in the
 SECTION: Fix 5 — echo ticket-ID guard
 res?.ticket?.id guarded with ?? null fallback. Echo reads "the ticket" instead of "ticket #undefined" when the server returns a degraded response without a ticket object.
 
-SECTION: Fix 6 — retry double-post idempotency
-Client: _postNotesPending flag set before fetch, cleared in both success and catch, preventing rapid double-click on Try again. _postNotesToken (random+timestamp) generated once per open box, sent as idempotencyKey in POST body, survives retries. On success, token is deleted so the next save (via "Add another note") generates a fresh token. Server: _notesIdempCheck() maintains an in-memory Map keyed on ticketId:token with 60-second TTL; duplicate within window returns 200 ok with deduplicated:true without writing. Stale entries purged on each check. Single-instance assumption: k8s/deployment.yaml line 15 sets replicas: 1 with comment "MUST stay at 1 until session affinity or shared session store"; the in-memory Map is a double-click and retry guard only, not a distributed dedup. Notes persisted to Zendesk survive rollback to v1.3.6; there is no per-feature killswitch. E24 confirms two different notes within 60 s receive different tokens and both are written.
+SECTION: Fix 6 — retry double-post idempotency (write-then-commit)
+Client: _postNotesPending flag set before fetch, cleared in both success and catch, preventing rapid double-click on Try again. _postNotesToken (random+timestamp) generated once per open box, sent as idempotencyKey in POST body, survives retries. On success, token is deleted so the next save (via "Add another note") generates a fresh token. Server: two-phase write-then-commit discipline — _notesIdempCheck() only READS the Map (does not set); _notesIdempCommit() sets the Map entry ONLY after a successful Zendesk write. If the write fails, the token is never committed, so the client's retry with the same token is allowed through and attempts the write again (not silently dropped). Stale entries (>60s) purged on each check. Single-instance assumption: k8s/deployment.yaml line 15 sets replicas: 1 with comment "MUST stay at 1 until session affinity or shared session store"; the in-memory Map is a double-click and retry guard only, not a distributed dedup. Notes persisted to Zendesk survive rollback to v1.3.6; there is no per-feature killswitch. E24 confirms two sequential notes within 60 s receive different tokens and both are written. E25 confirms a 500 on the first save does not deduplicate the retry — the note is written exactly once on the second call. U15 tests _notesIdempCheck/_notesIdempCommit directly: failed write does not block retry; successful write blocks subsequent re-sends.
 
 SECTION: Fix 7 — counter amber at 900
 notesField and notesInput compute warnAt = Math.floor(maxChars * 0.9). Counter: below warnAt = muted grey, warnAt to maxChars-1 = amber (var(--warning,#f80)), at maxChars = danger red. Matches design section 6 amber-from-900 spec.
@@ -56,7 +56,7 @@ SECTION: Failure guidance
 If a note appears missing from the Zendesk ticket after a call: check the Zendesk ticket's internal comments (not the public body) for the [OOH NOTE] entry (post-submit notes) and look at the timed steps in the first internal comment for the TRG-STEP entry (flow notes). If the TRG-STEP is absent, check routes/api.js normaliseAdditionalNotes — it returns null for whitespace-only input. If the post-submit box shows an error, the agent can retry immediately from the error state (text is preserved) or navigate to Tonight → ticket and add the note from the drawer.
 
 SECTION: Self-verification results
-Unit: 348/349 pass, 0 fail, 1 skip (IoT repo drift check — skipped in CI, same as main; U14 XSS unit test added). E2E: 91/91 pass, 0 fail, 0 skip (24 additional-notes including E24 two-note idempotency; 10 control; 8 resolution; 9 tonight-callback; 8 area-model; 8 outside-lighting-p1; 3 killswitch; 3 auth; 3 boilercontrol; 13 removal-health).
+Unit: 349/350 pass, 0 fail, 1 skip (IoT repo drift check — skipped in CI, same as main; U14 XSS unit test + U15 idempotency logic test added). E2E: 92/92 pass, 0 fail, 0 skip (25 additional-notes including E24 two-note idempotency, E25 500-retry; 10 control; 8 resolution; 9 tonight-callback; 8 area-model; 8 outside-lighting-p1; 3 killswitch; 3 auth; 3 boilercontrol; 13 removal-health).
 
 SECTION: Deviations from the approved build plan
 Rework rounds 1 and 2 deviations listed in prior artefact versions. Rework round 3 adds: R3a line-endings (CR stripped, no functional change); R3b render() caret-logic disclosed (already built, now documented); R3c XSS E23+U14 added (escaping already correct, tests added); R3d IDOR accepted pre-existing risk (no code change); R3e echo guard for missing ticket ID (fallback to "the ticket"); R3f idempotency added (_postNotesPending + _postNotesToken client; _notesIdempMap 60s TTL server); R3g counter amber at 900; R3h route catch console.error (ticket ID + message only); R3i error message humanised (no raw HTTP strings).
@@ -95,7 +95,7 @@ SECTION: Copy deviation table (design section 6 vs as-built before rework 2)
 
 ### Unit tests (test/*.test.js)
 
-Run on branch: 349 total — 348 pass, 0 fail, 1 skip
+Run on branch: 350 total — 349 pass, 0 fail, 1 skip
 
 The one skip (test/iot-consumer-parse.test.js U13, drift check) requires the sibling ../iot-support-dashboard folder which is absent in CI. Same result on main.
 
@@ -107,7 +107,7 @@ All specs run against the local fixture server (port 3155, DATA_MODE=fixture, HA
 
 | Spec file | Tests | Pass | Fail | Skip |
 |-----------|-------|------|------|------|
-| additional-notes.spec.js | 24 | 24 | 0 | 0 |
+| additional-notes.spec.js | 25 | 25 | 0 | 0 |
 | control.spec.js | 10 | 10 | 0 | 0 |
 | resolution.spec.js | 8 | 8 | 0 | 0 |
 | tonight-callback.spec.js | 9 | 9 | 0 | 0 |
@@ -118,9 +118,9 @@ All specs run against the local fixture server (port 3155, DATA_MODE=fixture, HA
 | boilercontrol.spec.js | 3 | 3 | 0 | 0 |
 | removal-health.spec.js | 13 | 13 | 0 | 0 |
 
-Total: 91 pass, 0 fail, 0 skip
+Total: 92 pass, 0 fail, 0 skip
 
-E13 uses house ID 6758 (existing ambiguous fixture). E14 navigates to Tonight view via nav-tonight before raise-query. E17 tests P1 wording (helper text says "Not sent in urgent P1 texts"; P1 echo says "for the morning review" and "not in the urgent text"). E22 intercepts the /api/tickets/:id/notes POST, aborts it, and asserts the textarea retains the typed text in the error state. E23 injects XSS probes into the notes textarea, submits the flow, and asserts no img[onerror] element is created, no __xss flag is set, and the echo contains the literal escaped probe text. E24 saves note A, clicks "Add another note" in the saved state, saves note B within 60 s on the same ticket; asserts both POSTs fired with different idempotencyKey values confirming neither is dropped.
+E13 uses house ID 6758 (existing ambiguous fixture). E14 navigates to Tonight view via nav-tonight before raise-query. E17 tests P1 wording (helper text says "Not sent in urgent P1 texts"; P1 echo says "for the morning review" and "not in the urgent text"). E22 intercepts the /api/tickets/:id/notes POST, aborts it, and asserts the textarea retains the typed text in the error state. E23 injects XSS probes into the notes textarea, submits the flow, and asserts no img[onerror] element is created, no __xss flag is set, and the echo contains the literal escaped probe text. E24 saves note A, clicks "Add another note" in the saved state, saves note B within 60 s on the same ticket; asserts both POSTs fired with different idempotencyKey values confirming neither is dropped. E25 simulates a server 500 on the first save; asserts the error state is shown and the retry succeeds (route called exactly twice, note written once) — proving the write-then-commit discipline allows retry after failure.
 
 ---
 
@@ -190,12 +190,12 @@ Untracked operator scratch — not committed, not shipped.
 | public/js/app.js | Pre-existing quote restoration (Can’t load line); OOHDASH-119 focus/caret-preservation (22 lines) in render() |
 | routes/api.js | /api/outcomes additionalNotes plumbing; /api/query additionalNotes; /api/tickets/:id/notes OOHDASH-119 path; /api/me notes.maxChars; _notesIdempMap + _notesIdempCheck (R3); try/catch with console.error (R3) |
 | services/zendesk.js | normaliseAdditionalNotes; buildTrgBody TRG-STEP line; buildQueryBody TRG-STEP; addFeedbackNote OOH-NOTE; P1 escalate body |
-| test/additional-notes-routes.test.js | New: U8/U9/U10 unit tests for routes; U14 XSS vm-sandbox test (R3) |
+| test/additional-notes-routes.test.js | New: U8/U9/U10/U14/U15 unit tests (U14 XSS vm-sandbox, U15 idempotency write-then-commit) |
 | test/iot-consumer-parse.test.js | Extended: U6/U12/U13 vendored-regex tests |
 | test/notes-coverage-guard.test.js | New: U11 scan guard — every api.post outcome/query call contains additionalNotes |
 | test/outcome-callerwords.test.js | Added notes stubs to vm sandbox; driveRealScopeOutcome calls submitPendingOutcome |
 | test/zendesk.test.js | U1-U5/U7 extended for additionalNotes |
-| tests/additional-notes.spec.js | New: E1-E24 browser tests (E23 XSS probe, E24 two-note idempotency added R3/R3b) |
+| tests/additional-notes.spec.js | New: E1-E25 browser tests (E23 XSS, E24 two-note token, E25 500-retry write-then-commit) |
 | tests/area-model.spec.js | Minor: updated to pass alongside new notes fields |
 | tests/control.spec.js | Record-outcome confirm step navigation; Couldn’t assertion updated to U+2019 |
 | tests/killswitch.spec.js | Minor: updated to pass alongside new notes fields |
@@ -263,7 +263,7 @@ Rework R3 deviations (this report):
 - R3c: E23 (e2e XSS probe) and U14 (unit vm XSS probe) tests added. esc() was already correct; tests are additive.
 - R3d: IDOR on POST /api/tickets/:id/notes — accepted pre-existing risk. No code change.
 - R3e: Echo guard — res?.ticket?.id ?? null fallback prevents "ticket #undefined".
-- R3f: Idempotency — _postNotesPending + _postNotesToken client; _notesIdempMap 60s TTL server; idempotencyKey in POST body; saved state "Add another note" button resets box with fresh token so second note in 60 s is not dropped (E24).
+- R3f: Idempotency — _postNotesPending + _postNotesToken client; _notesIdempMap 60s TTL server; idempotencyKey in POST body; saved state "Add another note" button resets box with fresh token so second note in 60 s is not dropped (E24). Panel-found defect fixed: write-then-commit discipline (_notesIdempCheck read-only; _notesIdempCommit called only on successful write) prevents retry from being silently dropped after a failed write (E25, U15).
 - R3g: Counter amber threshold at 900 (warnAt = Math.floor(maxChars * 0.9)).
 - R3h: Route catch — console.error logs ticket ID + err.message only, never note content.
 - R3i: Error message humanised in saveNotesPost catch — no raw HTTP strings in UI.

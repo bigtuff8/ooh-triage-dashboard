@@ -33,17 +33,26 @@ const wrap = fn => (req, res) => fn(req, res).catch(err => {
 // OOHDASH-119: server-side idempotency for POST /api/tickets/:id/notes.
 // Deduplicates re-sends with the same token within a 60-second window.
 // Keys are `${ticketId}:${token}`; the Map is in-process memory only.
+// IMPORTANT: _notesIdempCheck only READS the Map; _notesIdempCommit records success.
+// This write-then-commit discipline means a failed write never blocks the retry:
+// if the Zendesk write throws, the token was never committed, so the next call with
+// the same token is allowed through and attempts the write again.
 const _notesIdempMap = new Map();
+function _notesIdempPurge() {
+    const now = Date.now();
+    for (const [k, ts] of _notesIdempMap) { if (now - ts > 60000) _notesIdempMap.delete(k); }
+}
 function _notesIdempCheck(ticketId, token) {
     if (!token) return false;
-    const key = `${ticketId}:${token}`;
-    const now = Date.now();
-    // Purge stale entries (>60s) on each check — keeps memory bounded.
-    for (const [k, ts] of _notesIdempMap) { if (now - ts > 60000) _notesIdempMap.delete(k); }
-    if (_notesIdempMap.has(key)) return true; // duplicate
-    _notesIdempMap.set(key, now);
-    return false;
+    _notesIdempPurge();
+    return _notesIdempMap.has(`${ticketId}:${token}`); // check only — do NOT set
 }
+function _notesIdempCommit(ticketId, token) {
+    if (!token) return;
+    _notesIdempMap.set(`${ticketId}:${token}`, Date.now());
+}
+// Exported for unit testing only — do not call from production paths.
+export { _notesIdempMap as _notesIdempMapForTest, _notesIdempCheck as _notesIdempCheckForTest, _notesIdempCommit as _notesIdempCommitForTest };
 
 /* ---------------- session / app context ---------------- */
 
@@ -409,6 +418,9 @@ router.post('/tickets/:id/notes', wrap(async (req, res) => {
         const labelledBody = `Additional notes from OOH agent: "${normalised}"`;
         try {
             await zendesk.addFeedbackNote(ticketId, req.session.operator, labelledBody);
+            // Commit AFTER a successful write — on failure the token is never recorded
+            // so the client's retry (same token) is allowed through and tries again.
+            _notesIdempCommit(ticketId, req.body.idempotencyKey);
         } catch (err) {
             // Log ticket id + error message; never log note content.
             console.error(`[OOH] notes save failed for ticket #${ticketId}: ${err.message}`);
