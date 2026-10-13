@@ -72,13 +72,29 @@ function startTileFlow(k) {
 }
 
 /* ------------------------ flow engine ------------------------ */
-function startFlow(k, freeText) {
-    state.flow = { cat: k, stage: 0, data: { freeText: freeText || '' }, done: [] };
+/**
+ * Starts a guided flow, restoring any matching sessionStorage draft (OOHDASH-119 E18).
+ * opts.carryNotes — true on in-flow shortcuts (aircon from heating, other-shortcut) to
+ * carry the in-memory additionalNotes across instead of restoring from sessionStorage.
+ * Does NOT clear the sessionStorage draft — clearing only happens at explicit end-of-call points.
+ */
+function startFlow(k, freeText, opts) {
+    const siteNo = state.workspace?.site?.siteNo || null;
+    let additionalNotes = '';
+    if (opts?.carryNotes && state.flow?.data?.additionalNotes) {
+        // Carry the in-memory value when an in-flow shortcut transitions between flow types
+        additionalNotes = state.flow.data.additionalNotes;
+    } else if (siteNo) {
+        // Restore from sessionStorage (E18: survives reload; does NOT clear the draft)
+        additionalNotes = notesDraftRestore(siteNo, k) || '';
+    }
+    state.flow = { cat: k, stage: 0, data: { freeText: freeText || '', _flowKey: k, additionalNotes }, done: [] };
     render();
 }
 
 function cancelFlow() {
     if (confirm('Cancel this issue? Anything recorded so far will still be captured to a ticket if a step was completed.')) {
+        notesDraftClear(); // OOHDASH-119: clear the draft on explicit cancel
         state.flow = null;
         render();
     }
@@ -165,14 +181,21 @@ function renderFlow() {
     const f = state.flow;
     const c = catOf(f.cat);
     let body = '';
-    if (f.stage === 99 && f.data._outcomeHtml) body = f.data._outcomeHtml;
-    else {
+    if (f.stage === 99 && f.data._outcomeHtml) {
+        // OOHDASH-119: replace %%NOTESPOST%% placeholder with the rendered post-submit box
+        body = f.data._outcomeHtml.replace('%%NOTESPOST%%', notesPostBox(f.data._ticketId));
+    } else {
         try { body = FLOWR[f.cat](state.workspace, f); }
         catch (e) { body = `<div class="alert err">Flow error: ${esc(e.message)}</div>`; }
     }
+    // OOHDASH-119 FLOW-BOX: inject the notes textarea into every active step (stage < 99).
+    // At stage 99 the notes post-box is already embedded in the outcome HTML above.
+    const notesBox = f.stage !== 99
+        ? notesField({ id: 'addnotes', bind: 'flow', value: f.data.additionalNotes || '' })
+        : '';
     return `<div class="flowpanel" data-testid="flow-panel">
   <div class="flowhead"><span style="font-size:18px">${c.ic}</span><b>${c.t}</b><span class="small" style="margin-left:6px">guided flow</span><button class="btn link" style="margin-left:auto" onclick="cancelFlow()">Cancel issue</button></div>
-  <div class="flowbody">${f.data.freeText ? `<div class="stepdone"><span>💬</span>Caller’s words: “${esc(f.data.freeText)}”</div>` : ''}${f.done.map(d => `<div class="stepdone"><span class="tick">✓</span>${d}</div>`).join('')}${body}</div>
+  <div class="flowbody">${f.data.freeText ? `<div class="stepdone"><span>💬</span>Caller's words: "${esc(f.data.freeText)}"</div>` : ''}${f.done.map(d => `<div class="stepdone"><span class="tick">✓</span>${d}</div>`).join('')}${body}${notesBox}</div>
   <div class="flowfoot"><span>Operator: <b>${esc(state.me.operator.name)}</b></span><span style="margin-left:auto">Everything here is recorded to the Zendesk ticket automatically</span></div>
  </div>`;
 }
@@ -182,54 +205,102 @@ function outButtons() {
     return `<div class="outbtns"><button class="btn" data-testid="add-another-issue" onclick="anotherIssue()">➕ Add another issue</button><button class="btn primary" data-testid="end-call" onclick="endCall()">✔ End call</button></div>`;
 }
 
-function anotherIssue() { state.flow = null; render(); }
+function anotherIssue() { notesDraftClear(); state.flow = null; render(); } // OOHDASH-119: clear draft
 
 function registerIssue(label, cls, ticketId) {
     if (state.call) state.call.issues.push({ label, cls, ticket: ticketId });
 }
 
 /**
- * Records an outcome to the server (ticket + audit) exactly once per flow key, then
- * swaps in the final outcome card. Failure renders inline with a manual retry —
- * never a silent drop, never an auto-retry loop.
+ * OOHDASH-119 E2 — Records an outcome exactly once per flow key after an agent confirms
+ * the outcome on the confirm step. Failure renders inline with a manual retry.
+ *
+ * Confirm step flow (operator decision B1+B2):
+ *   chip click → _conf_ stored, confirm step rendered (outcome description + FLOW-BOX + Record button)
+ *   Record outcome click → submitPendingOutcome → sets _pend_, fires POST, renders outcome card
+ *
+ * The existing _pend_ double-fire guard and Try-again error path are preserved.
  */
 function finishOutcome(f, key, payload, renderCard) {
+    // Already succeeded — return the cached card HTML
     if (f.data['_out_' + key]) return f.data['_out_' + key];
+    // Error state — show inline retry
     if (f.data['_err_' + key]) {
         const msg = f.data['_err_' + key];
         return `<div class="alert err">Couldn’t record the outcome: ${esc(msg)}
-   <button class="chip" style="margin-left:8px" onclick="state.flow.data['_err_${key}']=null;state.flow.data['_pend_${key}']=null;render()">Try again</button></div>`;
+   <button class="chip" style="margin-left:8px" onclick="state.flow.data['_err_${key}']=null;state.flow.data['_pend_${key}']=null;state.flow.data['_conf_${key}']=null;render()">Try again</button></div>`;
     }
-    if (!f.data['_pend_' + key]) {
-        f.data['_pend_' + key] = 1;
-        const ws = state.workspace;
-        api.post('/api/outcomes', {
-            siteNo: ws.site.siteNo,
-            siteName: ws.site.siteName,
-            callerWords: f.data.freeText || null,
-            ...payload
-        }).then(res => {
-            // Test 10 (D-10a) — echo the handler's typed words on the outcome card, so note
-            // retention is verifiable at their own screen, not only trusted to the back office.
-            // Rendered once here so all four outcome card types inherit it; nothing shown when
-            // no words were typed (a legitimate tile-without-typing path) — never an empty quote.
-            const echo = f.data.freeText
-                ? `<div class="stepdone small" data-testid="outcome-callerwords"><span>💬</span>Recorded from the caller: “${esc(f.data.freeText)}”</div>`
-                : '';
-            const html = echo + renderCard(res) + outButtons();
-            f.data['_out_' + key] = html;
-            registerIssue(payload.issueLabel || payload.subject, payload.issueCls || 'blue', res.ticket.id);
-            f.stage = 99;
-            f.data._outcomeHtml = html;
-            render();
-        }).catch(err => {
-            f.data['_err_' + key] = err.message;
-            f.data['_pend_' + key] = null;
-            render();
-        });
+    // Store the payload and renderCard idempotently on first visit
+    if (!f.data['_conf_' + key]) {
+        f.data['_conf_' + key] = { ...payload };
+        f.data['_renderCard_' + key] = renderCard;
     }
-    return '<div class="alert info">Recording the outcome…</div>';
+    // Submitting — loading state
+    if (f.data['_pend_' + key]) {
+        return '<div class="alert info">Recording the outcome…</div>';
+    }
+    // Confirm step: show outcome description + Record outcome button
+    // (The FLOW-BOX is injected by renderFlow outside this function so it stays live during the step)
+    return `<div class="confirm-step" data-testid="confirm-step">
+  <div class="alert info" style="margin-bottom:8px">
+   <b>${esc(payload.subject)}</b>
+   ${payload.detail ? `<div style="margin-top:4px;font-size:0.9em">${esc(payload.detail)}</div>` : ''}
+  </div>
+  <button class="btn primary" data-testid="record-outcome" style="margin-top:4px" onclick="submitPendingOutcome('${key}')">Record outcome</button>
+ </div>`;
 }
+
+/**
+ * OOHDASH-119 — fires the actual POST after the agent clicks "Record outcome".
+ * Global so it can be called from the inline onclick in the confirm step HTML.
+ */
+window.submitPendingOutcome = function submitPendingOutcome(key) {
+    const f = state.flow;
+    if (!f) return;
+    const payload = f.data['_conf_' + key];
+    if (!payload) return;
+    // Retrieve the renderCard stored on the closure captured in the outcome helper.
+    // We stored it alongside the payload at _renderCard_ when the confirm step was first built.
+    const renderCard = f.data['_renderCard_' + key];
+    f.data['_pend_' + key] = 1;
+    render(); // shows the loading state immediately
+    const ws = state.workspace;
+    api.post('/api/outcomes', {
+        siteNo: ws.site.siteNo,
+        siteName: ws.site.siteName,
+        callerWords: f.data.freeText || null,
+        additionalNotes: (f.data.additionalNotes || '').trim() || null, // OOHDASH-119; DF-01: trim so whitespace-only → null
+        ...payload
+    }).then(res => {
+        notesDraftClear(); // OOHDASH-119: clear sessionStorage draft on success
+        const echo = f.data.freeText
+            ? `<div class="stepdone small" data-testid="outcome-callerwords"><span>💬</span>Recorded from the caller: “${esc(f.data.freeText)}”</div>`
+            : '';
+        const notesEcho = (f.data.additionalNotes || '').trim()
+            ? (() => {
+                const isP1 = payload.type === 'escalate-p1';
+                const tid = res?.ticket?.id ?? null; // guard: id may be absent on degraded response
+                const ref = tid ? `ticket #${tid}` : 'the ticket';
+                const mid = isP1
+                    ? `Your notes are on ${ref} for the morning review: “${esc(f.data.additionalNotes)}” (not in the urgent text)`
+                    : `Your notes are on ${ref}: “${esc(f.data.additionalNotes)}”`;
+                return `<div class="stepdone small" data-testid="addnotes-echo"><span>📝</span>${mid}</div>`;
+            })()
+            : '';
+        const card = renderCard ? renderCard(res) : '';
+        const html = echo + notesEcho + card + '%%NOTESPOST%%' + outButtons();
+        f.data['_out_' + key] = html;
+        f.data._ticketId = res.ticket.id;
+        registerIssue(payload.issueLabel || payload.subject, payload.issueCls || 'blue', res.ticket.id);
+        f.stage = 99;
+        f.data._outcomeHtml = html;
+        render();
+    }).catch(err => {
+        f.data['_err_' + key] = err.message;
+        f.data['_pend_' + key] = null;
+        render();
+    });
+};
 
 function outcomeCaptured(f, key, { subject, detail, script, OohCaptureClass }) {
     return finishOutcome(f, key,
@@ -262,7 +333,7 @@ function outcomeNoAction(f, key, { subject, detail, script }) {
 }
 
 function otherShortcut() {
-    return `<div class="chips" style="margin-top:8px"><button class="chip" onclick="startFlow('other')">Continue under “Something else”</button></div>`;
+    return `<div class="chips" style="margin-top:8px"><button class="chip" onclick="startFlow('other', state.flow?.data?.freeText||'', {carryNotes:true})">Continue under "Something else"</button></div>`;
 }
 
 function ctlPlaceholder() { return '<div class="alert info">Complete the control action in the window…</div>'; }
@@ -378,7 +449,7 @@ const FLOWR = {
                 : '';
             // In-context aircon shortcut (§6): visibly NOT one of the two areas; starts the referral flow.
             const airconChip = siteHasAircon()
-                ? `<div class="chips" style="margin-top:8px"><button class="chip" data-testid="aircon-shortcut" onclick="startFlow('aircon', state.flow.data.freeText||'')">❄️ Air conditioning (handled by the IoT team)</button></div>`
+                ? `<div class="chips" style="margin-top:8px"><button class="chip" data-testid="aircon-shortcut" onclick="startFlow('aircon', state.flow.data.freeText||'', {carryNotes:true})">❄️ Air conditioning (handled by the IoT team)</button></div>`
                 : '';
             return `<div class="stepq">Which area is the caller talking about?</div><div class="chips">${areaChips}${fallbackChip}</div>${airconChip}`;
         }

@@ -9,6 +9,8 @@ test.describe('tonight & callback', () => {
         await confirmSite(page, '6749', 'Angel Inn');
         await page.locator('[data-testid="tile-lighting"]').click();
         await page.locator('.chip:has-text("Caller sorted it with the override")').click();
+        // OOHDASH-119: confirm step required before POST fires
+        await page.locator('[data-testid="record-outcome"]').click();
         await expect(page.locator('[data-testid="outcome-captured"]')).toContainText(/Ticket #\d+/);
 
         await page.locator('[data-testid="nav-tonight"]').click();
@@ -134,6 +136,8 @@ test.describe('tonight & callback', () => {
         await banner.locator('button:has-text("Run connection check")').click();
         await expect(page.locator('[data-testid="connectivity-alert"]')).toContainText('gateway at this site is offline');
         await page.locator('[data-testid="connectivity-stilldead"]').click();
+        // OOHDASH-119: confirm step required before POST fires
+        await page.locator('[data-testid="record-outcome"]').click();
         await expect(page.locator('[data-testid="outcome-captured"]')).toContainText(/Ticket #\d+/);
     });
 
@@ -149,6 +153,8 @@ test.describe('tonight & callback', () => {
         await expect(page.locator('[data-testid="contractor-pp-no"]')).toBeVisible();
         // No-guidance path: direct escalation (same P1 outcome as before)
         await page.locator('[data-testid="contractor-pp-no"]').click();
+        // OOHDASH-119: confirm step required before POST fires
+        await page.locator('[data-testid="record-outcome"]').click();
         const p1 = page.locator('[data-testid="outcome-p1"]');
         await expect(p1).toContainText('Escalated — P1');
         // Approach B: OOH tags ooh_p1 and the IoT Support Dashboard pages the on-duty manager.
@@ -169,6 +175,8 @@ test.describe('tonight & callback', () => {
         await page.locator('[data-testid="other-text"]').pressSequentially('boiler PCB fault — is that you?', { delay: 15 });
         await page.locator('[data-testid="other-check"]').click();
         await page.locator('[data-testid="scope-boiler"]').click();
+        // OOHDASH-119: confirm step required before POST fires
+        await page.locator('[data-testid="record-outcome"]').click();
         const outcome = page.locator('[data-testid="outcome-scope"]');
         await expect(outcome).toContainText('Not on Lighthouse at this site');
         await expect(outcome).toContainText(/ticket #\d+ \(scope-only\)/);

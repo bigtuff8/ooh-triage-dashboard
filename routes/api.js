@@ -30,6 +30,30 @@ const wrap = fn => (req, res) => fn(req, res).catch(err => {
     res.status(status).json({ error: err.message, ...(err.resolution ? { resolution: err.resolution } : {}), ...(err.guardrail ? { guardrail: true } : {}) });
 });
 
+// OOHDASH-119: server-side idempotency for POST /api/tickets/:id/notes.
+// Deduplicates re-sends with the same token within a 60-second window.
+// Keys are `${ticketId}:${token}`; the Map is in-process memory only.
+// IMPORTANT: _notesIdempCheck only READS the Map; _notesIdempCommit records success.
+// This write-then-commit discipline means a failed write never blocks the retry:
+// if the Zendesk write throws, the token was never committed, so the next call with
+// the same token is allowed through and attempts the write again.
+const _notesIdempMap = new Map();
+function _notesIdempPurge() {
+    const now = Date.now();
+    for (const [k, ts] of _notesIdempMap) { if (now - ts > 60000) _notesIdempMap.delete(k); }
+}
+function _notesIdempCheck(ticketId, token) {
+    if (!token) return false;
+    _notesIdempPurge();
+    return _notesIdempMap.has(`${ticketId}:${token}`); // check only — do NOT set
+}
+function _notesIdempCommit(ticketId, token) {
+    if (!token) return;
+    _notesIdempMap.set(`${ticketId}:${token}`, Date.now());
+}
+// Exported for unit testing only — do not call from production paths.
+export { _notesIdempMap as _notesIdempMapForTest, _notesIdempCheck as _notesIdempCheckForTest, _notesIdempCommit as _notesIdempCommitForTest };
+
 /* ---------------- session / app context ---------------- */
 
 router.get('/me', wrap(async (req, res) => {
@@ -50,7 +74,9 @@ router.get('/me', wrap(async (req, res) => {
         // R11/C7: panel-pinned client-config delivery path — the client has no other server→client
         // config channel, so client knobs ride /me. midWaitPromptMs arms the mid-wait decision
         // prompt (control.js); the R8 controlLive signal joins this object on the same surface.
-        control: { midWaitPromptMs: config.control.midWaitPromptMs }
+        control: { midWaitPromptMs: config.control.midWaitPromptMs },
+        // OOHDASH-119: notes limit delivered to client so the textarea maxlength is set from config.
+        notes: { maxChars: config.notes.maxChars }
     });
 }));
 
@@ -273,7 +299,7 @@ export function buildOutcomeTranscript({ action, type, siteNo, siteName, detail,
 
 router.post('/outcomes', wrap(async (req, res) => {
     const op = req.session.operator;
-    const { type, siteNo, siteName, subject, detail, callerWords, OohCaptureClass, actionId, holdText, p1Summary } = req.body;
+    const { type, siteNo, siteName, subject, detail, callerWords, OohCaptureClass, actionId, holdText, p1Summary, additionalNotes } = req.body;
     if (!type || !siteNo || !subject || !detail) {
         return res.status(400).json({ error: 'type, siteNo, subject and detail are required' });
     }
@@ -291,7 +317,9 @@ router.post('/outcomes', wrap(async (req, res) => {
         callerWords,
         outcomeType: type,
         priority: isP1 ? 'urgent' : 'normal',
-        extraTags: isP1 ? ['ooh_p1'] : []
+        extraTags: isP1 ? ['ooh_p1'] : [],
+        // OOHDASH-119: additional notes ride alongside but are NOT written to the P1 SMS or audit log.
+        additionalNotes: additionalNotes || null
     });
 
     let p1 = null;
@@ -377,6 +405,33 @@ router.get('/tickets/:id/thread', wrap(async (req, res) => {
 }));
 
 router.post('/tickets/:id/notes', wrap(async (req, res) => {
+    // OOHDASH-119: kind='additional-notes' writes a labelled [OOH NOTE] comment from the post-submit
+    // notes box. Without kind the existing drawer-notes behaviour is byte-for-byte unchanged.
+    if (req.body.kind === 'additional-notes') {
+        const ticketId = req.params.id;
+        // Idempotency: deduplicate re-sends with the same token within 60 s.
+        if (_notesIdempCheck(ticketId, req.body.idempotencyKey)) {
+            return res.json({ ok: true, deduplicated: true });
+        }
+        const normalised = zendesk.normaliseAdditionalNotes(req.body.body);
+        if (!normalised) return res.status(400).json({ error: 'Note is empty' });
+        const labelledBody = `Additional notes from OOH agent: "${normalised}"`;
+        try {
+            await zendesk.addFeedbackNote(ticketId, req.session.operator, labelledBody);
+            // Commit AFTER a successful write — on failure the token is never recorded
+            // so the client's retry (same token) is allowed through and tries again.
+            _notesIdempCommit(ticketId, req.body.idempotencyKey);
+        } catch (err) {
+            // Log ticket id + error message; never log note content.
+            console.error(`[OOH] notes save failed for ticket #${ticketId}: ${err.message}`);
+            throw err; // re-throw so wrap() returns 500 to the client
+        }
+        await audit.logAction({
+            actionType: 'note', operator: req.session.operator,
+            detail: `Note added to ticket #${ticketId}`, outcome: 'note', ticketId: Number(ticketId)
+        });
+        return res.json({ ok: true });
+    }
     if (!req.body.body?.trim()) return res.status(400).json({ error: 'Note body is required' });
     await zendesk.addFeedbackNote(req.params.id, req.session.operator, req.body.body.trim());
     await audit.logAction({
@@ -388,7 +443,12 @@ router.post('/tickets/:id/notes', wrap(async (req, res) => {
 
 router.post('/query', wrap(async (req, res) => {
     if (!req.body.text?.trim()) return res.status(400).json({ error: 'Query text is required' });
-    const ticket = await zendesk.raiseQuery(req.session.operator, req.body.siteNo, req.body.text.trim());
+    const ticket = await zendesk.raiseQuery(
+        req.session.operator,
+        req.body.siteNo,
+        req.body.text.trim(),
+        req.body.additionalNotes || null // OOHDASH-119
+    );
     await audit.logAction({
         actionType: 'query', operator: req.session.operator, siteNo: req.body.siteNo || null,
         detail: `Query raised: ${req.body.text.trim()}`, outcome: 'query', ticketId: ticket.id

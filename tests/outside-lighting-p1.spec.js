@@ -27,11 +27,11 @@ test.describe('OOHDASH-111 & 112 — outside lighting P1 + script text', () => {
         await confirmSite(page, '6749', 'Angel Inn');
         await page.locator('[data-testid="tile-lighting"]').click();
 
-        // Capture the POST before the outcome card renders
-        const [request] = await Promise.all([
-            page.waitForRequest(r => r.url().includes('/api/outcomes') && r.method() === 'POST'),
-            page.locator('.chip:has-text("Still not working")').click()
-        ]);
+        // OOHDASH-119: chip click now shows confirm step; POST fires on Record outcome click
+        const requestPromise = page.waitForRequest(r => r.url().includes('/api/outcomes') && r.method() === 'POST');
+        await page.locator('.chip:has-text("Still not working")').click();
+        await page.locator('[data-testid="record-outcome"]').click();
+        const request = await requestPromise;
 
         // POST body must carry type:'escalate-p1'
         const body = JSON.parse(request.postData());
@@ -48,6 +48,8 @@ test.describe('OOHDASH-111 & 112 — outside lighting P1 + script text', () => {
         await confirmSite(page, '6749', 'Angel Inn');
         await page.locator('[data-testid="tile-lighting"]').click();
         await page.locator('.chip:has-text("Caller sorted it with the override")').click();
+        // OOHDASH-119: confirm step required
+        await page.locator('[data-testid="record-outcome"]').click();
 
         // Must be a captured outcome — NOT a P1
         await expect(page.locator('[data-testid="outcome-captured"]')).toBeVisible();
@@ -58,6 +60,8 @@ test.describe('OOHDASH-111 & 112 — outside lighting P1 + script text', () => {
         await confirmSite(page, '6749', 'Angel Inn');
         await page.locator('[data-testid="tile-lighting"]').click();
         await page.locator('.chip:has-text("Still not working")').click();
+        // OOHDASH-119: confirm step required
+        await page.locator('[data-testid="record-outcome"]').click();
 
         const status = page.locator('[data-testid="p1-dispatch-status"]');
         await expect(status).toContainText('logged as ticket');
@@ -83,10 +87,11 @@ test.describe('OOHDASH-111 & 112 — outside lighting P1 + script text', () => {
         await confirmSite(page, '6749', 'Angel Inn');
         await page.locator('[data-testid="tile-lighting"]').click();
 
-        const [request] = await Promise.all([
-            page.waitForRequest(r => r.url().includes('/api/outcomes') && r.method() === 'POST'),
-            page.locator('.chip:has-text("Still not working")').click()
-        ]);
+        // OOHDASH-119: chip click shows confirm step; POST fires on Record outcome click
+        const requestPromise = page.waitForRequest(r => r.url().includes('/api/outcomes') && r.method() === 'POST');
+        await page.locator('.chip:has-text("Still not working")').click();
+        await page.locator('[data-testid="record-outcome"]').click();
+        const request = await requestPromise;
 
         const body = JSON.parse(request.postData());
         expect(body.p1Summary).toBe('External lighting not responding');
