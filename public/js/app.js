@@ -120,10 +120,21 @@ async function boot() {
 /* ------------------------ shell ------------------------ */
 function render() {
     if (state.loadError) {
-        document.getElementById('app').innerHTML =
+        document.getElementById(‘app’).innerHTML =
             `<div class="content narrow" style="margin:60px auto"><div class="alert err"><b>Can’t load the OOH Dashboard.</b> ${esc(state.loadError)} <button class="btn" style="margin-left:10px" onclick="boot()">Retry</button></div></div>`;
         return;
     }
+    // OOHDASH-119: save focus + caret position for any notes textarea before re-rendering
+    // (prevents focus and cursor loss when a live workspace refresh triggers render()).
+    let _savedFocusId = null, _savedStart = 0, _savedEnd = 0;
+    try {
+        const ae = document.activeElement;
+        if (ae && ae.tagName === ‘TEXTAREA’ && ae.id && ae.id.startsWith(‘addnotes’)) {
+            _savedFocusId = ae.id;
+            _savedStart = ae.selectionStart;
+            _savedEnd = ae.selectionEnd;
+        }
+    } catch { /* ignore */ }
     const op = state.me.operator;
     const isIot = op.role === 'iot';
     const ws = state.workspace;
@@ -156,6 +167,13 @@ function render() {
  </div>`;
     ({ home: vHome, site: vSite, callback: vCallback, tonight: vTonight, admin: vAdmin })[state.view]();
     paintDrawer();
+    // OOHDASH-119: restore focus + caret to the notes textarea after re-render
+    try {
+        if (_savedFocusId) {
+            const el = document.getElementById(_savedFocusId);
+            if (el) { el.focus(); el.setSelectionRange(_savedStart, _savedEnd); }
+        }
+    } catch { /* ignore */ }
 }
 
 async function go(v) {

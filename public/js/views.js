@@ -226,6 +226,7 @@ function siteTickets(ws) {
 }
 
 function endCall() {
+    notesDraftClear(); // OOHDASH-119: clear the sessionStorage draft at explicit end-of-call
     clearInterval(wsRefreshTimer);
     state.flow = null;
     state.call = null;
