@@ -227,7 +227,7 @@ function finishOutcome(f, key, payload, renderCard) {
     // Error state — show inline retry
     if (f.data['_err_' + key]) {
         const msg = f.data['_err_' + key];
-        return `<div class="alert err">Couldn't record the outcome: ${esc(msg)}
+        return `<div class="alert err">Couldn’t record the outcome: ${esc(msg)}
    <button class="chip" style="margin-left:8px" onclick="state.flow.data['_err_${key}']=null;state.flow.data['_pend_${key}']=null;state.flow.data['_conf_${key}']=null;render()">Try again</button></div>`;
     }
     // Store the payload and renderCard idempotently on first visit
@@ -277,7 +277,13 @@ window.submitPendingOutcome = function submitPendingOutcome(key) {
             ? `<div class="stepdone small" data-testid="outcome-callerwords"><span>💬</span>Recorded from the caller: “${esc(f.data.freeText)}”</div>`
             : '';
         const notesEcho = f.data.additionalNotes
-            ? `<div class="stepdone small" data-testid="addnotes-echo"><span>📝</span>Note added — for the ticket and morning review: "${esc(f.data.additionalNotes)}"</div>`
+            ? (() => {
+                const isP1 = payload.type === 'escalate-p1';
+                const mid = isP1
+                    ? `Your notes are on ticket #${res.ticket.id} for the morning review: “${esc(f.data.additionalNotes)}” (not in the urgent text)`
+                    : `Your notes are on ticket #${res.ticket.id}: “${esc(f.data.additionalNotes)}”`;
+                return `<div class="stepdone small" data-testid="addnotes-echo"><span>📝</span>${mid}</div>`;
+            })()
             : '';
         const card = renderCard ? renderCard(res) : '';
         const html = echo + notesEcho + card + '%%NOTESPOST%%' + outButtons();

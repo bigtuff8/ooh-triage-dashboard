@@ -1,12 +1,13 @@
 /**
- * OOHDASH-119 — Additional notes e2e tests (E1–E20).
+ * OOHDASH-119 — Additional notes e2e tests (E1–E22).
  *
  * Live-proof site: Old Grey Mare (6832) — contains heating (Salus), refrigeration
  * and an outside-lighting fixture, matching operator decision B3.
  *
  * Tests cover: notes textarea visibility, autosave, confirm-step placement,
  * POST payload, outcome echo, post-submit late notes, ambiguous-site path,
- * query path, draft clearing, max-chars, and null/empty handling.
+ * query path, draft clearing, max-chars, null/empty handling, P1 echo wording,
+ * capture-flow note, and post-submit failure-keeps-text.
  */
 import { test, expect } from '@playwright/test';
 import { signIn, confirmSite } from './helpers.js';
@@ -297,20 +298,29 @@ test('E16: notes carried in POST for lighting P1 escalation', async ({ page }) =
     expect(body.type).toBe('escalate-p1');
 });
 
-// ─── E17: notes on capture-flow (outside lighting override) ──────────────────
-test('E17: notes carried in POST for a capture outcome (lighting override)', async ({ page }) => {
-    const NOTE = 'E17 capture outcome note';
+// ─── E17: P1 wording — helper text and echo on a P1 outcome ─────────────────
+test('E17: P1 wording — helper text includes P1 notice and echo shows morning-review wording', async ({ page }) => {
+    const NOTE = 'E17 P1 wording note';
     await signIn(page, 'Test Handler');
     await confirmSite(page, '6749', 'Angel Inn');
     await page.locator('[data-testid="tile-lighting"]').click();
+
+    // Helper text must mention the P1/urgent-text exclusion (visible on any flow)
+    const helperText = page.locator('.notes-group .small').first();
+    await expect(helperText).toContainText('Not sent in urgent P1 texts');
+
     await page.locator('#addnotes').fill(NOTE);
-    const postPromise = page.waitForRequest(r => r.url().includes('/api/outcomes') && r.method() === 'POST');
-    await page.locator('.chip:has-text("Caller sorted it with the override")').click();
+    await page.locator('.chip:has-text("Still not working")').click();
     await page.locator('[data-testid="record-outcome"]').click();
-    const req = await postPromise;
-    const body = JSON.parse(req.postData());
-    expect(body.additionalNotes).toBe(NOTE);
-    expect(body.type).toBe('capture');
+    // P1 outcomes render outcome-p1 card (not outcome-captured)
+    await expect(page.locator('[data-testid="outcome-p1"]')).toBeVisible({ timeout: 8000 });
+
+    // P1 echo: morning-review wording with "not in the urgent text"
+    const echo = page.locator('[data-testid="addnotes-echo"]');
+    await expect(echo).toBeVisible();
+    await expect(echo).toContainText(NOTE);
+    await expect(echo).toContainText('for the morning review');
+    await expect(echo).toContainText('not in the urgent text');
 });
 
 // ─── E18: notes autosave restored after page reload ──────────────────────────
@@ -373,4 +383,52 @@ test('E20: double-click on Record outcome does not fire two POSTs', async ({ pag
 
     await expect(page.locator('[data-testid="outcome-captured"]')).toBeVisible();
     expect(postCount).toBe(1);
+});
+
+// ─── E21: notes on capture-flow (outside lighting override) ──────────────────
+test('E21: notes carried in POST for a capture outcome (lighting override)', async ({ page }) => {
+    const NOTE = 'E21 capture outcome note';
+    await signIn(page, 'Test Handler');
+    await confirmSite(page, '6749', 'Angel Inn');
+    await page.locator('[data-testid="tile-lighting"]').click();
+    await page.locator('#addnotes').fill(NOTE);
+    const postPromise = page.waitForRequest(r => r.url().includes('/api/outcomes') && r.method() === 'POST');
+    await page.locator('.chip:has-text("Caller sorted it with the override")').click();
+    await page.locator('[data-testid="record-outcome"]').click();
+    const req = await postPromise;
+    const body = JSON.parse(req.postData());
+    expect(body.additionalNotes).toBe(NOTE);
+    expect(body.type).toBe('capture');
+});
+
+// ─── E22: post-submit failure preserves typed text in textarea ───────────────
+test('E22: post-submit save failure keeps typed text in the box for retry', async ({ page }) => {
+    const NOTE = 'E22 failure keep text note';
+    await signIn(page, 'Test Handler');
+    await confirmSite(page, '6832', 'Old Grey Mare');
+    await page.locator('[data-testid="tile-other"]').click();
+    await page.locator('[data-testid="other-text"]').pressSequentially('e22 test', { delay: 20 });
+    await page.locator('[data-testid="other-capture"]').click();
+    await page.locator('[data-testid="record-outcome"]').click();
+    await expect(page.locator('[data-testid="outcome-captured"]')).toBeVisible({ timeout: 8000 });
+
+    // Open the post-submit notes box and type text
+    await page.locator('[data-testid="addnotes-post-open"]').click();
+    const noteInput = page.locator('[data-testid="addnotes-post-input"]');
+    await expect(noteInput).toBeVisible();
+    await noteInput.fill(NOTE);
+
+    // Intercept the notes POST and make it fail (network error)
+    await page.route('**/api/tickets/*/notes', route => route.abort('failed'));
+
+    await page.locator('[data-testid="addnotes-post-save"]').click();
+
+    // Error state: textarea must still be present and contain the typed text
+    await expect(page.locator('[data-testid="addnotes-post-error"]')).toBeVisible({ timeout: 6000 });
+    const textareaAfterError = page.locator('[data-testid="addnotes-post-error"] [data-testid="addnotes-post-input"]');
+    await expect(textareaAfterError).toBeVisible();
+    await expect(textareaAfterError).toHaveValue(NOTE);
+
+    // Unintercept so retry can succeed
+    await page.unroute('**/api/tickets/*/notes');
 });

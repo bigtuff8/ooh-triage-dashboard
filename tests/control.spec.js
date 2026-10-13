@@ -242,7 +242,7 @@ test.describe('control & sync', () => {
         await page.locator('[data-testid="fridge-risk"]').click(); // P1 path
         // OOHDASH-119: confirm step shown; click Record outcome to fire the (mocked-to-fail) POST
         await page.locator('[data-testid="record-outcome"]').click();
-        await expect(page.locator('.flowbody')).toContainText("Couldn't record the outcome: Zendesk exploded");
+        await expect(page.locator('.flowbody')).toContainText("Couldn’t record the outcome: Zendesk exploded");
         // Try again resets to confirm step; click Record outcome again to fire the now-succeeding POST
         await page.locator('button:has-text("Try again")').click();
         await page.locator('[data-testid="record-outcome"]').click();

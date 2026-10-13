@@ -35,9 +35,9 @@ function notesField({ id = 'addnotes', bind = null, value = '', helperText } = {
         ? `${currentLen} / ${maxChars}, limit reached`
         : `${currentLen} / ${maxChars}`;
     const helper = helperText ||
-        'Anything extra for the ticket and morning review — not sent in the urgent P1 text.';
+        'For the ticket and the IoT team’s morning review. Not sent in urgent P1 texts. Keep it factual, no personal details.';
     return `<div class="notes-group" style="margin-top:10px">
-  <label for="${safeValue ? id : id}" style="display:block;font-size:0.85em;font-weight:600;margin-bottom:4px">Additional notes from OOH agent:</label>
+  <label for="${id}" style="display:block;font-size:0.85em;font-weight:600;margin-bottom:4px">Additional notes for the IoT team (optional)</label>
   <textarea
     id="${id}"
     data-testid="${id}"
@@ -45,7 +45,7 @@ function notesField({ id = 'addnotes', bind = null, value = '', helperText } = {
     maxlength="${maxChars}"
     rows="2"
     style="width:100%;box-sizing:border-box;font-size:16px;padding:6px 8px;border:1px solid var(--border,#ccc);border-radius:6px;resize:vertical"
-    placeholder="Optional — leave blank if nothing to add"
+    placeholder="Anything the caller or site told you that isn’t captured above, e.g. engineer due at 7am"
     oninput="notesInput(this)"
   >${safeValue}</textarea>
   <div style="display:flex;justify-content:space-between;align-items:center;margin-top:3px">
@@ -160,22 +160,42 @@ function notesPostBox(ticketId, { expanded = false } = {}) {
     const ps = (typeof state !== 'undefined' && state?.flow?.data?._postNotes) || 'idle';
     if (ps === 'saved') {
         return `<div class="notes-group" style="margin-top:8px" data-testid="addnotes-post-saved">
-  <span class="small" style="color:var(--success,green)">✓ Note added to ticket</span>
+  <span class="small" style="color:var(--success,green)">✓ Note saved to ticket #${ticketId}</span>
 </div>`;
     }
     if (ps === 'saving') {
-        return `<div class="notes-group" style="margin-top:8px"><span class="small">Saving note…</span></div>`;
+        const draft = (typeof state !== 'undefined' && state?.flow?.data?._postNotesDraft) || '';
+        const safeD = typeof esc === 'function' ? esc(draft) : String(draft).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+        return `<div class="notes-group" style="margin-top:8px" data-testid="addnotes-post-saving">
+  <label style="display:block;font-size:0.85em;font-weight:600;margin-bottom:4px">Add a note to ticket #${ticketId} (optional)</label>
+  <textarea id="addnotes-post-input" data-testid="addnotes-post-input" rows="2" disabled
+    style="width:100%;box-sizing:border-box;font-size:16px;padding:6px 8px;border:1px solid var(--border,#ccc);border-radius:6px;resize:vertical"
+  >${safeD}</textarea>
+  <div style="margin-top:6px">
+   <button class="btn primary" data-testid="addnotes-post-save" disabled>Saving…</button>
+  </div>
+</div>`;
     }
     if (ps === 'error') {
         const msg = state?.flow?.data?._postNotesError || 'Could not save note';
+        const draft = (typeof state !== 'undefined' && state?.flow?.data?._postNotesDraft) || '';
+        const safeD = typeof esc === 'function' ? esc(draft) : String(draft).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+        const safeMsg = typeof esc === 'function' ? esc(msg) : msg;
         return `<div class="notes-group" style="margin-top:8px" data-testid="addnotes-post-error">
-  <span class="small" style="color:var(--danger,#c00)">⚠ ${typeof esc === 'function' ? esc(msg) : msg}</span>
-  <button class="btn link" onclick="window._postNotesReset()">Retry</button>
+  <label style="display:block;font-size:0.85em;font-weight:600;margin-bottom:4px">Add a note to ticket #${ticketId} (optional)</label>
+  <textarea id="addnotes-post-input" data-testid="addnotes-post-input" rows="2"
+    style="width:100%;box-sizing:border-box;font-size:16px;padding:6px 8px;border:1px solid var(--border,#ccc);border-radius:6px;resize:vertical"
+  >${safeD}</textarea>
+  <div style="margin-top:6px">
+   <span class="small" style="color:var(--danger,#c00);display:block;margin-bottom:4px">⚠ Couldn’t save the note: ${safeMsg}. Try again, or add it later from Tonight → ticket.</span>
+   <button class="btn primary" data-testid="addnotes-post-save" onclick="saveNotesPost(${ticketId})">Try again</button>
+   <button class="btn link" style="margin-left:8px" onclick="window._postNotesReset()">Cancel</button>
+  </div>
 </div>`;
     }
     if (ps === 'open' || expanded) {
         return `<div class="notes-group" style="margin-top:8px" data-testid="addnotes-post-open">
-  <label style="display:block;font-size:0.85em;font-weight:600;margin-bottom:4px">Add a note to ticket #${ticketId}:</label>
+  <label style="display:block;font-size:0.85em;font-weight:600;margin-bottom:4px">Add a note to ticket #${ticketId} (optional)</label>
   <textarea id="addnotes-post-input" data-testid="addnotes-post-input" rows="2"
     style="width:100%;box-sizing:border-box;font-size:16px;padding:6px 8px;border:1px solid var(--border,#ccc);border-radius:6px;resize:vertical"
     placeholder="Type a note…"></textarea>
@@ -200,6 +220,9 @@ async function saveNotesPost(ticketId) {
     const value = el?.value?.trim();
     if (!value) return;
     if (typeof state !== 'undefined' && state?.flow?.data) {
+        // OOHDASH-119: preserve typed text before render wipes the textarea, so
+        // the saving and error states can show it for retry (round 2 rework fix).
+        state.flow.data._postNotesDraft = value;
         state.flow.data._postNotes = 'saving';
     }
     if (typeof render === 'function') render();
@@ -207,11 +230,13 @@ async function saveNotesPost(ticketId) {
         await api.post(`/api/tickets/${ticketId}/notes`, { body: value, kind: 'additional-notes' });
         if (typeof state !== 'undefined' && state?.flow?.data) {
             state.flow.data._postNotes = 'saved';
+            delete state.flow.data._postNotesDraft; // no longer needed once saved
         }
     } catch (err) {
         if (typeof state !== 'undefined' && state?.flow?.data) {
             state.flow.data._postNotes = 'error';
             state.flow.data._postNotesError = err.message;
+            // _postNotesDraft is kept so the error state can restore the textarea text
         }
     }
     if (typeof render === 'function') render();
@@ -228,6 +253,7 @@ window._postNotesReset = function () {
     if (typeof state !== 'undefined' && state?.flow?.data) {
         state.flow.data._postNotes = 'idle';
         delete state.flow.data._postNotesError;
+        delete state.flow.data._postNotesDraft;
     }
     if (typeof render === 'function') render();
 };
