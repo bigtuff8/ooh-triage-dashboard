@@ -186,10 +186,9 @@ test('TF-04: whitespace-only note sends null; no TRG-STEP in ticket body', async
     const req = await postPromise;
     const reqBody = JSON.parse(req.postData());
 
-    // POST body: whitespace-only note is sent as-is; server normalises to null
-    // Behaviour proof: no echo element rendered (removal assertion)
-    expect(reqBody).toHaveProperty('additionalNotes'); // key present
-    // No echo (removal assertion — confirms server normalised blank note to null)
+    // DF-01 fix (7308309): client now trims before testing; whitespace-only sends null not '   '
+    expect(reqBody.additionalNotes).toBeNull();
+    // No echo (removal assertion — null note means no echo div rendered)
     await expect(page.locator('[data-testid="addnotes-echo"]')).toHaveCount(0);
 });
 
@@ -1182,4 +1181,43 @@ test('TF-33: single-quote in note is escaped in HTML attribute on sessionStorage
     // literal apostrophe character, not the HTML entity, regardless of how the template was built.
     // esc() correctness (&#39; in the HTML template string) is proven by unit tests; the behaviour
     // that matters here is that the DOM .value equals the original string, which is asserted above.
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// TF-34: Pipe character in note — client sends raw '|' in the POST body;
+//        server-side normaliseAdditionalNotes() (zendesk.js) converts '|' to
+//        '¦' (U+00A6 broken bar) before inserting into TRG-STEP, preventing
+//        field-separator collision. The tester spec asserts the client-to-server
+//        payload contains the raw pipe (client responsibility) and the echo
+//        renders the note safely (the echo shows what was typed, not the
+//        server-normalised form). Server-side '|' → '¦' is covered exhaustively
+//        by unit tests in test/zendesk.test.js (build commit 7308309).
+// ─────────────────────────────────────────────────────────────────────────────
+test('TF-34: note with pipe — POST body has raw pipe; echo renders note safely', async ({ page }) => {
+    const NOTE_WITH_PIPE = 'fault code | E3 | heating failure';
+
+    await signIn(page, 'Test Handler');
+    await confirmSite(page, '6832', 'Old Grey Mare');
+    await page.locator('[data-testid="tile-other"]').click();
+    await page.locator('[data-testid="other-text"]').pressSequentially('fryer issue', { delay: 20 });
+    await page.locator('#addnotes').pressSequentially(NOTE_WITH_PIPE, { delay: 5 });
+    await page.locator('[data-testid="other-capture"]').click();
+    await expect(page.locator('[data-testid="confirm-step"]')).toBeVisible();
+
+    // Intercept POST and assert raw pipe is sent (client does not normalise)
+    const requestPromise = page.waitForRequest(
+        r => r.url().includes('/api/outcomes') && r.method() === 'POST'
+    );
+    await page.locator('[data-testid="record-outcome"]').click();
+    const req = await requestPromise;
+    const reqBody = JSON.parse(req.postData());
+
+    // Client sends raw pipe — server normalises to ¦ (U+00A6) in zendesk.js
+    expect(reqBody.additionalNotes).toBe(NOTE_WITH_PIPE);
+
+    // Echo shows the typed note safely (raw pipe rendered as text, not field separator)
+    const echo = page.locator('[data-testid="addnotes-echo"]');
+    await expect(echo).toBeVisible();
+    await expect(echo).toContainText('fault code');
+    await expect(echo).toContainText('E3');
 });
