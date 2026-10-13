@@ -143,9 +143,11 @@ test.describe('control & sync', () => {
         await startHeatingFlow(page, 'bar-restaurant'); // IT500-BAR-6832
         await page.locator('[data-testid="need-off"]').click();
         const reco = page.locator('[data-testid="reco-frost"]');
-        await expect(reco).toContainText('no “off” switch');
+        await expect(reco).toContainText('no "off" switch');
         await expect(reco).toContainText('frost-hold');
         await page.locator('[data-testid="frost-decline"]').click();
+        // OOHDASH-119: confirm step required before POST fires
+        await page.locator('[data-testid="record-outcome"]').click();
         const outcome = page.locator('[data-testid="outcome-noaction"]');
         await expect(outcome).toContainText('Call logged — no action taken');
         await expect(outcome).toContainText(/Ticket #\d+/);
@@ -217,6 +219,8 @@ test.describe('control & sync', () => {
         // The aircon request is reached from the caller's words and ends in a referral capture — never a control.
         await page.locator('[data-testid="smart-entry"]').pressSequentially('the air con is blowing warm', { delay: 25 });
         await page.locator('[data-testid="suggest-aircon"]').click();
+        // OOHDASH-119: confirm step required before POST fires
+        await page.locator('[data-testid="record-outcome"]').click();
         const captured = page.locator('[data-testid="outcome-captured"]');
         await expect(captured).toContainText('Captured for the IoT team');
         await expect(captured).toContainText(/Ticket #\d+/);
@@ -236,8 +240,12 @@ test.describe('control & sync', () => {
         });
         await page.locator('[data-testid="tile-fridge"]').click();
         await page.locator('[data-testid="fridge-risk"]').click(); // P1 path
-        await expect(page.locator('.flowbody')).toContainText('Couldn’t record the outcome: Zendesk exploded');
+        // OOHDASH-119: confirm step shown; click Record outcome to fire the (mocked-to-fail) POST
+        await page.locator('[data-testid="record-outcome"]').click();
+        await expect(page.locator('.flowbody')).toContainText("Couldn't record the outcome: Zendesk exploded");
+        // Try again resets to confirm step; click Record outcome again to fire the now-succeeding POST
         await page.locator('button:has-text("Try again")').click();
+        await page.locator('[data-testid="record-outcome"]').click();
         // Approach B: OOH tags the ticket ooh_p1; the IoT Support Dashboard pages the manager.
         // The dispatch-status must show the honest fixed line — not the old false Approach-A warning.
         await expect(page.locator('[data-testid="outcome-p1"]')).toContainText('logged as ticket', { timeout: 15000 });

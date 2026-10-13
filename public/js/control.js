@@ -181,7 +181,7 @@ function drawControl() {
     if (ph === 'confirm' && c.midWait) {
         tail = `<div class="alert warn" data-testid="sync-midwait" aria-live="assertive">⏳ <b>Still no confirmation from the device.</b>${c.action?.slowEchoDevice ? ' This unit (IT700) can be slow to echo.' : ''} It may still land — but you have a caller on hold. <b>What do you want to do?</b></div>
    <div style="display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap"><button class="btn" data-testid="midwait-hold" onclick="ctlMidWaitHold()">Keep caller on hold</button><button class="btn" data-testid="midwait-stop" onclick="ctlMidWaitStop()">Stop waiting</button><button class="btn primary" data-testid="midwait-escalate" onclick="ctlEscalate()">Escalate</button></div>`;
-    } else if (ph === 'sent' || ph === 'confirm') tail = `<p class="small" style="text-align:center" aria-live="polite">Waiting for the device to echo the change back — usually under 30 seconds. <b>“Applied” only means device-confirmed.</b></p>`;
+    } else if (ph === 'sent' || ph === 'confirm') tail = `<p class="small" style="text-align:center" aria-live="polite">Waiting for the device to echo the change back — usually under 30 seconds. <b>"Applied" only means device-confirmed.</b></p>`;
     if (ph === 'done') tail = `<div class="alert ok" data-testid="sync-applied" aria-live="polite">✅ <b>Applied — device confirmed ${ctlValTxt()} at ${new Date(c.action.settledAt).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}.</b>${c.hold !== 'none' ? ` Hold active: reverts at ${holdRevertText(c.hold)}.` : ''}</div><div style="text-align:right"><button class="btn primary" data-testid="sync-done" onclick="ctlFinish()">Done</button></div>`;
     // C6 applied-LATE — a device that echoed AFTER we told the handler "not applied" (timeout).
     // Distinct from the plain "Applied" card so the handler is told to go back to the caller. This
@@ -366,16 +366,16 @@ async function ctlFinish() {
         notesDraftClear(); // OOHDASH-119: clear sessionStorage draft on success
         if (state.flow?.data) { state.flow.data._ticketId = res.ticket.id; }
         const notesEcho = additionalNotes
-            ? `<div class=”stepdone small” data-testid=”addnotes-echo”><span>📝</span>Note added — for the ticket and morning review: “${esc(additionalNotes)}”</div>`
+            ? `<div class="stepdone small" data-testid="addnotes-echo"><span>📝</span>Note added — for the ticket and morning review: "${esc(additionalNotes)}"</div>`
             : '';
         registerIssue(`${what} — ${c.device.zone}`, 'green', res.ticket.id);
-        html = `<div class=”outcome applied” data-testid=”outcome-applied”><h3>✅ Change applied — device confirmed</h3><p>${detail}</p>${holdTxt ? `<p style=”margin-top:4px”>⏱️ ${holdTxt}</p>` : ''}
-  ${notesEcho}<div class=”script”>”${script}”</div><p class=”small”>Recorded on ticket <b>#${res.ticket.id}</b> · reviewed by the IoT team next working day (in the IoT Support dashboard)</p>%%NOTESPOST%%${outButtons()}</div>`;
+        html = `<div class="outcome applied" data-testid="outcome-applied"><h3>✅ Change applied — device confirmed</h3><p>${detail}</p>${holdTxt ? `<p style="margin-top:4px">⏱️ ${holdTxt}</p>` : ''}
+  ${notesEcho}<div class="script">"${script}"</div><p class="small">Recorded on ticket <b>#${res.ticket.id}</b> · reviewed by the IoT team next working day (in the IoT Support dashboard)</p>%%NOTESPOST%%${outButtons()}</div>`;
         toast(`✅ <b>${esc(state.workspace.site.siteName)}</b>: ${what} ${ctlValTxt(c)} — device confirmed`);
     } catch (err) {
-        html = `<div class=”outcome applied” data-testid=”outcome-applied”><h3>✅ Change applied — device confirmed</h3><p>${detail}</p>
-  <div class=”alert err”>The change IS applied, but recording the ticket failed: ${esc(err.message)}. Tell the IoT team via Tonight → Raise a query so the audit trail is complete.</div>
-  <div class=”script”>”${script}”</div>${outButtons()}</div>`;
+        html = `<div class="outcome applied" data-testid="outcome-applied"><h3>✅ Change applied — device confirmed</h3><p>${detail}</p>
+  <div class="alert err">The change IS applied, but recording the ticket failed: ${esc(err.message)}. Tell the IoT team via Tonight → Raise a query so the audit trail is complete.</div>
+  <div class="script">"${script}"</div>${outButtons()}</div>`;
     }
     if (state.flow) { state.flow.stage = 99; state.flow.data._outcomeHtml = html; }
     render();
@@ -411,12 +411,12 @@ async function ctlEscalate() {
         notesDraftClear(); // OOHDASH-119
         if (state.flow?.data) { state.flow.data._ticketId = res.ticket.id; }
         registerIssue(`${what} — NOT applied`, 'blue', res.ticket.id);
-        html = `<div class=”outcome captured” data-testid=”outcome-escalated”><h3>📥 Captured for the IoT team</h3>
-  <p>Attempted ${what} (${ctlValTxt(c)}) on <span class=”mono”>${esc(c.device.deviceId)}</span> but ${esc(why)}. <b>The change must be treated as not applied.</b></p>
-  <div class=”script”>”I tried to make that change remotely but the device hasn't confirmed it, so I'm not going to tell you it's done when it may not be. I've logged it as a priority instead${isTimeout ? ' — it may still land, and the team will check' : ''}.”</div>
-  <p class=”small”>Ticket <b>#${res.ticket.id}</b></p>%%NOTESPOST%%${outButtons()}</div>`;
+        html = `<div class="outcome captured" data-testid="outcome-escalated"><h3>📥 Captured for the IoT team</h3>
+  <p>Attempted ${what} (${ctlValTxt(c)}) on <span class="mono">${esc(c.device.deviceId)}</span> but ${esc(why)}. <b>The change must be treated as not applied.</b></p>
+  <div class="script">"I tried to make that change remotely but the device hasn't confirmed it, so I'm not going to tell you it's done when it may not be. I've logged it as a priority instead${isTimeout ? ' — it may still land, and the team will check' : ''}."</div>
+  <p class="small">Ticket <b>#${res.ticket.id}</b></p>%%NOTESPOST%%${outButtons()}</div>`;
     } catch (err) {
-        html = `<div class=”alert err”>Couldn't record the escalation: ${esc(err.message)} — raise it via Tonight → Raise a query so it isn't lost.</div>${outButtons()}`;
+        html = `<div class="alert err">Couldn't record the escalation: ${esc(err.message)} — raise it via Tonight → Raise a query so it isn't lost.</div>${outButtons()}`;
     }
     if (state.flow) { state.flow.stage = 99; state.flow.data._outcomeHtml = html; }
     render();

@@ -99,6 +99,8 @@ test.describe('OOHDASH-82 heating area model', () => {
         const shortcut = page.locator('[data-testid="aircon-shortcut"]');
         await expect(shortcut).toBeVisible();
         await shortcut.click();
+        // OOHDASH-119: shortcut now shows confirm step; must click Record outcome to fire POST
+        await page.locator('[data-testid="record-outcome"]').click();
 
         const req = await postClass;
         expect(JSON.parse(req.postData())).toMatchObject({ type: 'capture', OohCaptureClass: 'aircon-referral' });
@@ -124,6 +126,8 @@ test.describe('OOHDASH-82 heating area model', () => {
         const postClass = page.waitForRequest(req =>
             req.url().includes('/api/outcomes') && req.method() === 'POST');
         await suggest.click();
+        // OOHDASH-119: suggestion now shows confirm step; must click Record outcome to fire POST
+        await page.locator('[data-testid="record-outcome"]').click();
 
         const req = await postClass;
         expect(JSON.parse(req.postData())).toMatchObject({ type: 'capture', OohCaptureClass: 'aircon-referral' });
