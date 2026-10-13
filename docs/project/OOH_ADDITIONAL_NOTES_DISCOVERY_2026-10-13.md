@@ -3,28 +3,40 @@ SECTION: What we are solving
 OOHDASH-119. OOH agents frequently have extra context the guided flow does not capture — a caller's specific complaint, a comment from a site engineer, a nuance not covered by any chip. Today that extra context travels by WhatsApp or Teams after the call, invisibly, detached from the ticket. The immediate win is a free-text Additional Notes box that appears at every point in the UI where a ticket is about to be submitted, so the agent can type those words once and they land on the Zendesk ticket and on the IoT Support Dashboard record, not in a side-channel.
 
 SECTION: Where tickets get submitted today
-Every guided flow in the app ends at one of four outcome types — P1 escalation, capture-and-refer, scope-only log, or no-action log. All four reach the server via the same single endpoint, POST /api/outcomes. There are ten guided flows (heating, aircon, hot water, kitchen, lighting, fan, fridge, connectivity, contractor, and other/free-text), plus a separate ambiguous-site capture path and a Tonight-view query button, giving 25 distinct outcome call-sites in total. All 25 create a Zendesk ticket. Six of them also push the ticket to the IoT Support Dashboard via a Zendesk webhook (the P1 paths in kitchen, lighting, fridge, and contractor). Control-confirmed outcomes (setpoint changes, frost-hold, switch actions) reach the same POST /api/outcomes endpoint via a separate client path in control.js, also with no current notes field.
+Every guided flow ends at one of four outcome types: P1 escalation, capture-and-refer, scope-only log, or no-action log. All ten guided flows (heating, aircon, hot water, kitchen, lighting, fan, fridge, connectivity, contractor, and other) use a shared helper called finishOutcome, which posts to POST /api/outcomes. The server creates a Zendesk ticket for every call. Six outcome types also push to the IoT Support Dashboard via a Zendesk webhook on the ooh_p1 tag (the P1 paths in kitchen, lighting, fridge, and contractor). Control-confirmed outcomes — setpoint changes, frost-hold, switch, and hot-water boost — are a separate submit path in control.js: two functions, ctlFinish and ctlEscalate, each post to POST /api/outcomes and create a Zendesk ticket. These are genuine submit end points and are in scope. Beyond the guided flows, a separate ambiguous-site capture in views.js and a Tonight-view query button each create their own tickets. The total is 27 distinct submit end points.
 
 SECTION: How notes would reach Zendesk and the IoT dashboard
-The Zendesk ticket body is assembled in one place on the server: the buildTrgBody function in services/zendesk.js. It builds the [TRG] internal comment in a fixed order — summary line, Operator line, optional Caller's words line, Outcome anchor, then the timestamped Transcript block. Additional notes appended after the Transcript block would land on the ticket body, be visible to IoT agents in the Zendesk ticket, and appear in the IoT Support Dashboard OOH oversight screen. No existing consumer parse or downstream system reads past the Transcript block. On the client side, the common outcome helper finishOutcome in public/js/flows.js is the single point where all ten guided-flow outcomes are posted; a notes field captured there would need to travel to POST /api/outcomes and from there to buildTrgBody. The ambiguous-site and query paths post directly in views.js and would need separate but minor wiring. Control-path outcomes use a different client module and would need their own wiring; they are lower priority as the operator is mid-control-action and the natural pause point is less clear.
+The Zendesk ticket body is assembled in one place on the server: the buildTrgBody function in services/zendesk.js. It builds the [TRG] internal comment with a fixed structure — summary line, Operator line, optional Caller's words line, Outcome anchor, then the timestamped Transcript block. Additional notes appended after the Transcript block land on the ticket body. The IoT Support Dashboard's ticket detail view renders the full [TRG] comment body, so notes ARE visible there. However, the OOH oversight queue screen in the IoT dashboard (ooh-review.js buildOohQueue) uses parseTrgDescription, which only extracts three regex-matched fields — Operator, Outcome, and Caller's words — from the Zendesk search API description field. Notes appended after the transcript are NOT extracted by that function and do NOT appear in the queue row. To show notes in the oversight queue, either a small change to parseTrgDescription is needed (add a notes regex), or notes must be placed in a position parseTrgDescription already reads.
 
 SECTION: Frozen-consumer conformance
-The IoT Support Dashboard parses the [TRG] comment body in services/ooh-review.js using three regex matches: Operator, Outcome, and Caller's words. None of these matches anything past the Transcript block. Text appended after the transcript — the proposed notes — does not disturb any of those regexes. The P1 SMS built by the IoT side uses only ticket metadata (site name, subject, ticket ID), never the comment body; notes in the body have no effect on the SMS content or trigger. Verdict: no contract change is needed. The notes can be appended after the transcript in the existing [TRG] body without breaking any consumer, or alternatively posted as a second internal comment using the existing [OOH NOTE] mechanism. Both options keep the frozen [TRG] anchor intact.
+The three regex anchors in parseTrgDescription — Operator, Outcome, and Caller's words — appear before the Transcript block and are unaffected by any text added after it. The P1 SMS built by the IoT side uses only ticket metadata (site name, subject, ticket ID), never the comment body, so notes have no effect on SMS content or trigger. Verdict: no contract change is needed for ticket creation or P1 dispatch. A small optional consumer change to parseTrgDescription would be needed only if the notes must also appear in the OOH oversight queue row; that is a separate decision.
 
 SECTION: Risks and costs
-The only token cost is negligible: the notes field adds a line of text to the Zendesk API call already made on every outcome. There is no recurring background process, no new polling, no separate service. The main risk is operator behaviour: a free-text field on a live production tool needs a length cap and HTML-escape to prevent runaway input or rendering issues; the existing callerWords field already demonstrates this pattern. A secondary risk is scope creep into control-path outcomes, which are harder to instrument (the submit happens after a device echo, not at a human pause point); those should be deferred to a follow-up ticket. PII caution is warranted — agents may type caller names or phone numbers into a free-text box; the field should carry a brief label reminding them to keep it factual and operational.
+The only token cost is negligible: the notes field adds a line of text to the Zendesk API call already made on every outcome. There is no background process, no new polling, no separate service, and no idle cost. The main risks are PII exposure (agents may type caller names into a free-text box — the field label should caution against it), runaway input (a length cap and server-side trim prevent bloat), and control-path UX complexity (the control submit fires after a device echo, not at a human pause point, so notes for those outcomes must be collected differently — see the decision below). The existing callerWords field demonstrates the safe pattern for free-text input throughout the codebase.
 
 SECTION: Recommended approach
-Add a single shared Additional Notes textarea that appears in the outcome-pending UI just before the outcome POST fires. The textarea is optional, capped at 500 characters, and its value is included in the POST /api/outcomes payload as a new additionalNotes field. On the server, buildTrgBody appends one line after the transcript — "Additional notes from OOH agent: …" — when the field is non-empty. The ambiguous-site capture and the Tonight query should receive the same treatment in their own UI prompts. Control-path outcomes are out of scope for this ticket.
+Add a shared Additional Notes textarea that appears in the flow UI just before or at the moment of outcome submit for all guided-flow end points (items 1 to 23). The textarea value travels in the POST /api/outcomes payload as additionalNotes and is appended after the transcript in buildTrgBody as one labelled line. For control-path outcomes (items 26 and 27), a post-submit notes affordance in the outcome card is the realistic option, posting via the existing POST /api/tickets/:id/notes path. The ambiguous-site and Tonight-query paths each get their own modal textarea. The DECISION on IoT oversight queue visibility determines whether a small parseTrgDescription change is also needed.
 
 DECISION: Should Additional Notes be optional or required? | Optional — agent may leave it blank | Required — agent must enter something before submitting
-DETAIL: Recommend optional. Requiring a note on every outcome slows down the majority of calls where nothing extra needs recording. The immediate win is making notes possible, not mandatory.
+DETAIL: Recommend optional. Requiring a note on every outcome slows the majority of calls where nothing extra needs recording.
 
-DECISION: How should notes reach the ticket body? | Append after transcript in the [TRG] first comment (pre-submit, one server-side change in buildTrgBody) | Post as a second [OOH NOTE] internal comment after the ticket is created (post-submit, uses the existing /api/tickets/:id/notes endpoint)
-DETAIL: Recommend option A (append in [TRG]). The notes appear in the primary ticket record alongside the rest of the outcome, are present from the moment the ticket is created, and require no extra client round-trip. The frozen-consumer conformance check confirms this is safe.
+DECISION: How should notes reach the ticket body? | Append after transcript in the [TRG] first comment, pre-submit, via one server-side change to buildTrgBody | Post as a second [OOH NOTE] internal comment after ticket creation, via the existing /api/tickets/:id/notes endpoint
+DETAIL: Recommend option A (pre-submit append in [TRG]). Notes are present from ticket creation, require no second round-trip, and pass the frozen-consumer conformance check. Option B is simpler server-side but loses notes if the session drops after submit.
 
-DECISION: Should Additional Notes appear in the P1 SMS sent by the IoT Support Dashboard? | Body only — notes appear in the Zendesk ticket body but not in the SMS text | Include a truncated excerpt in the SMS
-DETAIL: Recommend body only. The SMS is a terse page-alert that tells the on-duty manager a P1 exists at a named site. Appending free-text agent notes risks making the SMS unreadable; the manager opens the ticket link to see the full context. No change to the IoT side is needed.
+DECISION: Should notes appear in the IoT Support Dashboard OOH oversight queue row? | Body-only — notes visible in ticket detail view and Zendesk, not in the queue row (no IoT consumer change) | Queue row — add a notes line to parseTrgDescription in ooh-review.js so notes appear in the manager oversight screen (small consumer change)
+DETAIL: Recommend body-only for this stop-gap. Queue-row visibility requires a coordinated change to the frozen IoT consumer repo; it is low risk but out of scope for a same-day delivery. Raise as a follow-up if the IoT team needs morning-review visibility of notes in the queue.
+
+DECISION: How should control-path outcome notes (setpoint, frost-hold, switch, boost) be handled? | Post-submit textarea in the outcome card, posting via the existing /api/tickets/:id/notes endpoint (no change to control.js submit logic) | Defer to a follow-up ticket with an explicit OOHDASH ticket reference
+DETAIL: Recommend post-submit textarea. Control outcomes submit automatically on device echo — there is no natural pre-submit pause point. A post-submit notes box in the outcome card (matching the existing ticket drawer pattern) is the honest implementation. Deferral is acceptable only if James agrees; it must not be a silent omission.
+
+DECISION: What is the maximum length for Additional Notes? | 500 characters — enough for three to four sentences, enforced via client maxlength attribute and server-side trim/reject | 1000 characters or no cap
+DETAIL: Recommend 500 characters. Keeps notes concise, prevents bloat in the Zendesk ticket body, and stays well within Zendesk's description field rendering.
+
+DECISION: What label should appear on the notes line in the ticket body? | "Additional notes from OOH agent:" | "Agent notes:" | No label — plain text only
+DETAIL: Recommend "Additional notes from OOH agent:" — clear authorship, unambiguous to IoT agents reviewing the ticket the next morning.
+
+DECISION: How should the notes value be sanitised before writing to the ticket body? | Use the existing oneLine plus XSS-escape pattern already applied to callerWords throughout the codebase | A separate sanitisation step
+DETAIL: Recommend the existing pattern. oneLine collapses whitespace, the XSS-escape prevents injection, and callerWords proves it works in this context. No new library is needed.
 -->
 
 # OOHDASH-119 — Additional Notes at Ticket Submit: Discovery
@@ -32,33 +44,45 @@ DETAIL: Recommend body only. The SMS is a terse page-alert that tells the on-dut
 **Date:** 2026-10-13
 **Author:** Discovery doer (Claude Code, bigtuff8 session)
 **Ticket:** OOHDASH-119
-**Repo / branch:** bigtuff8/ooh-triage-dashboard · `discovery/oohdash-additional-notes`
+**Repo / branch:** bigtuff8/ooh-triage-dashboard `discovery/oohdash-additional-notes`
 **Status:** Discovery complete — awaiting design gate
 
 ---
 
 ## 1. Problem statement
 
-OOH agents on the phone to a customer frequently hold context that no guided-flow chip captures: a note from a site engineer standing nearby, a caller's specific complaint phrased precisely, a nuance that doesn't map to any existing step. Today that context travels on WhatsApp or Teams after the call, invisible to the Zendesk ticket and to the IoT Support Dashboard. The requirement is a free-text Additional Notes field presented at every guided-flow outcome point, before the ticket is submitted, so those words go into the ticket rather than a side-channel.
+OOH agents on the phone frequently hold context that no guided-flow chip captures: a note from a site engineer, a caller's specific complaint phrased precisely, a nuance that doesn't map to any step. Today that context travels on WhatsApp or Teams after the call, invisible to the Zendesk ticket and to the IoT Support Dashboard. The requirement is a free-text Additional Notes field at every guided-flow outcome point, before the ticket is submitted, so those words go into the ticket rather than a side-channel.
 
 ---
 
 ## 2. Submit end-point inventory
 
-Every guided-flow outcome calls `finishOutcome` in `public/js/flows.js`, which posts to `POST /api/outcomes` on the server. The server creates the Zendesk ticket in `services/zendesk.js:createOutcomeTicket`. Two additional code paths in `public/js/views.js` also create tickets directly.
+### 2a. Outcome types (guided flows)
 
-### 2a. Outcome types
+All ten guided flows (heating, aircon, hot water, kitchen, lighting, fan, fridge, connectivity, contractor, other) call `finishOutcome` in `public/js/flows.js`, which fires `api.post('/api/outcomes', payload)`. The server route is `POST /api/outcomes` in `routes/api.js`; the ticket is created by `createOutcomeTicket` in `services/zendesk.js`.
 
-| Outcome type | Client function | Server type value |
-|---|---|---|
-| Capture-and-refer | `outcomeCaptured` | `capture` |
-| P1 escalation | `outcomeP1` | `escalate-p1` |
-| Scope log | `outcomeScope` | `scope-only` |
-| No-action log | `outcomeNoAction` | `no-action` |
+Four outcome helpers map to four server type values:
 
-All four call `finishOutcome`, which fires `api.post('/api/outcomes', payload)`.
+- `outcomeCaptured` → type `capture`
+- `outcomeP1` → type `escalate-p1`
+- `outcomeScope` → type `scope-only`
+- `outcomeNoAction` → type `no-action`
 
-### 2b. Full end-point table
+### 2b. Control-path outcomes (separate client module)
+
+`public/js/control.js` contains two additional submit paths, both posting to `POST /api/outcomes`:
+
+- `ctlFinish` (line 353): fires when the device confirms the command (synced). Submits with `actionId`, `type` from the action, and the applied subject. Creates a Zendesk ticket.
+- `ctlEscalate` (line 390): fires when the operator clicks Escalate after a timeout or write failure. Submits with `type: 'capture'` and `OohCaptureClass: 'control-failure'`. Creates a Zendesk ticket.
+
+These are genuine submit end points. They are in scope. There is no pre-submit pause point in the control flow — the submit fires automatically after the device echo or on an explicit "Escalate" button click, not at a step where a notes textarea can naturally appear before the POST. The realistic notes option for these paths is a post-submit textarea in the outcome card that posts via `POST /api/tickets/:id/notes`. See the DECISION in the contract.
+
+### 2c. Non-flow submit paths (views.js)
+
+- `ambiguousCapture` (views.js line 86): posts directly to `POST /api/outcomes` with `type: 'capture'` when the house ID is ambiguous. Creates a Zendesk ticket.
+- `sendQuery` (views.js line 396): posts to `POST /api/query`, which calls `zendesk.raiseQuery` and creates a Zendesk ticket. This is the Tonight-view "Raise a query" button.
+
+### 2d. Full end-point table
 
 | # | Journey / flow | Outcome label | Type | Destination |
 |---|---|---|---|---|
@@ -68,192 +92,166 @@ All four call `finishOutcome`, which fires `api.post('/api/outcomes', payload)`.
 | 4 | Aircon — not controllable, referred to IoT team | Aircon referral captured | capture | Zendesk |
 | 5 | Hot water — boost unavailable or caller declined | Hot-water captured | capture | Zendesk |
 | 6 | Hot water — likely boiler fault | Scope logged | scope-only | Zendesk |
-| 7 | Kitchen — off during active service | **P1 escalation** | escalate-p1 | Zendesk + IoT dashboard |
-| 8 | Kitchen — needed later / not service-critical | Schedule request captured | capture | Zendesk |
+| 7 | Kitchen — off during active service | P1 escalation | escalate-p1 | Zendesk + IoT dashboard |
+| 8 | Kitchen — needed later, not service-critical | Schedule request captured | capture | Zendesk |
 | 9 | Lighting — resolved with on-site override | Override capture logged | capture | Zendesk |
-| 10 | Lighting — override failed / not responding | **P1 escalation** | escalate-p1 | Zendesk + IoT dashboard |
-| 11 | Fan — schedule / time request captured | Fan request captured | capture | Zendesk |
-| 12 | Fridge — stock at risk | **P1 escalation** | escalate-p1 | Zendesk + IoT dashboard |
+| 10 | Lighting — override failed or not responding | P1 escalation | escalate-p1 | Zendesk + IoT dashboard |
+| 11 | Fan — schedule or time request captured | Fan request captured | capture | Zendesk |
+| 12 | Fridge — stock at risk | P1 escalation | escalate-p1 | Zendesk + IoT dashboard |
 | 13 | Fridge — query only, monitored | Scope logged | scope-only | Zendesk |
 | 14 | Connectivity — gateway restored on the call | Restored capture logged | capture | Zendesk |
 | 15 | Connectivity — equipment-group gateway offline | Group gateway captured | capture | Zendesk |
 | 16 | Connectivity — direct-connection site, equipment unreachable | Direct-site capture | capture | Zendesk |
 | 17 | Connectivity — gateway still offline after checks | Gateway offline captured | capture | Zendesk |
-| 18 | Contractor — on site, no PowerPause path | **P1 escalation** | escalate-p1 | Zendesk + IoT dashboard |
-| 19 | Contractor — PowerPause, Donkey Derby exception | **P1 escalation** | escalate-p1 | Zendesk + IoT dashboard |
-| 20 | Contractor — PowerPause override given | **P1 escalation** | escalate-p1 | Zendesk + IoT dashboard |
+| 18 | Contractor — on site, no PowerPause path | P1 escalation | escalate-p1 | Zendesk + IoT dashboard |
+| 19 | Contractor — PowerPause, Donkey Derby exception | P1 escalation | escalate-p1 | Zendesk + IoT dashboard |
+| 20 | Contractor — PowerPause override given | P1 escalation | escalate-p1 | Zendesk + IoT dashboard |
 | 21 | Other — general issue, capture path | General captured | capture | Zendesk |
 | 22 | Other — issue monitored only | Scope logged | scope-only | Zendesk |
 | 23 | Other — issue not on Lighthouse | Scope logged | scope-only | Zendesk |
 | 24 | Ambiguous site — house ID matches more than one site | Ambiguous capture | capture | Zendesk |
-| 25 | Tonight view — "Raise a query with the IoT team" | Query ticket | query | Zendesk |
+| 25 | Tonight view — Raise a query with the IoT team | Query ticket | query | Zendesk |
+| 26 | Control path — device confirms command (ctlFinish) | Applied outcome | control type | Zendesk |
+| 27 | Control path — timeout or write failure (ctlEscalate) | Control-failure capture | capture | Zendesk |
 
-**Total: 25 distinct submit end points.** 23 use `finishOutcome` / `outcomeCaptured` / `outcomeP1` / `outcomeScope` / `outcomeNoAction` in `public/js/flows.js`; items 24 and 25 post directly in `public/js/views.js:ambiguousCapture` and `views.js:sendQuery`. Items 7, 10, 12, 18, 19, 20 also trigger the IoT Support Dashboard via the Zendesk webhook on the `ooh_p1` tag.
-
-**Out of scope for this ticket:** control-confirmed outcomes (setpoint change, frost-hold, switch) also reach `POST /api/outcomes` via `public/js/control.js` with an `actionId` payload. These happen after a device echo, not at a human pause point, and are lower priority. Recommend a follow-up ticket.
+**Total: 27 distinct submit end points.** Items 7, 10, 12, 18, 19, 20 also trigger the IoT Support Dashboard via the Zendesk webhook on the `ooh_p1` tag.
 
 ---
 
 ## 3. Where the ticket body is assembled today
 
-### Zendesk body assembly
+All outcome tickets are created by `createOutcomeTicket` in `services/zendesk.js` (line 267), which calls `buildTrgBody` (line 243). The `[TRG]` internal comment is assembled in a frozen order:
 
-All outcome tickets are built by `createOutcomeTicket` in `services/zendesk.js` (line 267). It delegates to `buildTrgBody` (line 243), which assembles the `[TRG]` internal comment in this frozen order:
+Line 1: `[TRG]` followed by the summary, maximum 180 characters.
+Line 2: `Operator:` followed by the agent name and "(OOH)".
+Line 3 (optional): `Caller's words:` followed by what the caller said, present only when `callerWords` is non-null.
+Line 4: `Outcome:` followed by a hyphenated code such as `capture` or `escalate-p1`.
+Remaining lines: `Transcript:` header followed by timestamped steps in the form `HH:MM | description`.
 
-```
-[TRG] <summary — max 180 chars>
-Operator: <name> (OOH)
-Caller's words: "<text>"         ← optional, present when callerWords non-null
-Outcome: <hyphenated-code>
-Transcript:
-HH:MM | <step 1>
-HH:MM | <step 2>
-…
-```
+The Outcome anchor and the three lines above it must precede the transcript so they survive Zendesk's approximately 1,500-character description truncation (the `description` field on Zendesk search results). Anything appended after the Transcript block is safe and does not disturb the anchors.
 
-The `Outcome:` line and the three lines above it are the frozen anchor that the IoT Support Dashboard consumer parses. Anything appended after the transcript block is safe.
-
-### Client submission path
-
-`finishOutcome` in `public/js/flows.js` (line 196) is the single shared helper all ten guided flows call. It fires `api.post('/api/outcomes', { siteNo, siteName, callerWords, ...payload })` exactly once per flow key (the `_pend_` guard prevents double-fire). The `payload` is built by each outcome function. A new `additionalNotes` field would be added to this payload.
-
-### Simplest shared injection point
-
-One text area added to the UI just before the final outcome chip fires, capturing `additionalNotes` into `state.flow.data.additionalNotes` via the same `flowStep` mechanism used for all other flow data. `finishOutcome` reads it from `f.data.additionalNotes` and includes it in the POST body. On the server, `buildTrgBody` appends one line after the transcript when the field is non-empty.
-
-Items 24 (ambiguous capture) and 25 (query) each need a separate text area in their respective modal UIs (views.js), wired to their own POST calls.
+A new `additionalNotes` line appended after the transcript would read: `Additional notes from OOH agent: "…"` (when non-empty). This is the proposed server-side change: one conditional `lines.push` at the end of `buildTrgBody`, guarded on the new field being non-null and non-empty.
 
 ---
 
-## 4. Frozen-consumer conformance
+## 4. IoT Support Dashboard visibility — concrete finding
 
-### IoT Support Dashboard — ooh-review.js
+The IoT Support Dashboard touches OOH ticket data in two places:
 
-The IoT dashboard parses the `[TRG]` comment body in `services/ooh-review.js:parseTrgDescription` (line 129) using three regex matches:
+**Ticket detail view (`public/js/app.js`):** When an IoT agent opens a specific ticket, the full comment body is rendered. The `classifyComment` function at line 218 identifies a comment starting with `[TRG]` as type 'OOH' and renders it in full. Notes appended to the `[TRG]` body after the transcript ARE visible here.
 
-- `/Operator:\s*([^\n]+)/` — extracts the operator name
-- `/Outcome:\s*([\w-]+)/` — extracts the outcome code
-- `/Caller'?s words:\s*[""']?([^""'\n]+)/i` — extracts caller words (optional)
-- The first line after `[TRG]` is taken as the summary
+**OOH oversight queue (`services/ooh-review.js:buildOohQueue`):** This is the manager-facing morning-review screen. It searches Zendesk for `tags:ooh` tickets and maps them through `projectRow`, which calls `parseTrgDescription(t.description)`. The `t.description` field is the Zendesk search API's description, which Zendesk truncates to approximately 1,500 characters. `parseTrgDescription` extracts three fields using regex: Operator, Outcome code, and Caller's words. It also takes the first line as the summary. Notes appended after the transcript do NOT match any of these three regexes and do NOT appear in the queue row.
 
-All three anchors appear before the Transcript block. Text appended after the transcript — the proposed notes — is ignored by these regexes. **Conformance verdict: no contract change needed.**
-
-### P1 SMS
-
-The P1 SMS built by the IoT Support Dashboard (`services/ooh-escalation.js:buildOohWhatsAppAlert`, line 149) uses only ticket metadata: `siteName`, `subject`, and `ticketId`. It does not read the `[TRG]` comment body. Notes in the body have zero effect on the SMS content or trigger.
-
-### Alternative: [OOH NOTE] second comment
-
-If the pre-submit approach (appending to `[TRG]`) is not preferred, notes can be posted after ticket creation as a second internal comment using the existing `POST /api/tickets/:id/notes` → `zendesk.addFeedbackNote` path. This requires no change to `buildTrgBody` or the POST /api/outcomes schema. The trade-off is that the notes appear as a second comment (tagged `[OOH NOTE]`) rather than embedded in the primary ticket record; they still appear in Zendesk and in the IoT dashboard thread view. This path is already proven in the ticket drawer (F015).
-
-**Recommendation: pre-submit append to the `[TRG]` body.** The notes are present from ticket creation, require no second round-trip, and the conformance check confirms safety.
+**Verdict:** Notes appended to the `[TRG]` body are visible to IoT agents in the ticket detail view (and in the Zendesk native interface), but are NOT visible in the OOH oversight queue row without a small additional change to `parseTrgDescription`. The DECISION in the contract captures the options.
 
 ---
 
-## 5. Customer-experience success criteria (for design)
+## 5. Frozen-consumer conformance
 
-**Persona and journey:** The OOH agent is on the phone to a site caller (often a duty manager or staff member), navigating the guided flow in real time. They reach the final chip that determines the outcome. They may have just heard something from the caller that doesn't fit the flow — a specific complaint, an engineer's name, a scheduling nuance. The journey end-to-end is: guided flow → outcome determination → outcome recording → return to issue picker or end call.
-
-**Reassurance vs friction calibration:**
-- The notes field is **low-stakes and optional.** It must not slow down the majority of calls. It should appear naturally at the point of outcome, below the outcome determination, above the "Add another issue / End call" buttons.
-- The field should not feel like a form to complete. A placeholder like "Anything the caller said that isn't captured above…" signals its purpose without demanding input.
-- No confirmation required — agents type what they want and the notes go automatically when the outcome fires or when they click a lightweight "Save notes" affordance.
-
-**"Great looks like…":** An agent finishes a call, sees the outcome card ("Captured for the IoT team"), notices the notes field, types a single sentence, and the ticket in Zendesk carries that sentence alongside the full transcript. They never open WhatsApp or Teams to pass on that context. On the IoT dashboard side, the agent reviewing the ticket the next morning sees the full picture in one place.
+The three anchors in `parseTrgDescription` (`/Operator:\s*([^\n]+)/`, `/Outcome:\s*([\w-]+)/`, `/Caller'?s words:…/i`) all match lines that appear before the Transcript block. Text after the transcript is invisible to those regexes. The P1 SMS built by the IoT side (`ooh-escalation.js:buildOohWhatsAppAlert`) uses only `siteName`, `subject`, and `ticketId` from ticket metadata — it never reads the comment body. **No contract change is needed for ticket creation or P1 SMS dispatch.** A small optional consumer change to `parseTrgDescription` would be needed only to surface notes in the oversight queue row.
 
 ---
 
-## 6. Data scope
+## 6. Customer-experience success criteria (for design)
+
+**Persona and journey:** The OOH agent is on the phone to a site caller, navigating the guided flow in real time. They reach the final step that determines the outcome. They may have just heard something from the caller that the flow did not capture. The journey end-to-end is: guided flow → outcome determination → outcome recording → return to issue picker or end call.
+
+**Reassurance vs friction calibration:** The notes field is low-stakes and optional. It must not slow down the majority of calls where nothing extra needs recording. It should appear naturally below the outcome determination and above the "Add another issue / End call" buttons. A placeholder such as "Anything the caller said that isn't captured above…" signals purpose without demanding input. No confirmation step — the agent types what they need and it goes automatically with the outcome.
+
+**"Great looks like…":** An agent finishes a call, types a single sentence in the notes field, and the ticket in Zendesk carries that sentence alongside the full transcript. The agent never opens WhatsApp or Teams to pass on that context. The IoT agent reviewing the ticket the next morning sees the full picture in one place.
+
+---
+
+## 7. Data scope
 
 | Entity | Key fields | Source | Sensitivity |
 |---|---|---|---|
-| Additional notes text | Free text, max 500 chars | Agent keyboard input | Operational — may contain caller names or site details; label should caution against personal data |
-| Ticket body | [TRG] comment body | Zendesk internal comment | Internal only (public:false) |
+| Additional notes text | Free text, max 500 characters | Agent keyboard input | Operational — may contain caller names or site details; label should caution against personal data |
+| Ticket body | [TRG] comment body | Zendesk internal comment | Internal only (public: false) |
 | Outcome payload | type, siteNo, subject, detail, callerWords, additionalNotes | POST /api/outcomes | Internal |
 
-No new storage entity is introduced. Notes are written once into the Zendesk ticket body and are subject to Zendesk's existing data retention. No separate database, cache, or log.
+No new storage entity is introduced. Notes are written once into the Zendesk ticket body and are subject to Zendesk's existing retention. No separate database, cache, or log.
 
 ---
 
-## 7. End-to-end testing scope
+## 8. End-to-end testing scope
 
 The test stage must be able to verify:
 
-- **Happy path — guided flow with notes:** An agent navigates any flow to its outcome, enters a notes value, and the created Zendesk ticket carries the notes text in the expected position (after the transcript, before any data-quality footer).
-- **Happy path — empty notes:** An agent submits an outcome without filling in the notes field; the ticket body is identical to a pre-feature ticket (no empty notes line, no regression).
-- **P1 path with notes:** A P1 outcome (e.g. kitchen) carries notes in the ticket body; the `ooh_p1` tag and priority are unchanged; the P1 SMS content is unchanged (notes are not in the SMS).
-- **Notes field character limit:** Entering more than 500 characters is prevented client-side; the server also rejects or trims oversized input.
-- **Ambiguous capture with notes:** The ambiguous-site modal includes its own notes prompt; the resulting ticket carries those notes.
-- **Tonight query with notes:** The query modal includes a notes prompt; the resulting ticket carries those notes.
-- **No double-fire regression:** The existing `_pend_` guard in `finishOutcome` still prevents duplicate posts when the outcome chip is re-rendered.
-- **Existing tests not broken:** `test/zendesk.test.js`, `test/outcome-callerwords.test.js`, `tests/tonight-callback.spec.js`, and `test/p1-dispatch-honesty.test.js` must all continue to pass.
+- Happy path with notes — agent navigates any guided flow to its outcome, enters a notes value, and the created Zendesk ticket carries the notes text after the transcript and before any data-quality footer.
+- Happy path without notes — agent submits an outcome without filling in the notes field; the ticket body is identical to a pre-feature ticket (no empty notes line, no regression).
+- P1 path with notes — a P1 outcome carries notes in the ticket body; the `ooh_p1` tag, priority, and P1 SMS content are unchanged.
+- Notes field character limit — entering more than 500 characters is prevented client-side; the server also rejects or trims oversized input.
+- Control path notes — after a control outcome (applied or failed), the post-submit notes textarea appears in the outcome card; a filled note posts to `POST /api/tickets/:id/notes` and appears as an `[OOH NOTE]` comment on the ticket.
+- Ambiguous capture with notes — the ambiguous-site modal includes a notes prompt; the resulting ticket carries those notes.
+- Tonight query with notes — the query modal includes a notes prompt; the resulting ticket carries those notes.
+- No double-fire regression — the existing `_pend_` guard in `finishOutcome` still prevents duplicate posts when the outcome chip is re-rendered.
+- Existing tests unchanged — `test/zendesk.test.js`, `test/outcome-callerwords.test.js`, `tests/tonight-callback.spec.js`, and `test/p1-dispatch-honesty.test.js` must all continue to pass.
 
 ---
 
-## 8. Existing test coverage relevant to this feature
+## 9. Existing test coverage relevant to this feature
 
 | Test file | What it covers | Action needed |
 |---|---|---|
 | `test/zendesk.test.js` | `buildTrgBody`, `createOutcomeTicket` | Extend with `additionalNotes` assertion |
 | `test/outcome-callerwords.test.js` | callerWords retention in outcome card | Reference pattern for notes retention |
-| `test/p1-dispatch-honesty.test.js` | P1 outcome tags and dispatch note | Verify notes don't affect P1 path |
+| `test/p1-dispatch-honesty.test.js` | P1 outcome tags and dispatch note | Verify notes do not affect P1 path |
 | `tests/tonight-callback.spec.js` | Playwright e2e for tonight and callback views | Extend for query notes modal |
-| No existing test covers the notes UI field | — | New Playwright test needed |
+| No existing test covers a notes UI field | — | New Playwright test needed |
 
 ---
 
-## 9. Options
+## 10. Options
 
-### Option A — Pre-submit: notes appended in [TRG] body (recommended)
+### Option A — Pre-submit append in [TRG] body (recommended for guided flows)
 
-Notes captured in a textarea before `finishOutcome` fires; included in `POST /api/outcomes` payload as `additionalNotes`; appended after the Transcript block in `buildTrgBody`. One server-side change, one shared client-side change.
+Notes captured in a textarea before `finishOutcome` fires; included in `POST /api/outcomes` as `additionalNotes`; appended after the Transcript block in `buildTrgBody`. One server-side change, one shared client-side change in `finishOutcome`. Notes land in the primary ticket record from creation.
 
-- Cost: negligible (one extra field in an already-fired API call)
-- Silent running: no background component; nothing runs when idle
-- Notes land in the primary ticket record from creation
-- No contract change for any consumer
+Cost: negligible — one extra field in an already-fired API call. No background component.
 
-### Option B — Post-submit: notes as [OOH NOTE] second comment
+### Option B — Post-submit [OOH NOTE] second comment (realistic for control-path outcomes)
 
-Notes captured in a textarea that appears in the outcome card after the ticket is created; posted separately via `POST /api/tickets/:id/notes`. Uses the existing feedback-note path.
+Notes captured in a textarea rendered in the outcome card after the ticket is created; posted via `POST /api/tickets/:id/notes`. Notes appear as a `[OOH NOTE]` second comment. Appropriate for `ctlFinish` and `ctlEscalate` where the submit fires automatically and there is no pre-submit pause.
 
-- Cost: one extra Zendesk API call per outcome where notes are provided
-- Notes appear as a second comment; not in the [TRG] body
-- No change to `buildTrgBody` or POST /api/outcomes schema
-- Slightly simpler server-side; slightly more complex client-side (second POST)
-- Notes are decoupled from the ticket creation — a dropped session after the outcome but before the note means the note is lost
+Cost: one extra Zendesk API call per outcome where notes are provided. Notes are decoupled from ticket creation — a dropped session after the outcome but before saving the note means the note is lost.
+
+### Option C — Small consumer change to parseTrgDescription (optional follow-up)
+
+If notes must appear in the IoT Support Dashboard's OOH oversight queue, add a `agentNotes` regex to `parseTrgDescription` in `ooh-review.js`. This is a small, low-risk change to the IoT consumer repo and does not affect the OOH producer. Not required for the stop-gap.
 
 ---
 
-## 10. Risks
+## 11. Risks
 
 | Risk | Likelihood | Impact | Mitigation |
 |---|---|---|---|
-| Agent types PII (caller name, phone number) into notes | Medium | Low-medium (internal comment, not public) | Label the field with "Keep it factual and operational — do not record personal details" |
-| Agent pastes a long block of text, bloating the ticket | Low | Low | 500-char client limit with a `maxlength` attribute; server-side trim/reject |
-| Forgotten notes cause a double-fire (reload before outcome clears) | Low | Low | Existing `_pend_` guard prevents double-post; notes are in the flow state and survive a re-render |
-| Control-path outcomes missed (setpoint change, frost-hold) | Medium | Low | Accepted deferral; raise as follow-up ticket |
-| Notes break the frozen [TRG] parse in ooh-review.js | Very low | High (would break IoT oversight screen) | Verified safe — `parseTrgDescription` only matches lines before the transcript |
+| Agent types PII into notes | Medium | Low-medium (internal comment, not public) | Label the field: "Keep it factual and operational — do not record personal details" |
+| Agent pastes a long block of text | Low | Low | 500-character client limit via maxlength attribute; server-side trim and reject |
+| Control-path notes lost after session drop | Low | Low | Accepted — post-submit path for control outcomes; the ticket still exists without the note |
+| Notes break the frozen [TRG] parse | Very low | High | Verified safe — all three parseTrgDescription regexes match lines before the transcript |
+| IoT oversight queue misses notes | Certain (by design) | Low | Accepted as body-only for stop-gap; Option C available as follow-up |
 
 ---
 
-## 11. Open questions with recommended defaults
+## 12. Open questions with recommended defaults
 
 | # | Question | Recommended default |
 |---|---|---|
-| Q1 | Optional or required? | **Optional** — no mandate on every call |
-| Q2 | Character limit? | **500 chars** — enough for 3-4 sentences; enforced client-side (`maxlength`) and server-side (trim/reject) |
-| Q3 | Label on the ticket body? | **"Additional notes from OOH agent:"** — clear authorship, unambiguous to IoT reviewers |
-| Q4 | Should notes appear in the P1 SMS? | **No** — SMS carries site/subject/ticket ID only; notes are in the ticket body for the IoT agent reviewing the ticket |
-| Q5 | Cover control-path outcomes (setpoint, frost-hold, switch)? | **Defer** — the natural pause point is before the device echo, which is handled by a separate module (`control.js`); raise as a follow-up ticket |
-| Q6 | Sanitisation / escaping? | **Use the existing `oneLine` + XSS-escape pattern** already applied to `callerWords` throughout the codebase |
+| Q1 | Covered by DECISION: optional vs required | Optional |
+| Q2 | Covered by DECISION: character limit | 500 characters |
+| Q3 | Covered by DECISION: label in ticket body | "Additional notes from OOH agent:" |
+| Q4 | Should notes appear in the P1 SMS? | No — body and ticket detail only |
+| Q5 | Covered by DECISION: control-path UX | Post-submit textarea in outcome card |
+| Q6 | Covered by DECISION: sanitisation | Existing `oneLine` plus XSS-escape pattern |
+| Q7 | Should Option C (IoT oversight queue) be in this ticket's scope? | No — follow-up ticket after stop-gap ships |
 
 ---
 
-## 12. Recommended first phase and next steps
+## 13. Recommended first phase and next steps
 
-**Recommended first phase:** Design and build Option A (pre-submit, [TRG] append) covering the 23 guided-flow outcomes (items 1-23), with the ambiguous-site and query paths (items 24-25) in the same build. Control-path outcomes deferred.
+**Recommended first phase:** Design and build covering items 1-25 (guided flows, ambiguous capture, Tonight query) with Option A pre-submit notes for items 1-23 and separate modal notes for 24-25. Control-path items 26-27 use Option B post-submit via the existing notes endpoint in the same build.
 
 **Blockers requiring external action before build can start:** None. All investigation is complete within the current codebase. No external dependencies, no contract negotiation required.
 
-**What this unlocks:** Agents can record extra context at the point of outcome; IoT agents see it on the ticket the same morning; WhatsApp/Teams side-channels for this purpose are eliminated; the IoT Support Dashboard oversight screen shows the full picture without any code change on that side.
+**What this unlocks:** Agents record extra context at the point of outcome; IoT agents see it in the ticket detail view the same morning; WhatsApp and Teams side-channels for this purpose are eliminated.
