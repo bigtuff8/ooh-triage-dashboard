@@ -3,7 +3,7 @@ SECTION: What this delivers
 Every place in the OOH Dashboard where an agent creates a ticket gets the same small, optional Additional notes box. Whatever the agent types is saved onto the Zendesk ticket under the heading "Additional notes from OOH agent:", so the extra context stops travelling by WhatsApp or Teams. Leaving the box empty changes nothing: the ticket is exactly what it is today. The limit is 1000 characters (operator decision, now confirmed), held in one setting so it can be changed in one place. Nothing runs in the background, no AI is used, and there is no idle cost: the notes simply ride along on the ticket call the dashboard already makes.
 
 SECTION: Where the box appears
-All 27 submit points from discovery are covered, plus two more the code inspection found (a second heating no-action outcome and a contractor fallback outcome), which come for free because they share the same code. For the 25 guided-flow outcomes the box sits at the bottom of the guided flow from the first step, because the dashboard records the outcome the moment the agent clicks the final choice; there is no pause before recording to put a box in. Whatever is in the box at that moment goes onto the ticket when it is created. After the outcome, a small "Add a note to ticket" link lets the agent add anything they remember late. The ambiguous-site card and the Tonight "Raise a query" window each get the same box above their send button. The two device-control outcomes carry anything typed before the change, and also show an "Add a note" box on the result card, as the operator decided.
+All 27 submit points from discovery are covered, plus two more the code inspection found (a second heating no-action outcome and a contractor fallback outcome), which come for free because they share the same code. For the 25 guided-flow outcomes the box sits at the bottom of the guided flow from the first step, because the dashboard records the outcome the moment the agent clicks the final choice; there is no pause before recording to put a box in. Whatever is in the box at that moment goes onto the ticket when it is created. After the outcome, a small "Add a note to ticket" link lets the agent add anything they remember late. The ambiguous-site card and the Tonight "Raise a query" window each get the same box above their send button. The two device-control outcomes carry anything typed before the change, and also show an "Add a note" box on the result card, as the operator decided. A clickable mockup of all of this, including phone width, is at OOH_ADDITIONAL_NOTES_MOCKUP_2026-10-13.html in the same folder as this document.
 
 SECTION: What the IoT team will see
 In Zendesk the notes are on the ticket from the moment it is created. The design found one thing discovery got wrong: the IoT Support Dashboard ticket view does not show the raw ticket text. It rebuilds an OOH ticket from four recognised pieces (operator, caller's words, the timed steps, outcome) and silently drops anything else. A plain notes line would therefore be invisible there. The fix needs no change to the IoT dashboard: the notes are written as the final timed step, for example a step timed 21:42 reading "Additional notes from OOH agent: ...", so they show as the last line of the action list the IoT team already reads. The morning queue row is unchanged, as agreed. P1 texts to the on-duty manager are unchanged: they never read the ticket text.
@@ -34,6 +34,10 @@ DETAIL: Recommend keep-and-mark. The screen already stops typing at 1000, and a 
 **Repo / branch:** bigtuff8/ooh-triage-dashboard, `design/oohdash-119-additional-notes` (from main `2d9718c`, live v1.3.6)
 **Input:** signed-off discovery `docs/project/OOH_ADDITIONAL_NOTES_DISCOVERY_2026-10-13.md`, operator decisions D1 to D7 from gate PR #79
 **Scope:** stop-gap, same-day release. Lean by design.
+
+---
+
+**Clickable mockup (DF-09):** [OOH_ADDITIONAL_NOTES_MOCKUP_2026-10-13.html](OOH_ADDITIONAL_NOTES_MOCKUP_2026-10-13.html), a self-contained file with no network calls. Scenario A is a guided flow with the persistent notes box and live counter through to a capture outcome, B is a P1 outcome, C is the control path with the "Add a note to ticket #N" box (device confirms or times out), D is the resulting Zendesk [TRG] body with the timed notes step, the IoT detail view and the unchanged queue row. It has a Desktop / Phone 390px toggle and a "Simulate Zendesk error" switch for the unhappy paths.
 
 ---
 
@@ -212,7 +216,7 @@ State coverage for the box: **empty** (placeholder, counter 0), **typing** (coun
 
 Mobile (390 px wide): textarea is full width; `font-size: 16px` on the notes textarea to stop iOS zooming on focus; it grows from 2 to 5 rows (`field-sizing: content` with a `max-height`, falling back to a fixed 3 rows); the counter sits right-aligned under the box; no horizontal scroll. In the flow panel the box sits below the step choices, so the primary choice buttons stay above it and are not pushed down by an empty box.
 
-Design intent: the box is quiet (secondary border, small label) so routine calls ignore it at zero cost, which is the friction-moment calibration from discovery; the echo after creation is the reassurance moment ("it is on ticket #N").
+See it in the mockup (scenario A, then the Phone 390px toggle). Design intent: the box is quiet (secondary border, small label) so routine calls ignore it at zero cost, which is the friction-moment calibration from discovery; the echo after creation is the reassurance moment ("it is on ticket #N").
 
 ---
 
@@ -332,7 +336,6 @@ Live P1 and live device-control proofs are deliberately not run (they page the o
 | R5 | Re-render steals focus mid-typing | Low to medium | Focus and caret restore in `render()`; E11 |
 | R6 | Notes containing "Caller's words:" pollute the IoT queue | Low | Neutraliser; U5, U6 |
 | R7 | Late notes lost if the page reloads before saving | Low | Accepted for the stop-gap (ticket still exists) |
-| R8 | Hi-fi interactive mockup (DF-09) not included in this artefact, per the same-day, single-file instruction | n/a | Copy and states are fully specified in section 6; Build's fixture-mode screens serve as the clickable reference at the Test gate |
 
 Rollback: the change is additive and needs no data migration. `scripts/release.sh` prints the rollback command; the target is v1.3.6, image `080ccab` (`kubectl -n <ns> set image deployment/<deploy> <deploy>=<registry>/...:080ccab`). Tickets already carrying notes remain valid plain text under v1.3.6 and in the IoT dashboard.
 
@@ -342,4 +345,4 @@ Rollback: the change is additive and needs no data migration. `scripts/release.s
 
 - Contract: sections 3 to 7. Load-bearing CX moments: the always-visible box (do not move it into the outcome card), the echo, and the TRG-STEP line format (do not change it to a plain line).
 - Do not touch `C:\repos\iot-support-dashboard` (D3).
-- Open flags: DECISIONS 1 to 4 above (recommended defaults assumed); F3 extra call sites; R8 mockup.
+- Open flags: DECISIONS 1 to 4 above (recommended defaults assumed); F3 extra call sites. Visual and behavioural reference: the mockup linked at the top.
