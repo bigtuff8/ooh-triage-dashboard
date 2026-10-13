@@ -164,6 +164,39 @@ test('U6: N_adv3 (neutralised HH:MM - no pipe) — no extra spurious step inject
     assert.equal(r.steps.length, 3, 'three steps — no injected extra step from the HH:MM-pipe text inside the note');
 });
 
+// CT fix #2 regression: free-text pipe normalised to ¦ must not create spurious steps
+// or pollute anchors in the IoT consumer parser.
+const N_pipe_raw = 'bar area | caller says very cold';
+// After normaliseAdditionalNotes, the '|' is replaced with '¦' (U+00A6, BROKEN BAR).
+// The TRG-STEP line that reaches the Zendesk comment body will contain '¦' not '|'.
+const N_pipe_normalised = 'bar area ¦ caller says very cold';
+
+test('U6: free-text pipe (¦ after normalisation) — step count unaffected, anchors intact', () => {
+    const notesLine = `21:01 | Additional notes from OOH agent: "${N_pipe_normalised}"`;
+    const body = buildBodyWith(notesLine);
+    const r = parseOohTrgComment(body);
+    // Parser sees '¦' not '|' — RE_STEP does not treat '¦' as a delimiter
+    assert.equal(r.steps.length, 3, 'three steps (baseline 2 + notes step) — ¦ does not create a spurious step');
+    assert.equal(r.operator, 'Test Handler', 'operator anchor unchanged');
+    assert.equal(r.outcomeType, 'capture', 'outcome anchor unchanged');
+    assert.equal(r.callerWords, 'the fryer just stopped', 'callerWords anchor unchanged');
+    // The notes step text contains the broken bar, not a literal pipe
+    assert.ok(r.steps[2].text.includes('¦'), 'broken bar preserved in step text');
+    assert.ok(!r.steps[2].text.includes('|'), 'no literal pipe in step text');
+});
+
+test('U6: raw free-text pipe (NOT normalised) — verify RE_STEP treats embedded | as plain text (single step)', () => {
+    // This test documents the benign parser behaviour for an unnormalised pipe inside the note value.
+    // Because RE_STEP matches from BOL and the embedded '|' is mid-line, it does not split into a new step.
+    // The fix (CT fix #2) prevents this path from ever reaching the live body, but the test confirms
+    // the parser's actual behaviour as additional defence-in-depth evidence.
+    const notesLine = `21:01 | Additional notes from OOH agent: "${N_pipe_raw}"`;
+    const body = buildBodyWith(notesLine);
+    const r = parseOohTrgComment(body);
+    // RE_STEP matches the full line as one step — embedded '|' is captured as part of sm[2]
+    assert.equal(r.steps.length, 3, 'still three steps — embedded | is captured in step text, not a new step');
+});
+
 /* ------------------------------------------------------------------ */
 /* U12 — classifyComment for [OOH NOTE]                               */
 /* ------------------------------------------------------------------ */
