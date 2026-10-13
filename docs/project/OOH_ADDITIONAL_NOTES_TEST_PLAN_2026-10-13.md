@@ -23,7 +23,7 @@ A check passes only when it produces observable evidence matching the expected o
 **Date:** 2026-10-13
 **Ticket:** OOHDASH-119
 **Tester:** Independent (test-stage, not the builder)
-**Branch under test:** build/oohdash-119-additional-notes @ 2465d99
+**Branch under test:** build/oohdash-119-additional-notes @ 32a0aa6 (rework R2)
 **Test branch:** test/oohdash-119-additional-notes
 **Script:** tests/tester/oohdash-119.tester.spec.js
 
@@ -41,24 +41,22 @@ The U11 test must be removed from the suite. It must not be used as evidence of 
 
 Note: the build plan itself specified U11 in this form. The design regression is in the plan (plan asked for a source-check); the code bug is that the builder implemented it as specified. This finding routes both to the author (remove the test file) and to the design stage (the plan must not specify source-check tests in future).
 
-### F-02 — Copy deviations from design section 6 (design regression, routes to design stage for Sam Day sign-off)
+### F-02 — Copy deviations from design section 6 (updated after rework R2 @ 32a0aa6)
 
-The following user-visible copy strings differ from design section 6. They must be reviewed and approved or corrected before Stage B runs (Sam Day sign-off is a hard gate).
+Rework R2 corrected 7 of the 8 original deviations. The table below shows the full status. One deviation remains open and routes to the author as a code bug.
 
-| Element | Design says | Implemented as |
-|---------|-------------|----------------|
-| Label | Additional notes for the IoT team (optional) | Additional notes from OOH agent: |
-| Placeholder | Anything the caller or site told you that isn't captured above, e.g. engineer due at 7am | Optional — leave blank if nothing to add |
-| Helper text | For the ticket and the IoT team's morning review. Not sent in urgent P1 texts. Keep it factual, no personal details. | Anything extra for the ticket and morning review — not sent in the urgent P1 text. |
-| Echo (non-P1) | 📝 Your notes are on ticket #N: "…" | 📝 Note added — for the ticket and morning review: "..." (no ticket number; different wording; no distinction from P1 echo) |
-| Echo (P1 outcome) | 📝 Your notes are on ticket #N for the morning review: "…" (not in the urgent text) | Same as non-P1 echo — no distinct P1 wording in submitPendingOutcome |
-| Post-submit box label | Add a note to ticket #N (optional) | Add a note to ticket #N: (no "optional") |
-| Saved confirmation | ✓ Note saved to ticket #N | ✓ Note added to ticket (no ticket number) |
-| Counter amber threshold | amber from 900 | not verified in source (may not be implemented) |
+| Element | Design says | Status after R2 |
+|---------|-------------|-----------------|
+| Label | Additional notes for the IoT team (optional) | RESOLVED — now matches exactly |
+| Placeholder | Anything the caller or site told you that isn't captured above, e.g. engineer due at 7am | RESOLVED — now matches exactly |
+| Helper text | For the ticket and the IoT team's morning review. Not sent in urgent P1 texts. Keep it factual, no personal details. | RESOLVED — typographic apostrophe in "team's" is acceptable |
+| Echo (non-P1) | 📝 Your notes are on ticket #N: "…" (curly quotes) | RESOLVED — ticket ID present, curly quotes U+201C/U+201D used |
+| Echo (P1 outcome) | 📝 Your notes are on ticket #N for the morning review: "…" (not in the urgent text) | RESOLVED — distinct P1 branch now in submitPendingOutcome using payload.type === 'escalate-p1' |
+| Post-submit box label | Add a note to ticket #N (optional) | RESOLVED — "optional" now present |
+| Saved confirmation | ✓ Note saved to ticket #N | RESOLVED — ticket number now included |
+| Counter amber threshold | amber from 900 | OPEN — implementation goes grey to red only at 1000; no amber/warning colour at 900. Code bug, routes to author. |
 
-The label discrepancy is significant: the design says the on-screen label is for the agent ("for the IoT team") while the implementation shows the Zendesk field heading ("from OOH agent"), which is the correct wording for the ticket body but not the right framing for the agent at the screen.
-
-The P1 echo discrepancy means the E17 plan check (which asserts "morning-review wording" on P1 echo distinctly from the non-P1 echo) will likely fail, because both P1 and non-P1 outcomes produce the same echo string.
+The one remaining open item (counter amber at 900) is a code bug: `notesInput` sets `counter.style.color` to `var(--danger,#c00)` at limit and `var(--text-muted,#666)` otherwise; there is no intermediate warning colour at 900. TF-05 in the tester spec asserts for this behaviour and will flag it as a failure.
 
 ### F-03 — Builder's spec E1 does not cover the plan's E1 (code-bug exposure risk, informational)
 

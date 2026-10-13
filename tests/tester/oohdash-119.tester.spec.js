@@ -113,8 +113,10 @@ test('TF-02: N1 appears in echo and in the fixture ticket body (TRG-STEP)', asyn
     expect(ticketBody).toContain(N1);
 
     // Echo is visible and contains the note text (data fidelity — not just existence)
+    // R2: echo now reads "Your notes are on ticket #N: "…"" with ticket ID present
     const echo = page.locator('[data-testid="addnotes-echo"]');
     await expect(echo).toBeVisible();
+    await expect(echo).toContainText('Your notes are on ticket #');
     await expect(echo).toContainText(N1.substring(0, 30)); // leading portion proves content not empty
 });
 
@@ -200,10 +202,14 @@ test('TF-04: whitespace-only note sends null; no TRG-STEP in ticket body', async
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
-// TF-05: N4 (1100 chars) pasted; textarea value capped at 1000; counter shows
-//        "1000 / 1000, limit reached".
+// TF-05: Character cap and counter colour states.
+//        (a) N4 (1100 chars) capped at 1000; counter shows limit text.
+//        (b) DESIGN DEVIATION CHECK: counter should turn amber at 900 chars
+//            (design §6: "amber from 900"); implementation currently skips
+//            directly to red at 1000. This sub-check is expected to FAIL until
+//            the author adds the amber threshold — failure is a code bug.
 // ─────────────────────────────────────────────────────────────────────────────
-test('TF-05: 1100-char input capped at 1000; counter shows limit reached', async ({ page }) => {
+test('TF-05a: 1100-char input capped at 1000; counter shows limit reached', async ({ page }) => {
     await signIn(page, 'Test Handler');
     await confirmSite(page, '6832', 'Old Grey Mare');
     await page.locator('[data-testid="tile-other"]').click();
@@ -217,6 +223,29 @@ test('TF-05: 1100-char input capped at 1000; counter shows limit reached', async
     // Counter must show the limit state (exact text from notes.js notesInput)
     const counter = page.locator('#addnotes-counter');
     await expect(counter).toHaveText('1000 / 1000, limit reached');
+});
+
+test('TF-05b: counter colour is amber/warning at 900 chars (design §6 — expected to fail until fix)', async ({ page }) => {
+    await signIn(page, 'Test Handler');
+    await confirmSite(page, '6832', 'Old Grey Mare');
+    await page.locator('[data-testid="tile-other"]').click();
+
+    const notesBox = page.locator('#addnotes');
+    // Type exactly 900 chars — should trigger amber warning per design §6
+    await notesBox.fill('A'.repeat(900));
+
+    const counterColor = await page.evaluate(() => {
+        const el = document.getElementById('addnotes-counter');
+        if (!el) return '';
+        return window.getComputedStyle(el).color;
+    });
+    // Design says amber from 900; acceptable amber values include orange, amber, or a warning CSS var.
+    // Red/danger (#c00) at exactly 900 chars is a failure — should only appear at 1000.
+    // This assertion documents the expected behaviour; it will fail if only red/grey are implemented.
+    const isDanger = counterColor.includes('204, 0, 0') || counterColor.includes('cc0000') || counterColor.includes('#c00');
+    const isMuted = counterColor.includes('102, 102, 102') || counterColor.includes('666');
+    // Neither danger nor muted — must be an intermediate amber/warning colour
+    expect(isDanger || isMuted).toBe(false); // EXPECTED TO FAIL until amber threshold added
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -402,6 +431,15 @@ test('TF-11: kitchen P1 carries additionalNotes; P1 copy wording present', async
     const req = await postPromise;
     const body = JSON.parse(req.postData());
     expect(body.additionalNotes).toBe(N1);
+
+    // P1 echo wording must be the morning-review variant (distinct from non-P1)
+    // Design §6: "📝 Your notes are on ticket #N for the morning review: "…" (not in the urgent text)"
+    // R2 implementation: isP1 branch in submitPendingOutcome checks payload.type === 'escalate-p1'
+    const echo = page.locator('[data-testid="addnotes-echo"]');
+    if (await echo.count() > 0) {
+        await expect(echo).toContainText('morning review');
+        await expect(echo).toContainText('not in the urgent text');
+    }
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -474,9 +512,9 @@ test('TF-13: post-submit box: open → save → saved state; save button absent'
 
     // Step 4: saved state — save button gone (removal assertion)
     await expect(page.locator('[data-testid="addnotes-post-save"]')).not.toBeVisible();
-    // Saved confirmation visible
+    // Saved confirmation visible with ticket number (design §6 R2: "✓ Note saved to ticket #N")
     await expect(page.locator('[data-testid="addnotes-post-saved"]')).toBeVisible();
-    await expect(page.locator('[data-testid="addnotes-post-saved"]')).toContainText(/note/i);
+    await expect(page.locator('[data-testid="addnotes-post-saved"]')).toContainText('Note saved to ticket #');
 
     // Step 5: trigger a re-render by waiting for the next polling cycle
     // (simulated by waiting for any network request or timeout)
