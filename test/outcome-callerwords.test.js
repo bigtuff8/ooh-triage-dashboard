@@ -37,6 +37,13 @@ function loadClient(workspace, { realFinishOutcome = false } = {}) {
         // api.post is the real finishOutcome's sink; capture the payload and resolve a ticket so the
         // real echo-rendering .then() runs (used to assert the D-10a card echo end-to-end).
         api: { post: async (url, payload) => { posts.push(payload); captured.push(payload); return { ticket: { id: 900 + posts.length }, p1: null }; } },
+        // OOHDASH-119: notes.js helpers called by startFlow/cancelFlow/finishOutcome; no-op stubs for unit isolation
+        notesDraftRestore: () => '',
+        notesDraftSave: () => {},
+        notesDraftClear: () => {},
+        notesField: () => '',
+        notesPostBox: () => '',
+        notesValue: () => '',
         Promise, Date,
         window: {},
         console
@@ -63,12 +70,19 @@ function loadClient(workspace, { realFinishOutcome = false } = {}) {
 
 // Drives the fridge non-risk (scope) outcome through the REAL finishOutcome and waits for the async
 // echo-rendering .then() to settle, returning the rendered outcome HTML (f.data._outcomeHtml).
+// OOHDASH-119: finishOutcome now shows a confirm step first; simulate the "Record outcome" click
+// by calling submitPendingOutcome with the pending key so the POST fires.
 async function driveRealScopeOutcome(ctx, state, ws) {
     state.flow.stage = 1;
     state.flow.data.risk = 0;
     ctx.FLOWR.fridge(ws, state.flow);
+    // OOHDASH-119: detect the confirm-step pending key and submit it
+    const confKey = Object.keys(state.flow.data).find(k => k.startsWith('_conf_'));
+    if (confKey && ctx.submitPendingOutcome) {
+        ctx.submitPendingOutcome(confKey.slice('_conf_'.length));
+    }
     // let the api.post().then() microtask resolve and render
-    for (let i = 0; i < 10 && !state.flow.data._outcomeHtml; i++) await Promise.resolve();
+    for (let i = 0; i < 20 && !state.flow.data._outcomeHtml; i++) await Promise.resolve();
     return state.flow.data._outcomeHtml || '';
 }
 

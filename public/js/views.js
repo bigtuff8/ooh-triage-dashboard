@@ -176,7 +176,7 @@ function renderWorkspace() {
    <div class="card">
    ${callSoFar()}
    <h3>What is the caller reporting?</h3>
-   <input class="issueinput" id="iq" data-testid="smart-entry" placeholder="Type it in the caller’s words — e.g. "pub is freezing", "no power in the kitchen"…" autocomplete="off" oninput="issueSearch(this.value)">
+   <input class="issueinput" id="iq" data-testid="smart-entry" placeholder="Type it in the caller’s words — e.g. “pub is freezing”, “no power in the kitchen”…" autocomplete="off" oninput="issueSearch(this.value)">
    <div class="sugg" id="isugg"></div>
    <div class="tiles" data-testid="category-tiles">${CATS.map(c => `<div class="tile" data-testid="tile-${c.k}" onclick="startTileFlow('${c.k}')"><div class="tt">${c.ic} ${c.t}</div><div class="td">${c.d}</div></div>`).join('')}</div></div>`;
 
@@ -193,7 +193,7 @@ function renderWorkspace() {
   <div>
    <div class="card tight"><h3>What Lighthouse controls at this site</h3><ul class="scopelist" data-testid="scope-list">
     ${ws.scope.map(g => `<li><span${g.level === 'none' ? ' style="color:var(--text-disabled)"' : ''}>${esc(g.label)}</span>${scopeTag(g)}</li>`).join('')}
-   </ul><p class="small" style="margin-top:6px">Live from the device inventory — use it to answer "isn’t that you?"</p></div>
+   </ul><p class="small" style="margin-top:6px">Live from the device inventory — use it to answer “isn’t that you?”</p></div>
    <div class="card tight"><h3>Open tickets for this site</h3>${siteTickets(ws)}</div>
   </div></div></div>`;
     if (!state.flow) $('#iq')?.focus();
@@ -258,7 +258,7 @@ function drawerShell(ticketId, cbTicket, threadHtml) {
     return `<div class="dh">Ticket #${ticketId}<button class="btn link" onclick="state.drawer=null;paintDrawer()">✕</button></div><div class="db">
   ${cbTicket ? `<p><b>${esc(cbTicket.subject)}</b></p>
   <p class="small" style="margin-bottom:10px">Opened ${esc(cbTicket.createdFriendly)} · <span class="tag blue">${esc(cbTicket.status.agent)}</span></p>
-  <h3>Read to the caller</h3><div class="script" data-testid="caller-script">"${esc(cbTicket.script)}"</div>
+  <h3>Read to the caller</h3><div class="script" data-testid="caller-script">“${esc(cbTicket.script)}”</div>
   ${cbTicket.visit ? '<div class="alert warn" data-testid="chargeable-warning">⚠️ <b>Engineer visit involved</b> — remind the caller: if the fault turns out not to be Lighthouse equipment, the visit may be chargeable.</div>' : ''}
   <h3 style="margin-top:14px">Caller expects an update by…</h3>
   <div style="display:flex;gap:8px;margin-bottom:14px"><input type="date" id="fud" style="border:1.5px solid var(--border);border-radius:6px;padding:7px 10px"><button class="btn" onclick="saveFollowUp(${ticketId})">Save follow-up</button></div>` : ''}
@@ -297,7 +297,7 @@ async function saveFollowUp(ticketId) {
 function vCallback() {
     const cb = state.cb;
     $('#view').innerHTML = `<div class="content narrow">
-  <div class="card"><h2>Callback Lookup</h2><p class="sub" style="margin-bottom:12px">"I called earlier — what’s happening?" Find the site, read the script. Use ↑ ↓ and Enter to pick.</p>
+  <div class="card"><h2>Callback Lookup</h2><p class="sub" style="margin-bottom:12px">“I called earlier — what’s happening?” Find the site, read the script. Use ↑ ↓ and Enter to pick.</p>
   <div class="searchwrap"><input id="cbq" data-testid="callback-search" placeholder="House number or pub name" autocomplete="off"><div id="cbres"></div></div></div>
   ${cb.error ? `<div class="alert err">${esc(cb.error)}</div>` : ''}
   ${cb.data ? cbTickets() : ''}
@@ -389,12 +389,12 @@ function paintTonight() {
 }
 
 function raiseQuery() {
-    openModal(`<div class="mh">Raise a query with the IoT team<button class="btn link" onclick="closeModal()">✕</button></div><div class="mb">
+    openModal(`<div data-testid="query-modal"><div class="mh">Raise a query with the IoT team<button class="btn link" onclick="closeModal()">✕</button></div><div class="mb">
   <p class="sub" style="margin-bottom:10px">For anything older than tonight, or anything you're unsure about — this goes straight onto a ticket for the team.</p>
   <div class="formrow"><label>Site (if known)</label><input id="qsite" data-testid="query-site" placeholder="e.g. 6832"></div>
   <div class="formrow"><label>Your query</label><textarea id="qtxt" data-testid="query-text" rows="3" placeholder="e.g. Caller says they rang two nights ago about fryers — can't see it tonight"></textarea></div>
   ${notesField({ id: 'addnotes-q' })}
- </div><div class="mf"><button class="btn" onclick="closeModal()">Cancel</button><button class="btn primary" data-testid="query-send" onclick="sendQuery()">Send query</button></div>`);
+ </div><div class="mf"><button class="btn" onclick="closeModal()">Cancel</button><button class="btn primary" data-testid="query-send" onclick="sendQuery()">Send query</button></div></div>`);
 }
 
 async function sendQuery() {

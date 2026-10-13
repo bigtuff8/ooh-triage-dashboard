@@ -143,7 +143,7 @@ test.describe('control & sync', () => {
         await startHeatingFlow(page, 'bar-restaurant'); // IT500-BAR-6832
         await page.locator('[data-testid="need-off"]').click();
         const reco = page.locator('[data-testid="reco-frost"]');
-        await expect(reco).toContainText('no "off" switch');
+        await expect(reco).toContainText('no “off” switch');
         await expect(reco).toContainText('frost-hold');
         await page.locator('[data-testid="frost-decline"]').click();
         // OOHDASH-119: confirm step required before POST fires

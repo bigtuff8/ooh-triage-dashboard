@@ -216,22 +216,16 @@ test('E12: draft cleared after "Add another issue"', async ({ page }) => {
 });
 
 // ─── E13: notes on ambiguous site capture ────────────────────────────────────
+// Uses house ID 6758 — the known ambiguous fixture (two sites: Bowers and Bowman).
 test('E13: notes carried into POST for ambiguous site capture', async ({ page }) => {
     await signIn(page, 'Test Handler');
-    // Use the ambiguous path (site search that hits multiple results and doesn't resolve)
-    // For this test we navigate to the ambiguous card using the known ambiguous fixture
-    await page.goto('/auth/dev');
-    await page.locator('button:has-text("Test Handler")').click();
-    // Directly navigate to the OOH session
-    await page.locator('[data-testid="site-search"]').pressSequentially('9999', { delay: 40 });
-    // If ambiguous fixture is available, test the notes field on the ambiguous card
+    await page.locator('[data-testid="site-search"]').pressSequentially('6758', { delay: 40 });
+    await expect(page.locator('.ri .tag:has-text("duplicate ID")').first()).toBeVisible();
+    await page.keyboard.press('ArrowDown');
+    await page.keyboard.press('Enter');
     const ambCard = page.locator('[data-testid="ambiguous-card"]');
-    const isAmbiguous = await ambCard.count();
-    if (!isAmbiguous) {
-        // No ambiguous fixture in this environment — skip by passing trivially
-        test.skip();
-        return;
-    }
+    await expect(ambCard).toBeVisible();
+    await expect(ambCard).toContainText('House ID 6758 is ambiguous');
     const noteField = page.locator('#addnotes-amb');
     await expect(noteField).toBeVisible();
     const NOTE = 'E13 ambiguous note';
@@ -244,31 +238,27 @@ test('E13: notes carried into POST for ambiguous site capture', async ({ page })
 });
 
 // ─── E14: notes on query ────────────────────────────────────────────────────
+// Navigates to the Tonight view where raise-query lives.
 test('E14: notes carried into POST /api/query when query submitted', async ({ page }) => {
     await signIn(page, 'Test Handler');
-    await confirmSite(page, '6832', 'Old Grey Mare');
-    const queryTrigger = page.locator('[data-testid="raise-query"]');
-    if (!(await queryTrigger.count())) {
-        // Query button not rendered in this state — try tile-other path
-        test.skip();
-        return;
-    }
+    // Tonight view hosts the raise-query button
+    await page.locator('[data-testid="nav-tonight"]').click();
+    await expect(page.locator('[data-testid="raise-query"]')).toBeVisible();
     const NOTE = 'E14 query note';
-    await queryTrigger.click();
+    await page.locator('[data-testid="raise-query"]').click();
     const modal = page.locator('[data-testid="query-modal"]');
     await expect(modal).toBeVisible();
-    await modal.locator('textarea').fill('E14 query text');
-    const noteField = modal.locator('#addnotes-q');
-    if (await noteField.count()) {
-        await noteField.fill(NOTE);
-    }
+    // Fill query text in the first textarea (query-text)
+    await page.locator('[data-testid="query-text"]').fill('E14 query text');
+    // Fill the additional-notes field inside the modal
+    const noteField = page.locator('#addnotes-q');
+    await expect(noteField).toBeVisible();
+    await noteField.fill(NOTE);
     const postPromise = page.waitForRequest(r => r.url().includes('/api/query') && r.method() === 'POST');
-    await modal.locator('button:has-text("Raise query")').click();
+    await page.locator('[data-testid="query-send"]').click();
     const req = await postPromise;
     const body = JSON.parse(req.postData());
-    if (await noteField.count()) {
-        expect(body.additionalNotes).toBe(NOTE);
-    }
+    expect(body.additionalNotes).toBe(NOTE);
 });
 
 // ─── E15: whitespace-only notes sends null ───────────────────────────────────

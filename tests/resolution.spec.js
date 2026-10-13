@@ -18,7 +18,7 @@ test.describe('F004 resolution', () => {
 
     test('no-match search shows explicit guidance, never a fuzzy match', async ({ page }) => {
         await page.locator('[data-testid="site-search"]').pressSequentially('7244', { delay: 40 });
-        await expect(page.locator('[data-testid="search-empty"]')).toContainText('No site matches "7244"');
+        await expect(page.locator('[data-testid="search-empty"]')).toContainText('No site matches “7244”');
         await expect(page.locator('[data-testid="search-empty"]')).toContainText('may not be on Lighthouse');
         await expect(page.locator('[data-testid="search-results"] .ri')).toHaveCount(0);
     });
