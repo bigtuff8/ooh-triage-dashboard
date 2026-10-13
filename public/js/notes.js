@@ -30,10 +30,12 @@ function notesField({ id = 'addnotes', bind = null, value = '', helperText } = {
     const safeValue = typeof esc === 'function' ? esc(value || '') : String(value || '')
         .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
     const maxChars = (typeof state !== 'undefined' && state?.me?.notes?.maxChars) || 1000;
+    const warnAt = Math.floor(maxChars * 0.9); // amber from 90% (900 for 1000 cap) per design §6
     const currentLen = (value || '').length;
     const counterText = currentLen >= maxChars
         ? `${currentLen} / ${maxChars}, limit reached`
         : `${currentLen} / ${maxChars}`;
+    const counterColor = currentLen >= maxChars ? 'var(--danger,#c00)' : currentLen >= warnAt ? 'var(--warning,#f80)' : 'var(--text-muted,#666)';
     const helper = helperText ||
         'For the ticket and the IoT team’s morning review. Not sent in urgent P1 texts. Keep it factual, no personal details.';
     return `<div class="notes-group" style="margin-top:10px">
@@ -50,7 +52,7 @@ function notesField({ id = 'addnotes', bind = null, value = '', helperText } = {
   >${safeValue}</textarea>
   <div style="display:flex;justify-content:space-between;align-items:center;margin-top:3px">
    <span class="small" style="color:var(--text-muted,#666)">${helper}</span>
-   <span id="${id}-counter" class="small" style="white-space:nowrap;margin-left:8px;color:${currentLen >= maxChars ? 'var(--danger,#c00)' : 'var(--text-muted,#666)'}">${counterText}</span>
+   <span id="${id}-counter" class="small" style="white-space:nowrap;margin-left:8px;color:${counterColor}">${counterText}</span>
   </div>
 </div>`;
 }
@@ -69,12 +71,13 @@ function notesInput(el) {
     // Update the character counter directly without a re-render
     const counter = document.getElementById(el.id + '-counter');
     const maxChars = parseInt(el.maxLength, 10) || 1000;
+    const warnAt = Math.floor(maxChars * 0.9); // amber from 90% per design §6
     const len = el.value.length;
     if (counter) {
         counter.textContent = len >= maxChars
             ? `${len} / ${maxChars}, limit reached`
             : `${len} / ${maxChars}`;
-        counter.style.color = len >= maxChars ? 'var(--danger,#c00)' : 'var(--text-muted,#666)';
+        counter.style.color = len >= maxChars ? 'var(--danger,#c00)' : len >= warnAt ? 'var(--warning,#f80)' : 'var(--text-muted,#666)';
     }
     // Write to in-memory flow state when bound to the flow panel
     if (el.dataset.bind === 'flow' && typeof state !== 'undefined' && state?.flow?.data) {
@@ -216,27 +219,50 @@ function notesPostBox(ticketId, { expanded = false } = {}) {
 /* -------------------------------------------------------------------------- */
 
 async function saveNotesPost(ticketId) {
+    // Idempotency guard: bail if a request is already in flight (prevents double-post on rapid retry).
+    if (typeof state !== 'undefined' && state?.flow?.data?._postNotesPending) return;
+
     const el = document.getElementById('addnotes-post-input');
     const value = el?.value?.trim();
     if (!value) return;
+
+    // Generate a per-submission idempotency token if not already set.
+    // The token is kept across retries so the server can deduplicate re-sends.
+    const token = (typeof state !== 'undefined' && state?.flow?.data?._postNotesToken)
+        || Math.random().toString(36).slice(2) + Date.now().toString(36);
+
     if (typeof state !== 'undefined' && state?.flow?.data) {
-        // OOHDASH-119: preserve typed text before render wipes the textarea, so
-        // the saving and error states can show it for retry (round 2 rework fix).
         state.flow.data._postNotesDraft = value;
+        state.flow.data._postNotesToken = token;
+        state.flow.data._postNotesPending = true;
         state.flow.data._postNotes = 'saving';
     }
     if (typeof render === 'function') render();
     try {
-        await api.post(`/api/tickets/${ticketId}/notes`, { body: value, kind: 'additional-notes' });
+        await api.post(`/api/tickets/${ticketId}/notes`, { body: value, kind: 'additional-notes', idempotencyKey: token });
         if (typeof state !== 'undefined' && state?.flow?.data) {
             state.flow.data._postNotes = 'saved';
-            delete state.flow.data._postNotesDraft; // no longer needed once saved
+            state.flow.data._postNotesPending = false;
+            delete state.flow.data._postNotesDraft;
+            delete state.flow.data._postNotesToken;
         }
     } catch (err) {
         if (typeof state !== 'undefined' && state?.flow?.data) {
+            // Humanise the error: never expose raw HTTP strings or server internals.
+            let friendly;
+            if (err.network) {
+                friendly = 'No connection — check your internet and try again.';
+            } else if (err.status >= 500) {
+                friendly = 'The server had a problem. Try again in a moment.';
+            } else if (err.status === 400) {
+                friendly = err.message; // already a user-facing validation string
+            } else {
+                friendly = 'Couldn’t save — please try again.';
+            }
             state.flow.data._postNotes = 'error';
-            state.flow.data._postNotesError = err.message;
-            // _postNotesDraft is kept so the error state can restore the textarea text
+            state.flow.data._postNotesError = friendly;
+            state.flow.data._postNotesPending = false;
+            // _postNotesDraft and _postNotesToken are kept for retry
         }
     }
     if (typeof render === 'function') render();
@@ -252,8 +278,10 @@ window._postNotesOpen = function () {
 window._postNotesReset = function () {
     if (typeof state !== 'undefined' && state?.flow?.data) {
         state.flow.data._postNotes = 'idle';
+        state.flow.data._postNotesPending = false;
         delete state.flow.data._postNotesError;
         delete state.flow.data._postNotesDraft;
+        delete state.flow.data._postNotesToken; // new token on next open
     }
     if (typeof render === 'function') render();
 };

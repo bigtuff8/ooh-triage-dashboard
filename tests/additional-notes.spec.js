@@ -432,3 +432,61 @@ test('E22: post-submit save failure keeps typed text in the box for retry', asyn
     // Unintercept so retry can succeed
     await page.unroute('**/api/tickets/*/notes');
 });
+
+// ─── E23: XSS — notes payload is escaped at every DOM sink ───────────────────
+test('E23: XSS payload in notes field is escaped — no element or script created at any DOM sink', async ({ page }) => {
+    // Two canonical XSS probes: tag injection and textarea breakout.
+    const XSS_IMG = '<img src=x onerror=alert(1)>';
+    const XSS_TA  = '</textarea><script>window.__xss=1<\/script>';
+    const XSS = XSS_IMG + XSS_TA;
+
+    let alertFired = false;
+    page.on('dialog', d => { alertFired = true; d.dismiss(); });
+
+    await signIn(page, 'Test Handler');
+    await confirmSite(page, '6832', 'Old Grey Mare');
+    await page.locator('[data-testid="tile-other"]').click();
+    await page.locator('[data-testid="other-text"]').pressSequentially('xss probe', { delay: 20 });
+
+    // Sink 1: FLOW-BOX textarea — direct user input (safe by definition; textarea does not parse HTML)
+    await page.locator('#addnotes').fill(XSS);
+
+    // Sink 2: confirm-step echo (payload.subject — not additionalNotes, but verify no bleed-through)
+    await page.locator('[data-testid="other-capture"]').click();
+    await expect(page.locator('[data-testid="confirm-step"]')).toBeVisible();
+
+    // Proceed to outcome
+    await page.locator('[data-testid="record-outcome"]').click();
+    await expect(page.locator('[data-testid="outcome-captured"]')).toBeVisible({ timeout: 8000 });
+
+    // No alert dialog (onerror / script) must have fired by now
+    expect(alertFired).toBe(false);
+
+    // window.__xss must not have been set (textarea-breakout script did not run)
+    const xssRan = await page.evaluate(() => window.__xss === 1);
+    expect(xssRan).toBe(false);
+
+    // Sink 3: addnotes-echo div — esc() wraps additionalNotes; no img[onerror] in DOM
+    const echo = page.locator('[data-testid="addnotes-echo"]');
+    await expect(echo).toBeVisible();
+    // The literal '<img' text must appear as plain text (escaped), not as an element
+    await expect(echo).toContainText('<img');
+    const imgCount = await page.evaluate(() => document.querySelectorAll('img[onerror]').length);
+    expect(imgCount).toBe(0);
+
+    // Sink 4: post-submit textarea in saving state — open box, fill XSS, intercept + abort the POST
+    await page.locator('[data-testid="addnotes-post-open"]').click();
+    await page.locator('[data-testid="addnotes-post-input"]').fill(XSS);
+    await page.route('**/api/tickets/*/notes', route => route.abort('failed'));
+    await page.locator('[data-testid="addnotes-post-save"]').click();
+
+    // Error state: textarea must show XSS as raw text value, not parsed HTML
+    await expect(page.locator('[data-testid="addnotes-post-error"]')).toBeVisible({ timeout: 6000 });
+    const errInput = page.locator('[data-testid="addnotes-post-error"] [data-testid="addnotes-post-input"]');
+    await expect(errInput).toHaveValue(XSS); // .value is raw text, confirms esc() worked
+    const imgAfterError = await page.evaluate(() => document.querySelectorAll('img[onerror]').length);
+    expect(imgAfterError).toBe(0);
+    expect(alertFired).toBe(false); // still no alert
+
+    await page.unroute('**/api/tickets/*/notes');
+});

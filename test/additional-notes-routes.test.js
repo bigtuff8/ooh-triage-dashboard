@@ -11,9 +11,10 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync } from 'fs';
+import { mkdtempSync, readFileSync } from 'fs';
 import { tmpdir } from 'os';
 import { join } from 'path';
+import { createContext, runInContext } from 'vm';
 
 process.env.DATA_MODE = 'fixture';
 process.env.WRITES_DISABLED = 'false';
@@ -118,4 +119,37 @@ test('U10: config.notes.maxChars matches normaliseAdditionalNotes cap behaviour'
     // Core length is <= max
     const core = normalised.slice(0, -1);
     assert.ok(core.length <= max, `core length ${core.length} within config cap ${max}`);
+});
+
+/* ------------------------------------------------------------------ */
+/* U14 — notesField() XSS escaping (client-side DOM sink)             */
+/* ------------------------------------------------------------------ */
+
+test('U14: notesField() escapes XSS payload — no raw <img> or </textarea> or <script> in output', () => {
+    // Minimal vm sandbox mirroring the browser globals notes.js needs.
+    const esc = x => String(x ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    const sandbox = {
+        esc,
+        state: { me: { notes: { maxChars: 1000 } } },
+        window: {}
+    };
+    sandbox.window = sandbox;
+    const ctx = createContext(sandbox);
+    const src = readFileSync(new URL('../public/js/notes.js', import.meta.url), 'utf8');
+    runInContext(src, ctx, { filename: 'notes.js' });
+
+    const XSS_IMG = '<img src=x onerror=alert(1)>';
+    const XSS_TA  = '</textarea><script>window.__xss=1</script>';
+    const html = ctx.notesField({ value: XSS_IMG + XSS_TA });
+
+    // Must NOT contain raw executable tags
+    assert.ok(!/<img\s+src=x/i.test(html), 'no raw <img src=x> in output');
+    assert.ok(!/<\/textarea>/i.test(html) || html.indexOf('&lt;/textarea&gt;') > -1,
+        'no unescaped </textarea> that could break out of the element');
+    assert.ok(!/<script>/i.test(html), 'no raw <script> in output');
+
+    // MUST contain escaped form
+    assert.ok(html.includes('&lt;img'), 'img tag is escaped to &lt;img');
+    assert.ok(html.includes('&lt;/textarea&gt;'), '</textarea> is escaped');
+    assert.ok(html.includes('&lt;script&gt;'), '<script> is escaped');
 });

@@ -77,7 +77,8 @@ function renderAmbiguous() {
     $('#view').innerHTML = `<div class="content narrow"><div class="card" style="border-color:var(--warning)" data-testid="ambiguous-card">
    <h2>⚠️ House ID ${esc(a.siteNo)} is ambiguous</h2>
    <p class="sub" style="margin:8px 0">This ID matches more than one site (${a.matches.map(m => `<b>${esc(m.siteName)}</b>`).join(' and ')}). To protect against changing the wrong site, remote control is blocked for ambiguous IDs.</p>
-   <div class="script">“I can’t safely make changes for this site number tonight — I’ll log this for the IoT team as a priority and they’ll pick it up.”</div>
+   <div class="script">“I can’t safely make changes for this site number tonight — I’ll log this for the IoT team as a priority and they’ll pick it up.”</div>
+
    ${notesField({ id: 'addnotes-amb' })}
    <div style="margin-top:10px">
     <button class="btn primary" data-testid="ambiguous-capture" onclick="ambiguousCapture()">Capture &amp; escalate to IoT</button>
@@ -113,7 +114,8 @@ function renderConfirmGate() {
    ${siteSubline(s)}
    ${unverifiedNotice(s)}
    <p style="margin:10px 0 4px">${esc(s.deviceSummary)}</p>
-   <div class="script">“Can I just confirm — you’re calling from <b>${esc(s.siteName)}</b>, site number <b>${esc(s.siteNo)}</b>?”</div>
+   <div class="script">“Can I just confirm — you’re calling from <b>${esc(s.siteName)}</b>, site number <b>${esc(s.siteNo)}</b>?”</div>
+
    <div style="display:flex;gap:10px;margin-top:16px">
     <button class="btn primary big" data-testid="confirm-site" onclick="confirmSite()">✓ This is the right site</button>
     <button class="btn big" onclick="go('home')">Search again</button>
@@ -390,9 +392,11 @@ function paintTonight() {
 
 function raiseQuery() {
     openModal(`<div data-testid="query-modal"><div class="mh">Raise a query with the IoT team<button class="btn link" onclick="closeModal()">✕</button></div><div class="mb">
-  <p class="sub" style="margin-bottom:10px">For anything older than tonight, or anything you’re unsure about — this goes straight onto a ticket for the team.</p>
+  <p class="sub" style="margin-bottom:10px">For anything older than tonight, or anything you’re unsure about — this goes straight onto a ticket for the team.</p>
+
   <div class="formrow"><label>Site (if known)</label><input id="qsite" data-testid="query-site" placeholder="e.g. 6832"></div>
-  <div class="formrow"><label>Your query</label><textarea id="qtxt" data-testid="query-text" rows="3" placeholder="e.g. Caller says they rang two nights ago about fryers — can’t see it tonight"></textarea></div>
+  <div class="formrow"><label>Your query</label><textarea id="qtxt" data-testid="query-text" rows="3" placeholder="e.g. Caller says they rang two nights ago about fryers — can’t see it tonight"></textarea></div>
+
   ${notesField({ id: 'addnotes-q' })}
  </div><div class="mf"><button class="btn" onclick="closeModal()">Cancel</button><button class="btn primary" data-testid="query-send" onclick="sendQuery()">Send query</button></div></div>`);
 }

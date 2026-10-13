@@ -413,10 +413,12 @@ async function ctlEscalate() {
         registerIssue(`${what} — NOT applied`, 'blue', res.ticket.id);
         html = `<div class="outcome captured" data-testid="outcome-escalated"><h3>📥 Captured for the IoT team</h3>
   <p>Attempted ${what} (${ctlValTxt(c)}) on <span class="mono">${esc(c.device.deviceId)}</span> but ${esc(why)}. <b>The change must be treated as not applied.</b></p>
-  <div class="script">“I tried to make that change remotely but the device hasn’t confirmed it, so I’m not going to tell you it’s done when it may not be. I’ve logged it as a priority instead${isTimeout ? ' — it may still land, and the team will check' : ''}.”</div>
+  <div class="script">“I tried to make that change remotely but the device hasn’t confirmed it, so I’m not going to tell you it’s done when it may not be. I’ve logged it as a priority instead${isTimeout ? ' — it may still land, and the team will check' : ''}.”</div>
+
   <p class="small">Ticket <b>#${res.ticket.id}</b></p>%%NOTESPOST%%${outButtons()}</div>`;
     } catch (err) {
-        html = `<div class="alert err">Couldn’t record the escalation: ${esc(err.message)} — raise it via Tonight → Raise a query so it isn’t lost.</div>${outButtons()}`;
+        html = `<div class="alert err">Couldn’t record the escalation: ${esc(err.message)} — raise it via Tonight → Raise a query so it isn’t lost.</div>${outButtons()}`;
+
     }
     if (state.flow) { state.flow.stage = 99; state.flow.data._outcomeHtml = html; }
     render();

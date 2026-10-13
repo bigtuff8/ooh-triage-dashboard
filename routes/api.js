@@ -30,6 +30,21 @@ const wrap = fn => (req, res) => fn(req, res).catch(err => {
     res.status(status).json({ error: err.message, ...(err.resolution ? { resolution: err.resolution } : {}), ...(err.guardrail ? { guardrail: true } : {}) });
 });
 
+// OOHDASH-119: server-side idempotency for POST /api/tickets/:id/notes.
+// Deduplicates re-sends with the same token within a 60-second window.
+// Keys are `${ticketId}:${token}`; the Map is in-process memory only.
+const _notesIdempMap = new Map();
+function _notesIdempCheck(ticketId, token) {
+    if (!token) return false;
+    const key = `${ticketId}:${token}`;
+    const now = Date.now();
+    // Purge stale entries (>60s) on each check — keeps memory bounded.
+    for (const [k, ts] of _notesIdempMap) { if (now - ts > 60000) _notesIdempMap.delete(k); }
+    if (_notesIdempMap.has(key)) return true; // duplicate
+    _notesIdempMap.set(key, now);
+    return false;
+}
+
 /* ---------------- session / app context ---------------- */
 
 router.get('/me', wrap(async (req, res) => {
@@ -384,13 +399,24 @@ router.post('/tickets/:id/notes', wrap(async (req, res) => {
     // OOHDASH-119: kind='additional-notes' writes a labelled [OOH NOTE] comment from the post-submit
     // notes box. Without kind the existing drawer-notes behaviour is byte-for-byte unchanged.
     if (req.body.kind === 'additional-notes') {
+        const ticketId = req.params.id;
+        // Idempotency: deduplicate re-sends with the same token within 60 s.
+        if (_notesIdempCheck(ticketId, req.body.idempotencyKey)) {
+            return res.json({ ok: true, deduplicated: true });
+        }
         const normalised = zendesk.normaliseAdditionalNotes(req.body.body);
         if (!normalised) return res.status(400).json({ error: 'Note is empty' });
         const labelledBody = `Additional notes from OOH agent: "${normalised}"`;
-        await zendesk.addFeedbackNote(req.params.id, req.session.operator, labelledBody);
+        try {
+            await zendesk.addFeedbackNote(ticketId, req.session.operator, labelledBody);
+        } catch (err) {
+            // Log ticket id + error message; never log note content.
+            console.error(`[OOH] notes save failed for ticket #${ticketId}: ${err.message}`);
+            throw err; // re-throw so wrap() returns 500 to the client
+        }
         await audit.logAction({
             actionType: 'note', operator: req.session.operator,
-            detail: `Note added to ticket #${req.params.id}`, outcome: 'note', ticketId: Number(req.params.id)
+            detail: `Note added to ticket #${ticketId}`, outcome: 'note', ticketId: Number(ticketId)
         });
         return res.json({ ok: true });
     }

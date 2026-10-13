@@ -279,9 +279,11 @@ window.submitPendingOutcome = function submitPendingOutcome(key) {
         const notesEcho = f.data.additionalNotes
             ? (() => {
                 const isP1 = payload.type === 'escalate-p1';
+                const tid = res?.ticket?.id ?? null; // guard: id may be absent on degraded response
+                const ref = tid ? `ticket #${tid}` : 'the ticket';
                 const mid = isP1
-                    ? `Your notes are on ticket #${res.ticket.id} for the morning review: “${esc(f.data.additionalNotes)}” (not in the urgent text)`
-                    : `Your notes are on ticket #${res.ticket.id}: “${esc(f.data.additionalNotes)}”`;
+                    ? `Your notes are on ${ref} for the morning review: “${esc(f.data.additionalNotes)}” (not in the urgent text)`
+                    : `Your notes are on ${ref}: “${esc(f.data.additionalNotes)}”`;
                 return `<div class="stepdone small" data-testid="addnotes-echo"><span>📝</span>${mid}</div>`;
             })()
             : '';

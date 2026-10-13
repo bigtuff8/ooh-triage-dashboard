@@ -121,7 +121,8 @@ async function boot() {
 function render() {
     if (state.loadError) {
         document.getElementById('app').innerHTML =
-            `<div class="content narrow" style="margin:60px auto"><div class="alert err"><b>Can’t load the OOH Dashboard.</b> ${esc(state.loadError)} <button class="btn" style="margin-left:10px" onclick="boot()">Retry</button></div></div>`;
+            `<div class="content narrow" style="margin:60px auto"><div class="alert err"><b>Can’t load the OOH Dashboard.</b> ${esc(state.loadError)} <button class="btn" style="margin-left:10px" onclick="boot()">Retry</button></div></div>`;
+
         return;
     }
     // OOHDASH-119: save focus + caret position for any notes textarea before re-rendering
