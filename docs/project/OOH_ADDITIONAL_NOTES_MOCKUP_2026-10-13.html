@@ -1,0 +1,385 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Additional Notes Mockup</title>
+<style>
+/* Palette and component classes copied from public/css/styles.css (live v1.3.6) */
+:root{
+  --primary:#594AE2;--primary-dark:#4338CA;--primary-light:#EEF2FF;
+  --success:#10B981;--success-light:#D1FAE5;
+  --warning:#F59E0B;--warning-light:#FEF3C7;
+  --danger:#EF4444;--danger-light:#FEE2E2;
+  --info:#3B82F6;--info-light:#DBEAFE;
+  --surface:#FFFFFF;--surface-variant:#F8FAFC;--background:#F1F5F9;
+  --sidebar-bg:#1E293B;--sidebar-text:#94A3B8;--sidebar-active:#334155;
+  --text-primary:#1E293B;--text-secondary:#64748B;--text-disabled:#94A3B8;
+  --border:#E2E8F0;
+  --urgency-critical:#DC2626;--urgency-critical-bg:#FEF2F2;
+  --radius-sm:6px;--radius-md:8px;--radius-lg:12px;
+  --shadow-sm:0 1px 2px rgba(0,0,0,.05);--shadow-md:0 4px 6px -1px rgba(0,0,0,.1);
+  --mono:ui-monospace,Consolas,'Cascadia Mono',monospace;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:Inter,system-ui,-apple-system,'Segoe UI',sans-serif;font-size:14px;line-height:22px;color:var(--text-primary);background:#CBD5E1}
+button{font:inherit;cursor:pointer}
+input,select,textarea{font:inherit}
+.mono{font-family:var(--mono);font-size:12.5px;font-weight:500}
+
+/* ---- mockup chrome (not part of the product) ---- */
+.mk{background:#0F172A;color:#E2E8F0;padding:10px 16px;display:flex;flex-wrap:wrap;gap:8px;align-items:center;font-size:13px;position:sticky;top:0;z-index:50}
+.mk b{color:#fff;margin-right:6px}
+.mk button{background:#1E293B;color:#CBD5E1;border:1px solid #334155;border-radius:6px;padding:5px 10px;font-size:12.5px}
+.mk button.on{background:var(--primary);border-color:var(--primary);color:#fff}
+.mk label{display:flex;align-items:center;gap:5px;color:#CBD5E1;font-size:12.5px}
+.mk .sep{width:1px;height:20px;background:#334155;margin:0 4px}
+.mknote{max-width:1240px;margin:10px auto 0;padding:0 16px;font-size:12.5px;color:#334155}
+.stage{padding:16px;display:flex;justify-content:center}
+.frame{width:100%;max-width:1240px;background:var(--background);border-radius:10px;overflow:hidden;box-shadow:0 10px 30px rgba(15,23,42,.25);position:relative}
+.frame.phone{max-width:390px;min-height:780px;border:10px solid #0F172A;border-radius:36px}
+
+/* ---- product shell ---- */
+.app{display:flex;min-height:640px}
+.sidebar{width:220px;background:var(--sidebar-bg);color:var(--sidebar-text);display:flex;flex-direction:column;flex-shrink:0}
+.sidebar .brand{padding:20px 20px 16px;color:#fff;font-weight:700;font-size:16px;border-bottom:1px solid #33415555}
+.sidebar .brand small{display:block;font-weight:400;font-size:11.5px;color:var(--sidebar-text);margin-top:2px}
+.nav{padding:12px 8px;flex:1}
+.nav button{display:flex;align-items:center;gap:10px;width:100%;text-align:left;background:none;border:0;color:var(--sidebar-text);padding:10px 12px;border-radius:var(--radius-md);font-size:14px;margin-bottom:2px}
+.nav button.active{background:var(--sidebar-active);color:#fff;font-weight:600}
+.main{flex:1;display:flex;flex-direction:column;min-width:0}
+.topbar{height:52px;background:var(--surface);border-bottom:1px solid var(--border);display:flex;align-items:center;gap:12px;padding:0 24px}
+.topbar .ctx{font-weight:600}
+.topbar .ver{margin-left:auto;color:var(--text-disabled);font-size:12px}
+.banner{padding:8px 24px;font-size:13.5px;font-weight:500}
+.banner.live{background:var(--success-light);color:#065F46;border-bottom:1px solid #A7F3D0}
+.content{padding:18px 24px;max-width:820px;width:100%;margin:0 auto}
+.card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-md);box-shadow:var(--shadow-sm);padding:18px;margin-bottom:12px}
+.card h3{font-size:14.5px;line-height:20px;font-weight:600;margin-bottom:6px}
+.small{font-size:12.5px;line-height:17px;color:var(--text-secondary)}
+.btn{border:1px solid var(--border);background:var(--surface);color:var(--text-primary);border-radius:var(--radius-md);padding:8px 16px;font-weight:500;font-size:14px}
+.btn:hover{border-color:var(--primary);color:var(--primary)}
+.btn.primary{background:var(--primary);border-color:var(--primary);color:#fff}
+.btn.link{border:none;background:none;color:var(--primary);padding:4px 6px}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+.tag{display:inline-flex;align-items:center;font-size:11.5px;font-weight:600;border-radius:var(--radius-sm);padding:1px 7px;line-height:17px;white-space:nowrap}
+.tag.green{background:var(--success-light);color:#065F46}
+.tag.red{background:var(--danger-light);color:#991B1B}
+.tag.blue{background:var(--info-light);color:#1E40AF}
+.alert{border-radius:var(--radius-md);padding:11px 14px;font-size:13.5px;margin:10px 0;line-height:20px}
+.alert.err{background:var(--danger-light);color:#991B1B}
+.alert.info{background:var(--info-light);color:#1E40AF}
+.flowpanel{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);box-shadow:var(--shadow-md);overflow:hidden}
+.flowhead{padding:12px 18px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px;background:var(--surface-variant)}
+.flowbody{padding:18px}
+.flowfoot{padding:8px 18px;border-top:1px solid var(--border);display:flex;flex-wrap:wrap;align-items:center;gap:4px 12px;font-size:12px;color:var(--text-secondary)}
+.stepdone{display:flex;gap:8px;align-items:center;color:var(--text-secondary);font-size:13px;padding:5px 0;border-bottom:1px dashed var(--surface-variant)}
+.stepdone .tick{color:var(--success);font-weight:700}
+.chips{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px}
+.chip{border:1.5px solid var(--border);background:var(--surface);border-radius:var(--radius-md);padding:9px 16px;font-size:14px;font-weight:500;min-height:40px;text-align:left}
+.chip:hover{border-color:var(--primary);color:var(--primary)}
+.zoneread{border:1px solid var(--border);border-radius:var(--radius-md);padding:10px 14px;margin:8px 0;display:flex;align-items:center;gap:14px;flex-wrap:wrap}
+.zoneread .t{font-size:20px;font-weight:700}
+.script{background:var(--surface-variant);border-left:3px solid var(--primary);border-radius:0 var(--radius-md) var(--radius-md) 0;padding:11px 14px;font-size:14px;font-style:italic;margin:10px 0;line-height:21px}
+.outcome{border-radius:var(--radius-lg);padding:16px;margin-top:14px}
+.outcome.applied{background:var(--success-light)}
+.outcome.captured{background:var(--info-light)}
+.outcome.p1{background:var(--urgency-critical-bg);border:1px solid #FECACA}
+.outcome h3{margin-bottom:6px;font-size:15px}
+.outbtns{display:flex;gap:10px;margin-top:12px;flex-wrap:wrap}
+.formrow{margin-bottom:12px}
+.formrow label{display:block;font-size:12.5px;font-weight:600;margin-bottom:4px;color:var(--text-secondary)}
+.formrow textarea{width:100%;border:1.5px solid var(--border);border-radius:var(--radius-sm);padding:8px 10px;outline:none;resize:vertical}
+.formrow textarea:focus{border-color:var(--primary)}
+
+/* ---- NEW: Additional notes component (OOHDASH-119) ---- */
+.addnotes{margin-top:16px;padding-top:12px;border-top:1px dashed var(--border)}
+.addnotes textarea{min-height:58px;max-height:140px;field-sizing:content;background:var(--surface-variant)}
+.addnotes textarea:focus{background:var(--surface)}
+.addnotes .meta{display:flex;gap:10px;align-items:flex-start;margin-top:4px}
+.addnotes .help{flex:1}
+.addnotes .count{font-size:12px;color:var(--text-disabled);white-space:nowrap;font-variant-numeric:tabular-nums}
+.addnotes .count.near{color:#B45309;font-weight:600}
+.addnotes .count.full{color:#991B1B;font-weight:600}
+.notesecho{display:flex;gap:8px;font-size:13px;color:var(--text-secondary);padding:6px 0}
+.notesecho q{font-style:italic;color:var(--text-primary)}
+.postnote{margin-top:12px;background:rgba(255,255,255,.65);border-radius:var(--radius-md);padding:10px 12px}
+.postnote .formrow{margin-bottom:6px}
+.postnote .row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.saved{color:#065F46;font-size:13px;font-weight:600}
+
+/* ---- ticket preview (scenario D) ---- */
+.trg{font-family:var(--mono);font-size:12.5px;line-height:19px;background:#0F172A;color:#E2E8F0;border-radius:var(--radius-md);padding:12px 14px;white-space:pre-wrap;word-break:break-word}
+.trg .hl{background:#4338CA;color:#fff;border-radius:3px;padding:0 2px}
+.iotstep{font-size:12.5px;line-height:1.7}
+.iotstep li.hl{background:var(--warning-light);border-radius:4px}
+.qrow{display:grid;grid-template-columns:70px 1fr 1fr 90px;gap:8px;font-size:12.5px;border:1px solid var(--border);border-radius:var(--radius-sm);padding:8px 10px}
+.qrow.h{background:var(--surface-variant);font-weight:600;color:var(--text-secondary)}
+.overlay{position:absolute;inset:0;background:rgba(15,23,42,.45);display:flex;align-items:center;justify-content:center;z-index:30;padding:16px}
+.modal{background:var(--surface);border-radius:var(--radius-lg);width:420px;max-width:100%;box-shadow:var(--shadow-md);overflow:hidden}
+.modal .mh{padding:12px 16px;border-bottom:1px solid var(--border);font-weight:600}
+.modal .mb{padding:16px}
+
+/* ---- phone width: mirrors the live @media(max-width:900px) rules ---- */
+.phone .app{flex-direction:column-reverse;min-height:760px}
+.phone .sidebar{width:100%;height:56px;flex-direction:row;align-items:center}
+.phone .sidebar .brand{display:none}
+.phone .nav{display:flex;padding:6px}
+.phone .nav button{justify-content:center;font-size:12px;padding:8px 6px}
+.phone .nav .lbl{display:none}
+.phone .topbar{padding:0 14px}
+.phone .content{padding:12px}
+.phone .flowbody{padding:14px}
+.phone .addnotes textarea,.phone .postnote textarea{font-size:16px}
+.phone .qrow{grid-template-columns:1fr 1fr}
+.phone .banner{padding:8px 14px}
+@media(max-width:640px){.mk{position:static}.addnotes textarea,.postnote textarea{font-size:16px}.app{flex-direction:column-reverse}.sidebar{width:100%;height:56px;flex-direction:row}.sidebar .brand{display:none}.nav{display:flex;padding:6px}.nav .lbl{display:none}.content{padding:12px}}
+</style>
+</head>
+<body>
+
+<div class="mk" role="toolbar" aria-label="Mockup controls">
+  <b>OOHDASH-119 mockup</b>
+  <button data-sc="A" class="on">A · Guided flow (capture)</button>
+  <button data-sc="B">B · P1 outcome</button>
+  <button data-sc="C">C · Control path</button>
+  <button data-sc="D">D · Resulting ticket</button>
+  <span class="sep"></span>
+  <button data-view="desktop" class="on">Desktop</button>
+  <button data-view="phone">Phone 390px</button>
+  <span class="sep"></span>
+  <label><input type="checkbox" id="simErr"> Simulate Zendesk error</label>
+  <button id="reset">Reset</button>
+</div>
+<p class="mknote">Clickable mockup, not production code. Everything in the white dashboard frame is the proposed screen; the dark bar above is only for driving the demo. Tickets "created" here appear under D.</p>
+
+<div class="stage"><div class="frame" id="frame">
+  <div class="app">
+    <div class="sidebar">
+      <div class="brand">OOH Dashboard<small>Lighthouse out-of-hours support</small></div>
+      <div class="nav">
+        <button class="active">📞 <span class="lbl">New Call</span></button>
+        <button>↩️ <span class="lbl">Callback Lookup</span></button>
+        <button>🌙 <span class="lbl">Tonight</span></button>
+      </div>
+    </div>
+    <div class="main">
+      <div class="topbar"><span class="ctx">The Kings Arms</span><span class="mono">6832</span><span class="ver">v1.3.7 · mockup</span></div>
+      <div class="banner live">🟢 <b>Device control is LIVE</b> — confirm the site before every change.</div>
+      <div class="content" id="view"></div>
+    </div>
+  </div>
+  <div id="modalroot"></div>
+</div></div>
+
+<script>
+'use strict';
+// Single shared limit, mirrors config.notes.maxChars delivered via /api/me
+var ME = { operator: { name: 'Kirsty Walsh' }, notes: { maxChars: 1000 } };
+var S, tickets = [], seq = 48213, sc = 'A';
+
+function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];});}
+function hhmm(d){d=d||new Date();return String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0');}
+function $(id){return document.getElementById(id);}
+function simErr(){return $('simErr').checked;}
+
+// Server-side normaliser (design 5.2) replicated so the ticket preview is truthful
+function normaliseNotes(raw){
+  if(typeof raw!=='string')return null;
+  var s=raw.replace(/(\r?\n)+/g,' / ').replace(/\s+/g,' ').trim();
+  s=s.replace(/caller'?s words\s*:/gi,"caller's words -");
+  if(!s)return null;
+  if(s.length>ME.notes.maxChars){var c=s.slice(0,ME.notes.maxChars);if(/[\uD800-\uDBFF]$/.test(c))c=c.slice(0,-1);s=c+'…';}
+  return s;
+}
+
+/* ---------- shared component: notesField / notesInput / notesPostBox ---------- */
+function notesField(id,value){
+  var max=ME.notes.maxChars,len=(value||'').length;
+  return '<div class="addnotes formrow" data-testid="'+id+'-wrap">'+
+    '<label for="'+id+'">Additional notes for the IoT team (optional)</label>'+
+    '<textarea id="'+id+'" data-testid="'+id+'" rows="2" maxlength="'+max+'" oninput="notesInput(this)" '+
+    'placeholder="Anything the caller or site told you that isn\'t captured above, e.g. engineer due at 7am">'+esc(value||'')+'</textarea>'+
+    '<div class="meta"><span class="help small">For the ticket and the IoT team&rsquo;s morning review. Not sent in urgent P1 texts. Keep it factual, no personal details.</span>'+
+    '<span class="count'+countCls(len)+'" id="'+id+'-counter" data-testid="'+id+'-counter">'+countTxt(len)+'</span></div></div>';
+}
+function countCls(n){return n>=ME.notes.maxChars?' full':(n>=ME.notes.maxChars*0.9?' near':'');}
+function countTxt(n){var m=ME.notes.maxChars;return n>=m?(m+' / '+m+', limit reached'):(n+' / '+m);}
+function notesInput(el){
+  var c=$(el.id+'-counter'),n=el.value.length;
+  c.textContent=countTxt(n);c.className='count'+countCls(n);
+  if(el.id==='addnotes')S.notes=el.value; else S.postDraft=el.value;
+}
+function notesEcho(t,id,p1){
+  return t?'<div class="notesecho" data-testid="addnotes-echo">📝<span>Your notes are on ticket <b>#'+id+'</b>'+(p1?' for the morning review':'')+': <q>'+esc(t)+'</q>'+(p1?' <span class="small">(not in the urgent text)</span>':'')+'</span></div>':'';
+}
+function notesPostBox(id,expandedDefault){
+  var p=S.post;
+  if(p.state==='saved')return '<div class="postnote"><div class="saved" data-testid="addnotes-post-saved">✓ Note saved to ticket #'+id+'</div><div class="notesecho"><q>'+esc(p.text)+'</q></div></div>';
+  if(p.state==='idle'&&!expandedDefault)return '<div class="postnote" style="padding:6px 10px"><button class="btn link" data-testid="addnotes-post-open" onclick="S.post.state=\'open\';draw()">+ Add a note to ticket #'+id+'</button></div>';
+  var max=ME.notes.maxChars,v=S.postDraft||'',saving=p.state==='saving';
+  return '<div class="postnote"><div class="addnotes formrow" style="margin-top:0;padding-top:0;border:0">'+
+    '<label for="addnotes-post-input">Add a note to ticket #'+id+' (optional)</label>'+
+    '<textarea id="addnotes-post-input" data-testid="addnotes-post-input" rows="2" maxlength="'+max+'" oninput="notesInput(this)" '+(saving?'disabled':'')+
+    ' placeholder="Anything you remembered after recording, e.g. caller rang back to say it is working now">'+esc(v)+'</textarea>'+
+    '<div class="meta"><span class="help small">Saved as a separate internal note on the ticket.</span><span class="count'+countCls(v.length)+'" id="addnotes-post-input-counter">'+countTxt(v.length)+'</span></div></div>'+
+    (p.state==='error'?'<div class="alert err" data-testid="addnotes-post-error" style="margin:4px 0 8px">Couldn’t save the note: Zendesk did not respond (503). Try again, or add it later from Tonight → ticket.</div>':'')+
+    '<div class="row"><button class="btn primary" data-testid="addnotes-post-save" '+(saving?'disabled':'')+' onclick="saveNotesPost('+id+')">'+(saving?'Saving…':(p.state==='error'?'Try again':'Save note'))+'</button></div></div>';
+}
+function saveNotesPost(id){
+  var t=normaliseNotes(S.postDraft||'');
+  if(!t){S.post.state='open';draw();var el=$('addnotes-post-input');if(el)el.focus();return;}
+  S.post.state='saving';draw();
+  setTimeout(function(){
+    if(simErr()){S.post.state='error';draw();return;}
+    S.post={state:'saved',text:t};
+    var tk=tickets.find(function(x){return x.id===id;});if(tk)tk.ooHNotes.push(t);
+    draw();
+  },800);
+}
+
+/* ---------- scenarios ---------- */
+function fresh(){S={stage:0,notes:'',post:{state:'idle'},postDraft:'',done:[],out:null,err:null};}
+
+function createTicket(o){
+  var t={id:++seq,time:hhmm(),subject:o.subject,outcome:o.outcome,steps:o.steps,notes:normaliseNotes(S.notes),p1:o.p1,ooHNotes:[]};
+  tickets.unshift(t);return t;
+}
+function record(o){
+  S.stage=1;S.err=null;draw();
+  setTimeout(function(){
+    if(simErr()){S.stage=0;S.err='Zendesk did not respond (503)';draw();return;}
+    var t=createTicket(o);S.out={ticket:t,kind:o.kind,detail:o.detail,script:o.script,expanded:o.expanded};S.stage=99;draw();
+  },900);
+}
+
+function kitchenStep(){
+  return '<div class="zoneread"><span style="font-size:20px">🍳</span><div><div><b>Kitchen circuits</b> — controller online</div><div class="small mono">LH-KIT-6832-01 · live read just now</div></div><span class="tag green">online</span></div>'+
+  '<h3 style="margin-top:12px">Is the kitchen needed for service right now?</h3>'+
+  '<div class="chips">'+
+  (sc==='A'?'':'<button class="chip" data-testid="kitchen-crit" onclick="pickKitchen(true)">🔥 Yes, in service now and it’s off</button>')+
+  '<button class="chip" data-testid="kitchen-ncrit" onclick="pickKitchen(false)">🕖 No, needed later (not service-critical)</button>'+
+  (sc==='A'?'<button class="chip" disabled title="Shown in scenario B" style="opacity:.5">🔥 Yes, in service now (see B)</button>':'')+
+  '</div>';
+}
+function pickKitchen(crit){
+  S.done.push(crit?'Business-critical during service — P1':'Not service-critical tonight');
+  var base=[{t:'Site confirmed: The Kings Arms (6832)'},{t:'Issue: kitchen equipment off'},{t:'Live read: kitchen circuits reachable'}];
+  if(crit) record({kind:'p1',subject:'Kitchen off during service — P1',outcome:'escalate-p1',p1:true,
+    steps:base.concat([{t:'Business-critical during service'},{t:'P1 escalation raised — on-duty manager to be paged'}]),
+    detail:'Kitchen equipment is off during active service at The Kings Arms.',script:'I’ve escalated this as a priority — the on-duty manager is being contacted now and will call you back.'});
+  else record({kind:'captured',subject:'Kitchen schedule request — needed for breakfast service',outcome:'capture',
+    steps:base.concat([{t:'Not service-critical tonight — schedule request captured'}]),
+    detail:'Kitchen needed for tomorrow’s 07:00 breakfast service; not service-critical tonight.',script:'I’ve logged that for the IoT team — it’ll be actioned first thing on the next working day.'});
+}
+
+function controlStep(){
+  return '<div class="zoneread"><span class="t">17.5°C</span><div><div>Setpoint <b>19°C</b> · mode <b>auto</b></div><div class="small mono">SAL-TRV-6832-BAR · live read just now · coldest of 3 zones in Bar &amp; Restaurant</div></div><span class="tag green">online</span></div>'+
+  '<h3 style="margin-top:12px">Caller wants it warmer: raise the setpoint?</h3>'+
+  '<div class="chips"><button class="chip" data-testid="ctl-open" onclick="openCtl()">🌡️ Raise setpoint to 21°C</button></div>';
+}
+function openCtl(){
+  $('modalroot').innerHTML='<div class="overlay"><div class="modal"><div class="mh">Raise setpoint — Bar &amp; Restaurant</div><div class="mb">'+
+  '<div class="alert info">Sent to <span class="mono">SAL-TRV-6832-BAR</span>. Waiting for the device to confirm…</div>'+
+  '<p class="small" style="margin-bottom:10px">Choose how the device responds (demo only):</p>'+
+  '<div class="chips"><button class="chip" onclick="ctlResult(true)">✅ Device confirms (ctlFinish)</button><button class="chip" onclick="ctlResult(false)">⏱️ Times out (ctlEscalate)</button></div></div></div></div>';
+}
+function ctlResult(ok){
+  $('modalroot').innerHTML='';
+  S.done.push('Requested: warmer');
+  var base=[{t:'Site confirmed: The Kings Arms (6832)'},{t:'Zone: Bar & Restaurant · SAL-TRV-6832-BAR'},{t:'Live read: 17.5°C, setpoint 19°C'},{t:'Dispatched: setpoint 21°C'}];
+  var expanded=!normaliseNotes(S.notes);
+  if(ok) record({kind:'applied',subject:'Setpoint raise — Bar & Restaurant',outcome:'setpoint',expanded:expanded,
+    steps:base.concat([{t:'Device confirmed (synced)'},{t:'Hold until 07:00 — will revert automatically'}]),
+    detail:'Setpoint raise to <b>21°C</b> on <span class="mono">SAL-TRV-6832-BAR</span>, device-confirmed (<span class="mono">synced</span>).',
+    script:'Done — I’ve set it to 21 degrees and the device has confirmed. It’ll hold until the morning schedule.'});
+  else record({kind:'escalated',subject:'Setpoint raise — NOT applied, escalated',outcome:'capture',expanded:expanded,
+    steps:base.concat([{t:'No sync confirmation (timeout) — treated as not applied'}]),
+    detail:'Attempted setpoint raise (21°C) on <span class="mono">SAL-TRV-6832-BAR</span> but no sync confirmation (timeout). <b>The change must be treated as not applied.</b>',
+    script:'I tried to make that change remotely but the device hasn’t confirmed it, so I’m not going to tell you it’s done. I’ve logged it as a priority instead.'});
+}
+
+function outcomeCard(){
+  var o=S.out,t=o.ticket,id=t.id,h;
+  var cls={captured:'captured',p1:'p1',applied:'applied',escalated:'captured'}[o.kind];
+  var title={captured:'📥 Captured for the IoT team',p1:'🚨 Escalated — P1',applied:'✅ Change applied — device confirmed',escalated:'📥 Captured for the IoT team'}[o.kind];
+  h='<div class="outcome '+cls+'" data-testid="outcome-'+o.kind+'"><h3>'+title+'</h3><p>'+o.detail+'</p>';
+  if(o.kind==='p1')h+='<p style="margin-top:4px">The P1 is logged as ticket <b>#'+id+'</b> in the IoT Support dashboard, which pages the on-duty manager.</p>';
+  if(o.kind==='captured')h+='<p style="margin-top:4px">This will be actioned on the <b>next working day</b> — it is logged, not lost.</p>';
+  h+='<div class="script">“'+o.script+'”</div><p class="small">Ticket <b>#'+id+'</b></p>';
+  h+=notesEcho(t.notes,id,o.kind==='p1');
+  h+=notesPostBox(id,(o.kind==='applied'||o.kind==='escalated')&&o.expanded);
+  h+='<div class="outbtns"><button class="btn" onclick="resetSc()">➕ Add another issue</button><button class="btn primary" onclick="resetSc()">✔ End call</button></div></div>';
+  return h;
+}
+
+function draw(){
+  var cat={A:['🍳','Kitchen'],B:['🍳','Kitchen'],C:['🌡️','Heating']}[sc];
+  if(sc==='D'){ $('view').innerHTML=ticketView(); return; }
+  var active=document.activeElement,aid=active&&active.id,ss=active&&active.selectionStart,se=active&&active.selectionEnd;
+  var body;
+  if(S.stage===99)body=outcomeCard();
+  else if(S.stage===1)body='<div class="alert info">Recording the outcome…</div>';
+  else body=(S.err?'<div class="alert err">Couldn’t record the outcome: '+esc(S.err)+' <button class="chip" style="margin-left:8px;min-height:30px;padding:3px 10px" onclick="S.err=null;draw()">Try again</button> <span class="small">(your notes are kept)</span></div>':'')+(sc==='C'?controlStep():kitchenStep());
+  var box=S.stage!==99?notesField('addnotes',S.notes):'';
+  $('view').innerHTML='<div class="flowpanel" data-testid="flow-panel">'+
+    '<div class="flowhead"><span style="font-size:18px">'+cat[0]+'</span><b>'+cat[1]+'</b><span class="small" style="margin-left:6px">guided flow</span><button class="btn link" style="margin-left:auto" onclick="resetSc()">Cancel issue</button></div>'+
+    '<div class="flowbody">'+
+      '<div class="stepdone"><span class="tick">✓</span>Site confirmed: <b>The Kings Arms</b> <span class="mono">6832</span></div>'+
+      (sc==='C'?'<div class="stepdone"><span class="tick">✓</span>Area: <b>Bar &amp; Restaurant</b></div>':'<div class="stepdone"><span class="tick">✓</span>Issue: <b>kitchen equipment off</b></div>')+
+      S.done.map(function(d){return '<div class="stepdone"><span class="tick">✓</span>'+esc(d)+'</div>';}).join('')+
+      body+box+
+    '</div>'+
+    '<div class="flowfoot"><span>Operator: <b>'+esc(ME.operator.name)+'</b></span><span style="margin-left:auto">Everything here is recorded to the Zendesk ticket automatically</span></div></div>'+
+    (S.stage===0&&!S.err?'<p class="small" style="margin-top:10px">Tip: type a note above, then pick the outcome. The note travels with the ticket at creation.</p>':'');
+  if(aid&&$(aid)&&!$(aid).disabled){var el=$(aid);el.focus();try{el.setSelectionRange(ss,se);}catch(e){}}
+}
+
+/* ---------- D: what lands in Zendesk and the IoT dashboard ---------- */
+function trgBody(t){
+  var L=['[TRG] '+t.subject,'Operator: '+ME.operator.name+' (OOH)','Outcome: '+t.outcome,'Transcript:'];
+  t.steps.forEach(function(s){L.push(t.time+' | '+s.t);});
+  if(t.notes)L.push('§§'+t.time+' | Additional notes from OOH agent: "'+t.notes+'"');
+  return L.map(function(l){return l.indexOf('§§')===0?'<span class="hl">'+esc(l.slice(2))+'</span>':esc(l);}).join('\n');
+}
+function ticketView(){
+  if(!tickets.length)return '<div class="card"><h3>No tickets yet</h3><p class="small">Run scenario A, B or C first. A sample ticket is shown once one is created.</p><div class="chips"><button class="chip" onclick="seedSample()">Load a sample ticket with notes</button></div></div>';
+  var t=tickets[0],h='';
+  h+='<div class="card"><h3>Zendesk ticket #'+t.id+' · [OOH] '+esc(t.subject)+' '+(t.p1?'<span class="tag red">urgent · ooh_p1</span>':'<span class="tag blue">normal</span>')+'</h3>'+
+    '<p class="small" style="margin-bottom:8px">First internal comment, exactly as the server builds it. The highlighted line is new; everything above it is unchanged.</p>'+
+    '<div class="trg" data-testid="trg-body">'+trgBody(t)+'</div>';
+  if(!t.notes)h+='<p class="small" style="margin-top:8px">No notes were typed, so the body is identical to today’s.</p>';
+  t.ooHNotes.forEach(function(n){h+='<p class="small" style="margin:10px 0 4px">Second internal comment (post-submit note):</p><div class="trg">'+esc('[OOH NOTE] Additional notes from OOH agent: "'+n+'"\n\nOperator: '+ME.operator.name+' (kirsty.walsh@airedale-group.co.uk)')+'</div>';});
+  h+='</div>';
+  h+='<div class="card"><h3>IoT Support Dashboard · ticket detail view</h3><p class="small" style="margin-bottom:8px">How the frozen IoT dashboard rebuilds the comment (operator, timed steps, outcome). The notes show as the last step, no IoT change needed.</p>'+
+    '<div style="font-size:13px;margin-bottom:4px"><b>Operator:</b> '+esc(ME.operator.name)+' (OOH)</div>'+
+    '<div class="small" style="font-weight:700;text-transform:uppercase;letter-spacing:.4px;margin:6px 0 2px">Action transcript — what the operator clicked</div>'+
+    '<ol class="iotstep" style="margin:0 0 8px 18px">'+t.steps.map(function(s){return '<li><span class="mono">'+t.time+'</span> '+esc(s.t)+'</li>';}).join('')+
+    (t.notes?'<li class="hl"><span class="mono">'+t.time+'</span> Additional notes from OOH agent: "'+esc(t.notes)+'"</li>':'')+'</ol>'+
+    '<div style="font-size:12.5px"><b>Outcome:</b> <span class="tag '+(t.p1?'red':'blue')+'">'+esc(t.outcome)+'</span></div>'+
+    (t.ooHNotes.length?'<p class="small" style="margin-top:8px">The post-submit note appears below this as an ordinary internal comment.</p>':'')+'</div>';
+  h+='<div class="card"><h3>IoT oversight queue row (unchanged by design)</h3><div class="qrow h"><span>Ticket</span><span>Operator</span><span>Summary</span><span>Outcome</span></div>'+
+    '<div class="qrow"><span>#'+t.id+'</span><span>'+esc(ME.operator.name)+' (OOH)</span><span>'+esc(t.subject)+'</span><span>'+esc(t.outcome)+'</span></div>'+
+    '<p class="small" style="margin-top:6px">Notes are deliberately not in the queue row (decision D3). P1 text to the on-duty manager uses site, subject and ticket number only.</p></div>';
+  if(tickets.length>1)h+='<p class="small">'+(tickets.length-1)+' earlier ticket(s) from this session are kept; the newest is shown.</p>';
+  return h;
+}
+function seedSample(){
+  tickets.unshift({id:++seq,time:'21:42',subject:'Kitchen off during service — P1',outcome:'escalate-p1',p1:true,ooHNotes:[],
+    steps:[{t:'Site confirmed: The Kings Arms (6832)'},{t:'Issue: kitchen equipment off'},{t:'Live read: kitchen circuits reachable'},{t:'Business-critical during service'},{t:'P1 escalation raised — on-duty manager to be paged'}],
+    notes:normaliseNotes('Duty manager says fryer 2 tripped twice since 9pm\nEngineer from the fryer supplier booked for 7am')});
+  draw();
+}
+
+/* ---------- toolbar ---------- */
+function resetSc(){fresh();$('modalroot').innerHTML='';draw();}
+document.querySelectorAll('[data-sc]').forEach(function(b){b.onclick=function(){
+  document.querySelectorAll('[data-sc]').forEach(function(x){x.classList.toggle('on',x===b);});sc=b.getAttribute('data-sc');resetSc();};});
+document.querySelectorAll('[data-view]').forEach(function(b){b.onclick=function(){
+  document.querySelectorAll('[data-view]').forEach(function(x){x.classList.toggle('on',x===b);});
+  $('frame').classList.toggle('phone',b.getAttribute('data-view')==='phone');};});
+$('reset').onclick=function(){tickets=[];resetSc();};
+fresh();draw();
+</script>
+</body>
+</html>
