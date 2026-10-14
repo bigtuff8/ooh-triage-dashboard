@@ -1163,6 +1163,46 @@
           }
         }
       ]
+    },
+    {
+      "siteNo": "7001",
+      "siteName": "Dark Fleet Arms",
+      "brand": "Greene King - Local Pubs",
+      "address": "Test Row, Leeds LS1",
+      "callsLast30Days": 1,
+      "_comment": "OOHDASH-123 (D-DARK-FLEETS): a single dark (offline, not reporting) iT500 heating device. Exercises the 'device not reporting' dark-fleet branch in the heating flow (no controls).",
+      "devices": [
+        {
+          "deviceId": "gk-7001-salusit500-1",
+          "zone": "Accommodation",
+          "deviceType": "salus-it500",
+          "kind": "heating",
+          "area": "Accommodation",
+          "online": false,
+          "telemetry": {}
+        }
+      ]
+    },
+    {
+      "siteNo": "7002",
+      "siteName": "Power Pause Inn",
+      "brand": "Greene King - Local Pubs",
+      "address": "Test Row, Leeds LS2",
+      "callsLast30Days": 1,
+      "_comment": "OOHDASH-123 (WU13, DD-SCHED-DISPLAY): an online PowerPause kitchen circuit carrying a decoded next-scheduled-change (the live path decodes this from SHARED_SCOPE `schedules`; the fixture path serves devices verbatim, so it carries the already-decoded, labelled string).",
+      "devices": [
+        {
+          "deviceId": "gk-7002-powerpause-1",
+          "zone": "Kitchen power circuit",
+          "deviceType": "tuya",
+          "kind": "kitchen",
+          "online": true,
+          "schedule": "based on the device's stored schedule, next change to on at 06:30 tomorrow",
+          "telemetry": {
+            "switch_1": true
+          }
+        }
+      ]
     }
   ]
 }
