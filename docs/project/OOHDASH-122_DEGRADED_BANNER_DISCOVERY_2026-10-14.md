@@ -1,6 +1,6 @@
 <!-- gate:contract
 SECTION: What we are solving
-OOHDASH-122. After the v1.3.7 deploy on 13 October the New Call home page showed two banners at once: a red one saying control actions are disabled, and a green one saying Device control is LIVE and changes will reach real equipment. Both appear from the moment the pod starts until the first full workspace is loaded. A handler seeing both does not know which to trust. This discovery traces every signal driving each banner, confirms the cold-start false negative in the code, explains why the condition persisted even after a site search on 6832, and frames fix options for the operator to choose between.
+OOHDASH-122. After the v1.3.7 deploy on 13 October the New Call home page showed two banners at once: a red one saying control actions are disabled, and a green one saying Device control is LIVE and changes will reach real equipment. Both appear from the moment the pod starts until the first workspace is loaded. A handler seeing both does not know which to trust. This discovery traces every signal driving each banner, confirms the cold-start false negative in the code, identifies thingsboardRead cycling as a separate /healthz-only degraded contributor that does not affect the banners, and frames fix options for the operator to choose between.
 
 SECTION: Root cause
 The red kill-banner fires when either the bridge read-health flag is false OR the workspace degraded flag is true. The bridge flag initialises to false in live mode on every pod restart and only flips to true after a full site workspace is loaded — a site search alone does not update it. The green LIVE banner fires from a completely separate, static deploy-time flag that says writes are enabled. The two signals are never compared. So both banners fire simultaneously from pod start until the first workspace load, which can be minutes or longer on a quiet night. This is not a new bug: the same initialisation has been in place since at least v1.3.6 and is documented in the CIR as a known gotcha.
@@ -15,7 +15,7 @@ SECTION: Biggest open bet
 The biggest open bet after landing Option B is whether state.me.degraded captures all red-banner triggers. Today the red banner fires on state.me.degraded || state.workspace.degraded. Option B's false-negative fix only changes how me.degraded is derived. If workspace.degraded can fire independently for reasons outside the bridge-health path — and if those reasons are not themselves genuine read failures — then the compound guard is correct in structure but the residual workspace.degraded signal may be a second false-negative source not addressed by Option B. This must be established before Option B is approved for production.
 
 SECTION: Questions for James
-One factual question before the fix is scoped: when you looked up site 6832 at around 23:05 on 13 October, did you open the full site workspace so the device list loaded, or did you only see 6832 appear in the search results without clicking through? The answer determines whether the CIR note that the condition clears on the first lookup has ever been accurate, or whether it has always required a full workspace load. The rest of the open questions are the decisions below.
+The 6832 question is answered: James confirmed he opened the full site workspace and ran the flow through to ticket submission. The full flow calls getSitesByNumber (via resolve and confirm), so bridge health clears correctly. The residual /healthz status degraded at 23:05 is most likely from thingsboardRead cycling on its 60-second TTL — a separate contributor to /healthz that does not affect the banners. The remaining open questions are the three decisions below.
 
 DECISION: Which false-negative fix? | Option B (one line, fast) + Mutual-exclusion guard, in this ticket | Option C (tri-state, proper) + Mutual-exclusion guard, in this ticket
 DETAIL: Both choices must include the Mutual-exclusion guard (negating the full compound condition) to satisfy AC-2. Option B touches two files (routes/api.js and public/js/app.js). Option C is larger but architecturally correct and satisfies AC-3 without a follow-up. Recommend Option B as the fast unblock, Option C as a planned follow-up.
@@ -88,9 +88,11 @@ There is no startup probe and no timer — only these two reactive paths.
 
 `searchSites()` (lines 1019-1039) calls the Zendesk site directory and does NOT update `lastReadOk` at all. A handler typing "6832" in the search box calls `GET /api/sites/search` → `searchSites()` — `lastReadOk` is never touched.
 
-This explains why degraded persisted "after a live site lookup on 6832": the lookup was a search operation (autocomplete), not a workspace load. A workspace load (`POST /confirm` → `GET /workspace/:siteNo`) calls `getSitesByNumber()` and would update `lastReadOk`. Since `lastError` remained `null` at ~23:05, `getSitesByNumber` was never called — confirming the lookup was search-only.
+James subsequently confirmed he opened the full site workspace on 6832, running the resolve and confirm flow through to ticket submission. The full flow DOES call `getSitesByNumber` — via `resolution.resolveSite` (`services/resolution.js:34`) on confirm, and directly by `GET /api/workspace/:siteNo` on workspace load. The code makes it structurally impossible for `bridge.healthy: false, lastError: null` to persist after a successful `getSitesByNumber` call: success always sets both `lastReadOk = true` and `lastReadError = null` together; a failure sets `lastReadOk = false, lastReadError = err.message` (non-null). The state `bridge.healthy: false, lastError: null` can only be the module's initial load state.
 
-The `thingsboardRead: 'unknown'` observed at ~23:01 is a separate, independent signal: it is the ThingsBoard read-credential proof state from `tb-client.js:93` (`if (!isFresh()) return 'unknown'`), which becomes `'healthy'` after `activeReadProbe()` completes. It does not affect `lastReadOk`.
+The most likely explanation for `/healthz status: degraded` persisting at ~23:05 is a SEPARATE signal: `thingsboardRead: 'unknown'`. At ~23:01, `thingsboardRead` was observed cycling to 'unknown' as its 60-second probe TTL expired (`config.control.healthProbeTtlMs: 60000`). In `server.js:75-81`, `tbReadDegraded = true` when `thingsboardRead` is 'unknown' or 'unhealthy' — this independently contributes to `/healthz status: degraded`, regardless of `bridge.healthy`. Bridge health likely cleared correctly after the workspace load; the residual `/healthz status: degraded` at ~23:05 was from the `thingsboardRead` cycle. This is consistent with all observed facts but cannot be confirmed without a pod-log review of individual subsystem values at that timestamp.
+
+Critically: `thingsboardRead: 'unknown'` does NOT affect `/api/me` or the banners — `/api/me:65` checks only `bridge.bridgeStatus().healthy`, not `thingsboardRead`. The banners would have cleared after the workspace load; only `/healthz` remained degraded.
 
 **Cold-start false negative: PROVEN structural.** In live mode, `lastReadOk = false` from first load; there is no mechanism to prove it healthy before an operator opens a workspace.
 
@@ -169,6 +171,17 @@ This is a **compound condition** with two independent paths:
 3. **Workspace-level failure (second surviving path — the AC-2 gap):** `me.degraded=false` but `workspace.degraded=true`. Red fires (because the kill condition is `me.degraded || workspace.degraded`). A guard on `!me.degraded` alone does NOT prevent the green banner from firing — because `me.degraded` is false. Both banners still co-fire. Guard must be `!(me.degraded || workspace.degraded)` to close this path.
 
 The mutual-exclusion guard closes all three paths only when it mirrors the exact compound condition that fires the red banner.
+
+**Additional /healthz contributor: `thingsboardRead: 'unknown'` (does NOT affect banners)**
+
+A fourth, independent signal contributes to `/healthz status: degraded` that is separate from the banner contradiction entirely. In `server.js:75-81`:
+
+    const tbReadDegraded = subsystems.thingsboard?.mode === 'live'
+        && (tbReadState === 'unknown' || tbReadState === 'unhealthy');
+
+`tbReadState` is the ThingsBoard read-credential proof state from `tb-client.js:93`. It returns `'unknown'` whenever the probe has not run within the 60-second TTL (`config.control.healthProbeTtlMs: 60000`), and `'healthy'` after `activeReadProbe()` completes. When `tbReadDegraded` is true, `/healthz` returns `status: degraded` independently of `subsystems.bridge.healthy`.
+
+This signal does NOT feed `/api/me` or either banner. `/api/me:65` checks only `bridge.bridgeStatus().healthy`. The two surfaces — banners and `/healthz` — can therefore diverge after a workspace load: banners clear (bridge.healthy flips via getSitesByNumber); `/healthz` may remain degraded from the `thingsboardRead` cycle. This is the most likely explanation for the ~23:05 observation on site 6832.
 
 ---
 
@@ -319,6 +332,8 @@ when `GET /healthz` is called within 5 seconds of pod-ready,
 then `subsystems.bridge` reflects one of: `{ mode:'live', state:'unknown' }` (unproven, not an error), `{ mode:'live', state:'healthy' }` (proven), or `{ mode:'live', state:'unhealthy', lastError:'<message>' }` (real failure) — never `{ healthy: false, lastError: null }` as a false negative.
 The 'unknown' state must NOT count against `status:degraded` at `/healthz`.
 *(Satisfied by Option C + Option A in the follow-up ticket. Option B alone does not satisfy AC-3.)*
+
+Note: the user-visible harm — contradictory banners — is fully addressed by Options B or C plus the mutual-exclusion guard (AC-1 and AC-2). AC-3 targets a separate, lower-severity concern: `/healthz` can remain `status: degraded` after bridge health clears, because `thingsboardRead: 'unknown'` cycles independently on its 60-second TTL. This does not affect any handler-facing surface and has lower urgency than the banner fix.
 
 ---
 
