@@ -123,7 +123,21 @@ const HEATING_AREA_ORDER = ['Accommodation', 'Bar/Restaurant'];
  */
 function heatingDevices() {
     return state.workspace.devices.filter(d =>
-        d.deviceType === 'salus-it700' || d.deviceType === 'salus-it500' || d.deviceType === 'boiler-panel');
+        d.deviceType === 'salus-it700' || d.deviceType === 'salus-it500'
+        // OOHDASH-123 (D-DARK-FLEETS): the old-convention bare `salus` units are heating devices too.
+        // They are dark (not reporting) so they only ever surface the "device not reporting" branch,
+        // never a controllable reading.
+        || d.deviceType === 'salus' || d.deviceType === 'boiler-panel');
+}
+
+/**
+ * OOHDASH-123 (D-DARK-FLEETS): a dark-fleet heating device is a Salus iT500 or an older bare-salus
+ * unit. These are non-controllable and, in practice, offline (they stopped reporting telemetry), so an
+ * area made up only of them is surfaced as "device not reporting" with no controls (not the generic
+ * gateway "not responding" branch). deviceType is the authoritative signal (registry marks both dark).
+ */
+function isDarkFleet(d) {
+    return !!d && (d.deviceType === 'salus-it500' || d.deviceType === 'salus');
 }
 
 /** True when the site has any aircon (Intesis) device — gates the in-context aircon shortcut (§6). */
@@ -461,6 +475,31 @@ const FLOWR = {
         // No online device in the area → connectivity branch (design §7.3 rule 2), same as a single
         // offline device today. Uses any device in the set to name the area in the connectivity line.
         if (!z) {
+            // OOHDASH-123 (D-DARK-FLEETS): when every device in the area is a dark Salus (iT500 /
+            // bare-salus), it is offline because it does not report, not because the site is unreachable.
+            // Say "device not reporting" plainly and offer NO controls, instead of diverting into the
+            // generic gateway "not responding" connectivity branch. The outcome (offline, no controls,
+            // captured for the IoT team) is unchanged; only the wording matches James's binding decision.
+            if (set.length > 0 && set.every(isDarkFleet)) {
+                if (f.data.need === 'darkcap') {
+                    return outcomeCaptured(f, 'darkcap', {
+                        subject: `Heating device not reporting (${areaLabel})`,
+                        detail: `The ${areaLabel} heating controller is a Salus unit that is not reporting to Lighthouse (no live data), so it cannot be read or adjusted remotely. Logged for the IoT team to check the device and its connection.`,
+                        script: "That heating controller isn't sending us any data at the moment, so I can't read or change it remotely tonight. I've logged it for the IoT team to look into.",
+                        OohCaptureClass: 'dark-fleet-heating'
+                    });
+                }
+                if (f.data.need === 'darknoact') {
+                    return outcomeNoAction(f, 'darknoact', {
+                        subject: `Heating device not reporting (${areaLabel}) - no action`,
+                        detail: `Caller asked about ${areaLabel} heating; the Salus controller is not reporting to Lighthouse and the caller declined a follow-up. Call recorded for the audit trail.`,
+                        script: ''
+                    });
+                }
+                doneLine(`Area: <b>${esc(areaLabel)}</b>`);
+                doneLine('Live read: <b>device not reporting</b>');
+                return `<div class="reco" data-testid="reco-dark-fleet"><b class="hd">This heating device is not reporting.</b>It is a Salus unit that has stopped sending live data to Lighthouse, so there is no live reading and it cannot be switched or adjusted from here. This usually means the device has lost power or its connection.<div class="outbtns"><button class="btn primary" data-testid="dark-capture" onclick="flowStep({need:'darkcap'})">Capture &amp; escalate for the IoT team</button><button class="btn" data-testid="dark-noact" onclick="flowStep({need:'darknoact'})">End with no action</button></div></div>`;
+            }
             doneLine(`Area: <b>${esc(areaLabel)}</b>`);
             doneLine('Live read: <b>no thermostat online in this area</b>');
             f.cat = 'connectivity'; f.stage = 0; f.data.from = 'heating';

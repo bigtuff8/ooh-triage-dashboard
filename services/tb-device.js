@@ -808,6 +808,22 @@ function parseLastActivity(attrs) {
 }
 
 /**
+ * OOHDASH-123 (WU13, DD-SCHED-DISPLAY): true when a device is a PowerPause circuit. PowerPause devices
+ * classify to deviceType `tuya` (the `powerpause` name token, ASSET_INTENT), so unlike the boiler panels
+ * they carry no distinguishing profile at the registry join. Their stored programme lives in SHARED_SCOPE
+ * `schedules`, so the fetch must identify them to read that attribute and decode a next-scheduled-change
+ * (boiler V1/V2 are identified by the `boilerControl` profile; this is the matching identifier for
+ * PowerPause). Checks the normalised name OR the raw profile/type for the `powerpause` token (a long,
+ * specific token - bleed-safe). Fail-safe: any unexpected shape returns false (no extra read).
+ */
+export function isPowerPauseDevice(d) {
+    if (!d) return false;
+    const name = normaliseName(d.name);
+    const profile = String(d.type ?? d.profile ?? '').toLowerCase();
+    return name.includes('powerpause') || profile.includes('powerpause');
+}
+
+/**
  * Bulk latest telemetry for a set of TB devices, PLUS the per-device online state (OOHDASH-80). Uses
  * per-device latest-timeseries reads over the read session AND a per-device SERVER_SCOPE `active`
  * read (the Device entity from /api/tenant/devices has no `active`/`lastActivityTime`; SERVER_SCOPE
@@ -827,6 +843,11 @@ async function fetchTelemetry(devices) {
         // read (no extra serial round-trip) to source the iT500 `site` code / iT700 `salusLocation`
         // for area derivation.
         const isBoilerControl = (d.type ?? d.profile) === 'boilerControl';
+        // OOHDASH-123 (WU13 rework): PowerPause circuits also carry a decodable programme, in SHARED_SCOPE
+        // `schedules`. They have no boilerControl profile, so identify them by name/profile token and read
+        // just that one attribute. needsSharedScope drives both the read and the stash below.
+        const isPowerPause = isPowerPauseDevice(d);
+        const needsSharedScope = isBoilerControl || isPowerPause;
         const reads = [
             readRequest('GET', `/api/plugins/telemetry/DEVICE/${uuid}/values/timeseries`),
             readServerScopeAttributes(uuid, 'active,lastActivityTime'),
@@ -837,7 +858,10 @@ async function fetchTelemetry(devices) {
                 // OOHDASH-123 (WU13): also read the schedule attributes (V1 output1..4Schedule,
                 // V2 CHZ1/DHW schedule) for the next-scheduled-change decode (design §10, decoded display).
                 ? readSharedScopeAttributes(uuid, 'output1OutputMask,output1Schedule,output2Schedule,output3Schedule,output4Schedule,CHZ1.schedule,DHW.schedule,schedules')
-                : Promise.resolve(null)
+                : isPowerPause
+                    // PowerPause stores its programme under SHARED_SCOPE `schedules` only.
+                    ? readSharedScopeAttributes(uuid, 'schedules')
+                    : Promise.resolve(null)
         ];
         const [tsRes, activeRes, clientScopeRes, sharedScopeRes] = await Promise.allSettled(reads);
         const bag = {};
@@ -870,11 +894,14 @@ async function fetchTelemetry(devices) {
             bag.__clientScope = {};
         }
         // OOHDASH-114-F1: stash boilerControl SHARED_SCOPE.
-        if (isBoilerControl) {
+        // OOHDASH-123 (WU13 rework): also stash it for PowerPause so decodeDeviceSchedule can read its
+        // `schedules` programme. A failed read degrades THIS device to no schedule (safe fallback), never
+        // the whole site.
+        if (needsSharedScope) {
             if (sharedScopeRes.status === 'fulfilled' && sharedScopeRes.value !== null) {
                 bag.__sharedScope = sharedScopeRes.value || {};
             } else {
-                console.error(`[TB] SHARED_SCOPE read failed for boilerControl ${uuid}: ${sharedScopeRes.reason?.message}`);
+                console.error(`[TB] SHARED_SCOPE read failed for ${isPowerPause ? 'PowerPause' : 'boilerControl'} ${uuid}: ${sharedScopeRes.reason?.message}`);
                 bag.__sharedScope = {};
             }
         } else {
