@@ -1,5 +1,33 @@
 # Release Notes — OOH Dashboard
 
+## v1.4.1 — OOHDASH-128 legacy bare-salus thermostat load
+
+**Date:** TBD (release doer cuts with `npm run release:patch`) · **Bump type:** patch · **Branch:** `build/oohdash-128-legacy-salus-load`
+
+### What changed
+
+**OOHDASH-128 (bug fix):** Older-convention bare-salus thermostats (named `gk_{sitename}_salus_{serial} (NNNN-L-n)`) were never loaded into the site workspace because `normaliseName()` strips parentheticals before matching the site filter. Fixed by adding a supplementary ThingsBoard bracket-text lookup (`textSearch=(NNNN-`) in parallel with the existing token queries in `fetchLiveSitesByNumber`. Results are deduped by device ID (token-query results take precedence); the extended filter accepts a device if the existing anchored filter passes **or** `isLegacySalusForSite()` confirms it belongs to the target site.
+
+**Affected sites (74):** Every site that has at least one bare-salus thermostat now sees those devices loaded correctly.
+
+**Key outcomes:**
+- Older-convention Salus thermostats now load into the site workspace on all 74 affected sites.
+- Bar/Restaurant now appears at site 5191 (previously a total-failure site — now correctly resolved).
+- Site 5791 Bar/Restaurant remains pending **OOHDASH-129** (the no-bracket bare-salus deferred in D2 — those devices have no parenthetical and require a different lookup strategy).
+- Mixed-health Accommodation state on 72 sites is accurate and expected: the reading comes from the modern thermostat (salusit700); older units show honestly as "not reporting" with an area-level note ("N other heating units in Accommodation are not reporting. Nothing done on this call caused this.").
+- Four new paragraphs added to the handler support guide (OOHDASH-113): "Some heating units are not reporting", "If nothing in the area is reporting", a "not reporting" row in the reachability table, and a new FAQ item for the unmatched-area footnote.
+
+**Fail-soft:** Only the bracket lookup is silenced on error (`console.warn` + return `[]`); the token fetch degraded mode is unchanged.
+
+**New functions (services/tb-device.js):** `legacySalusSiteNo(rawName)`, `isLegacySalusForSite(rawName, siteNo)`, `fetchTbDevicesForText(textSearch)`.
+
+**UI changes (public/js/flows.js):** `isUnplacedLegacySalus(d)`, `unplacedLegacySalus()` guard unplaced units out of the fallback "Heating — area not identified" chip and into a site-level footnote (`data-testid="heating-unplaced-note"`). Area reading line gains "the only reporting zone" / "coldest of N reporting zones" variants. Area-not-reporting note (`data-testid="area-not-reporting-note"`) shows when some devices in an area are offline.
+
+### Accepted known behaviours
+
+- D2: bare-salus devices with no parenthetical (e.g. `gk_unknown_salus_STA10108795 5791-r-2`) remain absent from the workspace until OOHDASH-129.
+- The mixed-health Accommodation reading-line change is correct — it reflects that only the modern thermostat contributes the live reading.
+
 ## v1.3.8 — OOHDASH-122 degraded-mode banner false negative + OOHDASH-127 CI/mobile overflow fix
 
 **Date:** 2026-10-14 · **Bump type:** patch · **Ships from:** main at 123a72f (release commit adds version bump + this entry)

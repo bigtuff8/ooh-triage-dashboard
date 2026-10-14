@@ -207,6 +207,35 @@ export function siteNameFilter(brand, tokens) {
     return new RegExp(`^${esc(brand)}-(${alt})(?![0-9])`, 'i');
 }
 
+/**
+ * OOHDASH-128: Extracts the site number from an older-convention bare-salus device's raw name, or
+ * null. Guards against glued tokens (salusit500/salusit700) by requiring `_salus_` (not `_salusit`).
+ * Finds the LAST parenthetical group (same trailing-group rule as deriveArea :580), then extracts
+ * the leading digit run before the first hyphen. Always returns a string, never a number, so
+ * string-equality cross-site checks are exact. Returns null for: no _salus_ in name, no bracket,
+ * empty bracket, no digit-hyphen sequence, non-digit leading char.
+ */
+export function legacySalusSiteNo(rawName) {
+    const s = String(rawName == null ? '' : rawName);
+    if (!/[_]salus[_]/i.test(s)) return null;
+    const m = s.match(/\(([^)]*)\)\s*$/);
+    if (!m) return null;
+    const inner = m[1];
+    const dm = inner.match(/^\s*(\d+)\s*-/);
+    if (!dm) return null;
+    return dm[1];
+}
+
+/**
+ * OOHDASH-128: True when a device's raw name belongs to siteNo under the older Salus naming
+ * convention. Uses strict string equality: "520" never matches "5204". siteNo may be a number
+ * (String(5204) === "5204").
+ */
+export function isLegacySalusForSite(rawName, siteNo) {
+    const parsed = legacySalusSiteNo(rawName);
+    return parsed !== null && parsed === String(siteNo);
+}
+
 /* ------------------------------------------------------------------ */
 /* Site connectivity anchor + equipment-group label (OOHDASH-91 G2)     */
 /* ------------------------------------------------------------------ */
@@ -772,17 +801,23 @@ async function fetchTbDevicePage(textSearch, page) {
     return { data: Array.isArray(res?.data) ? res.data : (Array.isArray(res) ? res : []), hasNext: !!res?.hasNext };
 }
 
-async function fetchTbDevicesForToken(brand, token) {
+// OOHDASH-128 (WU2): extracted pagination body so the bracket-text search can share the same
+// TB_PAGE_CAP guard and fetchTbDevicePage call. Behaviour is byte-identical for all existing callers.
+async function fetchTbDevicesForText(textSearch) {
     const collected = [];
     let page = 0;
     let hasNext = true;
     while (hasNext && page < TB_PAGE_CAP) {
-        const { data, hasNext: more } = await fetchTbDevicePage(`${brand}-${token}`, page);
+        const { data, hasNext: more } = await fetchTbDevicePage(textSearch, page);
         collected.push(...data);
         hasNext = more;
         page += 1;
     }
     return collected;
+}
+
+async function fetchTbDevicesForToken(brand, token) {
+    return fetchTbDevicesForText(`${brand}-${token}`);
 }
 
 /** SERVER_SCOPE `active` array → boolean (OOHDASH-80). Any unexpected shape ⇒ false (fail-safe). */
@@ -920,18 +955,43 @@ async function fetchLiveSitesByNumber(siteNo) {
     const { brand, tokens } = siteQueryTokens(key);
     const filter = siteNameFilter(brand, tokens);
 
-    // Over-fetch a broad prefix per token, paginate, dedupe by TB id.
+    // OOHDASH-128 (WU3): Step 1 — existing per-token fetches (token results have dedup priority).
+    const tokenPromises = tokens.map(token => fetchTbDevicesForToken(brand, token));
+
+    // Step 2 — supplementary bracket lookup. "(5694-" returns all bare-salus for site 5694.
+    // Fail-soft: a failure returns [] and logs a warning; the token fetch still throws on failure
+    // (degraded mode unchanged). encodeURIComponent in fetchTbDevicePage handles the "(" safely.
+    const legacyPromise = fetchTbDevicesForText(`(${key}-`)
+        .catch(err => {
+            console.warn(`[TB] Older-Salus lookup failed for site ${key} - continuing without it: ${err.message}`);
+            return [];
+        });
+
+    // Step 3 — await both in parallel. Wall-clock cost = max(token fetch, legacy fetch), not sum.
+    const [tokenResults, legacyRaw] = await Promise.all([
+        Promise.all(tokenPromises),
+        legacyPromise
+    ]);
+
+    // Step 4 — deduplicate by TB id. Token results are added first (priority); legacy results
+    // skip any id already seen.
     const byId = new Map();
-    for (const token of tokens) {
-        const raw = await fetchTbDevicesForToken(brand, token);
+    for (const raw of tokenResults) {
         for (const d of raw) {
             const id = d?.id?.id || d?.id || d?.name;
             if (!byId.has(id)) byId.set(id, d);
         }
     }
+    for (const d of legacyRaw) {
+        const id = d?.id?.id || d?.id || d?.name;
+        if (!byId.has(id)) byId.set(id, d);
+    }
 
-    // Client-side anchored filter (defeats bleed AND split-loss).
-    const matched = [...byId.values()].filter(d => filter.test(normaliseName(d.name)));
+    // Step 5 — keep device if it passes the existing anchored siteNameFilter (UNCHANGED) OR the
+    // strict bare-salus check. The OR is additive only: cannot remove devices the existing path kept.
+    const matched = [...byId.values()].filter(d =>
+        filter.test(normaliseName(d.name)) || isLegacySalusForSite(d.name, key)
+    );
 
     // Latest telemetry for the matched set.
     const telemetryById = await fetchTelemetry(matched);
