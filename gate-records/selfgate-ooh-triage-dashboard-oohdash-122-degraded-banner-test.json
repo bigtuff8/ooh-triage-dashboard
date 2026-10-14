@@ -1,0 +1,25 @@
+{
+  "run": "selfgate-ooh-triage-dashboard-oohdash-122-degraded-banner",
+  "phase": "test",
+  "pr": 95,
+  "approvedBy": [
+    "bigtuff8"
+  ],
+  "reviewComments": [
+    "bigtuff8: - Release OOHDASH-122 now or defer?: Approve — all fix-specific checks pass; pre-existing failures are confirmed not caused by this change\n- Raise a separate ticket for the two F008 restaurant e2e failures now or after release?: Raise after release during normal triage\n\n(submitted via the interactive gate review)\n\n<!-- gate:selected [{\"question\":\"Release OOHDASH-122 now or defer?\",\"answer\":\"Approve — all fix-specific checks pass; pre-existing failures are confirmed not caused by this change\"},{\"question\":\"Raise a separate ticket for the two F008 restaurant e2e failures now or after release?\",\"answer\":\"Raise after release during normal triage\"}] -->"
+  ],
+  "mergeCommit": "6ecc3d0df709855a9046708274c9dd0a4b39d817",
+  "phaseBranch": "test/oohdash-122-degraded-banner",
+  "releaseBranch": "feat/oohdash-122-degraded-banner",
+  "stamp": 1791993207270,
+  "selectedOptions": [
+    {
+      "question": "Release OOHDASH-122 now or defer?",
+      "answer": "Approve — all fix-specific checks pass; pre-existing failures are confirmed not caused by this change"
+    },
+    {
+      "question": "Raise a separate ticket for the two F008 restaurant e2e failures now or after release?",
+      "answer": "Raise after release during normal triage"
+    }
+  ]
+}
