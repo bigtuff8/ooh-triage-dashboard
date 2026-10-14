@@ -1203,6 +1203,109 @@
           }
         }
       ]
+    },
+    {
+      "siteNo": "7003",
+      "siteName": "Bramley Farm Inn",
+      "brand": "Greene King",
+      "address": "Test Row, Leeds LS3",
+      "callsLast30Days": 0,
+      "devices": [
+        {
+          "deviceId": "gk-7003-salusit700",
+          "zone": "Accommodation",
+          "deviceType": "salus-it700",
+          "kind": "heating",
+          "area": "Accommodation",
+          "online": true,
+          "telemetry": {
+            "localTemperature": 19.5,
+            "heatingSetpoint": 21,
+            "mode": "Heat"
+          }
+        },
+        {
+          "deviceId": "gk_bramleyfarm_salus_STA10109321 (7003-f-1)",
+          "zone": "",
+          "deviceType": "salus",
+          "kind": "heating",
+          "area": "Accommodation",
+          "online": false,
+          "telemetry": {}
+        },
+        {
+          "deviceId": "gk_bramleyfarm_salus_STA10109322 (7003-f-2)",
+          "zone": "",
+          "deviceType": "salus",
+          "kind": "heating",
+          "area": "Accommodation",
+          "online": false,
+          "telemetry": {}
+        },
+        {
+          "deviceId": "gk_bramleyfarm_salus_STA10109323 (7003-f-3)",
+          "zone": "",
+          "deviceType": "salus",
+          "kind": "heating",
+          "area": "Accommodation",
+          "online": false,
+          "telemetry": {}
+        },
+        {
+          "deviceId": "gk_bramleyfarm_salus_STA10109324 (7003-r-2)",
+          "zone": "",
+          "deviceType": "salus",
+          "kind": "heating",
+          "area": "Bar/Restaurant",
+          "online": false,
+          "telemetry": {}
+        },
+        {
+          "deviceId": "gk_bramleyfarm_salus_STA10109325 (7003-r-3)",
+          "zone": "",
+          "deviceType": "salus",
+          "kind": "heating",
+          "area": "Bar/Restaurant",
+          "online": false,
+          "telemetry": {}
+        },
+        {
+          "deviceId": "gk_bramleyfarm_salus_STA10109369 (7003-z-1)",
+          "zone": "",
+          "deviceType": "salus",
+          "kind": "heating",
+          "area": null,
+          "online": false,
+          "telemetry": {}
+        }
+      ]
+    },
+    {
+      "siteNo": "7004",
+      "siteName": "Pine Tree Farm",
+      "brand": "Greene King",
+      "address": "Test Row, Leeds LS4",
+      "callsLast30Days": 0,
+      "devices": [
+        {
+          "deviceId": "gk_pinetreefarm_salus_STA10109673 (7004-z-1)",
+          "zone": "",
+          "deviceType": "salus",
+          "kind": "heating",
+          "area": null,
+          "online": false,
+          "telemetry": {}
+        },
+        {
+          "deviceId": "gk-7004-lwgateway-1",
+          "zone": "Gateway",
+          "deviceType": "gateway",
+          "kind": "gateway",
+          "area": null,
+          "online": true,
+          "telemetry": {}
+        }
+      ]
     }
   ]
 }

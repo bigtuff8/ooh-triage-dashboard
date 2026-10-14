@@ -50,3 +50,18 @@ Serialised `AreaClaim[]` of `{claimArea, claimGroup, claimPermission, modifier[]
 | SD-491 / SD-559 | Boiler-panel control investigation / IoTisan source |
 | SD-477 | Canonical persistent schedules (IoT Hub) |
 | SD-545 | IoT Hub architecture (sibling) · SD-574 authorization/scope · SD-583 estate security |
+
+## Derived device fields (OOHDASH-128)
+
+Fields and predicates introduced by the legacy bare-salus load fix. None are stored; all are computed per request from the ThingsBoard entity name.
+
+| Name | Kind | Meaning | Source | Retention/sensitivity |
+|---|---|---|---|---|
+| legacySalusSiteNo(rawName) | Pure function (server) | Site number from an older Salus name's trailing bracket, or null | services/tb-device.js | Not stored. Low. |
+| isLegacySalusForSite(rawName, siteNo) | Pure function (server) | Cross-site guard: strict string equality of parsed siteNo | services/tb-device.js | Not stored. Low. |
+| Legacy Salus site code | TB naming convention | Trailing "(NNNN-L-n)" on gk_{sitename}_salus_{serial} names. L is s/f/r/b. | ThingsBoard entity name and CLIENT_SCOPE site attribute | Read-only. Low. |
+| device.deviceType = "salus" | Existing derived field | Older-convention Salus thermostat (classifyDevice) | classifyDevice in tb-device.js | Per request. Low. |
+| device.area | Existing derived field | Accommodation, Bar/Restaurant or null | deriveArea in tb-device.js | Per request. Low. |
+| isUnplacedLegacySalus(d) | Client predicate | deviceType "salus" with area null | public/js/flows.js | Not stored. Low. |
+| area-not-reporting-note | UI test id | Silent-units note under an area reading | flows.js | n/a |
+| heating-unplaced-note | UI test id | Site-level footnote for unplaced older units | flows.js | n/a |
