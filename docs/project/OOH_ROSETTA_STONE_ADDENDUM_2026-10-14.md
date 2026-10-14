@@ -1,12 +1,12 @@
 <!-- gate:contract
 SECTION: What this addendum is
-James approved the Rosetta Stone discovery gate (PR #86, 2026-10-14) and then directed maximum research before Design starts. Eight Sonnet sub-agents ran read-only ThingsBoard checks and searched Jira, SharePoint and Teams across all thirteen Spencer questions from the matrix (S1 to S12) plus a new question on schedules (S13) and a full estate sweep of 5,140 command-capable devices. All nine research streams are back. This addendum consolidates their findings into the gate artefact, updates the per-question verdicts, records six new findings that were not in the approved gate, and lists the Spencer questions we are holding as a draft until everything is aggregated and confirmed (James's directive: nothing sent to Spencer until fully investigated). It also adds eight decisions that are yours before Design can start.
+James approved the Rosetta Stone discovery gate (PR #86, 2026-10-14) and then directed maximum research before Design starts. Eight Sonnet sub-agents ran read-only ThingsBoard checks and searched Jira, SharePoint and Teams across all thirteen Spencer questions from the matrix (S1 to S12) plus a new question on schedules (S13) and a full estate sweep of 5,140 command-capable devices. All nine research streams are back. This addendum consolidates their findings into the gate artefact, updates the per-question verdicts, records six new findings that were not in the approved gate, and lists the Spencer questions we are holding as a draft until everything is aggregated and confirmed (James's directive: nothing sent to Spencer until fully investigated). It also adds nine decisions that are yours before Design can start.
 
-SECTION: Security exposure — resolved by notification
-Both credentials found during research (SQ-SEC-1: a plaintext credential in the Command Gate rule chain metadata; SQ-SEC-2: a vendor token on gk-st-office-intesis-1 in SERVER_SCOPE) were reported directly to Spencer by James on 2026-10-14. Rotation is Spencer's action, tracked in the consolidated Spencer set. The combined blast radius (readable credential plus no per-caller gate authz) is owned by Spencer as gate owner. The OOH dashboard will not route real commands through the gate until the J8 admission test. No open decision remains on security.
+SECTION: Security exposure — OPEN, rotation unconfirmed, deadline 2026-10-21
+Two live credentials were found during research (SQ-SEC-1 and SQ-SEC-2). Spencer was notified by James on 2026-10-14. Notification is not the same as rotation confirmed: both credentials are still live and readable. Status is OPEN. Spencer must confirm rotation of both credentials in writing by 2026-10-21 (five business days from notification). If no written confirmation is received by that date, James escalates to the delivery manager and the J8 admission test is blocked until both rotations are confirmed. This decision is tracked as D-SEC-ROTATE in section 8 below, where it remains open until Spencer's written confirmation is recorded.
 
-SECTION: Gate admission for svc-control — folded into D-SEC-ROTATE
-The S5 research found that the IoT Command Gate has no per-caller authorisation check. Any identity that can write a Requested key to SERVER_SCOPE on an OOH-profiled device is admitted — controlled today by profile routing and the RBAC grant on the shared identity. This admission model needs to be confirmed as acceptable before the dashboard routes real commands. That confirmation is now part of D-SEC-ROTATE in section 8, not a separate decision: the admission risk and the credential exposure share the same blast radius and are settled together.
+SECTION: Gate admission model — separate open decision (D-ADMISSION-MODEL)
+Rotating the doorbell credential (SQ-SEC-1) does not fix the admission model. The IoT Command Gate has no per-caller authorisation check: any identity with the RBAC grant on svc-control can write a Requested key to SERVER_SCOPE on an OOH-profiled device and be admitted by the gate, regardless of who is calling. This is a distinct architectural risk and is tracked as its own open decision D-ADMISSION-MODEL in section 8. It must be explicitly accepted or resolved before the dashboard routes real commands, and its status does not change when the credentials are rotated.
 
 SECTION: The headline change the research made
 The most important finding is a new contradiction in the write path. To command a device through the production IoT Command Gate, the caller must write a Requested key to SERVER_SCOPE: switchRequested, setpointRequested, modeRequested or hwBoostHoursRequested. The gate then validates the request, writes pending, rewrites Desired, and rings the bridge doorbell. Our current dashboard code writes the Desired key directly, bypassing the gate entirely. That means no pending marker, no offline check, no doorbell ring, and possibly no dispatch at all on Tuya devices. Every CONTRADICTION row in the original gate doc affects a different part of the confirmation logic; this contradiction affects the dispatch itself. It is the first change Build must make.
@@ -27,18 +27,19 @@ SECTION: Questions for Spencer (HELD until James releases them)
 Twelve operational questions are listed in the document body. The two security items have been removed from this list and escalated separately (section 2). Nothing on this list has been sent to Spencer yet. James's directive is that nothing goes until everything is aggregated, confirmed and fully investigated. The full consolidated list is ready in section 6 of this document.
 
 SECTION: Decisions for you before Design starts
-Seven decisions remain after folding D-S5 into D-SEC-ROTATE. The immediate one is D-SEC-ROTATE: the security rotation choice and the gate admission confirmation are settled together in section 8. The decisions that most directly gate Design work: the dashboard offline threshold (3 hours as a configurable default is recommended), the split between the operator-facing copy figure and the confirm limit for Salus, and whether to pull the switch-only mapping fix forward. The dark-fleet and schedule questions are lower priority but Design needs a steer before it lays out the device cards.
+Nine decisions remain. The two security decisions are both open: D-SEC-ROTATE (rotation of the two live credentials, deadline 2026-10-21, owner Spencer, chased by James) and D-ADMISSION-MODEL (acceptance of the implicit no-per-caller-authz gate admission model as its own distinct risk). These are separate: rotating the credentials does not close the admission model question. The decisions that most directly gate Design work: the dashboard offline threshold (3 hours as a configurable default is recommended), the split between the operator-facing copy figure and the confirm limit for Salus, and whether to pull the switch-only mapping fix forward. The dark-fleet and schedule questions are lower priority but Design needs a steer before it lays out the device cards.
 
-SECTION: Security exposure — resolved by notification
-Both credentials (SQ-SEC-1 and SQ-SEC-2, described by location only — values never reproduced) were reported directly to Spencer (config owner) by James on 2026-10-14. Rotation is Spencer's action and is tracked as SQ-SEC-1 and SQ-SEC-2 in the consolidated Spencer set, where his written acknowledgement and rotation confirmation will be recorded — this satisfies the compliance independent-acknowledgement ask once received. The combined blast radius (readable doorbell credential plus no per-caller gate authz, D-S5) is stated and owned by Spencer as gate owner. The OOH dashboard will not route real commands through the gate until the J8 admission test, which James approves.
+DECISION: D-SEC-ROTATE: Are both credentials rotated and is rotation confirmed in writing by 2026-10-21? | Spencer confirms rotation of SQ-SEC-1 and SQ-SEC-2 in writing by 2026-10-21; James records confirmation in the consolidated Spencer set; D-SEC-ROTATE closes | Rotation is not confirmed by 2026-10-21: James escalates to delivery manager; J8 admission test is blocked until both rotations are written-confirmed; status remains OPEN
+
+DECISION: D-ADMISSION-MODEL: Is the implicit gate admission model (profile routing + RBAC on svc-control, no per-caller identity check) explicitly accepted as the R1 control? | Accept the implicit model for R1 on the basis that RBAC controls the svc-control identity and profile routing restricts which devices are reachable; document as an explicit accepted risk with an owner | Require a per-caller identity check in the gate before R1 routes any real commands; scope and cost this as a gate-side change with Spencer
 
 DECISION: What is the dashboard offline threshold for controllable devices? | 3 hours as the configurable default: the estate data shows a cliff between 3 hours and 48 hours; no live Tuya or IT700 device falls in that gap; all thresholds configurable per device class, not hard-coded | Keep the current code rule of 48 hours; revisit when more estate sweep data is available
 
 DECISION: How should the operator-facing copy figure (the N in "should take effect within about N minutes") be set relative to the confirm limit? | Split them: IT700 copy 5 minutes, confirm limit 45 minutes; IT500 copy 15 minutes, confirm limit 35 minutes; all configurable | Use the same single figure for both copy and limit, as the gate doc's 10-minute provisional
 
-DECISION: Does "next scheduled change" for boiler panels and PowerPause circuits enter this release? Schedules are readable today as JSON attributes and need only a pure function of the JSON and site timezone to compute next change. Size S to M. | A follow-up ticket, because the Design scope is already large | Pull it into this release alongside the control re-plumbing
+DECISION: Does "next scheduled change" for boiler panels and PowerPause circuits enter this release? | A follow-up ticket, because the Design scope is already large | Pull it into this release alongside the control re-plumbing
 
-DECISION: Is the switch-only mapping fix (adding the bare switch key as a fallback in mapTelemetry) pulled forward as a quick fix ahead of Design, so live external-lighting units show a state now? | Yes, a quick fix now: it is a one-line change to mapTelemetry and it fixes a live display gap independent of the control re-plumbing | It waits for the main Design and Build phase
+DECISION: Is the switch-only mapping fix (adding the bare switch key as a fallback in mapTelemetry) pulled forward as a quick fix ahead of Design? | Yes, a quick fix now: it is a one-line change to mapTelemetry and it fixes a live display gap independent of the control re-plumbing | It waits for the main Design and Build phase
 
 DECISION: How should the dashboard display the dark IT500 and bare-salus fleets (347 and 384 devices, none reporting for at least 12 days)? | Show them as offline with a neutral explanation: "device not reporting"; offer no control | Hide them from the device list until they resume reporting
 -->
@@ -59,29 +60,43 @@ This document names two locations where live credentials can be read by any iden
 - The IoT Command Gate rule chain metadata, accessible via the ThingsBoard rule chain API (SQ-SEC-1).
 - The SERVER_SCOPE attributes of gk-st-office-intesis-1, accessible via the ThingsBoard attributes API (SQ-SEC-2).
 
-This repository is private. The exposure described in this document is time-boxed to completion of the rotation actions in D-SEC-ROTATE. Once rotation is confirmed, this document remains as a historical record of the risk and its resolution.
+This repository is private. The exposure described in this document is time-boxed to completion of the rotation actions in D-SEC-ROTATE. Once rotation is confirmed in writing, this document remains as a historical record of the risk and its resolution.
 
 ---
 
-## 2. Security exposure — resolved by notification (2026-10-14)
+## 2. Security exposure — OPEN (Spencer notified 2026-10-14; rotation unconfirmed)
 
-> **James notified Spencer directly on 2026-10-14. Rotation is Spencer's action. No open decision remains here.**
+> **⚠ Status: OPEN. Spencer was notified on 2026-10-14. Notification is not rotation confirmed. Both credentials remain live and readable. Deadline: written confirmation of both rotations by 2026-10-21. No escalation or deadline existed previously; this addendum creates them.**
 
-Two live credentials were found during research, plus a gate-design fact that compounds them. None of the credential values are reproduced in this document. Both items were reported to Spencer (config owner) by James on 2026-10-14.
+Two live credentials were found during research, plus a gate-design fact that compounds them. None of the credential values are reproduced in this document. Both items were reported to Spencer (config owner) by James on 2026-10-14. The prior version of this artefact labelled these "resolved by notification." That label was incorrect: a notification that something needs rotating is not a rotation. Both SQ-SEC-1 and SQ-SEC-2 are reclassified as **OPEN** until Spencer provides written confirmation that each credential has been rotated.
+
+**Why this matters now.** Any team-access identity can today: (a) read the SQ-SEC-1 credential from the rule chain API using their existing access level, (b) use their own RBAC grant on svc-control to write a Requested key to SERVER_SCOPE on any OOH-profiled device, and (c) route a real command to a heating or lighting device through the production gate. No human has reported doing this; but the path is open and requires no special privilege beyond what any team member holds.
 
 **Combined blast radius (for the audit record)**
 
-The IoT Command Gate has no per-caller authorisation check (S5, PROVEN). Any identity that can write a Requested key to SERVER_SCOPE on an OOH-profiled device is admitted to the gate; the gate does not verify who is calling. SQ-SEC-1 exposes a credential that controls the gate's dispatch mechanism. Combined, any identity at our access level could read that credential, use their own RBAC grant to write a Requested key, and inject a real command into a heating or lighting device through the production gate. This blast radius is stated and owned by Spencer as gate owner.
+The IoT Command Gate has no per-caller authorisation check (S5, PROVEN — see D-ADMISSION-MODEL, section 8, for that risk as a separate decision). Any identity that can write a Requested key to SERVER_SCOPE on an OOH-profiled device is admitted to the gate; the gate does not verify who is calling. SQ-SEC-1 exposes a credential that controls the gate's dispatch mechanism. Combined, any identity at our access level could read that credential, use their own RBAC grant to write a Requested key, and inject a real command into a heating or lighting device through the production gate. This blast radius is stated and owned by Spencer as gate owner.
+
+**Note:** The admission model (no per-caller check) is a separate risk that persists even after the credentials are rotated. It is tracked independently as D-ADMISSION-MODEL below and must not be conflated with the rotation actions.
 
 **SQ-SEC-1 — Plaintext credential in Command Gate rule chain metadata**
 
-The IoT Command Gate rule chain contains a request-header credential in its metadata configuration readable via the ThingsBoard rule chain API by any identity holding team-level access. Reported to Spencer 2026-10-14. Tracked in the consolidated Spencer set; Spencer's written acknowledgement and rotation confirmation will be recorded there.
+The IoT Command Gate rule chain contains a request-header credential in its metadata configuration readable via the ThingsBoard rule chain API by any identity holding team-level access. Reported to Spencer 2026-10-14. **Status: OPEN — rotation unconfirmed.**
 
 **SQ-SEC-2 — Vendor token on gk-st-office-intesis-1 in SERVER_SCOPE**
 
-A SERVER_SCOPE attribute whose name indicates a vendor access token exists on the legacy Intesis entity gk-st-office-intesis-1, retrievable over a plain GET by our tenant-admin identity. Reported to Spencer 2026-10-14. Tracked in the consolidated Spencer set alongside SQ-SEC-1.
+A SERVER_SCOPE attribute whose name indicates a vendor access token exists on the legacy Intesis entity gk-st-office-intesis-1, retrievable over a plain GET by our tenant-admin identity. Reported to Spencer 2026-10-14. **Status: OPEN — rotation unconfirmed.**
 
-**Compliance:** Spencer's written acknowledgement and rotation confirmation in the consolidated Spencer set satisfies the independent-acknowledgement ask. The OOH dashboard will not route real commands through the gate until the J8 admission test, which James approves.
+**Deadline and escalation path**
+
+| Item | Owner | Deadline | Escalation if missed |
+|---|---|---|---|
+| Rotate SQ-SEC-1 (doorbell credential in rule chain metadata) | Spencer | 2026-10-21 | James escalates to delivery manager; J8 admission test blocked |
+| Rotate SQ-SEC-2 (vendor token on gk-st-office-intesis-1) | Spencer | 2026-10-21 | James escalates to delivery manager; J8 admission test blocked |
+| Provide written confirmation of both rotations | Spencer | 2026-10-21 | As above; D-SEC-ROTATE remains OPEN |
+
+**What "confirmed" means.** Spencer's written acknowledgement in the consolidated Spencer set that both credentials have been rotated, naming the credential type and the rotation date. A verbal acknowledgement or "on my list" reply does not close D-SEC-ROTATE. The J8 admission test — the gate before the dashboard routes real commands — is conditional on that written confirmation being on record.
+
+**Compliance note.** Spencer's written rotation confirmation in the consolidated Spencer set satisfies the independent-acknowledgement ask once received. Until then, the compliance gate is not met.
 
 ---
 
@@ -108,7 +123,7 @@ Consequences of the bypass:
 | S2 | Is pending a distinct first write? | PROVEN | Yes: gate writes pending, bridge writes the final accepted or rejected; they are two separate REST attribute writes to SERVER_SCOPE; pending is visible for only 0.3 to 1 second on Tuya (RESEARCH-S2-S3.md). |
 | S3 | What is switchRequested? | PROVEN | switchRequested (and each cap-prefixed Requested key) is the caller's input to the gate, written to SERVER_SCOPE; the gate reads it and writes Desired and pending; the dashboard should write Requested, not Desired (RESEARCH-S2-S3.md). |
 | S4 | How does the gate refuse? | PROVEN | Four rejected-plus-LastError cases (malformed value, device offline, no freshness keys for profile, internal fault) and three silent cases (key not Requested, multiple Requested keys in one write, doorbell failure leaves pending forever) (RESEARCH-S4-S5.md). |
-| S5 | Does the gate admit svc-control? | PROVEN — confirmation required | No caller check exists in the chain; admission is implicit via profile routing (4 OOH profiles reach the gate) and the SHARED_SCOPE RBAC on the identity; svc-control already appears in every audit-log entry for switchRequested (RESEARCH-S4-S5.md). **This admission model must be explicitly confirmed as acceptable before the dashboard routes real commands — confirmation is part of D-SEC-ROTATE in section 8.** |
+| S5 | Does the gate admit svc-control? | PROVEN — explicit acceptance required | No caller check exists in the chain; admission is implicit via profile routing (4 OOH profiles reach the gate) and the SHARED_SCOPE RBAC on the identity; svc-control already appears in every audit-log entry for switchRequested (RESEARCH-S4-S5.md). **The admission model is a separate open risk tracked as D-ADMISSION-MODEL; rotating the credentials does not resolve it.** |
 | S6 | Salus time limit; any Salus accepted since 10 Oct? | UNRESOLVED | No measured figure from Spencer; no Salus setpoint or mode command has reached accepted under the new contract anywhere we can read; the data supports IT700 copy 5 min / limit 45 min and IT500 copy 15 min / limit 35 min (DEDUCED from polling cadences) but the figure is UNRESOLVED (RESEARCH-S6.md). |
 | S7 | Re-send when Desired already matches the request | PROVEN | Write the same Requested value again; the gate fires on every write regardless of value equality (proven on Tuya audit: identical switchRequested produces a new vendor result each time); clear-then-set is pointless and partially harmful (empty value rejected as malformed) (RESEARCH-S7.md). |
 | S8 | Which telemetry key confirms a Salus setpoint? | DEDUCED | IT700: heatingSetpoint (PROVEN; setPoint is event-driven and can be stale for months; never use for confirmation); IT500: setPoint by deduction (no live IT500 exists in prod, so unproven); boost confirming key: hotWaterBoostHoursRemaining (DEDUCED, hold boost out of scope) (RESEARCH-S1-S8.md). |
@@ -134,7 +149,7 @@ The `switch` key (bare, no underscore-1) is not only a tongou variant. A populat
 
 This is a live display defect for external lighting, independent of the control re-plumbing. A single-line mapTelemetry fix would address it. Decision D-SWITCH-ONLY-LIGHTING below asks whether to pull this forward.
 
-**Multi-gang verification (S9-S11 evidence):** 30 devices carry both switch_1 and switch. On those, switch_1 is the current key and switch is stale (some entries thousands of hours old — switch was the legacy attribute). The 4 two-gang Brackley refrigeration devices carry switch_1 and switch_2, not bare switch. No device in the 3,097 sampled carries bare switch as the current confirming key alongside switch_1. The Build precondition for the switch fallback is therefore met: prefer switch_1 where present; fall through to switch only when switch_1 is absent on that device. No multi-gang hazard.
+**Multi-gang verification (S9-S11 evidence, sample-bounded):** 30 devices in the 3,097-device sample carry both switch_1 and switch. On those, switch_1 is the current key and switch is stale (some entries thousands of hours old — switch was the legacy attribute). The 4 two-gang Brackley refrigeration devices carry switch_1 and switch_2, not bare switch. No device in the 3,097 sampled carries bare switch as the current confirming key alongside switch_1. **This finding is bounded to the sampled 3,097 of 5,140 devices (60 percent of the estate); the remaining 40 percent has not been individually inspected.** The switch_1-preferred fallback design bounds the residual risk for the unsampled portion: the mapTelemetry logic prefers switch_1 where present and falls through to switch only when switch_1 is absent on that device, so any device that carries switch_1 (the dominant pattern) is unaffected by the fallback even if it also carries a stale switch entry.
 
 Source: RESEARCH-S9-S11.md; hasSwitchSignal tb-device.js:345-348 vs mapTelemetry (no switch entry).
 
@@ -257,13 +272,47 @@ These are consolidated and de-duplicated from all research streams. Nothing here
 
 ## 8. Decisions for James
 
-### D-SEC-ROTATE: Security and gate admission — RESOLVED (Spencer notified 2026-10-14)
+### D-SEC-ROTATE: Credential rotation — OPEN (deadline 2026-10-21)
 
-Both credentials (SQ-SEC-1 and SQ-SEC-2) were reported to Spencer by James on 2026-10-14. Rotation is Spencer's action, tracked in the consolidated Spencer set (SQ-SEC-1 and SQ-SEC-2). Spencer's written acknowledgement and rotation confirmation in that set satisfies the compliance independent-acknowledgement ask. No open decision remains.
+**Status: OPEN. Spencer notified 2026-10-14. Rotation unconfirmed. No closure until written confirmation received.**
 
-**Combined blast radius (audit record):** SQ-SEC-1, SQ-SEC-2 and the S5 admission finding together mean any identity at our access level could read the live doorbell credential, write a Requested key using their own RBAC grant, and route a real command to a heating or lighting device through the production gate. This is stated and owned by Spencer as gate owner.
+Both credentials (SQ-SEC-1 and SQ-SEC-2) were reported to Spencer by James on 2026-10-14. Rotation is Spencer's action, tracked in the consolidated Spencer set. The prior artefact labelled this decision "resolved." That was incorrect: notification is not rotation confirmed. Both exposures remain live today.
 
-**On gate admission (D-S5):** The gate has no per-caller authorisation check. Admission is controlled by profile routing and the RBAC grant on the svc-control identity. svc-control is the sole caller in the logs available to us. The implicit admission model (profile routing plus RBAC) is confirmed acceptable for R1 once the doorbell credential is rotated. The OOH dashboard will not route real commands through the gate until the J8 admission test, which James approves.
+**What closes this decision:** Spencer provides written confirmation, recorded in the consolidated Spencer set, naming the credential and rotation date for each of SQ-SEC-1 and SQ-SEC-2. A verbal "done" or a Jira status change does not close it — written confirmation only.
+
+**Deadline:** 2026-10-21 (five business days from notification).
+
+**Escalation if deadline is missed:** James escalates to the delivery manager. The J8 admission test — the gateway before the dashboard routes any real commands through the production gate — is explicitly blocked until both written confirmations are on record. James may not sign off J8 without them.
+
+**Owner-chase path:** James follows up with Spencer at 48-hour intervals (2026-10-16, 2026-10-19) before the deadline. If no response is received by morning 2026-10-21, the escalation fires the same day.
+
+**Note:** D-SEC-ROTATE covers the credential rotation risk only. The admission model risk (no per-caller gate authorisation check) is a separate, distinct risk tracked as D-ADMISSION-MODEL immediately below. Rotating the credentials does not close D-ADMISSION-MODEL.
+
+---
+
+### D-ADMISSION-MODEL: Gate admission model — OPEN (decision required before J8)
+
+**Status: OPEN — explicit acceptance or remediation required before the dashboard routes real commands.**
+
+The IoT Command Gate has no per-caller authorisation check (S5, PROVEN). Any identity that holds the RBAC grant on svc-control — which today means any team-access identity — and can write a Requested key to SERVER_SCOPE on an OOH-profiled device is admitted to the gate. The gate does not verify the identity of the caller; it only verifies that the key name is one of the four Requested keys and that the device's telemetry is fresh enough.
+
+**This risk is independent of D-SEC-ROTATE.** Rotating SQ-SEC-1 removes the ability for an attacker to read the doorbell credential and weaponise it externally. It does not change the gate's admission logic. After SQ-SEC-1 is rotated, the gate still admits any team-access identity with the RBAC grant. The blast radius contracts (an external attacker no longer has a readable credential to use), but the internal admission surface remains the same.
+
+**The two options:**
+
+**Option A — Accept the implicit admission model for R1**
+Accept that admission is controlled by: (1) RBAC on the svc-control identity, which gates who can write Requested keys to SERVER_SCOPE; (2) profile routing, which gates which devices are reachable through the gate. Document this as an explicitly accepted architectural risk with Spencer as owner. Record that no per-caller check exists in the chain and that this is a known, accepted posture for R1. Review before R2 if the svc-control RBAC expands.
+
+Conditions for acceptance: svc-control RBAC holders are enumerated; Spencer confirms the current holder set is appropriate; any future addition to that RBAC group triggers a re-review of this decision.
+
+**Option B — Require a per-caller identity check before R1 goes live**
+Scope a gate-side change with Spencer: the rule chain would inspect the calling identity (e.g. via ThingsBoard's built-in originator metadata) and compare it against an allowlist of permitted callers. This eliminates the implicit admission surface but requires gate-side development, testing, and a Spencer-owned deployment. Cost and timeline: UNVERIFIED — needs a scoping conversation with Spencer before this option can be sized.
+
+**Recommendation:** Accept Option A for R1, subject to the conditions above. The RBAC on svc-control is already the primary control; the profile routing provides a secondary layer. Document the accepted risk explicitly. Add Option B as a named item on the R2 backlog.
+
+**This decision must be recorded before J8.** James's sign-off on J8 requires both D-SEC-ROTATE (written rotation confirmation) and D-ADMISSION-MODEL (explicit acceptance or option decision on record).
+
+---
 
 ### D-OFFLINE: Dashboard offline threshold
 
@@ -286,6 +335,8 @@ Recommend: a follow-up ticket. The Design scope for the control re-plumbing is a
 ### D-SWITCH-ONLY-LIGHTING: Pull forward the switch mapping fix
 
 **Context:** The live external-lighting units gk-6237, gk-6186 and gk-6099 report only the bare `switch` key. Our mapTelemetry does not map it. Those units show no on/off state in the dashboard today. The fix is a single additional case in mapTelemetry (after switch_1, fall through to switch). It is independent of the full control re-plumbing.
+
+The multi-gang risk is sample-bounded: the estate sweep covered 3,097 of 5,140 devices (60 percent). No multi-gang hazard was found in the sampled population. The switch_1-preferred fallback bounds the residual risk for the unsampled 40 percent: the logic prefers switch_1 where present and only falls through to switch when switch_1 is absent on that specific device. Any device carrying switch_1 is unaffected regardless of whether it also carries a stale switch entry.
 
 Recommend: pull it forward as a quick fix ahead of Design. It is a one-line change with a clear test (mapTelemetry on a device with only switch returns the correct state).
 
@@ -335,12 +386,12 @@ No clear-then-set step: writing an empty or null value is rejected by the gate a
 
 ## 10. Next steps
 
-**Security is resolved.** Spencer was notified of both credentials by James on 2026-10-14. No open security decision remains. The remaining decisions for James are in section 8.
+**Security: two open decisions, both blocking J8.** D-SEC-ROTATE and D-ADMISSION-MODEL must both be resolved before the dashboard routes real commands through the production gate. D-SEC-ROTATE requires Spencer's written confirmation of credential rotation by 2026-10-21; James is chasing at 48-hour intervals. D-ADMISSION-MODEL requires James's explicit decision on the admission model (Option A or B in section 8) before J8 sign-off. These are separate decisions; neither closes the other.
 
-**Second: Design can start** on the items with full answers once those two decisions are recorded: the Requested write path, the Tuya confirmation rule (switch_1 or switch, normalised string comparison, 10-second limit), the three-outcome model on the new signals, the accepted phase copy, the pre-dispatch fix, and the hot-water flow (remove boost, capture-and-escalate). The Salus figures (section 5) are ready as configurable defaults; Spencer's measured numbers will arrive as a one-line config update.
+**Second: Design can start** on the items with full answers once the remaining section 8 decisions are recorded: the Requested write path, the Tuya confirmation rule (switch_1 or switch, normalised string comparison, 10-second limit), the three-outcome model on the new signals, the accepted phase copy, the pre-dispatch fix, and the hot-water flow (remove boost, capture-and-escalate). The Salus figures (section 5) are ready as configurable defaults; Spencer's measured numbers will arrive as a one-line config update.
 
 Items that wait for Spencer (held questions): the Salus bridge acceptance proof (SQ-05), the timing figures (SQ-06), IT500 poll status (SQ-07), and the gate threshold raise (SQ-12). None of these blocks Design starting. Each is a Build-time or go-live gate concern.
 
-Items that wait for James: the remaining decisions in section 8, particularly D-SWITCH-ONLY-LIGHTING (quick fix or wait) and D-OFFLINE (dashboard threshold).
+Items that wait for James: the remaining decisions in section 8, particularly D-ADMISSION-MODEL (required before J8), D-SWITCH-ONLY-LIGHTING (quick fix or wait), and D-OFFLINE (dashboard threshold).
 
 The Spencer questions (minus the security items) are ready to send as a single consolidated message whenever James gives the go-ahead.
