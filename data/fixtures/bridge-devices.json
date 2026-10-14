@@ -357,9 +357,8 @@
           "deviceType": "salus-it500-dhw",
           "kind": "hotwater",
           "online": true,
-          "telemetry": {
-            "hwBoostHours": 0
-          }
+          "_comment": "OOHDASH-123 divergence 2: boost capability stripped (hwBoostHours + dhw-controllable removed) but the entity is KEPT (site 6234 boilerControl.deviceId; used by control.spec + tonight-callback).",
+          "telemetry": {}
         },
         {
           "deviceId": "IT500-BAR-6234",
@@ -386,7 +385,7 @@
         "isV1": true,
         "isV2": false,
         "heatingControllable": false,
-        "dhwControllable": true,
+        "dhwControllable": false,
         "deviceId": "IT500-DHW-6234"
       }
     },
