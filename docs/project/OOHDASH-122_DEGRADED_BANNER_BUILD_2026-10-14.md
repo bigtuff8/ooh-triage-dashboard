@@ -1,24 +1,24 @@
 <!-- gate:contract
 SECTION: Overview
-OOHDASH-122, build complete. Branch feat/oohdash-122-degraded-banner, commit 0856514. Four production-file changes and two new test files plus two test additions fix the cold-start double-banner false negative, close the green/red co-fire for all five red-banner triggers (including the global and per-site kill-switch cases), and add a one-shot start-up read probe so the bridge latch reflects reality before any handler opens a workspace. All seven work units from the approved plan are implemented and self-verified. Unit 378 pass, 0 fail. E2E 137 pass, 2 skip (TF-18/TF-19, pre-existing fixture gaps), 0 fail. One minor discrepancy against the previous builder's stated diff counts is recorded under Deviations.
+OOHDASH-122, build complete plus hardening pass. Branch feat/oohdash-122-degraded-banner. Four production-file changes and two new test files plus two test additions implement the approved plan. A subsequent hardening pass (build-completion committee advisories + tester F-01) applied three test changes and one server.js improvement: U1-U3 now import the real bridgeDegraded from routes/api.js instead of an inlined copy; the server.js fire-and-forget .catch() logs a sanitised line; source-text-only tests U4, U15, P10 removed; P11 added proving probeBridgeReadOnce always resolves. Unit 376 pass, 0 fail, 1 skip. E2E 137 pass, 2 skip (TF-18/TF-19, pre-existing), 0 fail. DATA_MODE is hardcoded to "live" in k8s/deployment.yaml. The ACR registry for rollback is apitechhub (apitechhub.azurecr.io).
 
 SECTION: What was built (work units)
-WU1 (routes/api.js): bridgeDegraded() helper exported above the GET /me route; degraded derivation changed from !bridge.bridgeStatus().healthy to !!status.lastError at both /me and workspacePayload(). A fresh pod with lastError null is no longer reported as degraded. WU2 (services/tb-device.js): probeBridgeReadOnce() added as a self-contained block of 35 lines after bridgeStatus(). No existing line in the file was edited. WU3 (public/js/app.js): the green LIVE banner gains the guard controlLive && !kill; a three-line maintenance comment placed immediately above const kill documents the coupling. WU4 (server.js): fire-and-forget call to bridge.probeBridgeReadOnce() inside the app.listen callback in live mode only; logs one [TB] start-up read probe line per boot. WU5 (test/degraded-banner.test.js + test/bridge-startup-probe.test.js): 15 unit tests (U1-U15) and 10 probe tests (P1-P10) covering derivation correctness, the nine-state guard truth table (S1-S9), and all probe outcomes including race conditions and secret leakage. WU6 (tests/degraded-banner.spec.js + tests/killswitch.spec.js): seven browser journeys (E1-E7) plus two assertions (E5) added to the existing global kill-switch test. WU7 (full suite): both suites run clean; cold-start manual check passed in fixture mode.
+WU1 (routes/api.js): bridgeDegraded() helper exported above the GET /me route; degraded derivation changed from !bridge.bridgeStatus().healthy to !!status.lastError at both /me and workspacePayload(). A fresh pod with lastError null is no longer reported as degraded. WU2 (services/tb-device.js): probeBridgeReadOnce() added as a self-contained block of 35 lines after bridgeStatus(). No existing line in the file was edited. WU3 (public/js/app.js): the green LIVE banner gains the guard controlLive && !kill; a three-line maintenance comment placed immediately above const kill documents the coupling. WU4 (server.js): fire-and-forget call to bridge.probeBridgeReadOnce() inside the app.listen callback in live mode only; logs one [TB] start-up read probe line per boot. WU5 (test/degraded-banner.test.js + test/bridge-startup-probe.test.js): 13 unit tests (U1-U3 import real bridgeDegraded from routes/api.js; U4 and U15 source-text pins removed; U5-U14 unchanged) and 10 probe tests (P1-P9 unchanged; P10 wiring pin removed; P11 added: probeBridgeReadOnce always resolves, never rejects) covering derivation correctness, the nine-state guard truth table (S1-S9), and all probe outcomes including race conditions and secret leakage. WU6 (tests/degraded-banner.spec.js + tests/killswitch.spec.js): seven browser journeys (E1-E7) plus two assertions (E5) added to the existing global kill-switch test. WU7 (full suite): both suites run clean; cold-start manual check passed in fixture mode.
 
 SECTION: File and diff table
-Eight files changed. Four production files: routes/api.js +9/-2 (bridgeDegraded helper plus two call sites); services/tb-device.js +35/-0 (probeBridgeReadOnce purely additive); public/js/app.js +4/-1 (guard plus maintenance comment); server.js +6/-0 (probe wiring). Four test files: test/degraded-banner.test.js new (266 lines); test/bridge-startup-probe.test.js new (297 lines); tests/degraded-banner.spec.js new (160 lines); tests/killswitch.spec.js +4/-0 (two E5 assertions plus two comment lines). Not touched: services/control.js, services/killswitch.js, services/tb-client.js, config.js, public/js/control.js, public/js/views.js, k8s manifests, Cosmos.
+Nine files changed (eight from approved plan plus server.js hardening). Four production files: routes/api.js +9/-2 (bridgeDegraded helper plus two call sites); services/tb-device.js +35/-0 (probeBridgeReadOnce purely additive); public/js/app.js +4/-1 (guard plus maintenance comment); server.js +7/-1 (probe wiring plus improved .catch() that logs a sanitised line). Five test files: test/degraded-banner.test.js revised (real bridgeDegraded import via before() hook; U4 and U15 removed; comprehensive zendesk/store mocks added); test/bridge-startup-probe.test.js revised (P10 removed; P11 added); tests/degraded-banner.spec.js new (160 lines); tests/killswitch.spec.js +4/-0 (two E5 assertions plus two comment lines). Not touched: services/control.js, services/killswitch.js, services/tb-client.js, config.js, public/js/control.js, public/js/views.js, k8s manifests, Cosmos.
 
 SECTION: Advisories
-Advisory 1 (readRequest forwarder): readRequest at tb-device.js lines 37-39 is a lazy forwarder that resolves tb-client.readRequest via dynamic import and returns it without touching lastReadOk or lastReadError. The probe's untouched() guard (lastReadOk === false && lastReadError === null) therefore cannot race with a direct readRequest call. Confirmed by code inspection of the forwarder at lines 37-39 and every call site (lines 734, 795, and the new probe at line 1081). Advisory 2 (test seams): U1-U3 inline the derivation as const bridgeDegraded = (status) => !!status.lastError in the test file rather than importing the production helper, avoiding mock-module coupling for a trivial one-liner. U6-U14 use a vm preamble that injects function __setState(patch) { Object.assign(state, patch); } into the same script scope as the loaded app.js, then call ctx.__setState to patch state.me, state.siteNo, and state.workspace without a network call. U5 cache-busts the tb-device.js import with a query-string timestamp so each probe test starts with lastReadOk=false and lastReadError=null in a freshly initialised module. Advisory 3 (U12 and E5 pin the guard): U12 asserts that global kill-switch on (controlLive true, ks.global true, me.degraded false) renders kill-banner and hides control-live-banner; E5 in killswitch.spec.js asserts the same end-to-end while the switch is engaged and asserts green returns after it is cleared. Together they will catch any future attempt to separate the two banners or add a new red-banner path outside writesDisabled(). Advisory 4 (cold-start comment): the comment in server.js reads "Never awaited before listen" and is the intended documentation of the non-blocking probe contract. A 429 from TB at start-up sets outcome rate-limited, leaves the latch untouched (healthy:false, lastError:null), and produces no red banner; this state at /healthz is not a deploy failure.
+Advisory 1 (readRequest forwarder): readRequest at tb-device.js lines 37-39 is a lazy forwarder that resolves tb-client.readRequest via dynamic import and returns it without touching lastReadOk or lastReadError. The probe's untouched() guard (lastReadOk === false && lastReadError === null) therefore cannot race with a direct readRequest call. Confirmed by code inspection of the forwarder at lines 37-39 and every call site (lines 734, 795, and the new probe at line 1081). Advisory 2 (test seams): U1-U3 import the real bridgeDegraded from routes/api.js via a before() hook that runs after process.env.DATA_MODE and mock.module() are in place; a static ESM import is avoided because it would hoist before DATA_MODE is set, causing config.js to initialise with dataMode='fixture' and corrupting the lastReadOk latch (lastReadOk = config.dataMode === 'fixture' = true). The before() hook cache-busts the import so it does not share state with U5's tb-device.js instance. The zendesk and store mocks are extended with all named exports that routes/api.js's transitive dependencies require at load time. U6-U14 use a vm preamble that injects function __setState(patch) { Object.assign(state, patch); } into the same script scope as the loaded app.js, then call ctx.__setState to patch state.me, state.siteNo, and state.workspace without a network call. U5 cache-busts the tb-device.js import with a query-string timestamp so each probe test starts with lastReadOk=false and lastReadError=null in a freshly initialised module. Advisory 3 (U12 and E5 pin the guard): U12 asserts that global kill-switch on (controlLive true, ks.global true, me.degraded false) renders kill-banner and hides control-live-banner; E5 in killswitch.spec.js asserts the same end-to-end while the switch is engaged and asserts green returns after it is cleared. Together they will catch any future attempt to separate the two banners or add a new red-banner path outside writesDisabled(). Advisory 4 (cold-start comment): the comment in server.js reads "Never awaited before listen" and is the intended documentation of the non-blocking probe contract. A 429 from TB at start-up sets outcome rate-limited, leaves the latch untouched (healthy:false, lastError:null), and produces no red banner; this state at /healthz is not a deploy failure. Advisory 5 (lastError sanitisation and probe credential): the probe calls GET /api/tenant/devices?pageSize=1&page=0 using the TB read service account whose JWT token is passed in the X-Authorization request header, not in the URL. lastReadError is set only to err.message (e.g. "Request failed with status code 401"), never to err.config or response body. The message contains no URL, no credentials, and no token. P9 asserts this directly. No additional sanitisation is needed. The read service account is a scoped read-only credential; it cannot write to ThingsBoard.
 
 SECTION: Test results
-Unit command: node --experimental-test-module-mocks --test "test/*.test.js". Result: 379 total, 378 pass, 0 fail, 1 skip. The one skip is the IoT repo drift check (test/iot-consumer-parse.test.js U13), which requires the sibling ../iot-support-dashboard folder absent in CI; same result on main. E2E command: npx playwright test. Result: 139 total, 137 pass, 2 skip, 0 fail. The two skips are TF-18 (tests/tester/oohdash-119.tester.spec.js:660, ctlFinish carries additionalNotes) and TF-19 (line 707, ctlEscalate additionalNotes), both skipped because fixture site 6832 has no control tile; both pre-date this branch.
+Unit command: node --experimental-test-module-mocks --test "test/*.test.js". Result after hardening pass: 377 total, 376 pass, 0 fail, 1 skip. Net change from original build: -2 (U4, U15 removed), -1 (P10 removed), +1 (P11 added) = -2 from 379. The one skip is the IoT repo drift check (test/iot-consumer-parse.test.js U13), which requires the sibling ../iot-support-dashboard folder absent in CI; same result on main. E2E command: npx playwright test. Result: 139 total, 137 pass, 2 skip, 0 fail. The two skips are TF-18 (tests/tester/oohdash-119.tester.spec.js:660, ctlFinish carries additionalNotes) and TF-19 (line 707, ctlEscalate additionalNotes), both skipped because fixture site 6832 has no control tile; both pre-date this branch. No e2e files changed in the hardening pass.
 
 SECTION: Acceptance criteria
 AC-1 (no false red banner on clean restart): bridgeDegraded() returns false when lastError is null regardless of the value of healthy. A freshly started pod with no read yet is not reported as degraded. The probe moves lastReadOk and lastReadError to a real outcome within 8s of port binding. Proved by U1 (boot state false), U5 (module-level cold start false), E1 (green banner only in browser at cold start), P1 (probe success sets healthy true). AC-2 (red and green never show together): the guard controlLive && !kill on the green banner uses the exact value that draws the red banner, making them exact complements whenever controlLive is true. All nine states from design section 5 (S1-S9) are covered: S1-S5 by the degraded derivation fix, S6-S8 by the kill guard, S9 by site-aware kill. Proved by U6-U14 (full truth table), E1-E4 (four browser journeys), E5 (kill-switch co-fire closed). No combination of any red-banner trigger and the green banner is possible in v1.3.8. AC-3 (/healthz bridge reflects a real probe after start-up): the probe fires inside the app.listen callback, sets bridge.healthy true (or writes a real lastError message) within the first network round-trip, and leaves /healthz shape unchanged. Proved by P1-P4 (success, failure, timeout, 429); U5 explicitly documents the residual few-second boot window where lastError is still null (the design's accepted AC-3 partial scope at DECISION 2).
 
 SECTION: Deviations from the approved build plan
-None in function or behaviour. One counting discrepancy exists between the previous builder's stated diff summary and the actual git diff --numstat output. routes/api.js: stated +11/-2, actual +9/-2. public/js/app.js: stated +5/-1, actual +4/-1. The code matches the plan's diff shapes verbatim in both cases; the over-count arose because the previous builder counted the blank separator line in the routes/api.js hunk as two lines instead of one, and counted the maintenance comment as four lines when the design specified three. The build plan's prose ("~6 lines new + 2 changed" for routes/api.js; "4 comment lines + 1 changed line" for app.js) should be read as the plan's own estimate, not the exact numstat. As-built matches the design and plan verbatim in every functional respect. All plan work units are implemented without addition or omission.
+None in function or behaviour from the approved build plan. One counting discrepancy exists between the previous builder's stated diff summary and the actual git diff --numstat output. routes/api.js: stated +11/-2, actual +9/-2. public/js/app.js: stated +5/-1, actual +4/-1. The code matches the plan's diff shapes verbatim in both cases; the over-count arose because the previous builder counted the blank separator line in the routes/api.js hunk as two lines instead of one, and counted the maintenance comment as four lines when the design specified three. The build plan's prose ("~6 lines new + 2 changed" for routes/api.js; "4 comment lines + 1 changed line" for app.js) should be read as the plan's own estimate, not the exact numstat. As-built matches the design and plan verbatim in every functional respect. All plan work units are implemented without addition or omission. Hardening pass deviations: U4 and U15 test cases removed from test/degraded-banner.test.js; P10 test case removed from test/bridge-startup-probe.test.js; P11 added to bridge-startup-probe.test.js; U1-U3 now use real bridgeDegraded import instead of inlined copy; server.js .catch() improved to log one sanitised line. These changes do not alter production behaviour; test coverage is net-improved.
 -->
 
 # OOHDASH-122 Degraded Banner — Build Summary
@@ -35,11 +35,11 @@ None in function or behaviour. One counting discrepancy exists between the previ
 
 | Work unit | Description | Self-test verdict |
 |-----------|-------------|-------------------|
-| WU1 | routes/api.js: bridgeDegraded() helper; degraded derivation changed at /me and workspacePayload() | PASS (U1, U4, U5, E1, E2) |
-| WU2 | services/tb-device.js: probeBridgeReadOnce() additive block after bridgeStatus() | PASS (P1-P10) |
-| WU3 | public/js/app.js: controlLive && !kill guard; three-line maintenance comment above const kill | PASS (U6-U15, E1-E5) |
-| WU4 | server.js: fire-and-forget probe call inside app.listen callback (live only); one log line | PASS (P10 wiring pin; manual fixture check) |
-| WU5 | test/degraded-banner.test.js (U1-U15) + test/bridge-startup-probe.test.js (P1-P10) | PASS (378/378 unit pass) |
+| WU1 | routes/api.js: bridgeDegraded() helper; degraded derivation changed at /me and workspacePayload() | PASS (U1-U3, U5, E1, E2) |
+| WU2 | services/tb-device.js: probeBridgeReadOnce() additive block after bridgeStatus() | PASS (P1-P9, P11) |
+| WU3 | public/js/app.js: controlLive && !kill guard; three-line maintenance comment above const kill | PASS (U6-U14, E1-E5) |
+| WU4 | server.js: fire-and-forget probe call inside app.listen callback (live only); .catch() logs sanitised line | PASS (P11 proves probe resolves; manual fixture check) |
+| WU5 | test/degraded-banner.test.js (U1-U3, U5-U14) + test/bridge-startup-probe.test.js (P1-P9, P11) | PASS (376/376 unit pass) |
 | WU6 | tests/degraded-banner.spec.js (E1-E7) + tests/killswitch.spec.js E5 additions | PASS (137/137 e2e pass) |
 | WU7 | Full suite run; cold-start manual check in fixture mode | PASS (counts below) |
 
@@ -52,9 +52,9 @@ None in function or behaviour. One counting discrepancy exists between the previ
 | routes/api.js | bridgeDegraded() helper + two call sites | 9 | 2 | +7 |
 | services/tb-device.js | probeBridgeReadOnce() + STARTUP_PROBE_PATH (additive) | 35 | 0 | +35 |
 | public/js/app.js | LIVE banner guard + maintenance comment | 4 | 1 | +3 |
-| server.js | probe wiring in app.listen callback | 6 | 0 | +6 |
-| test/degraded-banner.test.js | new: U1-U15 | 266 | 0 | +266 |
-| test/bridge-startup-probe.test.js | new: P1-P10 | 297 | 0 | +297 |
+| server.js | probe wiring + improved .catch() | 7 | 1 | +6 |
+| test/degraded-banner.test.js | U1-U3 real import; U4/U15 removed; mocks extended | revised | - | - |
+| test/bridge-startup-probe.test.js | P10 removed; P11 added | revised | - | - |
 | tests/degraded-banner.spec.js | new: E1-E7 | 160 | 0 | +160 |
 | tests/killswitch.spec.js | E5: two assertions + two comment lines | 4 | 0 | +4 |
 
@@ -135,15 +135,14 @@ Command: node --experimental-test-module-mocks --test "test/*.test.js"
 
 | Metric | Count |
 |--------|-------|
-| Total | 379 |
-| Pass | 378 |
+| Total | 377 |
+| Pass | 376 |
 | Fail | 0 |
 | Skip | 1 |
 
 The one skip is test/iot-consumer-parse.test.js U13 (drift check against ../iot-support-dashboard);
-same skip result on main. All existing unit test files pass unchanged. New tests added by this
-branch: 25 (U1-U15 in degraded-banner.test.js) + 10 (P1-P10 in bridge-startup-probe.test.js) = 35
-new tests.
+same skip result on main. Net tests added by this branch: 23 (U1-U3 and U5-U14 in degraded-banner.test.js;
+U4 and U15 removed) + 10 (P1-P9 in bridge-startup-probe.test.js; P10 removed; P11 added) = 33 net new tests.
 
 ### E2E tests
 
@@ -217,7 +216,7 @@ Use either of these two methods before running scripts/release.sh:
 2. From ACR (list tags sorted by time):
 
        az acr repository show-tags \
-           --name <registry-name> \
+           --name apitechhub \
            --repository ooh-dashboard \
            --orderby time_desc \
            --output table
@@ -230,9 +229,13 @@ Use either of these two methods before running scripts/release.sh:
         deployment/ooh-dashboard \
         ooh-dashboard=<v1.3.7-digest>
 
-Verify resources are preserved afterwards (kubectl get deployment -o json and check
-.spec.template.spec.containers[0].resources; apply set resources if they drifted, per the
-OOM-crash lessons in memory/ooh-oom-crashloop-resource-drift.md).
+Verify resources match the manifest after rollback:
+
+    kubectl -n iot-services get deployment ooh-dashboard \
+        -o jsonpath='{.spec.template.spec.containers[0].resources}'
+
+The k8s/deployment.yaml manifest declares: requests cpu 100m / memory 192Mi,
+limits cpu 500m / memory 512Mi. If the live values differ, re-apply with set resources.
 
 **Go/no-go rule if the probe fails after release:**
 
@@ -331,6 +334,8 @@ Outcome values and their meaning:
   The latch will be set by the first real site lookup.
 - (line absent): the probe did not fire; either DATA_MODE is not live, or server.js did not
   reach the app.listen callback. Check the startup sequence in the logs.
+  DATA_MODE is set in k8s/deployment.yaml (env name DATA_MODE, value "live"). It is not an
+  operator-configured runtime setting; changing it requires a manifest apply and pod restart.
 
 The short window (a few seconds) between pod-ready and probe completion where /healthz shows
 bridge.healthy false and lastError null is normal; it is not a failure. Kubernetes probes are

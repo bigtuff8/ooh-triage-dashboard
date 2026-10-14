@@ -1,26 +1,24 @@
 /**
  * OOHDASH-122 — degraded banner fix: derivation correctness + guard truth table.
  *
- * U1-U3:  bridgeDegraded() derivation — inlined (same one-liner as routes/api.js).
- * U4:     Source pin: routes/api.js has `degraded: bridgeDegraded()` twice, old form absent.
+ * U1-U3:  bridgeDegraded() derivation — imported from routes/api.js (real production export);
+ *         bridge status provided via argument so bridge.bridgeStatus() default is not exercised.
  * U5:     Cold-start module state (documents the residual /healthz boot window, DECISION 2).
  * U6-U14: Guard truth table S1-S9 from design §5, vm sandbox (public/js/app.js).
- * U15:    Comment pin: maintenance comment present in app.js above `const kill`.
  *
  * No network. No wall-clock sleeps.
  */
-import { test, mock } from 'node:test';
+import { test, mock, before } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'fs';
 import vm from 'node:vm';
 
-/* ------------------------------------------------------------------ */
-/* bridgeDegraded() derivation — inlined; same one-liner as routes/api.js bridgeDegraded() */
-/* ------------------------------------------------------------------ */
-const bridgeDegraded = (status) => !!status.lastError;
+// bridgeDegraded is loaded dynamically after env and mocks are in place (see below).
+// Static import would hoist before process.env.DATA_MODE is set, corrupting config.dataMode.
+let bridgeDegraded;
 
 /* ------------------------------------------------------------------ */
-/* U1-U3: derivation correctness                                        */
+/* U1-U3: derivation correctness (exercises real bridgeDegraded export) */
 /* ------------------------------------------------------------------ */
 
 test('U1 AC-1: boot state (healthy:false, lastError:null) → not degraded', () => {
@@ -39,18 +37,6 @@ test('U3 AC-2: after a failed read (healthy:false, lastError set) → degraded',
 });
 
 /* ------------------------------------------------------------------ */
-/* U4: source pin — both call sites in routes/api.js use bridgeDegraded() */
-/* ------------------------------------------------------------------ */
-
-test('U4 AC-1: routes/api.js has degraded: bridgeDegraded() at both /me and workspacePayload, old form absent', () => {
-    const src = readFileSync(new URL('../routes/api.js', import.meta.url), 'utf8');
-    const newMatches = [...src.matchAll(/degraded:\s*bridgeDegraded\(\)/g)];
-    assert.equal(newMatches.length, 2, 'degraded: bridgeDegraded() must appear exactly twice (one per call site)');
-    assert.doesNotMatch(src, /degraded:\s*!bridge\.bridgeStatus\(\)\.healthy/,
-        'old form `degraded: !bridge.bridgeStatus().healthy` must be absent');
-});
-
-/* ------------------------------------------------------------------ */
 /* U5: cold-start module state (live mode, no probe, no real read)      */
 /* Documents the residual /healthz boot window (design DECISION 2).    */
 /* ------------------------------------------------------------------ */
@@ -59,18 +45,61 @@ test('U4 AC-1: routes/api.js has degraded: bridgeDegraded() at both /me and work
 process.env.DATA_MODE = 'live';
 
 // Minimal mocks so tb-device.js loads in live mode without real network calls.
+// The zendesk and store stubs cover all named imports used transitively when
+// routes/api.js is loaded by the before() hook for U1-U3.
 mock.module('../services/tb-client.js', {
     namedExports: {
         readRequest: async () => { throw new Error('readRequest must not be called in U5 (no probe or real read triggered)'); },
         readServerScopeAttributes: async () => [],
         readSharedScopeAttributes: async () => null,
+        tbStatus: () => ({ healthy: true, lastError: null }),
     }
 });
+const _noop = async () => {};
+const _noopSync = () => {};
 mock.module('../services/zendesk.js', {
     namedExports: {
         resolveSiteName: async () => 'Test Site',
         siteDirectory: async () => [],
+        hhmm: () => '',
+        zendeskStatus: () => ({ healthy: true }),
+        addLateSyncNote: _noop,
+        createLateSyncTicket: _noop,
+        addP1DispatchNote: _noop,
+        createOutcomeTicket: _noop,
+        addFeedbackNote: _noop,
+        getFeedbackThread: async () => [],
+        setFollowUpDate: _noop,
+        callbackLookup: async () => null,
+        ticketsForSite: async () => [],
+        raiseQuery: _noop,
+        findCallTickets: async () => [],
+        mergeTickets: _noop,
+        addRecordingNote: _noop,
+        normaliseAdditionalNotes: (raw) => raw || '',
+        normalizeVoiceMeta: () => ({}),
+        seedFixtureCallTicket: _noopSync,
+        resetFixtureCallTickets: _noopSync,
+        seedFixtureTicket: _noopSync,
+        resetSeededFixtureTickets: _noopSync,
+        getFixtureCallTicket: () => null,
+        buildAuthHeader: () => ({}),
     }
+});
+class _ConcurrencyError extends Error {}
+mock.module('../services/store.js', {
+    namedExports: {
+        ConcurrencyError: _ConcurrencyError,
+        collection: async () => ({}),
+        storeProbe: async () => ({ healthy: true }),
+        storeStatus: () => ({ healthy: true }),
+    }
+});
+
+// Load the real bridgeDegraded export from routes/api.js after env + mocks are in place.
+// Cache-busting keeps this import separate from the U5 tb-device.js instance.
+before(async () => {
+    ({ bridgeDegraded } = await import(`../routes/api.js?bd=${Math.random()}`));
 });
 
 test('U5 AC-1: cold-start module state — bridgeDegraded(bridgeStatus()) is false before any read or probe', async () => {
@@ -249,18 +278,4 @@ test('U14 AC-2 S9: site kill-switch on (different site) → green only', async (
     const html = await render(h);
     assert.ok(hasBanner(html, 'control-live-banner'), 'S9: green banner present (other site\'s kill)');
     assert.ok(!hasBanner(html, 'kill-banner'), 'S9: red banner absent');
-});
-
-/* ------------------------------------------------------------------ */
-/* U15: comment pin (maintenance comment must be present)               */
-/* ------------------------------------------------------------------ */
-
-test('U15 AC-2: maintenance comment "OOHDASH-122 AC-2" is present in app.js above const kill', () => {
-    const src = readFileSync(new URL('../public/js/app.js', import.meta.url), 'utf8');
-    assert.match(src, /OOHDASH-122 AC-2/,
-        'maintenance comment must be present — keeps the coupling from being deleted silently');
-    // Verify comment appears BEFORE `const kill = writesDisabled`
-    const commentIdx = src.indexOf('OOHDASH-122 AC-2');
-    const killIdx = src.indexOf('const kill = writesDisabled');
-    assert.ok(commentIdx < killIdx, 'comment must appear before const kill line');
 });
