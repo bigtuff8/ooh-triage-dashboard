@@ -21,8 +21,6 @@
  */
 import { test, beforeEach, mock } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'fs';
-import vm from 'node:vm';
 import { mkdtempSync } from 'fs';
 import { tmpdir } from 'os';
 import { join } from 'path';
@@ -136,113 +134,7 @@ test('save-and-resume (WU10) — a pod restart mid-watch no longer drops the res
     assert.ok(zdCalls.notes.length > notesBefore, 'the late result lands on the ticket after resume (restart hole closed)');
 });
 
-/* ============================ client-side: ephemeral applied-LATE banner ============================ */
 
-function fakeClock() {
-    let now = 0, seq = 0;
-    const timers = new Map();
-    return {
-        setTimeout: (fn, ms) => { const id = ++seq; timers.set(id, { fn, at: now + (ms || 0), repeat: false }); return { id, unref() {} }; },
-        clearTimeout: (t) => { if (t) timers.delete(t.id ?? t); },
-        setInterval: (fn, ms) => { const id = ++seq; timers.set(id, { fn, at: now + (ms || 0), every: ms || 0, repeat: true }); return { id, unref() {} }; },
-        clearInterval: (t) => { if (t) timers.delete(t.id ?? t); },
-        tick(ms) {
-            const target = now + ms;
-            let guard = 0;
-            for (;;) {
-                let next = null;
-                for (const [id, tm] of timers) {
-                    if (tm.at <= target && (!next || tm.at < next.tm.at)) next = { id, tm };
-                }
-                if (!next || ++guard > 10000) break;
-                now = next.tm.at;
-                if (next.tm.repeat) next.tm.at += next.tm.every || 1;
-                else timers.delete(next.id);
-                next.tm.fn();
-            }
-            now = target;
-        },
-        pendingOneShots: () => [...timers.values()].filter(t => !t.repeat).length
-    };
-}
-
-function loadControl() {
-    const clock = fakeClock();
-    const rendered = { html: '' };
-    const calls = { escalate: 0, posts: [], gets: [] };
-    const state = {
-        siteNo: '6832', confirmToken: 'tok-1',
-        me: { control: { midWaitPromptMs: 30000 } },
-        workspace: { site: { siteNo: '6832', siteName: 'The Red Lion', accountId: 'gk-6832' } },
-        flow: { stage: 1, data: {} }
-    };
-    const server = { action: { actionId: 'act-1', state: 'pending', actionType: 'setpoint', slowEchoDevice: true } };
-    const api = {
-        post: async (url) => {
-            calls.posts.push(url);
-            if (url === '/api/control/dispatch') return { action: { ...server.action } };
-            if (url.endsWith('/wait')) return { action: { ...server.action, state: 'pending' } };
-            return { ticket: { id: 901 }, p1: null };
-        },
-        get: async (url) => { calls.gets.push(url); return { action: { ...server.action } }; }
-    };
-    const sandbox = {
-        state, api, server, calls, rendered, clock,
-        setTimeout: clock.setTimeout, clearTimeout: clock.clearTimeout,
-        setInterval: clock.setInterval, clearInterval: clock.clearInterval,
-        esc: s => String(s),
-        openModal: (html) => { rendered.html = html; },
-        closeModal: () => {}, render: () => {}, toast: () => {}, registerIssue: () => {},
-        outButtons: () => '', writesDisabled: () => null,
-        Date, Number, Math, JSON, String, console, window: {}
-    };
-    sandbox.window = sandbox;
-    const ctx = vm.createContext(sandbox);
-    vm.runInContext(readFileSync(new URL('../public/js/control.js', import.meta.url), 'utf8'), ctx, { filename: 'control.js' });
-    return { ctx, state, calls, rendered, clock, server };
-}
-
-// Seed the compose state and dispatch, entering the confirm/waiting phase with the poller running.
-async function enterConfirm(h) {
-    h.ctx.window.ctl = { device: { deviceId: 'IT500-BAR-6832', zone: 'Bar', telemetry: {} }, mode: 'up', phase: 'compose', error: null, action: null, val: 19, hold: 'none' };
-    await h.ctx.ctlSend();
-}
-
-test('in-session late banner — a late echo (state late-synced) settles the tracker to a DISTINCT applied-LATE banner (phase done-late), not a plain "Applied"', async () => {
-    const h = loadControl();
-    await enterConfirm(h);
-    assert.equal(h.ctx.window.ctl.phase, 'confirm');
-
-    // The device echoes LATE. The 2s self-poll observes late-synced.
-    h.server.action.state = 'late-synced';
-    h.server.action.settledAt = new Date().toISOString();
-    h.clock.tick(2000);
-    await new Promise(r => setImmediate(r));
-
-    assert.equal(h.ctx.window.ctl.phase, 'done-late', 'distinct done-late phase, not done');
-    assert.match(h.rendered.html, /sync-applied-late/, 'the applied-LATE banner renders');
-    assert.match(h.rendered.html, /Applied LATE/i);
-    assert.match(h.rendered.html, /reported as/i);
-    assert.match(h.rendered.html, /actioned twice/i, 'warns to check nothing was actioned twice');
-    assert.doesNotMatch(h.rendered.html, /data-testid="sync-applied"/, 'NOT the plain Applied card');
-});
-
-test('interrupt-precedence — a late echo supersedes a stale mid-wait card: settling to done-late clears the mid-wait prompt', async () => {
-    const h = loadControl();
-    await enterConfirm(h);
-    // Let the mid-wait prompt fire first (still pending at 30s).
-    h.clock.tick(30000);
-    await new Promise(r => setImmediate(r));
-    assert.match(h.rendered.html, /sync-midwait/, 'mid-wait card is showing');
-
-    // Now the device echoes late — the poller settles to done-late and clears the mid-wait card.
-    h.server.action.state = 'late-synced';
-    h.server.action.settledAt = new Date().toISOString();
-    h.clock.tick(2000);
-    await new Promise(r => setImmediate(r));
-
-    assert.equal(h.ctx.window.ctl.phase, 'done-late');
-    assert.equal(h.ctx.window.ctl.midWait, false, 'mid-wait state cleared on settle');
-    assert.doesNotMatch(h.rendered.html, /sync-midwait/, 'the applied-LATE banner supersedes the stale mid-wait card');
-    assert.match(h.rendered.html, /sync-applied-late/);
-});
+/* The old ephemeral applied-LATE banner + mid-wait client tests are removed: DD-WAIT-HANDOFF
+ * dropped the mid-wait prompt and the done-late phase; the three-outcome client render (incl.
+ * confirmed-late) is covered in confirm-loop-timing.test.js. */

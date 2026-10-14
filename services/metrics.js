@@ -34,12 +34,15 @@ const alerts = new Map(); // alertId → alert
  * Records a control-loop event for streak detection (called by control/overrides).
  */
 export function recordControlEvent(kind) {
-    if (['failed', 'rejected', 'timeout'].includes(kind)) {
+    // OOHDASH-123 three-outcome vocabulary: a non-delivery (hard reject) or an indeterminate
+    // (accepted-but-not-confirmed at the limit) both count toward the streak alert, alongside the
+    // legacy failed/rejected/timeout values for any mid-migration records.
+    if (['failed', 'rejected', 'timeout', 'non-delivery', 'indeterminate'].includes(kind)) {
         const now = Date.now();
         recentFailures.push(now);
         while (recentFailures.length && recentFailures[0] < now - 30 * 60 * 1000) recentFailures.shift();
         if (recentFailures.length >= 3) {
-            raiseAlert('write-failure-streak', `${recentFailures.length} failed/rejected/timed-out device writes in the last 30 minutes`);
+            raiseAlert('write-failure-streak', `${recentFailures.length} device commands were not delivered / not confirmed in the last 30 minutes`);
         }
     }
 }
@@ -81,8 +84,10 @@ export async function computeMetrics(windowDays = 7) {
 
     const callOutcomes = entries.filter(e => CALL_OUTCOME_TYPES.includes(e.OohActionType));
     const controls = entries.filter(e => CONTROL_OUTCOME_TYPES.includes(e.OohActionType));
-    const applied = controls.filter(e => e.outcome === 'synced');
-    const failed = controls.filter(e => ['failed', 'rejected', 'timeout'].includes(e.outcome));
+    // OOHDASH-123: 'confirmed' (and the no-write 'already-set') are the applied outcomes; 'non-delivery'
+    // and 'indeterminate' are the not-applied ones. Legacy synced/failed/rejected/timeout kept for old rows.
+    const applied = controls.filter(e => ['confirmed', 'already-set', 'synced'].includes(e.outcome));
+    const failed = controls.filter(e => ['non-delivery', 'indeterminate', 'failed', 'rejected', 'timeout'].includes(e.outcome));
     const captures = entries.filter(e => e.OohActionType === 'capture');
     const p1s = entries.filter(e => e.OohActionType === 'escalate-p1');
 
