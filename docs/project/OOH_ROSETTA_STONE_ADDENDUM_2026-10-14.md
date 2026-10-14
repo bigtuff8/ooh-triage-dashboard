@@ -5,8 +5,8 @@ James approved the Rosetta Stone discovery gate (PR #86, 2026-10-14) and then di
 SECTION: Two security items escalated immediately — decoupled from the Spencer hold
 Two live exploitable credentials were found during research. They are NOT in the Spencer held queue. They require your decision now, ahead of any other action. SQ-SEC-1: the IoT Command Gate rule chain metadata contains a credential readable in plain text by any identity at our access level. SQ-SEC-2: a vendor token on gk-st-office-intesis-1 is retrievable over a plain GET by our tenant-admin identity. Both are described in section 2 of this document. The default recommendation is immediate out-of-band rotation before the Spencer message goes and before any dashboard commands route through the gate. If you choose to hold, that is an explicit risk you own — section 2 sets out exactly what you are accepting. This is not a Spencer question; it is a decision for you, today.
 
-SECTION: Gate admission for svc-control requires explicit confirmation
-The S5 research found that the IoT Command Gate has no per-caller authorisation check. Any identity that can write a Requested key to SERVER_SCOPE on an OOH-profiled device is admitted. Admission today is implicit: controlled by profile routing and the RBAC grant on the shared identity. Before the dashboard begins routing real commands through the gate, you need to confirm this is acceptable. Section 7 sets out the options. This is also a decision for you, today.
+SECTION: Gate admission for svc-control — folded into D-SEC-ROTATE
+The S5 research found that the IoT Command Gate has no per-caller authorisation check. Any identity that can write a Requested key to SERVER_SCOPE on an OOH-profiled device is admitted — controlled today by profile routing and the RBAC grant on the shared identity. This admission model needs to be confirmed as acceptable before the dashboard routes real commands. That confirmation is now part of D-SEC-ROTATE in section 8, not a separate decision: the admission risk and the credential exposure share the same blast radius and are settled together.
 
 SECTION: The headline change the research made
 The most important finding is a new contradiction in the write path. To command a device through the production IoT Command Gate, the caller must write a Requested key to SERVER_SCOPE: switchRequested, setpointRequested, modeRequested or hwBoostHoursRequested. The gate then validates the request, writes pending, rewrites Desired, and rings the bridge doorbell. Our current dashboard code writes the Desired key directly, bypassing the gate entirely. That means no pending marker, no offline check, no doorbell ring, and possibly no dispatch at all on Tuya devices. Every CONTRADICTION row in the original gate doc affects a different part of the confirmation logic; this contradiction affects the dispatch itself. It is the first change Build must make.
@@ -27,13 +27,11 @@ SECTION: Questions for Spencer (HELD until James releases them)
 Twelve operational questions are listed in the document body. The two security items have been removed from this list and escalated separately (section 2). Nothing on this list has been sent to Spencer yet. James's directive is that nothing goes until everything is aggregated, confirmed and fully investigated. The full consolidated list is ready in section 6 of this document.
 
 SECTION: Decisions for you before Design starts
-Eight decisions are yours. Two are immediate: the security rotation choice (section 2) and the S5 gate admission confirmation (decision D-S5-GATE-ADMISSION). The ones that most directly gate Design work: the dashboard offline threshold (3 hours is recommended; the current code uses 48 hours and the gate uses 45 minutes, each for different reasons), the split between the operator-facing copy figure and the confirm limit for Salus, and whether to pull the switch-only mapping fix forward as a quick pre-Design change so external-lighting units display a state. The schedule question and the dark-fleet display question are lower priority but Design needs your steer before it lays out the device cards.
+Seven decisions remain after folding D-S5 into D-SEC-ROTATE. The immediate one is D-SEC-ROTATE: the security rotation choice and the gate admission confirmation are settled together in section 8. The decisions that most directly gate Design work: the dashboard offline threshold (3 hours as a configurable default is recommended), the split between the operator-facing copy figure and the confirm limit for Salus, and whether to pull the switch-only mapping fix forward. The dark-fleet and schedule questions are lower priority but Design needs a steer before it lays out the device cards.
 
-DECISION: Do you rotate SQ-SEC-1 and SQ-SEC-2 credentials now, out of band, before the Spencer message goes? | Rotate now: both credentials are live and readable by any identity at our access level; rotation is the only safe default | Accept the risk: hold rotation until the consolidated Spencer message, with James as the named risk owner and a written deadline
+DECISION: Do you tell Spencer about the two live credentials now, separately from the consolidated list, and ask him to rotate both before any dashboard command routes through the gate? The gate has no per-caller check and the doorbell credential is readable by any identity at our access level — combined blast radius: any such identity could inject commands into real heating and lighting. | Tell Spencer now (separately): the two credential items go out today as a decoupled message; the rest of the Spencer questions stay held until released by James; Spencer must acknowledge receipt and commit to a rotation deadline | Keep everything held: James signs a dated risk acceptance as named owner, with a rotation deadline set to the date the consolidated Spencer list is sent
 
-DECISION: Is the implicit gate admission for svc-control (no per-caller authz check; admission via profile routing + RBAC) explicitly confirmed as acceptable before the dashboard routes real commands? | Confirm acceptable as-is: profile routing and RBAC together are sufficient for R1 | Require an explicit per-caller check be added to the gate before the dashboard routes commands
-
-DECISION: What is the dashboard offline threshold for controllable devices? | 3 hours: the estate data shows a cliff between 3 hours and 48 hours; no live Tuya or IT700 device falls in that gap | Keep the current code rule of 48 hours
+DECISION: What is the dashboard offline threshold for controllable devices? | 3 hours as the configurable default: the estate data shows a cliff between 3 hours and 48 hours; no live Tuya or IT700 device falls in that gap; all thresholds configurable per device class, not hard-coded | Keep the current code rule of 48 hours; revisit when more estate sweep data is available
 
 DECISION: How should the operator-facing copy figure (the N in "should take effect within about N minutes") be set relative to the confirm limit? | Split them: IT700 copy 5 minutes, confirm limit 45 minutes; IT500 copy 15 minutes, confirm limit 35 minutes; all configurable | Use the same single figure for both copy and limit, as the gate doc's 10-minute provisional
 
@@ -49,34 +47,58 @@ DECISION: How should the dashboard display the dark IT500 and bare-salus fleets 
 **Ticket:** OOHDASH-123 · **Stage:** Discovery addendum · **Date:** 2026-10-14
 **Base:** main a9e34ec (PR #86 merged, gate approved 2026-10-14)
 **Companion:** docs/project/OOH_ROSETTA_STONE_MATRIX_2026-10-14.md (matrix updated in this commit)
-**Research inputs:** C:/harness-runs/iot-ooh-dash/research/ (RESEARCH-S1-S8.md, RESEARCH-S2-S3.md, RESEARCH-S4-S5.md, RESEARCH-S6.md, RESEARCH-S7.md, RESEARCH-S9-S11.md, RESEARCH-S12-Q7.md, RESEARCH-S13-SCHEDULES.md, RESEARCH-ESTATE-SWEEP.md)
+**Research inputs:** docs/project/oohdash-123-research/ (nine files, secret-scanned; originals at C:/harness-runs/iot-ooh-dash/research/)
 
 ---
 
-## ⚠ 2. Security escalations — immediate action required, decoupled from Spencer hold
+## 0. Handling of this document
 
-> **These two items are not Spencer questions. They are not in the held list. They require your decision now — before the Spencer message goes and before any dashboard command routes through the gate.**
+This document names two locations where live credentials can be read by any identity at our access level. Their values are not reproduced anywhere here. The two locations are described structurally only:
 
-Two live exploitable credentials were found during research. Their values are not reproduced anywhere in this document. They are described structurally only.
+- The IoT Command Gate rule chain metadata, accessible via the ThingsBoard rule chain API (SQ-SEC-1).
+- The SERVER_SCOPE attributes of gk-st-office-intesis-1, accessible via the ThingsBoard attributes API (SQ-SEC-2).
+
+This repository is private. The exposure described in this document is time-boxed to completion of the rotation actions in D-SEC-ROTATE. Once rotation is confirmed, this document remains as a historical record of the risk and its resolution.
+
+---
+
+## ⚠ 2. Security escalations — immediate decision, decoupled from Spencer hold
+
+> **These items are not in the Spencer held queue. They require your decision today. The rest of the Spencer consolidated list stays held regardless of which option you choose.**
+
+Two live credentials were found during research, plus a gate-design fact that compounds them. None of the credential values are reproduced in this document.
+
+**Combined blast radius**
+
+The IoT Command Gate has no per-caller authorisation check (S5, PROVEN — see D-SEC-ROTATE in section 8). Any identity that can write a Requested key to SERVER_SCOPE on an OOH-profiled device is admitted to the gate; the gate does not verify who is calling. Admission is controlled today only by profile routing and the RBAC grant on the svc-control identity.
+
+SQ-SEC-1 exposes a credential that controls the gate's dispatch mechanism. Combined with the no-per-caller-check design, the blast radius is: any identity at our access level could read that credential, use their own RBAC grant to write a Requested key, and inject a real command into a heating or lighting device through the production gate — without appearing to the gate as anything other than a profiled caller.
 
 **SQ-SEC-1 — Plaintext credential in Command Gate rule chain metadata**
 
-The IoT Command Gate rule chain contains a request-header credential in its metadata configuration. That metadata is readable via a standard ThingsBoard API call by any identity holding team-level access — including svc-control and any identity that shares our RBAC grant. The credential is live and in use; it is not a test value.
+The IoT Command Gate rule chain contains a request-header credential in its metadata configuration. That metadata is readable via the ThingsBoard rule chain API by any identity holding team-level access. The credential is live and in use; it is not a test value.
 
 **SQ-SEC-2 — Vendor token on gk-st-office-intesis-1 in SERVER_SCOPE**
 
-A SERVER_SCOPE attribute whose name indicates a vendor access token exists on the legacy Intesis entity gk-st-office-intesis-1. It is retrievable over a plain GET /api/plugins/telemetry/DEVICE/{id}/values/attributes/SERVER_SCOPE by our tenant-admin identity. It is not encrypted at rest at the attribute level.
+A SERVER_SCOPE attribute whose name indicates a vendor access token exists on the legacy Intesis entity gk-st-office-intesis-1. It is retrievable over a plain GET to the ThingsBoard attributes API by our tenant-admin identity. It is not encrypted at rest at the attribute level.
 
-### The choice you are making — stated plainly
+### The choice
 
-**Option A — Rotate now (recommended).** Both credentials are escalated out of band today. You (James) name the rotation owner for each item — the person who holds the gate config access and the person who holds the Intesis bridge config — and set a rotation deadline (recommended: by end of business today). Neither item waits for the consolidated Spencer message. Rotation is complete before the dashboard begins routing real commands through the gate. This is the only option that closes the exposure before new command traffic creates a wider blast radius.
+**Option A (recommended) — Tell Spencer now, separately.**
 
-**Option B — Hold until Spencer message (risk acceptance).** You choose to hold both items in the Spencer consolidated message alongside the operational questions. By choosing this option you are explicitly accepting: (a) that both credentials remain readable by any team-level identity until Spencer acts; (b) that any new command traffic from the dashboard will flow through a gate whose doorbell credential is rotatable by an adversary with our access level; (c) that James Brown is the named risk owner, with a written acknowledgement in this document, until rotation is complete. This option does not lower the risk — it defers it, with James as the accountable owner.
+Contact Spencer out of band today with just the two credential items — the rest of the Spencer questions stay held until James releases them. Spencer is the rotation owner for both (he holds the gate rule chain config access and the Intesis bridge config access). This closes the exposure before the dashboard routes any real commands through the gate.
 
-**If you choose Option B, the following line must be added to this document before it is approved:**
-> *Risk accepted by: James Brown, jamesbrown@airedale-group.co.uk, 2026-10-14. Rotation deadline: [date]. Rotation owner for SQ-SEC-1: [name]. Rotation owner for SQ-SEC-2: [name]. Interim mitigations in place: [none / list].*
+Compliance ask for Option A: once Spencer is told, a written acknowledgement is required from him as the config owner — confirming he received the report, that he owns the rotation, and the deadline he commits to. That acknowledgement should be added here before this gate artefact is closed.
 
-The default is Option A. No further investigation is required to act. The values are not needed here — the rotation owners already have access to retrieve them through the correct secure channel.
+**Option B (risk acceptance) — Keep everything held.**
+
+Both items stay in the consolidated Spencer message, sent when James releases the full list. By choosing this option James Brown explicitly accepts: (a) both credentials remain readable by any team-level identity until Spencer acts; (b) any new command traffic from the dashboard flows through a gate whose doorbell credential is accessible to an adversary with our access level; (c) James Brown is the named risk owner with a written deadline.
+
+If you choose Option B, the following line must be added to this document before it is re-submitted:
+
+> *Risk accepted by: James Brown, jamesbrown@airedale-group.co.uk, 2026-10-14. Rotation deadline: [date you commit to]. Spencer notified by: [date]. Interim mitigations in place: [none confirmed / list any].*
+
+The default is Option A.
 
 ---
 
@@ -103,7 +125,7 @@ Consequences of the bypass:
 | S2 | Is pending a distinct first write? | PROVEN | Yes: gate writes pending, bridge writes the final accepted or rejected; they are two separate REST attribute writes to SERVER_SCOPE; pending is visible for only 0.3 to 1 second on Tuya (RESEARCH-S2-S3.md). |
 | S3 | What is switchRequested? | PROVEN | switchRequested (and each cap-prefixed Requested key) is the caller's input to the gate, written to SERVER_SCOPE; the gate reads it and writes Desired and pending; the dashboard should write Requested, not Desired (RESEARCH-S2-S3.md). |
 | S4 | How does the gate refuse? | PROVEN | Four rejected-plus-LastError cases (malformed value, device offline, no freshness keys for profile, internal fault) and three silent cases (key not Requested, multiple Requested keys in one write, doorbell failure leaves pending forever) (RESEARCH-S4-S5.md). |
-| S5 | Does the gate admit svc-control? | PROVEN — confirmation required | No caller check exists in the chain; admission is implicit via profile routing (4 OOH profiles reach the gate) and the SHARED_SCOPE RBAC on the identity; svc-control already appears in every audit-log entry for switchRequested (RESEARCH-S4-S5.md). **This admission model must be explicitly confirmed as acceptable before the dashboard routes real commands — see D-S5-GATE-ADMISSION in section 7.** |
+| S5 | Does the gate admit svc-control? | PROVEN — confirmation required | No caller check exists in the chain; admission is implicit via profile routing (4 OOH profiles reach the gate) and the SHARED_SCOPE RBAC on the identity; svc-control already appears in every audit-log entry for switchRequested (RESEARCH-S4-S5.md). **This admission model must be explicitly confirmed as acceptable before the dashboard routes real commands — confirmation is part of D-SEC-ROTATE in section 8.** |
 | S6 | Salus time limit; any Salus accepted since 10 Oct? | UNRESOLVED | No measured figure from Spencer; no Salus setpoint or mode command has reached accepted under the new contract anywhere we can read; the data supports IT700 copy 5 min / limit 45 min and IT500 copy 15 min / limit 35 min (DEDUCED from polling cadences) but the figure is UNRESOLVED (RESEARCH-S6.md). |
 | S7 | Re-send when Desired already matches the request | PROVEN | Write the same Requested value again; the gate fires on every write regardless of value equality (proven on Tuya audit: identical switchRequested produces a new vendor result each time); clear-then-set is pointless and partially harmful (empty value rejected as malformed) (RESEARCH-S7.md). |
 | S8 | Which telemetry key confirms a Salus setpoint? | DEDUCED | IT700: heatingSetpoint (PROVEN; setPoint is event-driven and can be stale for months; never use for confirmation); IT500: setPoint by deduction (no live IT500 exists in prod, so unproven); boost confirming key: hotWaterBoostHoursRemaining (DEDUCED, hold boost out of scope) (RESEARCH-S1-S8.md). |
@@ -128,6 +150,8 @@ Source: RESEARCH-S2-S3.md, RESEARCH-S4-S5.md, RESEARCH-S7.md.
 The `switch` key (bare, no underscore-1) is not only a tongou variant. A population of 18 tuya-profile devices with no switch_1 key uses `switch`, including the live external-lighting units gk-6237-externallighting-1, gk-6186-externallighting-1 and gk-6099-externallighting-1 (all fresh within 24 hours at sweep time). Our mapTelemetry function does not map `switch`, so these units show no on/off state today. The gate already handles `switch` in its freshness list and direction bypass. The gap is in our read path only.
 
 This is a live display defect for external lighting, independent of the control re-plumbing. A single-line mapTelemetry fix would address it. Decision D-SWITCH-ONLY-LIGHTING below asks whether to pull this forward.
+
+**Multi-gang verification (S9-S11 evidence):** 30 devices carry both switch_1 and switch. On those, switch_1 is the current key and switch is stale (some entries thousands of hours old — switch was the legacy attribute). The 4 two-gang Brackley refrigeration devices carry switch_1 and switch_2, not bare switch. No device in the 3,097 sampled carries bare switch as the current confirming key alongside switch_1. The Build precondition for the switch fallback is therefore met: prefer switch_1 where present; fall through to switch only when switch_1 is absent on that device. No multi-gang hazard.
 
 Source: RESEARCH-S9-S11.md; hasSwitchSignal tb-device.js:345-348 vs mapTelemetry (no switch entry).
 
@@ -162,6 +186,14 @@ The estate sweep shows Tuya owon devices report on a median 24-minute cycle, p90
 The dashboard should not adopt 45 minutes as its own offline threshold. The estate data shows a clean cliff: zero live Tuya devices fall between 3 hours and 48 hours. A 3-hour dashboard threshold separates live from dead correctly without false-positives.
 
 Source: RESEARCH-ESTATE-SWEEP.md.
+
+### 4.7 Stuck-pending has no server-side expiry (PROVEN)
+
+The doorbell-failure case — the bridge is unreachable or the doorbell HTTP call fails — leaves the pending attribute in place permanently. The gate does not set a timeout or clear pending itself. There is no safety net from the gate side.
+
+Build must rely entirely on the per-vendor confirm limit to decide when a command becomes INDETERMINATE. A pending state that persists beyond the confirm limit is classified INDETERMINATE by the dashboard, not by the gate. The gate will never clear it.
+
+Source: RESEARCH-S4-S5.md (silent case N3: doorbell failure leaves pending forever, no expiry).
 
 ---
 
@@ -198,6 +230,25 @@ The open question for Spencer (held, see section 7) is whether the Salus bridge 
 
 ---
 
+## 6b. Design steers — customer experience (non-blocking)
+
+These are steers for the design doer, not decisions for James. None blocks Design starting. They arise from three gaps in the approved gate that research made concrete.
+
+**Error message translation.** Raw gate error strings must never appear verbatim to an operator. The following translations are required:
+
+- "gate: device offline" should render as something like "Device is not responding — this may be temporary. Try again in a few minutes, or raise a support ticket if it persists."
+- "gate: malformed value" indicates a dashboard bug, not an operator error; log it internally, show a generic failure with no operator-visible gate string.
+- "vendor: No active Tuya session owns device" should render as a transient failure with a retry prompt: "Couldn't reach the device right now — try again."
+- "gate: internal fault" should render as "Something went wrong on our end — please try again; contact support if it persists."
+
+The design doer should produce a full error-to-copy translation table covering every gate: and vendor: prefix found in the research before writing any error UX.
+
+**Stuck-device interim UX.** Four devices on the estate have a Desired value set since September with no confirmed outcome: gk-6261, gk-6832, gk-1648 (IT700) and gk-6237 (external lighting, tongou). The dashboard currently shows no indication that these commands are outstanding. The recommended interim state for such a device: "Last command sent [date], outcome not confirmed — tap to resend." The resend writes the same Requested value again; this is proven safe on Tuya and the gate fires on every write regardless of value equality.
+
+**INDETERMINATE reassurance copy.** When a command reaches the confirm limit without a confirming telemetry reading, the outcome is INDETERMINATE. The recommended operator copy: "We sent the command but the device hasn't confirmed it yet. It may still take effect — check the device status in a few minutes, or raise a ticket if it does not respond." Do not say "failed" (the command may have executed). Do not leave the operator with nothing to do.
+
+---
+
 ## 7. Spencer questions (HELD — not yet sent)
 
 These are consolidated and de-duplicated from all research streams. Nothing here has been communicated to Spencer. James's directive: everything is held until aggregated, confirmed and fully investigated, then sent as one consolidated list.
@@ -223,35 +274,27 @@ These are consolidated and de-duplicated from all research streams. Nothing here
 
 ## 8. Decisions for James
 
-### D-SEC-ROTATE: Security credential rotation — immediate decision (BLOCKED on security)
+### D-SEC-ROTATE: Security and gate admission — immediate decision
 
-See section 2 for the full framing. This is not a Spencer question and is not deferred by the aggregation hold. The two live credentials (SQ-SEC-1 and SQ-SEC-2) are readable by any identity at our access level now.
+**Combined blast radius:** SQ-SEC-1, SQ-SEC-2 and the S5 admission finding together mean that any identity at our access level could read the live doorbell credential, write a Requested key using their own RBAC grant, and route a real command to a heating or lighting device through the production gate — without the gate checking caller identity. See section 2 for the full framing. This decision is not deferred by the aggregation hold.
 
-**Option A (recommended):** Rotate both credentials out of band, today. Name the rotation owner for SQ-SEC-1 (gate rule chain config access) and the rotation owner for SQ-SEC-2 (Intesis bridge config access). Set a deadline of end of business today. Do not wait for the Spencer message.
+**On gate admission (D-S5):** The gate has no per-caller authorisation check. Admission is controlled today by profile routing and the RBAC grant on the svc-control identity. svc-control's audit trail is clean and it is the sole caller in the logs available to us. The admission model is the standard ThingsBoard trust pattern and is acceptable for R1 once the doorbell credential is rotated. Whichever option you choose below, record here that the implicit admission model (profile routing plus RBAC, no per-caller identity check) is confirmed acceptable for R1, subject to rotation.
 
-**Option B (risk acceptance — requires written sign-off):** Hold both until the Spencer message. If you choose this option, add the following line to this document, signed with your name, email and today's date, before this artefact is re-submitted for approval:
+**Option A (recommended) — Tell Spencer now, separately.**
 
-> *Risk accepted by: James Brown, jamesbrown@airedale-group.co.uk, 2026-10-14. Rotation deadline: [date you commit to]. Rotation owner for SQ-SEC-1: [name]. Rotation owner for SQ-SEC-2: [name]. Interim mitigations: [none confirmed / list any].*
+Contact Spencer out of band today with just the two credential items. The rest of the Spencer questions stay held until James releases them. Spencer is the rotation owner for both. Once told, Spencer must acknowledge receipt in writing and commit to a rotation deadline; that acknowledgement must be added to this document before the gate artefact is closed.
 
-The absence of that line means Option A is in effect and rotation proceeds immediately.
+**Option B (risk acceptance) — Keep everything held.**
 
-### D-S5-GATE-ADMISSION: Confirm implicit gate admission is acceptable
+Both items stay in the consolidated Spencer message. Before choosing this option, add the risk-acceptance line from section 2 to this document, signed with your name, email and today's date.
 
-**Context:** The S5 research (RESEARCH-S4-S5.md) found that the IoT Command Gate performs no per-caller authorisation check. Any identity that can write a Requested key to SERVER_SCOPE on an OOH-profiled device is admitted to the gate. Today that is controlled by two guards: (1) profile routing — only devices on the four OOH profiles reach the gate rule chain; and (2) the RBAC grant on the svc-control identity — SHARED_SCOPE write access is required to write a SERVER_SCOPE Requested attribute. svc-control's audit trail is clean. No other identity has been observed writing Requested keys in the audit logs available to us.
-
-This is structurally an implicit admission model: any identity that holds the right RBAC grant and can reach a profiled device is a valid caller, without the gate itself checking caller identity. That may be acceptable by design — it is how ThingsBoard's trust model works — but it must be explicitly confirmed rather than assumed before the dashboard begins routing real commands.
-
-**Option A (confirm acceptable):** Profile routing + RBAC is sufficient for R1. The gate does not need a per-caller check. Confirm in writing and Design proceeds.
-
-**Option B (require explicit check):** A per-caller identity check must be added to the gate rule chain before the dashboard routes commands. This is a Spencer engineering ask; add to SQ list and block Design on the answer.
-
-Recommend Option A with confirmation on record: the RBAC model is the standard ThingsBoard pattern, and the audit trail shows svc-control is the sole caller. The risk is low and is already lower than the two security items above. But the choice must be recorded, not assumed.
+The absence of a risk-acceptance line means Option A is in effect and the Spencer contact proceeds immediately.
 
 ### D-OFFLINE: Dashboard offline threshold
 
 **Context:** The current code uses 48 hours (a soft rule). The topology doc claims three bands (live under 3 hours, quiet 3 to 12, offline over 12). The gate uses 45 minutes for its dispatch check. The estate data shows a clean cliff: no live Tuya or IT700 device falls between 3 hours and 48 hours. Adopting 45 minutes would mislabel about 1.6 percent of healthy Tuya devices.
 
-Recommend: 3 hours as the dashboard's offline threshold for controllable classes (Tuya, IT700, boilerControl). Keep 48 hours for monitor-only classes pending Sam's per-type cadence figures. Ask Spencer to raise the gate's dispatch threshold as a separate action.
+Recommend: 3 hours as the configurable default offline threshold for controllable classes (Tuya, IT700, boilerControl). This must be a named constant per device class, not a hard-coded cliff — it should be re-confirmed across later estate sweeps as Sam's per-type cadence data arrives. Keep 48 hours for monitor-only classes as the current default, also configurable. Ask Spencer to raise the gate's own dispatch threshold separately.
 
 ### D-SALUS-N: Split copy figure from confirm limit
 
@@ -273,9 +316,13 @@ Recommend: pull it forward as a quick fix ahead of Design. It is a one-line chan
 
 ### D-DARK-FLEETS: Display of IT500 and bare-salus in the dashboard
 
-**Context:** 347 IT500 devices have been dark for at least 12 days. 384 bare-salus devices have been dark since approximately 2 June. Cause is unresolved (Spencer question SQ-07 covers IT500; bare-salus has no ticket). Today the dashboard may show these as quiet rather than truly offline.
+**Context:** 347 IT500 devices have been dark for at least 12 days. 384 bare-salus devices have been dark since approximately 2 June. The scale (347 + 384 = 731 devices, two distinct populations) rules out 731 independent outages — this is a controlled or systemic shutdown. Cause is unresolved.
 
-Recommend: show them as offline with "device not reporting"; offer no control; do not hide them (operators need to know their site's thermostat is unreachable).
+Recommend the following before Design starts:
+
+- Raise a root-cause investigation ticket for each dark fleet. IT500 owner: Spencer (SD-373 covers the Arrayent shared-account shutdown; whether polling has resumed is SQ-07 in the held list). Bare-salus owner: unknown — needs identification before a ticket can be raised. The dark period (134 days for bare-salus) raises the possibility of a live service outage rather than a controlled decommission.
+- Mark all IT500 and bare-salus confirm figures as provisional and untestable while the fleets are dark. No Salus command can reach either population regardless of the confirm limit.
+- Display them as offline with "device not reporting"; offer no control; do not hide them (operators need to know their site's thermostat is unreachable).
 
 ### D-INTESIS-RECLASSIFY: R10A Modbus vs vendor-bridged Intesis labelling
 
@@ -287,7 +334,17 @@ No action required for R1 behaviour; confirm the display label update ("air cond
 
 **Context:** The current 409 block compares Desired to the requested value. The fix is to compare the device's own telemetry reading to the requested value and to re-fire by writing Requested (not by clearing and resetting Desired). The research proves clear-then-set (writing an empty or null value) is rejected by the gate as "gate: malformed value". The re-fire by writing the same Requested value again is proven safe on Tuya and deduced for Salus.
 
-Confirm the fix: judge "already satisfied" from device telemetry; re-send by writing Requested; no clear step.
+Confirm the fix, with a staleness guard:
+
+Design must bias to re-fire rather than suppress. Writing the same Requested value again is always safe — the gate fires on every write regardless of value equality (PROVEN on Tuya; deduced for Salus). Suppress only when a FRESH confirming telemetry reading already shows the outcome: a reading whose own timestamp is at or after the Requested key's lastUpdateTs (the timestamp of the pending write). A stale reading (timestamp before the Requested write) must not suppress a re-send.
+
+Per-vendor staleness guard:
+
+- Tuya: confirming key is switch_1 (or switch for switch-only devices); ts of the telemetry entry must be at or after switchRequested lastUpdateTs. Tuya heartbeat is median 24 minutes so readings can be stale within a short confirm window.
+- Salus IT700: confirming key is heatingSetpoint (not setPoint); heartbeat median 23.6 minutes, max observed 48 minutes; many readings will be stale relative to a recent Requested write; always compare the key's own ts before suppressing.
+- Salus IT500: confirming key is setPoint (DEDUCED; no live device to verify); same staleness rule; untestable while the IT500 fleet is dark.
+
+No clear-then-set step: writing an empty or null value is rejected by the gate as "gate: malformed value" (PROVEN).
 
 ---
 
@@ -303,7 +360,7 @@ Confirm the fix: judge "already satisfied" from device telemetry; re-send by wri
 
 ## 10. Next steps
 
-**First: two immediate actions before anything else.** The security rotation decision (D-SEC-ROTATE) and the gate admission confirmation (D-S5-GATE-ADMISSION) must both be settled today. Neither waits for the Spencer message, and neither waits for Design to start. Both are decisions for James alone.
+**First: one immediate action before anything else.** D-SEC-ROTATE must be settled today: it covers both the security credential notification choice and the gate admission confirmation, which share the same blast radius and are decided together. It does not wait for the Spencer message and does not wait for Design to start.
 
 **Second: Design can start** on the items with full answers once those two decisions are recorded: the Requested write path, the Tuya confirmation rule (switch_1 or switch, normalised string comparison, 10-second limit), the three-outcome model on the new signals, the accepted phase copy, the pre-dispatch fix, and the hot-water flow (remove boost, capture-and-escalate). The Salus figures (section 5) are ready as configurable defaults; Spencer's measured numbers will arrive as a one-line config update.
 
