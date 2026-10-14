@@ -308,8 +308,8 @@ test('TF-08: hotwater flow carries additionalNotes in POST (capture path)', asyn
         r => r.url().includes('/api/outcomes') && r.method() === 'POST'
     );
 
-    // Site has no DHW controllable device → "Capture & escalate" chip appears directly
-    await page.locator('.chip', { hasText: 'Capture' }).first().click();
+    // OOHDASH-123 (J5/D-BOOST): boost removed — hot water goes straight to capture-and-escalate.
+    await page.locator('[data-testid="hw-capture"]').click();
     // Confirm step → record outcome → POST fires
     await expect(page.locator('[data-testid="confirm-step"]')).toBeVisible();
     await page.locator('[data-testid="record-outcome"]').click();
