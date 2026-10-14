@@ -6,25 +6,37 @@ SECTION: Root cause (PROVEN)
 fetchLiveSitesByNumber searches ThingsBoard using textSearch=gk-{siteNo} then applies an anchored client-side filter ^gk-({siteNo})(?![0-9]) over the NORMALISED device name. normaliseName strips parentheticals before token matching. Bare-salus devices use the old naming convention gk_{sitename}_salus_{serial} ({siteNo}-{letter}-{n}): the site number appears only inside a trailing parenthetical which is stripped during normalisation. The normalised name gk-{sitename}-salus-{serial} does not start with gk-{siteNo}-, so it never matches the anchored filter, and the device is never loaded into the site workspace. OOHDASH-108 and OOHDASH-123 both operate downstream of this load step and have no effect on devices that never arrive.
 
 SECTION: Affected population (live sweep 2026-10-14, read-only, no writes)
-385 bare-salus devices total on the estate. 153 are restaurant controllers (letter r or b) across 74 distinct sites. 202 are accommodation (s or f). 30 have an unparseable or absent letter. 9 have no parenthetical at all (edge case, discussed in D2). Every sampled device has SERVER_SCOPE active: false -- the entire bare-salus fleet is dark (not reporting live telemetry). After the fix, bare-salus devices will load and the Bar/Restaurant area will surface; because all sampled devices are offline, the honest "device not reporting" branch activates per the OOHDASH-123 dark-fleet path. CLIENT_SCOPE site is populated on confirmed devices (e.g., site: "(5694-r-2)") and is already the primary source for deriveArea. The parenthetical fallback coded under OOHDASH-108 is also available. Bare-salus is the only device family using the old underscore-naming convention (no other family affected). OQ1 RESOLVED (second sweep 2026-10-14): 72 of the 74 affected sites have partial failure -- Bar/Restaurant already surfaces from modern gk-{siteNo}-salusit500-r/b devices; bare-salus thermostats for the same zone are additionally absent from the workspace. 2 sites have total failure (Bar/Restaurant completely absent): site 5791 has a no-paren restaurant thermostat (gk_unknown_salus_STA10108795 5791-r-2) that is not addressable by Option A alone; site 5191 has only accommodation bare-salus (f-2) and no r/b device in TB at all, suggesting no restaurant heating at that site. After Option A lands, 72 sites are fully addressed and site 5191 is also resolved (its accommodation bare-salus loads correctly). Site 5791 remains a gap for Bar/Restaurant via Option A alone; the no-paren fix path (see D2) is needed for that one site.
+385 bare-salus devices total on the estate. 153 are restaurant controllers (letter r or b) across 74 distinct sites. 202 are accommodation (s or f). 30 have an unparseable or absent letter. 9 have no parenthetical at all (edge case, discussed in OQ2/D2). All 15 sampled devices (3.9% of 385) have SERVER_SCOPE active: false; the full-fleet status is unconfirmed, but the sample establishes a strong dark-fleet signal. CLIENT_SCOPE site is populated on confirmed devices (e.g., site: "(5694-r-2)") and is already the primary source for deriveArea. Bare-salus is the only device family using the old underscore-naming convention (no other family affected). OQ1 RESOLVED (second sweep 2026-10-14): 72 of the 74 affected sites have partial failure -- Bar/Restaurant already surfaces from modern gk-{siteNo}-salusit500-r/b devices; bare-salus thermostats for the same zone are additionally absent from the workspace. 2 sites have total failure: site 5791 has a no-paren restaurant thermostat not addressable by Option A alone; site 5191 has only accommodation bare-salus (f-2) and no r/b device in TB.
 
 SECTION: Fix options and recommendation
-Three options exist. Option A is recommended. Option A (code change -- parenthetical supplementary fetch): in fetchLiveSitesByNumber, add a supplementary textSearch=(${siteNo}- query (verified to return all bare-salus for a given site, e.g. exactly 6 for site 5694) and extend the client-side filter to accept devices that pass a strict bare-salus parenthetical check (name contains _salus_ AND parenthetical leading digit group equals the target site number). The existing siteNameFilter is unchanged; modern devices continue to load via the existing path. No downstream changes needed: classifyDevice already assigns deviceType=salus for these devices (OOHDASH-108), deriveArea already resolves the area from CLIENT_SCOPE.site or the raw name parenthetical (OOHDASH-108), and heatingDevices() and isDarkFleet already include salus type (OOHDASH-123). One extra TB request per 30-second cache window per site -- negligible cost. Option B (site-aliases.json data entries): add 74 entries mapping siteNo to site-name token. DISPROVED as effective: live sweep confirmed that textSearch=gk-wingfieldfarm returns only modern gk-wingfieldfarm-* devices, NOT the old-convention gk_wingfieldfarm_salus_... devices. ThingsBoard normalises underscores to dashes internally, so the alias token does not reach bare-salus names. Option B does not fix the problem. Option C (TB device rename): rename all 385 devices to modern gk-{siteNo}-salus-... convention. Correct long-term but requires Spencer Thompson approval, a bulk write of 385 devices, and risk analysis for any integrations that reference old names. Out of scope for this ticket; viable as a separate cleanup. Recommendation: Option A in this ticket. Option C as a planned follow-on if Spencer confirms no integration dependency on old names.
+Three options exist. Option A is recommended. Option A (code change -- parenthetical supplementary fetch): in fetchLiveSitesByNumber, add a supplementary textSearch=(${siteNo}- query (verified to return all bare-salus for a given site, e.g. exactly 6 for site 5694) and extend the client-side filter to accept devices that pass a strict bare-salus parenthetical check (name contains _salus_ AND parenthetical leading digit group equals the target site number). The existing siteNameFilter is unchanged; modern devices continue to load via the existing path. No downstream changes needed. One extra TB request per 30-second cache window per site. Option B (site-aliases.json data entries) is DISPROVED: live sweep confirmed that textSearch on any site-name token does not return old-convention bare-salus devices. Option C (TB device rename) is correct long-term but requires Spencer Thompson approval and a bulk write of 385 devices -- out of scope for this ticket.
 
-SECTION: What is already correct
-classifyDevice (OOHDASH-108): correctly assigns deviceType=salus for bare-salus tokens via the FORWARD_ONLY_TOKENS guard -- no change needed. deriveArea (OOHDASH-108): correctly resolves r/b to Bar/Restaurant via CLIENT_SCOPE.site and parenthetical fallback -- no change needed. heatingDevices() and isDarkFleet in flows.js (OOHDASH-123): already include salus type and handle honest offline -- no change needed. The fix is entirely confined to fetchLiveSitesByNumber in services/tb-device.js (the fetch and filter extension).
+SECTION: Accommodation blast-radius -- BLOCKS DESIGN (OQ4)
+Option A's supplementary fetch is site-scoped, not area-scoped. Site 5694 (Wingfield Farm) has six bare-salus devices: two Restaurant (r-2, r-1) and four Accommodation/Staff (f-1, f-2, f-3, s-1). The supplementary fetch returns all six. The four s/f devices -- active: false in the sample -- load into the Accommodation health bucket alongside any healthy modern Accommodation devices. On the 72 partial-failure sites, Accommodation changes from an all-healthy view to a mixed-health view (some healthy modern, some dark bare-salus). This is accurate, not a regression, but it is a material overnight change. Design must handle the mixed-health state explicitly: distinguishable card types, copy that explains why older and newer thermostat types co-exist in one area, and an updated handler support guide. OQ4 asks James to accept or reject this blast-radius before Design starts. It blocks design.
+
+SECTION: The 30 no-usable-letter devices -- BLOCKS DESIGN (OQ5)
+Thirty bare-salus devices (including 9 with no parenthetical at all) carry no letter that deriveArea can resolve. They pass the supplementary fetch (they share a site number) and pass the cross-site guard (site number matches). But deriveArea returns null for them. Leaving this undefined allows null to leak into the render path and cause display corruption. Recommended default: drop them silently -- no area assigned, no card rendered, no error. This means 30 devices remain permanently invisible after the fix. OQ5 asks James to accept this default or choose an alternative (a dedicated "area not identified" chip). It blocks design because Design must know whether to lay out a third area bucket.
 
 SECTION: Cost and silent-running evaluation
-Option A adds one TB HTTP request per site query per 30-second cache window. No background polling, no idle token spend, no new service or daemon. The supplementary request is request-driven only (fires when an operator opens a site) and is bounded by the existing TTL. Cost: negligible. Silent-running: fully met.
+Option A adds one ThingsBoard GET per site page load per 30-second cache window. The supplementary fetch returns only that site's bare-salus devices -- evidence shows 6 devices for site 5694; fleet mean is approximately 5 per site (385 devices across 74 sites). The payload is a handful of device objects, not the full 385-device fleet. Fleet-scale bound: at most 74 additional GETs spread across all operator sessions visiting those 74 affected sites. No background polling, no idle token spend, no new service or daemon. Silent-running: fully met. Both options impose negligible cost. No criterion vetoes any proposed change.
 
 SECTION: What we still need
-OQ1 RESOLVED -- see population section above. OQ2: the 9 bare-salus devices with no trailing parenthetical use a space-separated site code (e.g., 5669-S-1) or have no site code at all. They are not addressable by Option A. Full breakdown: 3 are Salus r10a gateways (gk-6858/6099/6758-salus-r10a) that classify as gateways by matchAssetIntent and are irrelevant to the heating path. 4 genuine thermostat devices have a space-separated site code (s=1 at site 5669, r=1 at site 5791, f=2 at site 5791). 2 have no parseable site code at all. parseSiteCodeLetter handles uppercase correctly (lowercases before matching; 5669-S-1 resolves to s). The 1 restaurant thermostat (5791-r-2) is the only no-paren device that matters for the Bar/Restaurant gap -- it is at the one total-failure site (5791) that Option A alone does not fix. The decision is whether to include a secondary no-paren fix in this ticket. OQ3 (for Spencer Thompson, open, does not block this ticket): does any non-OOH integration reference bare-salus device names by the old name format? Relevant only if Option C (TB rename) becomes a future target.
+OQ1 RESOLVED -- 72 partial / 2 total failure sites. Option A addresses 73 of 74; site 5791 Bar/Restaurant remains a gap unless OQ2/D2 includes a secondary fix path. OQ2: should the 9 no-paren devices (1 restaurant thermostat at site 5791) be included in this ticket? Owner James, D2 decision, does not block design. OQ3: does any non-OOH integration reference bare-salus device names by old name format? Owner Spencer Thompson, relevant only if Option C is a future target. OQ4 (blocks design): do you accept Option A changing the Accommodation health view on 72 sites to mixed-health? OQ5 (blocks design): do you accept the 30 no-usable-letter devices are silently dropped? OQ6 (blocks ship, not design): should the cross-site guard be spot-checked on 2 to 3 additional sites before ship?
 
-DECISION: Fix approach | Option A (parenthetical supplementary fetch -- code change in fetchLiveSitesByNumber) | Option C (TB device rename -- separate ticket, Spencer approval required)
-DETAIL: Option B (alias data) is ruled out: live sweep proved TB does not return bare-salus devices when searching by site-name token. Option A fixes 72 of 74 sites fully and site 5191 (accommodation bare-salus loads correctly). Option C is clean long-term but requires external approval and a bulk write.
+DECISION: Fix approach (D1) | Option A (parenthetical supplementary fetch -- code change in fetchLiveSitesByNumber) | Option C (TB device rename -- separate ticket, Spencer approval required)
+DETAIL: Option B (alias data) is ruled out: live sweep proved TB does not return bare-salus devices when searching by site-name token. Option A fixes 72 of 74 sites fully and resolves site 5191 (accommodation bare-salus loads correctly). Option C is clean long-term but requires external approval and a bulk write.
 
-DECISION: No-paren edge-case devices (9 devices, 1 restaurant thermostat at site 5791) | Defer to a follow-on ticket -- only 1 device affects the heating gap; different fix path needed | Address in this ticket with a secondary fix path keyed on the space-separated site code in the device name
-DETAIL: 8 of the 9 no-paren devices are either gateways (irrelevant to heating) or accommodation thermostats. Only 1 -- gk_unknown_salus_STA10108795 5791-r-2 -- is a restaurant thermostat and it is the reason site 5791 remains a gap even after Option A. A secondary path (e.g., also search textSearch={siteNo}- without the opening paren and filter by space-separated site code pattern) would close this 1-device gap. Original D2 claim that all no-paren devices are s-letter (accommodation) was wrong and is corrected here; the evidence file has the full per-device breakdown.
+DECISION: No-paren edge-case devices (OQ2 / D2 -- 9 devices, 1 restaurant thermostat at site 5791) | Defer to a follow-on ticket -- only 1 device affects the heating gap; different fix path needed | Address in this ticket with a secondary fix path keyed on the space-separated site code in the device name
+DETAIL: 8 of the 9 no-paren devices are either gateways (irrelevant to heating) or accommodation thermostats. Only 1 -- gk_unknown_salus_STA10108795 5791-r-2 -- is a restaurant thermostat and it is the reason site 5791 remains a gap even after Option A. A secondary path (e.g., also search textSearch={siteNo}- without the opening paren and filter by space-separated site code pattern) would close this 1-device gap.
+
+DECISION: Accommodation blast-radius (OQ4 -- blocks design) | Accept -- Option A with explicit mixed-health UX; Design handles the mixed-health state and operator signposting | Reject -- use Option B (area-scoped fetch) to avoid loading Accommodation bare-salus when the Restaurant panel is viewed and vice versa
+DETAIL: The mixed-health state is factually correct: these Accommodation areas do contain dark thermostats. The blast-radius is a design obligation, not a technical veto. Option B should be chosen only if James decides the blast-radius is unacceptable for the current release.
+
+DECISION: Fate of 30 no-usable-letter devices (OQ5 -- blocks design) | Drop silently -- no card, no area, no display corruption; 30 devices remain permanently invisible | Surface in an area-not-identified chip so operators know unresolvable heating devices exist at this site
+DETAIL: Recommended: drop silently. An area-not-identified chip is the more honest option but adds a third area bucket to Design's layout and requires new copy in the handler support guide.
+
+DECISION: Cross-site guard pre-ship spot-check (OQ6 -- blocks ship, not design) | Yes -- spot-check on 2 to 3 additional sites (including at least one with malformed parenthetical) before ship; add to pre-ship gate | No -- trust the single-site verification on site 5694; accept residual cross-site bleed risk
+DETAIL: Recommended: yes. Site 5694 had clean, unambiguous parenthetical entries. Sites with malformed or absent parentheticals are the residual risk; a spot-check on 2 to 3 such sites gives much stronger evidence before going live.
 -->
 
 # DISCOVERY -- OOHDASH-128
@@ -55,12 +67,12 @@ This is not a recurrence of a prior fix. The load-step gap predates both OOHDASH
 2. Filter: the client-side anchored filter ^gk-({siteNo})(?![0-9]) is applied to the NORMALISED device name.
 3. Classify and map: classifyDevice, deriveArea, and mapTbDevice run on whatever passed the filter.
 
-**Where it breaks (stage 1 and 2):**
+**Where it breaks (stages 1 and 2):**
 
 normaliseName strips parentheticals before tokenising:
 
     "gk_wingfieldfarm_salus_STA10108576 (5694-r-2)"
-    --> normalised: "gk-wingfieldfarm-salus-sta10108576"
+    -> normalised: "gk-wingfieldfarm-salus-sta10108576"
 
 textSearch=gk-5694 does not match "gk_wingfieldfarm_salus_..." (live sweep confirmed: textSearch on the site number or site name returns zero bare-salus devices). The anchored filter ^gk-5694 does not match "gk-wingfieldfarm-salus-...". Result: devices never enter byId, the filter never sees them, stages 2 and 3 are never reached.
 
@@ -94,14 +106,18 @@ The bug is entirely in the fetch and filter layer.
 | Category | Count |
 |---|---|
 | Total bare-salus devices on estate | 385 |
-| Restaurant controllers (letter r or b) | 153 |
-| Accommodation (letter s or f) | 202 |
+| Restaurant controllers (letter r) | 146 |
+| Bar controllers (letter b) | 7 |
+| r + b subtotal (Bar/Restaurant) | 153 |
+| Staff accommodation (letter s) | 21 |
+| Flats accommodation (letter f) | 181 |
+| s + f subtotal (Accommodation) | 202 |
 | Other / no usable letter | 30 |
 | No parenthetical at all (edge case) | 9 |
 | Distinct site numbers affected | 74 |
-| SERVER_SCOPE active: true in sample (15 devices) | 0 |
+| SERVER_SCOPE active: false in sample (15 devices sampled) | 15 |
 
-All 15 sampled devices have active: false. The bare-salus fleet is entirely dark (not reporting live telemetry). After the fix, these devices will load and the Bar/Restaurant area will surface; the honest "device not reporting" branch activates per the OOHDASH-123 dark-fleet path (no controllable state shown, no control available -- correct).
+All 15 sampled devices have active: false. This is a 3.9% sample (15 of 385); it establishes a strong signal for this population but does not prove the entire fleet is dark. If any non-dark bare-salus device surfaces (e.g. during Design testing), the health-status display behaviour must be confirmed against a live device (see Test T8). After the fix, these devices will load and the Bar/Restaurant area will surface; the honest "device not reporting" branch activates per the OOHDASH-123 dark-fleet path (no controllable state shown, no control available -- correct for the sample).
 
 **Site-loading failure type (OQ1 -- RESOLVED, second sweep 2026-10-14, all 74 sites checked):**
 
@@ -118,7 +134,7 @@ Sweep of intesis, tuya, boiler, and gk_ prefix devices confirms bare-salus is th
 
 **textSearch=(${siteNo}- confirmation:**
 
-textSearch=(5694- returns exactly 6 devices -- all bare-salus for site 5694 (r-2, r-1, f-1, f-2, f-3, s-1). No false positives. This is the mechanism that makes Option A possible.
+textSearch=(5694- returns exactly 6 devices -- all bare-salus for site 5694 (r-2, r-1, f-1, f-2, f-3, s-1). No false positives. This is the mechanism that makes Option A possible and confirms the per-site payload is a handful of devices, not the full fleet.
 
 **CLIENT_SCOPE confirmation:**
 
@@ -129,6 +145,54 @@ Verified on gk_wingfieldfarm_salus_STA10108576 (5694-r-2):
 **alias-overlay disproof:**
 
 textSearch=gk-wingfieldfarm (dash), gk_wingfieldfarm (underscore), and wingfieldfarm (bare token) all return 10 modern devices only -- none of the 6 bare-salus for site 5694. ThingsBoard appears to normalise or tokenise device names internally such that the site-name alias approach does not reach old-convention bare-salus devices. Option B (alias data) is ruled out.
+
+---
+
+## Accommodation blast-radius
+
+**This section was absent from the initial artefact. OQ4 must be answered before Design starts.**
+
+### What the blast-radius is
+
+Option A's supplementary fetch is site-scoped, not area-scoped. Site 5694 (Wingfield Farm) has six bare-salus devices: two Restaurant (r-2, r-1) and four Accommodation/Staff (f-1, f-2, f-3, s-1). The supplementary fetch for site 5694 returns all six. The two Restaurant devices go into the Bar/Restaurant health bucket. The four Accommodation/Staff devices go into the Accommodation health bucket.
+
+If those four Accommodation devices are active: false (consistent with the 3.9% sample) and the site also has a healthy modern Salus IT700 thermostat in Accommodation, the Accommodation panel now shows one healthy modern device alongside four dark bare-salus devices. This is the blast-radius: a site whose Accommodation area appeared fully healthy now shows mixed health -- not because anything changed in the modern devices, but because previously invisible bare-salus devices became visible.
+
+### The scale
+
+72 of 74 affected sites have healthy modern Accommodation devices alongside bare-salus Accommodation devices. On all 72, Option A changes the Accommodation panel from a single-health view to a mixed-health view. The 202 s/f devices across 72 sites gives a mean of approximately 2.8 per site; even one dark bare-salus device in a previously-healthy area changes the panel state.
+
+### Design's obligation (if OQ4 is accepted)
+
+Design must explicitly handle the mixed-health state. This is not a regression. The design brief must cover:
+- How to visually distinguish dark bare-salus devices from healthy modern devices within the same area panel. A shared card design that shows active: false devices clearly as offline is the minimum.
+- What copy explains to an operator why a thermostat type they have not seen before (bare-salus) is showing as offline alongside a healthy thermostat they recognise. Operators must not read this as a new fault introduced by their action.
+- Whether the area panel's overall health indicator (the chip colour at the top of each area section) changes to amber or red when any bare-salus in that area is dark, or whether bare-salus darkness is visually separated from the modern-device health indicator.
+- An update to the handler support guide (OOHDASH-113) to reflect this change.
+
+These are Design responsibilities. Discovery defines them as obligations that must not be skipped; it does not resolve them.
+
+---
+
+## The 30 no-usable-letter devices
+
+**This section was absent from the initial artefact. OQ5 must be answered before Design starts.**
+
+Thirty bare-salus devices have no site-code letter that deriveArea can resolve. Nine of these have no parenthetical in their name at all (e.g. gk_unknown_salus_STA10109372 5669-S-1 -- the suffix is a space-separated site code rather than a trailing parenthetical). The other twenty-one have a parenthetical whose class-letter position contains a digit, z, or some other non-class character that parseSiteCodeLetter correctly rejects as malformed.
+
+These 30 devices pass the supplementary fetch (they share a site number) and pass the cross-site guard (siteNo matches). The problem arises at deriveArea: it returns null. The subsequent render step has no defined behaviour for a null-area device from a supplementary fetch.
+
+### Fate options
+
+| Fate | Description | Risk |
+|---|---|---|
+| Drop silently | No card rendered, no area assigned, no error shown | 30 devices permanently invisible; operators cannot see unplaced heating at this site |
+| Area-not-identified chip | Surface in an existing or new chip so the operator knows unresolvable heating exists | Design must lay out a third area bucket; chip must have clear copy |
+| Assign to Accommodation as fallback | Revert to pre-108 behaviour for these 30 only | Incorrect placement risk; reproduces the original OOHDASH-108 bug for this residue |
+
+**Recommended default: drop silently.** The 30 are a small residue (7.8% of the bare-salus fleet, 0.025% of the total 1,199 salus-named estate). The area-not-identified chip is the more honest option but adds a third area bucket to Design's layout and requires new copy in the handler support guide. The silent-drop default avoids display corruption with minimal operator impact. OQ5 asks James to accept this default or explicitly choose the chip alternative. Design cannot proceed until the fate is settled.
+
+Note: parseSiteCodeLetter handles uppercase correctly (lowercases before matching; 5669-S-1 resolves to s). Uppercase is not the failure mode for these devices -- the failure is absent or non-class letter positions.
 
 ---
 
@@ -154,55 +218,102 @@ Step 4 -- downstream unchanged: classifyDevice, deriveArea, mapTbDevice, heating
 - The exact-siteNo parenthetical guard prevents cross-site contamination.
 - No other device family uses the old underscore naming (confirmed by sweep).
 
-**Cost:**
+**Residual cases:**
 
-One extra TB HTTP request per site query per 30-second cache window. Request-driven, not background. No LLM token spend. Silent-running: fully met.
-
-**Residual case:**
-
-9 devices have no trailing parenthetical and are not addressed by this path. Of these, 3 are Salus r10a gateways (classify as gateways, irrelevant to the heating path). The 4 genuine thermostat devices have space-separated site codes: 3 at site 5791 (r-2, f-2, f-1) and 1 at site 5669 (S-1). parseSiteCodeLetter handles uppercase correctly (lowercases before matching; S-1 resolves to s). The 1 restaurant thermostat (5791-r-2) is the only device in this set that affects Bar/Restaurant -- it is at the one total-failure site (5791) not resolved by Option A alone. Decision D2 determines scope. The original D2 claim that all no-paren devices are s-letter (accommodation) was incorrect and is corrected here.
+The 9 no-paren devices are not addressed by this path. The 30 no-usable-letter devices pass the fetch but deriveArea returns null for them -- fate per OQ5. Decision D2 determines whether to include a secondary fix for the 1 restaurant thermostat at site 5791.
 
 ### Option B -- data/site-aliases.json entries
 
-Add 74 entries mapping siteNo to site-name token. RULED OUT: live sweep proved textSearch on the site name (with any separator) does not return bare-salus devices from ThingsBoard. The alias mechanism cannot find them.
+RULED OUT: live sweep proved textSearch on the site name (with any separator) does not return bare-salus devices from ThingsBoard. The alias mechanism cannot find them.
 
 ### Option C -- TB device rename
 
 Rename all 385 bare-salus devices to modern gk-{siteNo}-salus-... convention. Requires Spencer Thompson approval, a bulk write of 385+ devices, and risk assessment for any upstream integrations referencing old device names by name. Correct long-term cleanup but out of scope for this ticket without that approval. Present as a follow-on.
 
+### Options compared
+
+| Criterion | Option A | Option B (area-scoped variant) |
+|---|---|---|
+| ThingsBoard fetch calls per site view | 1 | 2 (one per area panel) |
+| Accommodation blast-radius on 72 sites | Yes -- mixed-health view (OQ4) | No |
+| Implementation complexity | Lower | Moderate |
+| Correctness of area placement (355 letter-bearing devices) | Full | Full |
+| 30 no-letter devices | Unrouted -- fate per OQ5 | Unrouted -- fate per OQ5 |
+| Cross-site guard required | Yes | Yes |
+| Recommended | Yes (with design constraints) | If OQ4 is rejected |
+
+---
+
+## Cross-site guard -- UNVERIFIED at scale
+
+The supplementary fetch retrieves bare-salus devices that share a site number with the target site. To prevent bleed from devices at adjacent sites whose names contain the same digit sequence in a different position, a client-side cross-site guard is required: each device's parsed siteNo must exactly match the target site number before it is accepted into the health bucket.
+
+**Evidence:** the cross-site guard logic was verified on site 5694 only. The six site-5694 devices all carry the site number unambiguously in the (NNNN-x-n) parenthetical, and a guard comparing parsed siteNo to "5694" rejects all non-5694 devices correctly. This gives one confirmed site; it is UNVERIFIED at scale.
+
+**Design of the guard:** the guard must use strict equality on the parsed siteNo and must reject devices where the parser returns null (i.e. malformed parenthetical). It must not fall back on raw substring matching, which could admit a device from a different site whose number appears as a substring.
+
+**OQ6 (blocks ship, not design):** a pre-ship spot-check on 2 to 3 additional sites -- including at least one with malformed-parenthetical bare-salus devices -- must confirm the guard rejects cross-site devices and accepts same-site devices correctly. This is a pre-ship gate item, not a blocker for Design.
+
 ---
 
 ## Customer experience success criteria (for design)
 
-Persona: site operator (heating path, pub or restaurant site).
+**Persona.** An OOH handler takes a call overnight from a pub with a heating complaint. They are not technical. They know the dashboard's existing panels (green/amber/red area chips, device cards). They may not know what a "bare-salus thermostat" is or why some thermostats appear offline.
 
-Journey: operator opens a site, sees heating option, follows heating path, selects an area.
+**Journey.** Handler searches for the site -> sees the site health view -> opens the Heating section -> sees device cards. Post-OOHDASH-128: the Heating section may now contain both healthy modern Salus cards and dark bare-salus cards.
 
-Target: the heating area selector shows "Bar/Restaurant" for sites that have bar or restaurant heating devices, regardless of whether those devices use old or new naming convention. Where a device is present but offline (the expected state for all bare-salus), the "device not reporting" branch activates -- honest, no controls offered, no false state shown.
+**Reassurance vs friction calibration:**
 
-"Great looks like...": the operator sees both Accommodation and Bar/Restaurant as selectable areas (where both exist), and bar/restaurant shows the correct honest offline state. The operator is not confused by a missing area.
+| Step | Want |
+|---|---|
+| Site health overview | Get out of the way -- handler needs the area health signal fast, not explanation of device types |
+| Area panel with mixed health | Checkpoint -- handler needs to distinguish "the main thermostat is fine" from "an older unit is offline"; these have different call-back actions |
+| Dark bare-salus card | Reassurance -- handler must understand this is not a new fault introduced by their action; it is a pre-existing state now made visible |
 
-Reassurance vs friction: this is a read path (no action requested yet). The area selector should be friction-free. If a device is not reporting, the message should be direct and calm -- not alarming.
-
----
-
-## Data scope
-
-Key entity: TB Device. Relevant fields: name (raw, for parenthetical parse), id.id (TB UUID), CLIENT_SCOPE.site (letter source), SERVER_SCOPE.active and lastActivityTime (online state). No new data entities. No retention or sensitivity concerns beyond the existing TB read credentials (already in scope).
+**"Great looks like..."** The handler opens the Accommodation panel at a partial-failure site and immediately sees: (a) the modern thermostat as green and controllable; (b) one or more bare-salus thermostats as clearly offline, with a label that distinguishes them from the modern unit and copy that says "this sensor is not reporting -- it may have been decommissioned; the modern thermostat above is active and can be controlled." The handler is not confused about which thermostat to use, does not try to control the offline bare-salus unit, and understands the difference between a live controllable device and an offline legacy sensor without needing to call the IoT team.
 
 ---
 
-## End-to-end testing scope
+## Data scope (for design)
 
-Test 1 (happy path, bare-salus r/b site): given a site with bare-salus restaurant devices and no modern r/b iT500 devices, when the operator opens the heating path, then Bar/Restaurant area is offered and shows "device not reporting" (honest offline). Device name format: gk_{sitename}_salus_{serial} ({siteNo}-r-n).
+| Entity / field | Origin | Significance | Sensitivity |
+|---|---|---|---|
+| Bare-salus device name | ThingsBoard entity name | Used to parse siteNo and site-code letter; raw name (before normalisation) needed for parenthetical fallback | Low |
+| CLIENT_SCOPE site attribute | ThingsBoard CLIENT_SCOPE | Primary site-letter source for deriveArea; may be absent on some devices | Low |
+| SERVER_SCOPE active flag | ThingsBoard entity attribute | Determines whether a bare-salus device is shown as online or offline | Low |
+| device.area (computed) | deriveArea output | Determines which health bucket the device appears in; null for the 30 no-letter devices -- fate per OQ5 | Low |
+| device.deviceType (computed) | classifyDevice output | Must be "salus" (the OOHDASH-108 type) for supplementary-fetch devices to be handled by the render path | Low |
 
-Test 2 (no regression, modern site): given a site with modern gk-{siteNo}-salusit500-r/b devices, when the operator opens the heating path, then the existing behavior is unchanged -- Bar/Restaurant and Accommodation surface as before, no new devices are added or removed.
+No personal data is involved. No new fields beyond the above are needed for OOHDASH-128's display scope.
 
-Test 3 (mixed site): given a site with both bare-salus and modern devices, when the operator opens the heating path, then the workspace contains both sets of devices and area derivation is correct for each.
+---
 
-Test 4 (numeric neighbour anti-regression): given a site with number 520 and a different site with number 5204, when site 520 is loaded, then no devices for site 5204 appear in the workspace (parenthetical exact-match guard).
+## End-to-end testing scope (for design)
 
-Test 5 (no parenthetical edge case): given a bare-salus device with no trailing parenthetical, when the site is loaded, the device is absent from the workspace (not fixed by Option A; honest behavior for the residual case).
+The following tests must be provable once the thing is built. Happy path and critical unhappy paths only.
+
+| Test | Scenario | Expected outcome |
+|---|---|---|
+| T1 | Operator opens a site with bare-salus Restaurant/Bar devices and no modern r/b iT500 devices | Bar/Restaurant panel shows bare-salus device cards with correct area label and honest offline state |
+| T2 | Operator opens a site with modern gk-{siteNo}-salusit500-r/b devices | Existing behaviour unchanged; no new devices added or removed |
+| T3 | Mixed site: bare-salus and modern devices both present | Workspace contains both sets; area derivation correct for each |
+| T4 (anti-bleed) | Site 520 loaded when site 5204 also has bare-salus devices | No devices for site 5204 appear in site 520's workspace; parenthetical exact-match guard holds |
+| T5 (no-paren) | Bare-salus device with no trailing parenthetical | Device absent from workspace (not fixed by Option A; honest residual behaviour) |
+| T6 (blast-radius) | Site with healthy modern Accommodation devices AND dark bare-salus Accommodation devices | Accommodation panel shows mixed health; both device types visible; operator can distinguish them; area chip reflects mixed health correctly; no regression message |
+| T7 (no-letter -- OQ5 outcome required) | Site has a bare-salus device with no usable letter | If drop: no card, no error, no display corruption. If chip: device appears in a clearly-labelled area-not-identified section |
+| T8 (conditional -- active sample caveat) | A non-dark bare-salus device surfaces | Device renders correctly as active/online; health display is not hardcoded to show bare-salus as offline |
+
+Tests T6, T7, and T8 are new requirements relative to the initial artefact. T7's expected outcome depends on the OQ5 decision and must be confirmed with James before the test script is written.
+
+---
+
+## Cost and silent-running evaluation
+
+**Token and cost efficiency.** Option A adds one ThingsBoard GET per site page load per 30-second cache window. The supplementary fetch returns only that site's bare-salus devices -- evidence confirms 6 devices for site 5694; the fleet mean is approximately 5 devices per site (385 devices across 74 sites). The payload is a handful of device objects per site, not the full 385-device fleet. Fleet-scale bound: at most 74 additional GETs spread across all operator sessions visiting those 74 affected sites -- negligible. Option B adds one GET per area panel open (two GETs per site with two area panels viewed). Both use the existing JWT read path; no new subscription, credential, or per-call cost is introduced. Cost impact: negligible for both options.
+
+**Silent running.** Neither option adds any background process, daemon, scheduled task, webhook listener, or polling component. The supplementary fetch is strictly on-demand -- it fires when an operator opens a site view and never at any other time. No tokens are spent, no machine resources consumed, and no process window is created while the dashboard is idle. This criterion is fully met by both options.
+
+**Neither criterion vetoes any proposed change.** There is no cost or silent-running compromise to disclose.
 
 ---
 
@@ -210,28 +321,52 @@ Test 5 (no parenthetical edge case): given a bare-salus device with no trailing 
 
 | Risk | Likelihood | Impact | Mitigation |
 |---|---|---|---|
-| Cross-site contamination via parenthetical fetch | Low | High | Exact-siteNo guard in client filter; sweep shows parenthetical is always the site number |
-| No-paren restaurant thermostat (site 5791) not loaded by Option A | Certain | Low (1 device, 1 site) | Accept as residual unless D2 chooses to include secondary fix path |
-| Dark-fleet devices surfacing controllable state incorrectly | None | High | isDarkFleet and freshness gates already handle this per OOHDASH-123 |
-| Option A regresses modern iT500/iT700 sites | None | High | siteNameFilter is unchanged; supplementary path is purely additive |
-| TB rename (Option C) breaks upstream integrations | UNVERIFIED | High | Blocker for Option C; needs Spencer review of any name-referencing integrations |
+| Cross-site contamination via parenthetical fetch | Medium -- verified on site 5694 only | High -- operator sees wrong site's devices | OQ6: pre-ship spot-check on 2-3 additional sites; guard must use strict parsed-siteNo equality, not substring matching |
+| Accommodation blast-radius confuses operators on 72 partial-failure sites | High -- will definitely occur | Medium -- operators may misread Accommodation health as a new fault | Design obligation: explicit mixed-health UX, distinguishable card types, explanatory copy, handler support guide update |
+| All bare-salus dark; operators raise tickets about "new" offline devices | Medium -- sample all inactive, but sample is 3.9% only | Medium -- alert volume increase, operator confusion | Explanatory card copy; handler support guide update; monitor alert volume post-release |
+| 30 no-letter devices leak null area into render path | High -- guaranteed if fate is undefined | Medium -- display corruption or uncaught exception | OQ5: fate must be decided before design; recommended drop is the safe default; T7 verifies the chosen path |
+| A non-dark bare-salus device exists and is shown incorrectly | Low -- sample signal is strong | Low -- display renders correctly if T8 passes | T8 (conditional) covers this; hardcoded active: false assumptions must be absent from the render path |
+| OOHDASH-108 regression: glued iT700 or iT500 devices reclassified by supplementary fetch | Low -- supplementary fetch is for bare-salus entities only | High -- area misclassification for hundreds of working devices | T3 and T4 regression guards; supplementary path is additive only |
+| No-paren restaurant thermostat (site 5791) not loaded by Option A | Certain | Low (1 device, 1 site) | Accept as residual unless D2 scope includes secondary no-paren fix path |
+| TB rename (Option C) breaks upstream integrations | UNVERIFIED | High | Blocker for Option C; needs Spencer review (OQ3) before any future rename ticket |
 
 ---
 
 ## Open questions
 
-| ID | Question | Owner | Status |
-|---|---|---|---|
-| OQ1 | How many of the 74 sites have total vs partial Bar/Restaurant failure? | Discovery sweep | RESOLVED: 72 partial, 2 total (5191 and 5791). Option A fixes 73; site 5791 remains a gap (no-paren r-letter device). |
-| OQ2 | Should the 9 no-paren devices (1 restaurant thermostat at site 5791) be included in this ticket? | James | Open -- D2 decision |
-| OQ3 | Does any non-OOH integration reference bare-salus device names by old name format? | Spencer Thompson | Open -- relevant only if Option C is a future target |
+| ID | Question | Blocks | Recommended default | Owner | Status |
+|---|---|---|---|---|---|
+| OQ1 | How many of the 74 sites have total vs partial Bar/Restaurant failure? | -- | -- | Discovery sweep | RESOLVED: 72 partial, 2 total (5191, 5791). Option A fixes 73; site 5791 remains a gap. |
+| OQ2 | Should the 9 no-paren devices (1 restaurant thermostat at site 5791) be included in this ticket? | Ship (not design) | Defer to follow-on | James | Open -- D2 decision |
+| OQ3 | Does any non-OOH integration reference bare-salus device names by old name format? | Future Option C | -- | Spencer Thompson | Open -- relevant only if Option C becomes a future target |
+| OQ4 | Do you accept that Option A changes the Accommodation health view on the 72 partial-failure sites from all-healthy to mixed-health? If no, Option B is required. | Design | Yes -- accept blast-radius; Option A with explicit mixed-health UX | James | Open |
+| OQ5 | Do you accept that the 30 no-usable-letter devices are silently dropped (no card, no error)? Or should they surface in an area-not-identified chip? | Design | Drop silently | James | Open |
+| OQ6 | Should the cross-site guard be spot-checked on 2 to 3 additional sites before ship? | Ship (not design) | Yes -- add to pre-ship gate | James | Open |
+
+OQ4 and OQ5 must be answered before Design can define its layout and component requirements. OQ2 and OQ6 are pre-ship gate items that do not block Design.
 
 ---
 
 ## Next steps
 
-Recommended first phase: implement Option A in design, covering the fetchLiveSitesByNumber supplementary fetch and extended client filter only (services/tb-device.js, no other file changes). Add unit tests for the new filter logic (bare-salus parenthetical match, anti-bleed guard). Add an e2e fixture covering a bare-salus restaurant site.
+**Immediate (before Design starts):**
 
-Before design starts: no external blockers for Option A. OQ1 and OQ2 are nice-to-know but do not block design; the fix is the same either way. OQ3 is relevant only for a future Option C ticket.
+1. James answers OQ4 and OQ5 at this gate. Design cannot proceed without both answers on record.
+2. If OQ4 is accepted (Option A): Design proceeds against the full brief -- mixed-health UX is a first-class design requirement, not an afterthought; §6 (accommodation blast-radius design obligations) is the primary design brief.
+3. If OQ4 is rejected (Option B selected): Build implements the area-scoped fetch (two call points instead of one) and the blast-radius analysis becomes moot -- but Design still owns the bare-salus card design and the handler support guide update.
+4. James records OQ5 fate (drop or chip). Design cannot finalise the area layout without this answer.
 
-Evidence file: docs/project/oohdash-128-discovery/tb-sweep-evidence.json (raw sweep output, no secrets).
+**During Design:**
+
+5. Design doer receives the CX success criteria, data scope, and E2E testing scope as the design brief.
+6. Active-status caveat (T8) must be surfaced in the design brief: bare-salus devices must not be hardcoded as offline -- active status must be read from the device attribute.
+
+**Pre-ship (OQ6):**
+
+7. A read-only spot-check on 2 to 3 additional sites (including at least one with malformed-parenthetical bare-salus names) confirms the cross-site guard. Owner: James; gate: pre-ship.
+
+**Owner of all external blockers:** James (OQ4, OQ5, OQ6 are internal decisions). Spencer Thompson owns OQ3, which is relevant only for a future Option C ticket and does not block this one.
+
+---
+
+*All population counts are from the read-only ThingsBoard sweep 2026-10-14T18:17:44Z against portal.lhlive.co.uk. Active-status finding (active: false) is attributed to the 15/385 (3.9%) sample -- it does not assert the full fleet is dark. Cross-site guard behaviour is verified on site 5694 only and is UNVERIFIED at scale. No application source was changed and no PR was opened by this artefact.*
