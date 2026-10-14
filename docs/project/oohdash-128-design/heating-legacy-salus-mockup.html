@@ -1,0 +1,239 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Older Salus Heating</title>
+<style>
+:root{
+  --primary:#594AE2;--primary-dark:#4338CA;--primary-light:#EEF2FF;
+  --success:#10B981;--success-light:#D1FAE5;--warning-light:#FEF3C7;--danger-light:#FEE2E2;--info-light:#DBEAFE;
+  --surface:#FFFFFF;--surface-variant:#F8FAFC;--background:#F1F5F9;
+  --text-primary:#1E293B;--text-secondary:#64748B;--border:#E2E8F0;--radius-md:8px;--radius-lg:12px;
+  --hl:#FDE68A;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --primary:#8B80F0;--primary-dark:#C7C2FA;--primary-light:#2A2550;
+    --success-light:#073B2C;--warning-light:#3D2E06;--danger-light:#401313;--info-light:#0F2747;
+    --surface:#1E293B;--surface-variant:#172133;--background:#0F172A;
+    --text-primary:#E2E8F0;--text-secondary:#94A3B8;--border:#334155;--hl:#6B5310;
+  }
+}
+:root[data-theme="dark"]{
+  --primary:#8B80F0;--primary-dark:#C7C2FA;--primary-light:#2A2550;
+  --success-light:#073B2C;--warning-light:#3D2E06;--danger-light:#401313;--info-light:#0F2747;
+  --surface:#1E293B;--surface-variant:#172133;--background:#0F172A;
+  --text-primary:#E2E8F0;--text-secondary:#94A3B8;--border:#334155;--hl:#6B5310;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:Inter,system-ui,-apple-system,'Segoe UI',sans-serif;font-size:14px;line-height:22px;color:var(--text-primary);background:var(--background);padding:16px}
+button{font:inherit;cursor:pointer;color:inherit}
+.wrap{max-width:760px;margin:0 auto}
+h1{font-size:18px;line-height:26px;margin-bottom:4px}
+.lede{color:var(--text-secondary);font-size:13px;margin-bottom:12px}
+.bar{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:12px;align-items:center}
+.seg{display:flex;flex-wrap:wrap;gap:6px}
+.seg button{border:1.5px solid var(--border);background:var(--surface);border-radius:var(--radius-md);padding:6px 12px;font-size:13px}
+.seg button[aria-pressed="true"]{border-color:var(--primary);background:var(--primary-light);color:var(--primary-dark);font-weight:600}
+.card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-md);margin-bottom:12px}
+.flowhead{display:flex;align-items:center;gap:8px;padding:12px 18px;border-bottom:1px solid var(--border)}
+.flowbody{padding:18px}
+.small{font-size:12.5px;line-height:17px;color:var(--text-secondary)}
+.done{margin-bottom:8px}
+.done div{font-size:13px;color:var(--text-secondary)}
+.stepq{font-size:15px;font-weight:600;margin:4px 0 10px}
+.chips{display:flex;flex-wrap:wrap;gap:8px}
+.chip{border:1.5px solid var(--border);background:var(--surface);border-radius:var(--radius-md);padding:9px 16px;font-size:14px;font-weight:500;min-height:40px}
+.chip:hover{border-color:var(--primary);color:var(--primary)}
+.zoneread{border:1px solid var(--border);border-radius:var(--radius-md);padding:10px 14px;margin:8px 0;display:flex;align-items:center;gap:14px;flex-wrap:wrap}
+.zoneread .t{font-size:24px;font-weight:700}
+.tag{display:inline-flex;font-size:11.5px;font-weight:600;border-radius:6px;padding:1px 7px;line-height:17px}
+.tag.green{background:var(--success-light);color:#065F46}
+.alert{border-radius:var(--radius-md);padding:11px 14px;font-size:13.5px;margin:10px 0;line-height:20px}
+.alert.warn{background:var(--warning-light)}
+.alert.info{background:var(--info-light)}
+.alert.ok{background:var(--success-light)}
+.reco{border:1.5px solid var(--border);border-radius:var(--radius-lg);padding:16px;margin:12px 0;background:var(--surface-variant)}
+.reco b.hd{display:block;font-size:15px;margin-bottom:6px}
+.outbtns{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}
+.btn{border:1px solid var(--border);background:var(--surface);border-radius:var(--radius-md);padding:8px 16px;font-weight:500}
+.btn.primary{background:var(--primary);border-color:var(--primary);color:#fff}
+.btn.link{border:none;background:none;color:var(--primary);padding:4px 6px}
+.new{background:var(--hl);border-radius:4px;padding:0 2px}
+.nohl .new{background:none;padding:0}
+.legend{font-size:12.5px;color:var(--text-secondary);margin-top:6px}
+.why{font-size:13px;color:var(--text-secondary);border-left:3px solid var(--primary);padding:6px 10px;margin-top:10px;background:var(--surface)}
+.note-gap{margin-top:12px}
+@media (max-width:480px){ .flowbody{padding:14px} .chip{flex:1 1 100%} .btn{flex:1 1 100%} }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Heating step with older Salus units (OOHDASH-128)</h1>
+  <p class="lede">A clickable mock of the heating conversation once older Salus thermostats load. Pick a site, then click through. Text with a yellow background is new or changed in this release; everything else is today's v1.4.0 screen.</p>
+
+  <div class="bar">
+    <div class="seg" role="group" aria-label="Site">
+      <button data-site="5204" aria-pressed="true">5204 Bramley Farm (mixed)</button>
+      <button data-site="5191" aria-pressed="false">5191 Cherry Tree Farm (only older units)</button>
+      <button data-site="5791" aria-pressed="false">5791 Pine Tree Farm (no area)</button>
+    </div>
+    <div class="seg" role="group" aria-label="Highlight">
+      <button id="hlBtn" aria-pressed="true">Highlight changes</button>
+      <button id="resetBtn" aria-pressed="false">Start again</button>
+    </div>
+  </div>
+
+  <div class="card" id="flow">
+    <div class="flowhead"><span aria-hidden="true">&#127777;</span><b>Heating</b><span class="small">guided flow</span><button class="btn link" style="margin-left:auto" id="cancelBtn">Cancel issue</button></div>
+    <div class="flowbody" id="body"></div>
+  </div>
+  <div class="why" id="why"></div>
+  <p class="legend">Older-unit names, site codes and counts are from the live ThingsBoard sweep of 14 Oct 2026 (every older unit checked last reported on 2 Jun 2026). Modern unit names and temperatures are illustrative.</p>
+</div>
+
+<script>
+(function(){
+  var SITES = {
+    '5204': {
+      name: 'Bramley Farm',
+      devices: [
+        {id:'gk-5204-salusit700', type:'salus-it700', area:'Accommodation', online:true, temp:19.5, sp:21, mode:'Heat'},
+        {id:'gk-5204-salusit500-r1', type:'salus-it500', area:'Bar/Restaurant', online:false},
+        {id:'gk_bramleyfarm_salus_STA10109... (5204-f-1)', type:'salus', area:'Accommodation', online:false},
+        {id:'gk_bramleyfarm_salus_STA10109... (5204-f-2)', type:'salus', area:'Accommodation', online:false},
+        {id:'gk_bramleyfarm_salus_STA10109... (5204-f-3)', type:'salus', area:'Accommodation', online:false},
+        {id:'gk_bramleyfarm_salus_STA10109... (5204-r-2)', type:'salus', area:'Bar/Restaurant', online:false},
+        {id:'gk_bramleyfarm_salus_STA10109... (5204-r-3)', type:'salus', area:'Bar/Restaurant', online:false},
+        {id:'gk_bramleyfarm_salus_STA10109369 (5204-z-1)', type:'salus', area:null, online:false}
+      ],
+      why: 'Mixed site. Accommodation still reads the modern thermostat (it is the only one reporting) and now says honestly that 3 other units are silent. Bar/Restaurant is all silent units, so it goes to the existing "not reporting" outcome with no controls. The one unit with an unreadable site code is acknowledged in a single footnote and kept out of the area question.'
+    },
+    '5191': {
+      name: 'Cherry Tree Farm',
+      devices: [
+        {id:'gk_cherrytreefarm_salus_STA10108309 (5191-f-2)', type:'salus', area:'Accommodation', online:false}
+      ],
+      why: 'Before this fix the handler saw "No heating on Lighthouse at this site." Now the Accommodation area appears and ends in the existing honest "not reporting" outcome, with capture for the IoT team.'
+    },
+    '5791': {
+      name: 'Pine Tree Farm',
+      devices: [
+        {id:'gk_pinetreefarm_salus_STA10109673 (5791-z-1)', type:'salus', area:null, online:false}
+      ],
+      why: 'The only heating unit this release can load here has an unreadable site code, so no area can be offered. The headline is reworded so it does not contradict the footnote. The restaurant thermostat at this site has no bracketed site code and is left to follow-on ticket OOHDASH-129.'
+    }
+  };
+
+  var state = { site:'5204', step:0, area:null, need:null, hl:true };
+  var body = document.getElementById('body');
+  var why = document.getElementById('why');
+
+  function esc(s){ return String(s).replace(/[&<>"]/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]; }); }
+  function N(s){ return '<span class="new">' + s + '</span>'; }
+  function plural(n, one, many){ return n === 1 ? one : many; }
+  function devs(){ return SITES[state.site].devices; }
+  function heating(){ return devs().filter(function(d){ return /^salus|boiler-panel/.test(d.type); }); }
+  function isDark(d){ return d.type === 'salus-it500' || d.type === 'salus'; }
+  function unplaced(){ return heating().filter(function(d){ return d.type === 'salus' && !d.area; }); }
+  function areas(){
+    var order = ['Accommodation','Bar/Restaurant'], present = {};
+    heating().forEach(function(d){ if (d.area) present[d.area] = 1; });
+    return order.filter(function(a){ return present[a]; });
+  }
+  function unmappedOther(){ return heating().some(function(d){ return !d.area && !(d.type === 'salus'); }); }
+  function setFor(a){ return heating().filter(function(d){ return d.area === a; }); }
+  function rep(set){
+    var on = set.filter(function(d){ return d.online; });
+    if (!on.length) return null;
+    return on.sort(function(a,b){ return a.temp - b.temp; })[0];
+  }
+
+  function footnote(){
+    var u = unplaced(); if (!u.length) return '';
+    var n = u.length, allOff = u.every(function(d){ return !d.online; });
+    var tail = allOff
+      ? plural(n, 'It is not reporting and is not used in this check.', 'They are not reporting and are not used in this check.')
+      : plural(n, 'It is not used in this check.', 'They are not used in this check.');
+    return '<p class="small note-gap" data-testid="heating-unplaced-note">' + N('Also at this site: ' + n + ' older Salus heating ' + plural(n,'unit','units') + ' that could not be matched to an area. ' + tail) + '</p>';
+  }
+
+  function done(lines){ return '<div class="done">' + lines.map(function(l){ return '<div>' + l + '</div>'; }).join('') + '</div>'; }
+
+  function render(){
+    document.body.classList.toggle('nohl', !state.hl);
+    why.textContent = SITES[state.site].why;
+    var h = '';
+    if (state.step === 0) {
+      var a = areas();
+      if (!a.length && !unmappedOther()) {
+        var msg = unplaced().length ? N('No heating area can be checked on Lighthouse at this site.') : 'No heating on Lighthouse at this site.';
+        h = '<div class="alert warn">' + msg + '</div>' + footnote() +
+            '<div class="chips" style="margin-top:10px"><button class="chip" data-act="other">Something else / not sure</button></div>';
+      } else {
+        h = '<div class="stepq">Which area is the caller talking about?</div><div class="chips">' +
+            a.map(function(x){ return '<button class="chip" data-area="' + esc(x) + '">' + esc(x) + '</button>'; }).join('') +
+            '</div>' + footnote();
+      }
+    } else if (state.step === 1) {
+      var set = setFor(state.area), z = rep(set);
+      if (!z) {
+        var many = set.length > 1;
+        h = done(['Area: <b>' + esc(state.area) + '</b>', 'Live read: <b>device not reporting</b>']) +
+          '<div class="reco"><b class="hd">' + (many ? N('The heating units in this area are not reporting.') : 'This heating device is not reporting.') + '</b>' +
+          (many ? N('They are Salus units that have stopped sending live data to Lighthouse, so there is no live reading and they cannot be switched or adjusted from here. This usually means the devices have lost power or their connection.')
+                : 'It is a Salus unit that has stopped sending live data to Lighthouse, so there is no live reading and it cannot be switched or adjusted from here. This usually means the device has lost power or its connection.') +
+          '<div class="outbtns"><button class="btn primary" data-act="cap">Capture &amp; escalate for the IoT team</button><button class="btn" data-act="noact">End with no action</button></div></div>';
+      } else {
+        var nOn = set.filter(function(d){ return d.online; }).length, nOff = set.length - nOn;
+        var live = 'live read just now';
+        if (set.length > 1 && nOff === 0) live += ' &middot; coldest of ' + set.length + ' zones in ' + esc(state.area);
+        if (set.length > 1 && nOff > 0) live += ' &middot; ' + N(nOn === 1 ? 'the only reporting zone in ' + esc(state.area) : 'coldest of ' + nOn + ' reporting zones in ' + esc(state.area));
+        var note = nOff > 0 ? '<p class="small" data-testid="area-not-reporting-note" style="margin:4px 0 10px">' +
+          N(nOff + ' other heating ' + plural(nOff,'unit','units') + ' in ' + esc(state.area) + ' ' + plural(nOff,'is','are') + ' not reporting, so ' + plural(nOff,'it is','they are') + ' not part of this reading. Nothing done on this call caused this.') + '</p>' : '';
+        h = done(['Area: <b>' + esc(state.area) + '</b>']) +
+          '<div class="zoneread"><span class="t">' + z.temp + '&deg;C</span><div><div>Setpoint <b>' + z.sp + '&deg;C</b> &middot; mode <b>' + esc(z.mode) + '</b></div><div class="small">' + esc(z.id) + ' &middot; ' + live + '</div></div><span class="tag green">online</span></div>' +
+          note +
+          '<div class="stepq">What does the caller need?</div><div class="chips">' +
+          '<button class="chip" data-need="warm">Warmer</button><button class="chip" data-need="cool">Cooler</button><button class="chip" data-need="off">Turn it off</button><button class="chip" data-need="broken">It&#8217;s not working</button></div>';
+      }
+    } else if (state.step === 2) {
+      var map = {
+        cap: '<div class="alert ok"><b>Captured for the IoT team.</b> Ticket raised: "Heating device not reporting (' + esc(state.area) + ')". Script: "That heating controller isn\'t sending us any data at the moment, so I can\'t read or change it remotely tonight. I\'ve logged it for the IoT team to look into."</div>',
+        noact: '<div class="alert info"><b>Ended with no action.</b> The call is recorded for the audit trail.</div>',
+        warm: '<div class="alert info">Opens today\'s control window for the modern thermostat (unchanged in this release).</div>',
+        cool: '<div class="alert info">Opens today\'s control window for the modern thermostat (unchanged in this release).</div>',
+        off: '<div class="alert info">Offers today\'s frost-hold at 5&deg;C (unchanged in this release).</div>',
+        broken: '<div class="alert info">Runs today\'s temperature-versus-target check (unchanged in this release).</div>',
+        other: '<div class="alert info">Goes to today\'s "Something else" flow (unchanged).</div>'
+      };
+      h = map[state.need] + '<div class="chips"><button class="chip" data-act="restart">Start again</button></div>';
+    }
+    body.innerHTML = h;
+  }
+
+  body.addEventListener('click', function(e){
+    var t = e.target.closest('button'); if (!t) return;
+    if (t.dataset.area) { state.area = t.dataset.area; state.step = 1; }
+    else if (t.dataset.need) { state.need = t.dataset.need; state.step = 2; }
+    else if (t.dataset.act === 'restart') { state.step = 0; state.area = null; }
+    else if (t.dataset.act) { state.need = t.dataset.act; state.step = 2; }
+    render();
+  });
+  document.querySelectorAll('[data-site]').forEach(function(b){
+    b.addEventListener('click', function(){
+      document.querySelectorAll('[data-site]').forEach(function(x){ x.setAttribute('aria-pressed', String(x === b)); });
+      state.site = b.dataset.site; state.step = 0; state.area = null; render();
+    });
+  });
+  document.getElementById('hlBtn').addEventListener('click', function(){
+    state.hl = !state.hl; this.setAttribute('aria-pressed', String(state.hl)); render();
+  });
+  document.getElementById('resetBtn').addEventListener('click', function(){ state.step = 0; state.area = null; render(); });
+  document.getElementById('cancelBtn').addEventListener('click', function(){ state.step = 0; state.area = null; render(); });
+  render();
+})();
+</script>
+</body>
+</html>
