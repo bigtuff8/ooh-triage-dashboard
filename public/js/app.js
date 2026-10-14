@@ -139,6 +139,9 @@ function render() {
     const op = state.me.operator;
     const isIot = op.role === 'iot';
     const ws = state.workspace;
+    // OOHDASH-122 AC-2 (one banner at a time): `kill` drives the red kill-banner AND suppresses the
+    // green LIVE banner below. Every reason control is blocked MUST be returned from writesDisabled()
+    // (app.js:47) - never rendered as a separate red banner - or the two banners can co-fire again.
     const kill = writesDisabled(state.siteNo);
     const notice = state.me.notices?.[0];
     document.getElementById('app').innerHTML = `
@@ -162,7 +165,7 @@ function render() {
    <span class="ver">v${esc(state.me.version)}${state.me.dataMode === 'fixture' ? ' · fixture data' : ''}</span>
   </div>
   ${kill ? `<div class="banner kill" data-testid="kill-banner">⛔ ${kill} — control actions are disabled; capture &amp; escalate still works.${isIot ? ' <button class="btn link" onclick="go(\'admin\')">Manage</button>' : ''}</div>` : ''}
-  ${state.me.controlLive ? `<div class="banner live" data-testid="control-live-banner">🟢 <b>Device control is LIVE</b> — changes you send will reach real equipment. Confirm the site before every change.</div>` : ''}
+  ${state.me.controlLive && !kill ? `<div class="banner live" data-testid="control-live-banner">🟢 <b>Device control is LIVE</b> — changes you send will reach real equipment. Confirm the site before every change.</div>` : ''}
   ${notice && (state.view === 'home' || state.view === 'site') ? `<div class="banner notice" data-testid="notice-banner">📣 <b>${esc(notice.OohNoticeTitle)}</b>&nbsp;${esc(notice.OohNoticeBody)}</div>` : ''}
   <div id="view"></div>
  </div>`;
