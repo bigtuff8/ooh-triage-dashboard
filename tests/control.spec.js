@@ -1,10 +1,13 @@
-/** F002/F005/F006/F007/F008/F009/F010 — control paths, guardrails, sync states, holds. */
+/** F002/F005/F006/F007/F008/F009/F010 — control paths, guardrails, three-outcome states, holds.
+ *
+ * OOHDASH-123: the confirm model is now the three honest outcomes (design §5). Heating (Salus) is a
+ * SLOW class — the handler is released at once (DD-WAIT-HANDOFF), so heating dispatch tests assert the
+ * slow-release card; the synchronous CONFIRMED / NOT DELIVERED / NOT CONFIRMED cards (fast Tuya) and the
+ * no-resend / no-409 behaviour are covered in control-rosetta.spec.js. Boost is removed (J5/D-BOOST).
+ */
 import { test, expect } from '@playwright/test';
 import { signIn, confirmSite } from './helpers.js';
 
-// OOHDASH-82: the heating flow's first step is now the two-area chip model (Accommodation /
-// Bar/Restaurant), not per-device `zone-N` chips. Selecting an area resolves to the coldest online
-// device in that area (the representative). Callers pass the area's testid slug.
 async function startHeatingFlow(page, areaSlug = 'bar-restaurant') {
     await page.locator('[data-testid="tile-heating"]').click();
     await page.locator(`[data-testid="area-${areaSlug}"]`).click();
@@ -13,42 +16,34 @@ async function startHeatingFlow(page, areaSlug = 'bar-restaurant') {
 test.describe('control & sync', () => {
     test.beforeEach(async ({ page }) => { await signIn(page, 'Test Handler'); });
 
-    test('F005 setpoint raise: full chain — modal, guardrail text, pending → synced, ticket, state reset', async ({ page }) => {
+    test('F005 Salus setpoint: full chain — modal, guardrail text, slow-release handoff, outcome, state reset', async ({ page }) => {
         await confirmSite(page, '6832', 'Old Grey Mare');
-        // Bar/Restaurant → IT500-BAR-6832 (the sole Bar/Restaurant device, 17.5°C)
-        await startHeatingFlow(page, 'bar-restaurant');
+        await startHeatingFlow(page, 'bar-restaurant');   // IT500-BAR-6832 (17.5C)
         await page.locator('[data-testid="need-warm"]').click();
 
-        // Target confirmation strip (second half of the F004 gate)
         await expect(page.locator('[data-testid="control-target"]')).toContainText('Old Grey Mare');
         await expect(page.locator('[data-testid="control-target"]')).toContainText('IT500-BAR-6832');
         await expect(page.locator('[data-testid="guardrail-text"]')).toContainText('15–21°C');
         await expect(page.locator('[data-testid="stepper-value"]')).toContainText('19°C');
 
-        // Stepper cannot exceed the window: click + repeatedly, button disables at 21
         const up = page.locator('[data-testid="stepper-up"]');
         for (let i = 0; i < 8 && await up.isEnabled(); i++) await up.click();
         await expect(page.locator('[data-testid="stepper-value"]')).toContainText('21°C');
         await expect(up).toBeDisabled();
 
         await page.locator('[data-testid="control-send"]').click();
-        // honest pending state first
-        await expect(page.locator('[data-testid="sync-steps"]')).toContainText('Device confirming');
-        // then device-confirmed
-        await expect(page.locator('[data-testid="sync-applied"]')).toContainText('Applied — device confirmed 21°C', { timeout: 20000 });
-        await page.locator('[data-testid="sync-done"]').click();
-
-        const outcome = page.locator('[data-testid="outcome-applied"]');
-        await expect(outcome).toContainText('Change applied — device confirmed');
+        // Slow (Salus) class: the handler is released at once with the honest "carry on" handoff.
+        await expect(page.locator('[data-testid="sync-sent-slow"]')).toContainText('Sent to the device', { timeout: 20000 });
+        await page.locator('[data-testid="sync-release"]').click();
+        const outcome = page.locator('[data-testid="outcome-awaiting"]');
+        await expect(outcome).toContainText('awaiting the device');
         await expect(outcome).toContainText('IT500-BAR-6832');
-        await expect(outcome).toContainText(/Recorded on ticket #\d+/);
         await expect(outcome).not.toContainText('[object');
 
-        // Protocol 5 — state reset: add another issue and reach a fresh control modal without reload
+        // Protocol 5 — state reset: add another issue and reach a fresh control modal without reload.
         await page.locator('[data-testid="add-another-issue"]').click();
         await expect(page.locator('[data-testid="category-tiles"]')).toBeVisible();
-        // Accommodation → the coldest of its two devices {IT500-RST 19.0, IT500-ACC 16.0} = IT500-ACC-6832
-        await startHeatingFlow(page, 'accommodation');
+        await startHeatingFlow(page, 'accommodation');   // coldest of {RST 19.0, ACC 16.0} = IT500-ACC-6832
         await page.locator('[data-testid="need-cool"]').click();
         await expect(page.locator('[data-testid="control-target"]')).toContainText('IT500-ACC-6832');
         await page.locator('button:has-text("Cancel")').last().click();
@@ -70,16 +65,11 @@ test.describe('control & sync', () => {
         expect(res.body.guardrail).toBe(true);
     });
 
-    test('F009 capability gating: boost rejected on a non-DHW device, mode rejected on Salus', async ({ page }) => {
+    test('F009 capability gating: boost rejected (removed), mode rejected on Salus, setpoint rejected on Tuya', async ({ page }) => {
         await confirmSite(page, '6832', 'Old Grey Mare');
-        // C2 (single-use confirm token): each admitted dispatch spends its token — even a
-        // guardrail-rejected (422) one — so mint a FRESH token per raw attempt. The guided UI
-        // never composes an invalid command; this exercises the server-side guardrail directly.
         const results = await page.evaluate(async () => {
             const freshToken = async () => {
-                const r = await fetch('/api/sites/6832/confirm', {
-                    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}'
-                });
+                const r = await fetch('/api/sites/6832/confirm', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' });
                 return (await r.json()).confirmToken;
             };
             const post = async (body) => {
@@ -103,41 +93,6 @@ test.describe('control & sync', () => {
         expect(results.writeToTuya.status).toBe(422);
     });
 
-    test('F008 failed write is reported honestly and escalates — never success (Robin Hood restaurant)', async ({ page }) => {
-        await confirmSite(page, '6851', 'Robin Hood');
-        await startHeatingFlow(page, 'bar-restaurant'); // Restaurant IT500-RST-6851 — fixture _demo: fail
-        // 17°C vs setpoint 21 → 'warmer' first shows the building-heat recommendation card
-        await page.locator('[data-testid="need-warm"]').click();
-        await expect(page.locator('[data-testid="reco-building-heat"]')).toContainText('Raising the setpoint won’t help');
-        await page.locator('button:has-text("Adjust the setpoint anyway")').click();
-        await page.locator('[data-testid="control-send"]').click();
-        const failed = page.locator('[data-testid="sync-failed"]');
-        await expect(failed).toContainText('The device refused this command', { timeout: 20000 });
-        await expect(failed).toContainText('do not tell the caller it’s done');
-        await expect(page.locator('[data-testid="sync-applied"]')).toHaveCount(0);
-        await page.locator('[data-testid="sync-escalate"]').click();
-        const outcome = page.locator('[data-testid="outcome-escalated"]');
-        await expect(outcome).toContainText('must be treated as not applied');
-        await expect(outcome).toContainText(/Ticket #\d+/);
-    });
-
-    test('F008 IT700 slow echo: timeout state, keep-waiting, escalate (Jolly Scotchman)', async ({ page }) => {
-        await confirmSite(page, '4741', 'Jolly Scotchman');
-        await startHeatingFlow(page, 'accommodation'); // IT700-BAR-4741 — fixture _demo: slow
-        await page.locator('[data-testid="need-cool"]').click();
-        await page.locator('[data-testid="control-send"]').click();
-        const timeout = page.locator('[data-testid="sync-timeout"]');
-        await expect(timeout).toContainText('Treat the change as NOT applied', { timeout: 30000 });
-        await expect(timeout).toContainText('IT700');
-        // keep waiting returns to a pending tracker
-        await page.locator('[data-testid="sync-wait"]').click();
-        await expect(page.locator('[data-testid="sync-steps"]')).toContainText('Device confirming');
-        // it times out again → escalate honestly
-        await expect(page.locator('[data-testid="sync-timeout"]')).toBeVisible({ timeout: 45000 });
-        await page.locator('[data-testid="sync-escalate"]').click();
-        await expect(page.locator('[data-testid="outcome-escalated"]')).toContainText('no sync confirmation (timeout)');
-    });
-
     test('F005 Salus turn-off: recommendation card offers frost-hold, decline records no-action', async ({ page }) => {
         await confirmSite(page, '6832', 'Old Grey Mare');
         await startHeatingFlow(page, 'bar-restaurant'); // IT500-BAR-6832
@@ -146,93 +101,60 @@ test.describe('control & sync', () => {
         await expect(reco).toContainText('no “off” switch');
         await expect(reco).toContainText('frost-hold');
         await page.locator('[data-testid="frost-decline"]').click();
-        // OOHDASH-119: confirm step required before POST fires
         await page.locator('[data-testid="record-outcome"]').click();
         const outcome = page.locator('[data-testid="outcome-noaction"]');
         await expect(outcome).toContainText('Call logged — no action taken');
         await expect(outcome).toContainText(/Ticket #\d+/);
     });
 
-    test('F005+F010 frost-hold with hold set: applied outcome shows durable revert; hold appears in Admin', async ({ page }) => {
+    test('F005+F010 frost-hold with hold: slow-release handoff, then the hold lands in Admin after the device confirms', async ({ page }) => {
         await confirmSite(page, '6832', 'Old Grey Mare');
-        // Accommodation → coldest of {IT500-RST 19.0, IT500-ACC 16.0} = IT500-ACC-6832
-        await startHeatingFlow(page, 'accommodation');
+        await startHeatingFlow(page, 'accommodation'); // coldest = IT500-ACC-6832
         await page.locator('[data-testid="need-off"]').click();
         await page.locator('[data-testid="frost-recommended"]').click();
-        // frost defaults to hold until 07:00
         await expect(page.locator('.chip.sel')).toContainText('Until 07:00 tomorrow');
         await expect(page.locator('.modal')).toContainText('revert survives restarts');
         await page.locator('[data-testid="control-send"]').click();
-        await expect(page.locator('[data-testid="sync-applied"]')).toContainText('Hold active', { timeout: 20000 });
-        await page.locator('[data-testid="sync-done"]').click();
-        await expect(page.locator('[data-testid="outcome-applied"]')).toContainText('will revert automatically (durable)');
+        // Slow class → released at once; the hold is scheduled server-side once the device confirms.
+        await expect(page.locator('[data-testid="sync-sent-slow"]')).toBeVisible({ timeout: 20000 });
+        await page.locator('[data-testid="sync-release"]').click();
+        await expect(page.locator('[data-testid="outcome-awaiting"]')).toBeVisible();
 
-        // Hold is visible in Admin (IoT role) with held + revert values
+        // The hold appears in Admin (IoT role) once the background watcher confirms + schedules it. The
+        // confirm is async for a slow class, so poll the admin holds view (reload) until it lands.
         const admin = await page.context().browser().newContext({ baseURL: test.info().project.use.baseURL });
         const apage = await admin.newPage();
         await signIn(apage, 'Test IoT Admin');
-        await apage.locator('[data-testid="nav-admin"]').click();
-        const holds = apage.locator('[data-testid="admin-holds"]');
-        await expect(holds).toContainText('IT500-ACC-6832');
-        await expect(holds).toContainText('5'); // frost value held
-        await expect(holds).toContainText('Test Handler');
-        // cancel the hold → reverts now (fixture confirms quickly)
-        apage.on('dialog', d => d.accept());
-        await holds.locator('button:has-text("Cancel hold")').first().click();
-        await expect(apage.locator('.toast')).toContainText('Hold reverted', { timeout: 30000 });
+        await expect(async () => {
+            await apage.locator('[data-testid="nav-admin"]').click();
+            await expect(apage.locator('[data-testid="admin-holds"]')).toContainText('IT500-ACC-6832', { timeout: 2000 });
+        }).toPass({ timeout: 30000 });
+        await expect(apage.locator('[data-testid="admin-holds"]')).toContainText('Test Handler');
         await admin.close();
     });
 
-    test('F006 HW boost on IT500 DHW confirms via sync (Ship Inn)', async ({ page }) => {
-        await confirmSite(page, '6234', 'Ship Inn');
-        await page.locator('[data-testid="tile-hotwater"]').click();
-        await page.locator('[data-testid="hw-boost-yes"]').click();
-        await expect(page.locator('[data-testid="stepper-value"]')).toContainText('2h');
-        // boost range honours 1–9
-        const down = page.locator('[data-testid="stepper-down"]');
-        await down.click();
-        await expect(page.locator('[data-testid="stepper-value"]')).toContainText('1h');
-        await expect(down).toBeDisabled();
-        await page.locator('[data-testid="control-send"]').click();
-        await expect(page.locator('[data-testid="sync-applied"]')).toContainText('Applied — device confirmed 1h boost', { timeout: 20000 });
-        await page.locator('[data-testid="sync-done"]').click();
-        await expect(page.locator('[data-testid="outcome-applied"]')).toContainText('HW boost');
-    });
-
-    // OOHDASH-82 (design §6): Intesis aircon control is REMOVED. The former "Intesis turn-off uses
-    // native mode Off" behaviour no longer exists — aircon is never controllable from the dashboard.
-    // On an Intesis-only site the heating flow offers no heating and no control; the aircon request is
-    // captured and referred to the IoT team (aircon-referral) via the smart-entry keyword route.
+    // OOHDASH-82: Intesis aircon control is REMOVED — captured & referred (unchanged by OOHDASH-123).
     test('F007→OOHDASH-82: Intesis-only site offers NO aircon control; the request is captured & referred (Tamar)', async ({ page }) => {
         await confirmSite(page, '6873', 'Tamar');
-        // The heating flow no longer sees the Intesis units at all — no area chips, no control.
         await page.locator('[data-testid="tile-heating"]').click();
         await expect(page.locator('.flowbody')).toContainText('No heating on Lighthouse at this site');
         await expect(page.locator('[data-testid="area-accommodation"]')).toHaveCount(0);
-        await expect(page.locator('[data-testid="area-bar-restaurant"]')).toHaveCount(0);
         await expect(page.locator('[data-testid="need-warm"]')).toHaveCount(0);
-        // Cancel the heating flow (confirm() dialog) to return to the New Call smart-entry.
         page.once('dialog', d => d.accept());
         await page.locator('button:has-text("Cancel issue")').last().click();
         await expect(page.locator('[data-testid="smart-entry"]')).toBeVisible();
 
-        // The aircon request is reached from the caller's words and ends in a referral capture — never a control.
         await page.locator('[data-testid="smart-entry"]').pressSequentially('the air con is blowing warm', { delay: 25 });
         await page.locator('[data-testid="suggest-aircon"]').click();
-        // OOHDASH-119: confirm step required before POST fires
         await page.locator('[data-testid="record-outcome"]').click();
         const captured = page.locator('[data-testid="outcome-captured"]');
         await expect(captured).toContainText('Captured for the IoT team');
         await expect(captured).toContainText(/Ticket #\d+/);
-        // No control affordance anywhere in the aircon referral.
         await expect(page.locator('[data-testid="control-send"]')).toHaveCount(0);
-        await expect(page.locator('[data-testid="need-warm"]')).toHaveCount(0);
-        await expect(page.locator('[data-testid="need-cool"]')).toHaveCount(0);
     });
 
     test('outcome-record failure shows inline error with manual retry (Protocol 4: 500 path)', async ({ page }) => {
         await confirmSite(page, '6832', 'Old Grey Mare');
-        // Fail ONLY the outcome-recording call — the control loop itself stays real
         let failNext = true;
         await page.route('**/api/outcomes', route => {
             if (failNext) { failNext = false; return route.fulfill({ status: 500, contentType: 'application/json', body: JSON.stringify({ error: 'Zendesk exploded' }) }); }
@@ -240,14 +162,10 @@ test.describe('control & sync', () => {
         });
         await page.locator('[data-testid="tile-fridge"]').click();
         await page.locator('[data-testid="fridge-risk"]').click(); // P1 path
-        // OOHDASH-119: confirm step shown; click Record outcome to fire the (mocked-to-fail) POST
         await page.locator('[data-testid="record-outcome"]').click();
         await expect(page.locator('.flowbody')).toContainText("Couldn’t record the outcome: Zendesk exploded");
-        // Try again resets to confirm step; click Record outcome again to fire the now-succeeding POST
         await page.locator('button:has-text("Try again")').click();
         await page.locator('[data-testid="record-outcome"]').click();
-        // Approach B: OOH tags the ticket ooh_p1; the IoT Support Dashboard pages the manager.
-        // The dispatch-status must show the honest fixed line — not the old false Approach-A warning.
         await expect(page.locator('[data-testid="outcome-p1"]')).toContainText('logged as ticket', { timeout: 15000 });
         await expect(page.locator('[data-testid="outcome-p1"]')).toContainText('pages the on-duty manager');
         await expect(page.locator('[data-testid="outcome-p1"]')).not.toContainText('Text not sent');

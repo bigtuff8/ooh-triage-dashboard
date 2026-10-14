@@ -37,10 +37,12 @@ test.describe('OOHDASH-114-F1 boilerControl controllability', () => {
         await expect(page.locator('[data-testid="scope-list"] li:has-text("Heating")')).toContainText('Controllable from here');
     });
 
-    test('BC-E5: V2 site (9001) — hotwater flow stage 0 shows DHW boost chip when dhwControllable=true', async ({ page }) => {
+    test('BC-E5: V2 site (9001) — OOHDASH-123 boost removed: hotwater flow shows capture-and-escalate, NO boost chip', async ({ page }) => {
         await confirmSite(page, '9001', 'Test BoilerControl V2 (DHW)');
         await page.locator('[data-testid="tile-hotwater"]').click();
-        await expect(page.locator('[data-testid="hw-boost-yes"]')).toBeVisible();
+        // J5/D-BOOST: the dishonest boost chip is gone even on a dhwControllable V2 site.
+        await expect(page.locator('[data-testid="hw-boost-yes"]')).toHaveCount(0);
+        await expect(page.locator('[data-testid="hw-capture"]')).toBeVisible();
     });
 });
 

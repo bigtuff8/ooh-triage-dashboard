@@ -1063,6 +1063,106 @@
         "dhwControllable": true,
         "deviceId": "gk-6999-boilercontrol-1"
       }
+    },
+    {
+      "siteNo": "6961",
+      "siteName": "Red Lion Rosetta",
+      "brand": "Greene King · Rosetta e2e",
+      "address": "Rosetta Bench",
+      "callsLast30Days": 1,
+      "devices": [
+        {
+          "deviceId": "gk-6961-externallighting-1",
+          "zone": "External lighting - car park",
+          "deviceType": "tuya",
+          "kind": "lighting",
+          "online": true,
+          "telemetry": {
+            "switch_1": true
+          }
+        },
+        {
+          "deviceId": "gk-6961-salusit700-1",
+          "zone": "Bar / Restaurant heating",
+          "deviceType": "salus-it700",
+          "kind": "heating",
+          "area": "Bar/Restaurant",
+          "online": true,
+          "telemetry": {
+            "localTemperature": 15.5,
+            "heatingSetpoint": 16.5
+          }
+        }
+      ]
+    },
+    {
+      "siteNo": "6962",
+      "siteName": "Angel Rosetta",
+      "brand": "Greene King · Rosetta e2e",
+      "address": "Rosetta Bench",
+      "callsLast30Days": 1,
+      "devices": [
+        {
+          "deviceId": "gk-6962-externallighting-1",
+          "zone": "External lighting - car park",
+          "deviceType": "tuya",
+          "kind": "lighting",
+          "online": true,
+          "telemetry": {
+            "switch_1": false
+          },
+          "_demo": "rejected-vendor"
+        }
+      ]
+    },
+    {
+      "siteNo": "6963",
+      "siteName": "Swan Rosetta",
+      "brand": "Greene King · Rosetta e2e",
+      "address": "Rosetta Bench",
+      "callsLast30Days": 1,
+      "devices": [
+        {
+          "deviceId": "gk-6963-externallighting-1",
+          "zone": "External lighting - car park",
+          "deviceType": "tuya",
+          "kind": "lighting",
+          "online": true,
+          "telemetry": {
+            "switch_1": false
+          },
+          "_demo": "noecho"
+        }
+      ]
+    },
+    {
+      "siteNo": "6964",
+      "siteName": "Falcon Rosetta",
+      "brand": "Greene King · Rosetta e2e",
+      "address": "Rosetta Bench",
+      "callsLast30Days": 1,
+      "devices": [
+        {
+          "deviceId": "gk-6964-externallighting-1",
+          "zone": "External lighting - car park",
+          "deviceType": "tuya",
+          "kind": "lighting",
+          "online": true,
+          "telemetry": {
+            "switch_1": true
+          }
+        },
+        {
+          "deviceId": "gk-6964-externallighting-2",
+          "zone": "External lighting - rear",
+          "deviceType": "tuya",
+          "kind": "lighting",
+          "online": true,
+          "telemetry": {
+            "switch_1": false
+          }
+        }
+      ]
     }
   ]
 }
