@@ -83,36 +83,30 @@ toast appeared.
 
 **`public/css/styles.css`** — both mobile breakpoints changed:
 
-```css
-/* before */
-@media(max-width:1100px){.wsgrid{grid-template-columns:1fr} … }
-…
-.wsgrid{grid-template-columns:1fr}           /* inside @media(max-width:900px) */
-
-/* after */
-@media(max-width:1100px){.wsgrid{grid-template-columns:minmax(0,1fr)} … }
-…
-.wsgrid{grid-template-columns:minmax(0,1fr)} /* inside @media(max-width:900px) */
-```
+    /* before */
+    @media(max-width:1100px){.wsgrid{grid-template-columns:1fr} … }
+    …
+    .wsgrid{grid-template-columns:1fr}           /* inside @media(max-width:900px) */
+    
+    /* after */
+    @media(max-width:1100px){.wsgrid{grid-template-columns:minmax(0,1fr)} … }
+    …
+    .wsgrid{grid-template-columns:minmax(0,1fr)} /* inside @media(max-width:900px) */
 
 **`public/js/views.js`** — subject span in `siteTickets()`:
 
-```javascript
-// before
-style="flex:1;font-size:13px"
-
-// after
-style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:13px"
-```
+    // before
+    style="flex:1;font-size:13px"
+    
+    // after
+    style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:13px"
 
 **`tests/tonight-callback.spec.js`** — wait for thread load before typing:
 
-```javascript
-await page.locator('[data-testid="callback-results"] .stepdone').first().click();
-// Wait for thread fetch to complete before typing
-await expect(page.locator('.drawer #thread')).not.toContainText('Loading');
-await page.locator('[data-testid="note-input"]').pressSequentially('…');
-```
+    await page.locator('[data-testid="callback-results"] .stepdone').first().click();
+    // Wait for thread fetch to complete before typing
+    await expect(page.locator('.drawer #thread')).not.toContainText('Loading');
+    await page.locator('[data-testid="note-input"]').pressSequentially('…');
 
 **`tests/oohdash-127.spec.js`** — new deterministic regression test:
 seeds ticket id 49900 (siteNo '6883', `custom_status_id` 11404223315612) in `beforeEach`
