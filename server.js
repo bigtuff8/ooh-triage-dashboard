@@ -168,7 +168,7 @@ async function start() {
         if (config.dataMode === 'live') {
             bridge.probeBridgeReadOnce()
                 .then(r => console.log(`[TB] start-up read probe: ${r.outcome}${r.ms !== undefined ? ` in ${r.ms}ms` : ''}${r.error ? ` (${r.error})` : ''}`))
-                .catch(() => { /* probeBridgeReadOnce never rejects; guard anyway */ });
+                .catch(err => console.warn(`[TB] start-up probe: unexpected rejection — ${(err && err.message) || 'unknown'}`));
         }
     });
 }

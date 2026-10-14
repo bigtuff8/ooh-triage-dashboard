@@ -1,10 +1,14 @@
 /**
- * OOHDASH-122 — bridge start-up read probe unit tests (P1-P10).
+ * OOHDASH-122 — bridge start-up read probe unit tests (P1-P9, P11).
  *
  * Pattern: DATA_MODE=live set before any import; mock.module('../services/tb-client.js')
  * provides a controllable readRequest; mock.module('../services/zendesk.js') provides
  * siteDirectory (needed for the module to load). Each test cache-busts the tb-device.js
  * import so it starts in boot state (lastReadOk=false, lastReadError=null).
+ *
+ * P10 (wiring text pin, server.js) was removed — wiring is covered by tester TF-122-01.
+ * P11: probeBridgeReadOnce always resolves, never rejects — the fire-and-forget .catch()
+ *      in server.js is belt-and-braces; the probe itself is the primary safety.
  *
  * No network. No wall-clock sleeps beyond a 20ms timeout in P3.
  */
@@ -277,21 +281,19 @@ test('P9 AC-3: no secret leakage — err.config credentials not in lastError', a
 });
 
 /* ------------------------------------------------------------------ */
-/* P10: wiring pin — server.js calls bridge.probeBridgeReadOnce() inside */
-/* app.listen callback, guarded by dataMode === 'live', not awaited.    */
+/* P11: probeBridgeReadOnce always resolves, never rejects.             */
+/* The fire-and-forget .catch() in server.js is belt-and-braces; the   */
+/* outer try/catch inside the probe is the primary safety mechanism.    */
 /* ------------------------------------------------------------------ */
-test('P10 AC-3: wiring pin — server.js wires the probe correctly', () => {
-    const src = readFileSync(new URL('../server.js', import.meta.url), 'utf8');
-    assert.match(src, /bridge\.probeBridgeReadOnce\(\)/,
-        'server.js must call bridge.probeBridgeReadOnce()');
-    assert.match(src, /dataMode\s*===\s*['"]live['"]/,
-        'the call must be guarded by dataMode === \'live\'');
-    // The call must NOT be preceded by `await` (non-blocking requirement).
-    const probeIndex = src.indexOf('bridge.probeBridgeReadOnce()');
-    // Look at the 50 chars before the call for 'await'.
-    const before = src.slice(Math.max(0, probeIndex - 50), probeIndex);
-    assert.ok(!before.includes('await'), `probe call must not be awaited — found: ${before}`);
-    // The call must be inside the app.listen callback (after 'app.listen').
-    const listenIdx = src.indexOf('app.listen');
-    assert.ok(listenIdx < probeIndex, 'probe call is inside the app.listen callback');
+test('P11 AC-3: probeBridgeReadOnce always resolves even when readRequest throws unexpectedly', async () => {
+    mockRq = async () => { throw new TypeError('Unexpected internal error — simulated crash'); };
+    const { probeBridgeReadOnce: probe } = await import(`../services/tb-device.js?p11=${Math.random()}`);
+    let resolved = false;
+    let rejected = false;
+    await probe().then(
+        r => { resolved = true; assert.ok(r.outcome, 'resolved with an outcome object'); },
+        () => { rejected = true; }
+    );
+    assert.ok(resolved, 'probeBridgeReadOnce must resolve (not reject) — fire-and-forget in server.js is safe');
+    assert.ok(!rejected, 'probeBridgeReadOnce must never reject — an unhandled rejection would crash startup');
 });
