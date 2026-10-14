@@ -84,9 +84,13 @@ test('null lastActivityTime via mapTbDevice → offline (missing timestamp is of
 
 test('unknown deviceType resolves to the 48h global default', () => {
     const { defaultMs, thresholdFor } = tb._freshness();
-    assert.equal(defaultMs, DEFAULT, 'default is 48h');
-    assert.equal(thresholdFor('salus-it700'), DEFAULT, 'a type with no override falls back to the default');
-    assert.equal(thresholdFor(undefined), DEFAULT, 'an absent deviceType falls back to the default');
+    assert.equal(defaultMs, DEFAULT, 'monitor/unknown default is 48h');
+    // OOHDASH-123 (WU8): controllable classes now carry a 3h offline threshold from the per-class contract;
+    // monitor-only / unknown classes keep the 48h default.
+    assert.equal(thresholdFor('salus-it700'), 3 * 60 * 60 * 1000, 'IT700 is a controllable class → 3h');
+    assert.equal(thresholdFor('tuya'), 3 * 60 * 60 * 1000, 'Tuya is a controllable class → 3h');
+    assert.equal(thresholdFor('boiler-panel'), DEFAULT, 'a monitor-only class keeps the 48h default');
+    assert.equal(thresholdFor(undefined), DEFAULT, 'an absent deviceType falls back to the 48h default');
 });
 
 test('a per-type override is honoured when applied at the resolver (hook shape works)', () => {

@@ -28,7 +28,7 @@ test('classify: Salus thermostat on the `default` profile is heating+controllabl
     assert.equal(c.kind, 'heating');
     assert.equal(c.deviceType, 'salus-it700');
     assert.equal(c.controllable, true);
-    assert.equal(c.control.attribute, 'setpointDesired');
+    assert.equal(c.control.attribute, 'setpointRequested');
 });
 
 test('classify: controllable Salus on `default` profile — control derives from telemetry signal, not the profile label', () => {
@@ -39,11 +39,11 @@ test('classify: controllable Salus on `default` profile — control derives from
     assert.equal(noSignal.controllable, false, 'no setpoint telemetry ⇒ monitor-only regardless of the name');
 });
 
-test('classify: Tuya switch signal → tuya + switchDesired (C5), kitchen kind from the name', () => {
-    const c = classifyDevice('gk-6209fryer-1', 'gatewayDevice', { switchReported: true });
+test('classify: Tuya switch signal → tuya + switchRequested (C5), kitchen kind from the name', () => {
+    const c = classifyDevice('gk-6209fryer-1', 'gatewayDevice', { switch_1: true });
     assert.equal(c.deviceType, 'tuya');
     assert.equal(c.controllable, true);
-    assert.equal(c.control.attribute, 'switchDesired');
+    assert.equal(c.control.attribute, 'switchRequested');
     assert.equal(c.kind, 'kitchen');
 });
 
@@ -128,7 +128,7 @@ test('classify typo-tolerance: `extracfan`→extractfan (fan) and `bainmare`→b
 /* ------------------------------------------------------------------ */
 
 test('refrig deny: cellar + switch → monitor-only refrigeration (deny beats the capability-first switch intent)', () => {
-    const c = classifyDevice('gk-6261-cellar-1', 'default', { switchReported: true });
+    const c = classifyDevice('gk-6261-cellar-1', 'default', { switch_1: true });
     assert.equal(c.kind, 'fridge');
     assert.equal(c.deviceType, 'refrigeration');
     assert.equal(c.deviceTypeLabel, 'Refrigeration (monitor-only)');
@@ -138,7 +138,7 @@ test('refrig deny: cellar + switch → monitor-only refrigeration (deny beats th
 
 test('refrig deny: every appliance noun denies even with a switch signal present', () => {
     for (const noun of ['fridge', 'freezer', 'chiller', 'coldroom', 'cold-room', 'refrigeration', 'refrig']) {
-        const c = classifyDevice(`gk-6261-${noun}-1`, 'default', { switchReported: true });
+        const c = classifyDevice(`gk-6261-${noun}-1`, 'default', { switch_1: true });
         assert.equal(c.deviceType, 'refrigeration', `${noun} must deny to refrigeration`);
         assert.equal(c.controllable, false, `${noun} must be monitor-only`);
         assert.equal(c.kind, 'fridge', `${noun} must be kind fridge`);
@@ -161,14 +161,14 @@ test('refrig deny: fail-closed default — cellar with no override and NO switch
 
 test('refrig deny: cellar + bare generic switch/relay word (no override) denies (deliberate tightening §3.2)', () => {
     for (const word of ['switch', 'relay', 'contactor', 'powerpause']) {
-        const c = classifyDevice(`gk-6261-cellar-${word}-1`, 'default', { switchReported: true });
+        const c = classifyDevice(`gk-6261-cellar-${word}-1`, 'default', { switch_1: true });
         assert.equal(c.deviceType, 'refrigeration', `cellar-${word} must fail-closed to refrigeration`);
         assert.equal(c.controllable, false);
     }
 });
 
 test('refrig deny: precedence over name intent — cellar + refrigeration word + a kitchen-context (non-override) word still denies', () => {
-    const c = classifyDevice('gk-6261-cellar-kitchen-1', 'default', { switchReported: true });
+    const c = classifyDevice('gk-6261-cellar-kitchen-1', 'default', { switch_1: true });
     // `kitchen` is NOT an override token; cellar location with no override ⇒ deny.
     assert.equal(c.deviceType, 'refrigeration');
     assert.equal(c.controllable, false);
@@ -178,7 +178,7 @@ test('refrig deny: precedence over name intent — cellar + refrigeration word +
 
 test('carve-out: cellar LIGHT is controllable (hyphenated + glued) — lighting/tuya', () => {
     for (const name of ['gk-6261-cellar-light-1', 'gk-6261-cellarlight-1']) {
-        const c = classifyDevice(name, 'gatewayDevice', { switchReported: true });
+        const c = classifyDevice(name, 'gatewayDevice', { switch_1: true });
         assert.equal(c.deviceType, 'tuya', `${name} must stay controllable tuya`);
         assert.equal(c.controllable, true, `${name} must stay controllable`);
         assert.equal(c.kind, 'lighting', `${name} groups under lighting (matchAssetIntent substring)`);
@@ -186,7 +186,7 @@ test('carve-out: cellar LIGHT is controllable (hyphenated + glued) — lighting/
 });
 
 test('carve-out: cellar FAN hyphenated → fan/tuya/controllable', () => {
-    const c = classifyDevice('gk-6261-cellar-fan-1', 'gatewayDevice', { switchReported: true });
+    const c = classifyDevice('gk-6261-cellar-fan-1', 'gatewayDevice', { switch_1: true });
     assert.equal(c.deviceType, 'tuya');
     assert.equal(c.controllable, true);
     assert.equal(c.kind, 'fan');
@@ -199,7 +199,7 @@ test('carve-out: GLUED short-token forms are controllable (blocking-finding-2 fi
     // overriding the design's §8.1 fan/lighting kind assertion). Regression guard against re-introducing
     // the exact-only short-token rule INTO isRefrigerationDeny (which would wrongly deny these).
     for (const name of ['gk-6261-cellarfan-1', 'gk-6261-cellarlgt-1']) {
-        const c = classifyDevice(name, 'gatewayDevice', { switchReported: true });
+        const c = classifyDevice(name, 'gatewayDevice', { switch_1: true });
         assert.equal(c.deviceType, 'tuya', `${name} must be controllable tuya (NOT denied)`);
         assert.equal(c.controllable, true, `${name} must be controllable`);
         assert.equal(c.kind, 'kitchen', `${name} groups under kitchen per ratified option (b)`);
@@ -207,21 +207,21 @@ test('carve-out: GLUED short-token forms are controllable (blocking-finding-2 fi
 });
 
 test('carve-out: cellar SOCKET is controllable (override token socket) — tuya/controllable', () => {
-    const c = classifyDevice('gk-6261-cellar-socket-1', 'gatewayDevice', { switchReported: true });
+    const c = classifyDevice('gk-6261-cellar-socket-1', 'gatewayDevice', { switch_1: true });
     assert.equal(c.deviceType, 'tuya');
     assert.equal(c.controllable, true);
 });
 
 test('carve-out: a genuine kitchen/lighting/fan switch on a NON-cellar site is untouched', () => {
-    assert.equal(classifyDevice('gk-6209fryer-1', 'gatewayDevice', { switchReported: true }).deviceType, 'tuya');
-    assert.equal(classifyDevice('gk-6209-switch-1', 'gatewayDevice', { switchReported: true }).controllable, true, 'non-cellar bare switch stays controllable');
+    assert.equal(classifyDevice('gk-6209fryer-1', 'gatewayDevice', { switch_1: true }).deviceType, 'tuya');
+    assert.equal(classifyDevice('gk-6209-switch-1', 'gatewayDevice', { switch_1: true }).controllable, true, 'non-cellar bare switch stays controllable');
 });
 
 test('appliance-absolutism: fridge-light-circuit is monitor-only DESPITE the light token (deliberate fail-closed §3.2)', () => {
     // An appliance noun returns the deny with NO override consulted. This is intentional, load-bearing
     // fail-closed behaviour resting on the §3.2 assumption (verified at CR3): no controllable circuit
     // carries a refrigeration appliance noun in its name.
-    const c = classifyDevice('gk-6261-fridge-light-circuit', 'default', { switchReported: true });
+    const c = classifyDevice('gk-6261-fridge-light-circuit', 'default', { switch_1: true });
     assert.equal(c.deviceType, 'refrigeration');
     assert.equal(c.controllable, false);
 });
@@ -279,11 +279,13 @@ test('site-query: pagination >200 — the filter is applied over the fully-pagin
 /* Telemetry mapping + switch normalisation (§2.5)                     */
 /* ------------------------------------------------------------------ */
 
-test('telemetry: switch normalisation trusts switchReported (fresh) over switchOn over stale switch_1', () => {
-    // switchReported present ⇒ the fresh echo wins even when the bare switch_1 is stale/opposite.
-    assert.equal(mapTelemetry({ switchReported: true, switchOn: false, switch_1: false }).switch_1, true);
-    // no switchReported ⇒ fall back to switchOn.
-    assert.equal(mapTelemetry({ switchOn: true, switch_1: false }).switch_1, true);
+test('telemetry: switch normalisation prefers switch_1, then bare switch, then legacy switchOn (switchReported retired)', () => {
+    // OOHDASH-123 (WU7): switchReported is retired. switch_1 is the canonical confirming reading.
+    assert.equal(mapTelemetry({ switch_1: true, switchOn: false }).switch_1, true);
+    // bare `switch` fallback (switch-only lighting) when switch_1 is absent.
+    assert.equal(mapTelemetry({ switch: true, switchOn: false }).switch_1, true);
+    // legacy switchOn only as a last resort.
+    assert.equal(mapTelemetry({ switchOn: true, switch_1: false }).switch_1, false);
     // only a (stale) switch_1 ⇒ last resort.
     assert.equal(mapTelemetry({ switch_1: true }).switch_1, true);
 });

@@ -28,6 +28,8 @@
 import { readFileSync } from 'fs';
 import { config } from '../config.js';
 import { resolveSiteName } from './zendesk.js';
+import * as registry from './registry.js';
+import { describeNextChange } from './schedule.js';
 
 /**
  * Lazily resolves tb-client.readRequest ONLY on the live read path. A static import would force
@@ -89,18 +91,41 @@ let lastReadError = null;
 /* must have reported to count as ONLINE.                              */
 /* ------------------------------------------------------------------ */
 
-// Global default: 48h. Provisional/conservative pending IoT per-type cadence (design §7, Sam Day).
+// Global default: 48h (monitor-only / unknown classes report infrequently).
 const FRESHNESS_DEFAULT_MS = 48 * 60 * 60 * 1000;
 
-// Per-deviceType override hook (design §4). Keyed by the same `cls.deviceType` registry keys the
-// classifier emits. Deliberately EMPTY until IoT confirms real per-type cadence — do NOT invent
-// numbers. When Sam's answer arrives, each slower/faster type gets a one-line entry here with no
-// change to the derivation, the seam, or any consumer.
-const FRESHNESS_BY_TYPE = { /* deviceType: ms — awaiting IoT cadence (design §7) */ };
+// Explicit per-deviceType override hook (ms). Still empty — the per-class offlineHours contract below
+// is the primary source; this stays as a last-resort hard override if a single type ever needs one.
+const FRESHNESS_BY_TYPE = { /* deviceType: ms */ };
 
-// Resolver (design §4): a type's threshold is its override if present, else the global default.
+// Resolver (OOHDASH-123 WU8, design §4/§5): a type's offline threshold comes from the per-class
+// contract (controllable classes 3h, monitor-only/unknown 48h), env-tunable per class. An explicit
+// FRESHNESS_BY_TYPE override, if ever set, wins. This replaces the hard global 48h for every type.
 function freshnessThresholdFor(deviceType) {
-    return FRESHNESS_BY_TYPE[deviceType] ?? FRESHNESS_DEFAULT_MS;
+    if (FRESHNESS_BY_TYPE[deviceType] != null) return FRESHNESS_BY_TYPE[deviceType];
+    const hours = registry.capabilitiesContractFor(deviceType)?.offlineHours;
+    return (hours != null ? hours : 48) * 60 * 60 * 1000;
+}
+
+// Schedule attribute keys we decode a next-change from (V1 output1..4Schedule, V2 CHZ1/DHW, PowerPause).
+const SCHEDULE_KEYS = ['schedules', 'CHZ1.schedule', 'DHW.schedule', 'output1Schedule', 'output2Schedule', 'output3Schedule', 'output4Schedule'];
+
+/**
+ * OOHDASH-123 (WU13): decode the next scheduled change for a boiler panel / PowerPause device from its
+ * SHARED_SCOPE schedule JSON. Returns a labelled operator string ("based on the device's stored
+ * schedule, next change to ...") or null (safe fallback → the UI shows "following its programme"). Only
+ * active when decoded display is on (config, James override). Never throws (describeNextChange is safe).
+ */
+function decodeDeviceSchedule(deviceType, sharedScope, now = Date.now()) {
+    if (!config.control.schedule.decoded) return null;
+    if (!sharedScope || typeof sharedScope !== 'object') return null;
+    for (const key of SCHEDULE_KEYS) {
+        if (sharedScope[key] != null) {
+            const txt = describeNextChange(sharedScope[key], new Date(now), config.control.schedule);
+            if (txt) return txt;
+        }
+    }
+    return null;
 }
 
 // OOHDASH-85 (design §5): server-side anti-flicker debounce state. Map<deviceUuid, { staleSince }>.
@@ -346,7 +371,8 @@ function levWithin(a, b, max) {
 /** True when any control-signalling switch key is present in telemetry (never the profile label, C7). */
 function hasSwitchSignal(t) {
     if (!t) return false;
-    return ['switchReported', 'switchOn', 'switch_1', 'switch'].some(k => t[k] !== undefined && t[k] !== null);
+    // OOHDASH-123 (WU7): switchReported retired; the bare `switch` key now counts as a switch signal.
+    return ['switchOn', 'switch_1', 'switch'].some(k => t[k] !== undefined && t[k] !== null);
 }
 function hasSetpointSignal(t) {
     return !!t && (t.heatingSetpoint !== undefined && t.heatingSetpoint !== null);
@@ -376,11 +402,11 @@ export function classifyDevice(name, profile, telemetry) {
     // 1) Capability from telemetry signals first (control-eligibility, never profile).
     let intent = null;
     if (hasSwitchSignal(telemetry)) {
-        intent = { kind: 'kitchen', deviceType: 'tuya', label: 'Tuya switch', control: { attribute: 'switchDesired', type: 'boolean' } };
+        intent = { kind: 'kitchen', deviceType: 'tuya', label: 'Tuya switch', control: { attribute: 'switchRequested', type: 'boolean' } };
     } else if (hasSetpointSignal(telemetry)) {
         // Setpoint present → a thermostat/AC. Refine the deviceType by the name asset token below;
         // default to salus-it700 (the dominant heating controller).
-        intent = { kind: 'heating', deviceType: 'salus-it700', label: 'Salus thermostat', control: { attribute: 'setpointDesired', type: 'number' } };
+        intent = { kind: 'heating', deviceType: 'salus-it700', label: 'Salus thermostat', control: { attribute: 'setpointRequested', type: 'number' } };
     }
 
     // 2) Asset-token intent from the (typo-corrected) name — refines/sets deviceType + kind.
@@ -391,7 +417,7 @@ export function classifyDevice(name, profile, telemetry) {
             // it agrees on a control family (heating→salus/intesis; switch→tuya).
             if (intent.deviceType === 'tuya' && nameIntent.deviceType === 'tuya') {
                 intent = { ...intent, kind: nameIntent.kind, label: nameIntent.label };
-            } else if (intent.control?.attribute === 'setpointDesired' && ['salus-it700', 'salus-it500', 'salus', 'intesis'].includes(nameIntent.deviceType)) {
+            } else if (intent.control?.attribute === 'setpointRequested' && ['salus-it700', 'salus-it500', 'salus', 'intesis'].includes(nameIntent.deviceType)) {
                 // OOHDASH-108: a setpoint-bearing bare-salus thermostat is refined from the iT700
                 // default to the new `salus` type by its name, so its area letter-resolves.
                 intent = { ...intent, deviceType: nameIntent.deviceType, kind: nameIntent.kind, label: nameIntent.label };
@@ -410,8 +436,8 @@ export function classifyDevice(name, profile, telemetry) {
     // Setpoint controllability requires heatingSetpoint present (registry.js:80-81 refuses without it).
     let controllable = false;
     let control = intent.control || null;
-    if (control?.attribute === 'switchDesired') controllable = true;
-    else if (control?.attribute === 'setpointDesired') controllable = hasSetpointSignal(telemetry);
+    if (control?.attribute === 'switchRequested') controllable = true;
+    else if (control?.attribute === 'setpointRequested') controllable = hasSetpointSignal(telemetry);
     if (!controllable) control = null;
 
     // OOHDASH-82 (design §6, A2): Intesis aircon is NEVER controllable from the dashboard — force it
@@ -577,7 +603,10 @@ export function mapTelemetry(tb) {
     const out = {
         temperature: num(t.temperature ?? t.localTemperature ?? t.temperatureC),
         localTemperature: num(t.localTemperature ?? t.temperature ?? t.temperatureC),
-        heatingSetpoint: num(t.heatingSetpoint ?? t.setpoint ?? t.setpointC),
+        // OOHDASH-123 (WU7): IT500 reports its setpoint on camelCase `setPoint`; fold it into the
+        // load-bearing heatingSetpoint and also expose it raw so the IT500 confirming key resolves.
+        heatingSetpoint: num(t.heatingSetpoint ?? t.setPoint ?? t.setpoint ?? t.setpointC),
+        setPoint: num(t.setPoint),
         mode: t.mode,
         heatingActive: t.heatingActive,
         coolingActive: t.coolingActive,
@@ -586,8 +615,8 @@ export function mapTelemetry(tb) {
         roomSensor1Temp: num(t.roomSensor1Temp),
         output1State: t.output1State
     };
-    // Switch normalisation — trust switchReported first (present ⇒ fresh bridge echo), then
-    // switchOn (always present), never a bare stale switch_1 first.
+    // Switch normalisation (OOHDASH-123 WU7): canonical switch_1, then the bare `switch` fallback for
+    // switch-only lighting, then legacy switchOn. switchReported is retired.
     const sw = pickSwitch(t);
     if (sw !== undefined) out.switch_1 = sw;
     // Drop keys that came out undefined so the canonical shape stays clean (parity with bridge.js
@@ -604,9 +633,12 @@ function toBool(v) {
 }
 
 function pickSwitch(t) {
-    if (t.switchReported !== undefined && t.switchReported !== null) return toBool(t.switchReported);
-    if (t.switchOn !== undefined && t.switchOn !== null) return toBool(t.switchOn);
+    // OOHDASH-123 (WU7): switchReported is retired (design §12). The device's own confirming reading is
+    // switch_1 (canonical), with the bare `switch` key as the fallback for switch-only lighting devices
+    // (gk-6237 etc.); switchOn is kept last for legacy bridge echoes.
     if (t.switch_1 !== undefined && t.switch_1 !== null) return toBool(t.switch_1);
+    if (t.switch !== undefined && t.switch !== null) return toBool(t.switch);
+    if (t.switchOn !== undefined && t.switchOn !== null) return toBool(t.switchOn);
     return undefined;
 }
 
@@ -685,7 +717,7 @@ export function applyFreshnessDebounce(uuid, rawOnline, now = Date.now(), hardOf
  * fixture data path and non-live callers are unchanged — the freshness rule engages whenever a
  * last-report time was actually read (the live path always supplies it, even as null).
  */
-export function mapTbDevice(raw, telemetryBag, clientScope) {
+export function mapTbDevice(raw, telemetryBag, clientScope, sharedScope = null) {
     const name = raw.name ?? raw.deviceId ?? '';
     const profile = raw.type ?? raw.profile ?? null;
     const telemetry = mapTelemetry(telemetryBag || raw.telemetry);
@@ -714,7 +746,11 @@ export function mapTbDevice(raw, telemetryBag, clientScope) {
             ? deriveFreshnessOnline(raw.lastActivityTime, raw.active ?? false, freshnessThresholdFor(cls.deviceType))
             : (raw.isOnline ?? raw.active ?? false),
         telemetry,
-        schedule: null,
+        // OOHDASH-123 (WU13, DD-SCHED-DISPLAY): decoded next-scheduled-change for boiler panels /
+        // PowerPause (from the SHARED_SCOPE schedule JSON), labelled and with a safe fallback to null
+        // (UI then shows "following its programme / overridden"). Decoded display is ON by default
+        // (James override); SQ-13 day-order/timezone are invertible config constants.
+        schedule: decodeDeviceSchedule(cls.deviceType, sharedScope ?? (raw.scheduleJson || null)),
         // additive (design-permitted):
         isDuplicate: /\(?\bold\b\)?/.test(lower),   // (old)/old duplicate devices — excluded from control
         hasReported: telemetryBag ? Object.keys(telemetryBag).length > 0 : false
@@ -798,7 +834,9 @@ async function fetchTelemetry(devices) {
                 ? readClientScopeAttributes(uuid, 'site,salusLocation,DHW.use_boiler')
                 : readClientScopeAttributes(uuid, 'site,salusLocation'),
             isBoilerControl
-                ? readSharedScopeAttributes(uuid, 'output1OutputMask')
+                // OOHDASH-123 (WU13): also read the schedule attributes (V1 output1..4Schedule,
+                // V2 CHZ1/DHW schedule) for the next-scheduled-change decode (design §10, decoded display).
+                ? readSharedScopeAttributes(uuid, 'output1OutputMask,output1Schedule,output2Schedule,output3Schedule,output4Schedule,CHZ1.schedule,DHW.schedule,schedules')
                 : Promise.resolve(null)
         ];
         const [tsRes, activeRes, clientScopeRes, sharedScopeRes] = await Promise.allSettled(reads);
@@ -885,7 +923,8 @@ async function fetchLiveSitesByNumber(siteNo) {
         const dev = mapTbDevice(
             { ...d, active: __active ?? false, lastActivityTime: __lastActivityTime ?? null },
             telemetryBag,
-            __clientScope || {}
+            __clientScope || {},
+            __sharedScope || null
         );
         // OOHDASH-85 (design §5): server-side anti-flicker debounce. `dev.online` is the raw freshness
         // verdict; the debounce holds a device online for one extra poll on its FIRST *stale* read, so

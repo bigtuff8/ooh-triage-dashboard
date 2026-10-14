@@ -21,10 +21,15 @@ import * as confirm from './confirm.js';
 import * as bridge from './bridge.js';
 import * as killswitch from './killswitch.js';
 import * as audit from './audit.js';
+import * as registry from './registry.js';
 import { recordControlEvent, raiseAlert } from './metrics.js';
 
 const WORKER_INTERVAL_MS = 30 * 1000;
-const REVERT_CONFIRM_TIMEOUT_MS = 90 * 1000;
+// OOHDASH-123 (WU14): the revert confirm uses the per-class confirm limit, but a single worker pass must
+// not block for the full Salus window (up to 45 min). We poll up to this synchronous cap; if the revert
+// has been dispatched but not yet confirmed, the doc stays 'reverting' and a later cycle RE-CONFIRMS
+// (without re-dispatching) until the per-class late-watch horizon — no false revert-failed alert fires.
+const REVERT_CONFIRM_CAP_MS = 3 * 60 * 1000;
 const LEASE_MS = 3 * 60 * 1000;
 const OWNER = `${hostname()}-${process.pid}`;
 
@@ -162,30 +167,60 @@ async function revert(col, doc) {
         const device = await bridge.getDevice(doc.siteNo, doc.deviceId) || {
             deviceId: doc.deviceId, deviceType: doc.deviceType, telemetry: {}
         };
+        const contract = registry.capabilitiesContractFor(device.deviceType);
+        let confirmed = false, rejected = false, rawError = null, stillPending = false;
 
-        // Edge-safe revert (D3 §3.7): the device may already be at revertValue (its own schedule
-        // reclaimed the slot). Re-writing the same desired dispatches NOTHING on the edge-triggered
-        // bridge, so the confirm poll would never see a FRESH echo and we'd raise a FALSE
-        // revert-failed. Classify first: already-satisfied → truthfully 'reverted', no write, no alert.
-        const edge = await confirm.classifyPreDispatch(tb, device, doc.attribute, doc.revertValue);
-        let confirmed;
-        if (edge.outcome === 'already-satisfied') {
-            confirmed = true; // already at the revert value and confirmed — honestly reverted
+        if (doc.revertDispatchedTs) {
+            // RE-CONFIRM a revert already dispatched on a prior cycle — read once, classify, do NOT
+            // re-fire (a slow Salus revert legitimately takes minutes; we just keep checking).
+            const st = await tb.readCommandState(device, device.deviceType);
+            const oc = confirm.classifyOutcome(st, doc.revertValue, doc.revertDispatchedTs, contract);
+            if (oc === 'CONFIRMED') confirmed = true;
+            else if (oc === 'NON-DELIVERY') { rejected = true; rawError = st.lastError; }
+            else stillPending = true;
         } else {
-            const dispatchTs = Date.now();
-            await tb.writeSharedAttribute(device, doc.attribute, doc.revertValue);
-
-            // Confirm the revert echoed back FRESH (syncTs > dispatchTs) before declaring it done.
-            const deadline = Date.now() + REVERT_CONFIRM_TIMEOUT_MS;
-            confirmed = false;
-            while (Date.now() < deadline) {
-                await new Promise(r => setTimeout(r, 3000));
-                const state = await tb.readControlState(device, doc.attribute);
-                if (confirm.isSettled(state, doc.revertValue, dispatchTs)) { confirmed = true; break; }
-                if (confirm.isFreshTerminal(state, dispatchTs)) break;
+            // Edge-safe revert (OOHDASH-123 WU14): judge from the device's own confirming telemetry. If
+            // the device already reads the revert value (its own schedule reclaimed the slot), it is
+            // truthfully reverted with no write — no false revert-failed.
+            const edge = await confirm.preDispatchCheck(tb, device, device.deviceType, doc.revertValue, contract);
+            if (edge.outcome === 'already-satisfied') {
+                confirmed = true;
+            } else {
+                // Write the Requested key so the gate dispatches, then confirm with the three-outcome rule.
+                const dispatchTs = await tb.writeServerScopeAttribute(device, doc.attribute, doc.revertValue);
+                doc.revertDispatchedTs = dispatchTs;
+                if (contract.copyMinutes != null) {
+                    // Slow (Salus) class — do NOT block the worker for minutes; re-confirm on later cycles.
+                    stillPending = true;
+                } else {
+                    // Fast (Tuya) class — confirm synchronously within a bounded window.
+                    const cap = Math.min(contract.confirmLimitMs || REVERT_CONFIRM_CAP_MS, REVERT_CONFIRM_CAP_MS);
+                    const pollMs = Math.min(contract.confirmPollMs || 3000, 5000);
+                    const deadline = Date.now() + cap;
+                    while (Date.now() < deadline) {
+                        await new Promise(r => setTimeout(r, pollMs));
+                        const st = await tb.readCommandState(device, device.deviceType);
+                        const oc = confirm.classifyOutcome(st, doc.revertValue, dispatchTs, contract);
+                        if (oc === 'CONFIRMED') { confirmed = true; break; }
+                        if (oc === 'NON-DELIVERY') { rejected = true; rawError = st.lastError; break; }
+                    }
+                    if (!confirmed && !rejected) stillPending = true;
+                }
             }
         }
 
+        // A still-pending revert past its per-class late-watch horizon is given up (real alert); before
+        // that it stays dispatched and is re-confirmed on a later cycle — NO false revert-failed alert.
+        const lateWatchUntil = (doc.revertDispatchedTs || Date.now()) + (contract.lateWatchMs || REVERT_CONFIRM_CAP_MS);
+        if (stillPending && Date.now() <= lateWatchUntil) {
+            doc.status = 'active';          // keep due so a later cycle re-confirms (revertDispatchedTs guards re-fire)
+            doc.leaseOwner = null;
+            doc.leaseUntil = null;
+            await col.upsert(doc);
+            return;                         // no audit row / alert yet — the revert is in flight
+        }
+
+        confirmed = confirmed && !rejected;
         doc.status = confirmed ? 'reverted' : 'revert-failed';
         doc.revertedAt = new Date().toISOString();
         doc.leaseOwner = null;
@@ -199,12 +234,12 @@ async function revert(col, doc) {
             siteName: doc.siteName,
             deviceId: doc.deviceId,
             zone: doc.zone,
-            detail: `Timed override revert: ${doc.attribute} → ${doc.revertValue} (held ${doc.heldValue} by ${doc.createdBy})${doc.cancelRequestedBy ? ` · cancelled early by ${doc.cancelRequestedBy}` : ''}`,
-            outcome: confirmed ? 'synced' : 'revert-failed',
+            detail: `Timed override revert: ${doc.attribute} → ${doc.revertValue} (held ${doc.heldValue} by ${doc.createdBy})${doc.cancelRequestedBy ? ` · cancelled early by ${doc.cancelRequestedBy}` : ''}${rawError ? ` · gate/vendor: ${String(rawError).slice(0, 200)}` : ''}`,
+            outcome: confirmed ? 'confirmed' : 'revert-failed',
             ticketId: doc.ticketId
         });
         recordControlEvent(confirmed ? 'revert-ok' : 'revert-failed');
-        if (!confirmed) raiseAlert('revert-failed', `Hold revert for ${doc.deviceId} (${doc.siteName}) was NOT confirmed by the device — manual check needed`);
+        if (!confirmed) raiseAlert('revert-failed', `Hold revert for ${doc.deviceId} (${doc.siteName}) was ${rejected ? 'rejected by the gate/vendor' : 'NOT confirmed within its window'} — manual check needed`);
     } catch (err) {
         console.error(`[OVERRIDES] Revert dispatch failed for ${doc.id}: ${err.message}`);
         doc.status = 'revert-failed';
