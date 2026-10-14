@@ -128,3 +128,9 @@ Full-diff scan (38 files, +2415/-1408) found no credential-shaped literals. Twil
 ## 9. Recommendation
 
 APPROVE for merge and progression to Release. Both suites green in their designed modes; all binding decisions met; divergences sound; no defects; no secrets. Release carries the four go-live preconditions forward; J8 stays read-only until James approves it in person.
+
+---
+
+## 10. Rebase provenance (orchestrator)
+
+After the Stage-1 sign-off the branch was rebased onto origin/main to pick up OOHDASH-127 (CI e2e-green fix: CSS/views/test tweaks, merged PR #94 at f6718e9; still v1.3.7, no OOHDASH-122 code yet). The rebase was clean (no conflicts; OOHDASH-127 is orthogonal to this change). Both suites were re-run on the integrated base: unit 365 pass / 0 fail / 1 skip (366 total); e2e 138 passed / 2 skipped / 0 failed (4.3m, within the webserver-death horizon). The e2e count rose by one versus the Stage-1 run because OOHDASH-127 adds its own spec. Verdict unchanged: PASS-WITH-NOTES.
