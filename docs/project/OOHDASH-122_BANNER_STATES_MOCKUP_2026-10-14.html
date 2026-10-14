@@ -1,0 +1,215 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>OOH Banner States</title>
+<style>
+:root{
+  --primary:#594AE2;--success-light:#D1FAE5;--danger-light:#FEE2E2;--info-light:#DBEAFE;--warning-light:#FEF3C7;
+  --surface:#FFFFFF;--background:#F1F5F9;--sidebar-bg:#1E293B;--sidebar-text:#94A3B8;--sidebar-active:#334155;
+  --text-primary:#1E293B;--text-secondary:#64748B;--border:#E2E8F0;--radius-md:8px;--radius-lg:12px;
+  --mono:ui-monospace,Consolas,'Cascadia Mono',monospace;
+  --kill-text:#991B1B;--kill-border:#FECACA;--live-text:#065F46;--live-border:#A7F3D0;--warn-text:#92400E;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --surface:#1E293B;--background:#0F172A;--text-primary:#E2E8F0;--text-secondary:#94A3B8;--border:#334155;
+    --success-light:#064E3B;--danger-light:#450A0A;--warning-light:#451A03;--info-light:#1E3A8A;
+    --kill-text:#FECACA;--kill-border:#7F1D1D;--live-text:#A7F3D0;--live-border:#065F46;--warn-text:#FDE68A;
+  }
+}
+:root[data-theme="dark"]{
+  --surface:#1E293B;--background:#0F172A;--text-primary:#E2E8F0;--text-secondary:#94A3B8;--border:#334155;
+  --success-light:#064E3B;--danger-light:#450A0A;--warning-light:#451A03;--info-light:#1E3A8A;
+  --kill-text:#FECACA;--kill-border:#7F1D1D;--live-text:#A7F3D0;--live-border:#065F46;--warn-text:#FDE68A;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:Inter,system-ui,-apple-system,'Segoe UI',sans-serif;background:var(--background);color:var(--text-primary);font-size:14px;line-height:1.45}
+.wrap{max-width:1100px;margin:0 auto;padding:16px}
+h1{font-size:18px;margin-bottom:4px}
+.lede{color:var(--text-secondary);margin-bottom:14px;max-width:760px}
+.controls{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:12px}
+.seg{display:inline-flex;border:1px solid var(--border);border-radius:var(--radius-md);overflow:hidden;background:var(--surface)}
+.seg button{border:0;background:transparent;color:var(--text-primary);padding:7px 12px;font:inherit;cursor:pointer}
+.seg button[aria-pressed="true"]{background:var(--primary);color:#fff}
+.states{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:14px}
+.states button{border:1px solid var(--border);background:var(--surface);color:var(--text-primary);border-radius:999px;padding:6px 12px;font:inherit;font-size:13px;cursor:pointer}
+.states button[aria-pressed="true"]{border-color:var(--primary);box-shadow:0 0 0 2px var(--primary) inset}
+.frame{display:grid;grid-template-columns:200px 1fr;border:1px solid var(--border);border-radius:var(--radius-lg);overflow:hidden;background:var(--surface);min-height:380px}
+.sidebar{background:var(--sidebar-bg);color:var(--sidebar-text);padding:14px 10px;display:flex;flex-direction:column;gap:4px}
+.brand{color:#fff;font-weight:600;margin-bottom:12px}.brand small{display:block;color:var(--sidebar-text);font-weight:400;font-size:11px}
+.nav button{display:block;width:100%;text-align:left;background:transparent;border:0;color:var(--sidebar-text);padding:7px 8px;border-radius:6px;font:inherit;cursor:pointer}
+.nav button.active{background:var(--sidebar-active);color:#fff}
+.main{display:flex;flex-direction:column;min-width:0}
+.topbar{display:flex;justify-content:space-between;padding:10px 24px;border-bottom:1px solid var(--border);font-weight:600}
+.topbar .ver{color:var(--text-secondary);font-weight:400;font-family:var(--mono);font-size:12px}
+.banner{padding:8px 24px;font-size:13.5px;font-weight:500;display:flex;align-items:center;gap:10px}
+.banner.kill{background:var(--danger-light);color:var(--kill-text);border-bottom:1px solid var(--kill-border)}
+.banner.live{background:var(--success-light);color:var(--live-text);border-bottom:1px solid var(--live-border)}
+.dot{width:10px;height:10px;border-radius:50%;flex:none}
+.kill .dot{background:#DC2626}.live .dot{background:#10B981}
+.content{padding:18px 24px;display:flex;flex-direction:column;gap:12px}
+.card{border:1px solid var(--border);border-radius:var(--radius-md);padding:14px}
+.search{width:100%;padding:10px 12px;border:1px solid var(--border);border-radius:var(--radius-md);font:inherit;background:var(--surface);color:var(--text-primary)}
+.ws{display:none}.ws.show{display:block}
+.warn{background:var(--warning-light);color:var(--warn-text);padding:8px 12px;border-radius:var(--radius-md);font-size:13px}
+.btn{border:1px solid var(--border);background:var(--surface);color:var(--text-primary);padding:7px 12px;border-radius:var(--radius-md);font:inherit;cursor:pointer}
+.btn.primary{background:var(--primary);border-color:var(--primary);color:#fff}
+.side{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:14px}
+.panel{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-md);padding:12px}
+.panel h2{font-size:13px;text-transform:uppercase;letter-spacing:.04em;color:var(--text-secondary);margin-bottom:8px}
+.verdict{font-weight:600;font-size:15px}.verdict.bad{color:#DC2626}.verdict.good{color:#10B981}
+pre{font-family:var(--mono);font-size:12px;white-space:pre-wrap;word-break:break-word;color:var(--text-primary)}
+.why{color:var(--text-secondary);margin-top:6px;font-size:13px}
+.modal{position:fixed;inset:0;background:rgba(15,23,42,.5);display:none;align-items:center;justify-content:center;padding:16px}
+.modal.show{display:flex}
+.modal .box{background:var(--surface);border-radius:var(--radius-lg);padding:18px;max-width:420px;width:100%}
+.modal .alert{background:var(--danger-light);color:var(--kill-text);padding:8px 12px;border-radius:var(--radius-md);margin:10px 0}
+@media (max-width:720px){.frame{grid-template-columns:1fr}.sidebar{flex-direction:row;flex-wrap:wrap}.brand{width:100%;margin-bottom:4px}.nav{display:flex;gap:4px}.side{grid-template-columns:1fr}.banner,.topbar,.content{padding-left:16px;padding-right:16px}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>OOHDASH-122 - one banner at a time</h1>
+  <p class="lede">Pick a system state, then switch between how the live v1.3.7 dashboard behaves today and how v1.3.8 will behave. The counter on the right should never read 2 in v1.3.8 mode. Site 6832 (Old Grey Mare) is the fixture site used in testing.</p>
+
+  <div class="controls">
+    <div class="seg" role="group" aria-label="Version">
+      <button id="v137" aria-pressed="false">Today (v1.3.7)</button>
+      <button id="v138" aria-pressed="true">After fix (v1.3.8)</button>
+    </div>
+  </div>
+  <div class="states" id="states" role="group" aria-label="System state"></div>
+
+  <div class="frame">
+    <div class="sidebar">
+      <div class="brand">OOH Dashboard<small>Lighthouse out-of-hours support</small></div>
+      <div class="nav"><button class="active" id="navHome">New Call</button><button>Callback Lookup</button><button>Tonight</button></div>
+    </div>
+    <div class="main">
+      <div class="topbar"><span id="ctx">New Call</span><span class="ver" id="ver">v1.3.8</span></div>
+      <div id="banners"></div>
+      <div class="content">
+        <div class="card" id="homeCard">
+          <h3 style="margin-bottom:8px">Who is calling?</h3>
+          <input class="search" value="" placeholder="House number or pub name, e.g. 6832 or Old Grey Mare" aria-label="Site search">
+          <p class="why" id="homeHint">Search for a site to start triage.</p>
+        </div>
+        <div class="card ws" id="wsCard">
+          <div class="warn" id="wsWarn" style="display:none;margin-bottom:10px">Live reads are unavailable - flows will capture and escalate rather than make changes.</div>
+          <h3 style="margin-bottom:6px">Old Grey Mare <span style="font-family:var(--mono);color:var(--text-secondary)">6832</span></h3>
+          <p class="why" style="margin-bottom:10px">Caller reports the bar area is cold. Bar/Restaurant thermostat IT500-BAR-6832 reads 17.5 C.</p>
+          <button class="btn primary" id="raise">Raise setpoint to 19.5 C</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="side">
+    <div class="panel">
+      <h2>What the handler sees</h2>
+      <div class="verdict" id="verdict"></div>
+      <p class="why" id="why"></p>
+    </div>
+    <div class="panel">
+      <h2>Signals behind it</h2>
+      <pre id="signals"></pre>
+    </div>
+  </div>
+</div>
+
+<div class="modal" id="modal" role="dialog" aria-modal="true" aria-labelledby="mt">
+  <div class="box">
+    <b id="mt">Control unavailable</b>
+    <div class="alert" id="mreason"></div>
+    <p class="why">Use capture and escalate instead - the request will be logged and actioned by the IoT team.</p>
+    <div style="text-align:right;margin-top:12px"><button class="btn primary" id="mok">OK</button></div>
+  </div>
+</div>
+
+<script>
+(function () {
+  var STATES = [
+    { id: 'cold', label: 'Cold start (just restarted)', site: false, controlLive: true, deploy: false, global: false, siteKs: false, lastError: null, healthyOld: false, probe: 'ok in 412ms',
+      why: 'Pod restarted 40 seconds ago; nobody has opened a site yet. Today the read latch starts as failed, so red shows next to green. In v1.3.8 the start-up probe has already proved reads, and "not checked yet" no longer counts as broken.' },
+    { id: 'tbfail', label: 'TB reads failing', site: false, controlLive: true, deploy: false, global: false, siteKs: false, lastError: 'Start-up read probe failed: Request failed with status code 503', healthyOld: false, probe: 'failed (Request failed with status code 503)',
+      why: 'ThingsBoard really is failing. Red is correct. Today green still shows beside it; in v1.3.8 green is hidden so the only signal is the true one.' },
+    { id: 'sitefail', label: 'Site reads failing', site: true, controlLive: true, deploy: false, global: false, siteKs: false, lastError: null, healthyOld: true, wsDegraded: true, probe: 'ok in 388ms',
+      why: 'The account-level flag is clear but the open site workspace reported degraded reads. Red shows for the site; v1.3.8 hides green too.' },
+    { id: 'healthy', label: 'Healthy after lookup', site: true, controlLive: true, deploy: false, global: false, siteKs: false, lastError: null, healthyOld: true, probe: 'ok in 401ms',
+      why: 'Normal night. Reads proven, writes enabled. Green only, in both versions.' },
+    { id: 'global', label: 'Global kill-switch', site: false, controlLive: true, deploy: false, global: true, siteKs: false, lastError: null, healthyOld: true, probe: 'ok in 395ms',
+      why: 'An IoT admin switched control off globally (reason: vendor cloud incident). Today both banners show. With the recommended guard (Decision 1) only red shows.' },
+    { id: 'siteks', label: 'Site kill-switch', site: true, controlLive: true, deploy: false, global: false, siteKs: true, lastError: null, healthyOld: true, probe: 'ok in 402ms',
+      why: 'Control is switched off for 6832 only. While that site is open, red shows and, with the recommended guard, green is hidden. Other sites still show green.' },
+    { id: 'deploy', label: 'Deploy lock on', site: false, controlLive: false, deploy: true, global: false, siteKs: false, lastError: null, healthyOld: true, probe: 'ok in 420ms',
+      why: 'WRITES_DISABLED is engaged (canary). Green never shows; red explains why. Unchanged by this ticket.' }
+  ];
+  var ver = '138', cur = STATES[0];
+  var el = function (id) { return document.getElementById(id); };
+
+  function killReason(s, v) {
+    if (s.deploy) return 'Device control is disabled at deploy time (safety/canary lock) - changes can\'t be sent yet';
+    if (s.global) return 'Device control is switched off globally - vendor cloud incident (IoT Support)';
+    if (s.site && s.siteKs) return 'Device control is switched off for this site - boiler engineer on site (IoT Support)';
+    var meDegraded = v === '137' ? !s.healthyOld : !!s.lastError;
+    var wsDegraded = s.site && !!s.wsDegraded;
+    if (meDegraded || wsDegraded) return 'Live device reads are unavailable (degraded mode) - changes can\'t be confirmed';
+    return null;
+  }
+
+  function render() {
+    var s = cur, v = ver;
+    var kill = killReason(s, v);
+    var showLive = v === '137' ? s.controlLive : (s.controlLive && !kill);
+    var html = '';
+    if (kill) html += '<div class="banner kill" data-testid="kill-banner"><span class="dot"></span><span>' + kill + ' - control actions are disabled; capture &amp; escalate still works.</span></div>';
+    if (showLive) html += '<div class="banner live" data-testid="control-live-banner"><span class="dot"></span><span><b>Device control is LIVE</b> - changes you send will reach real equipment. Confirm the site before every change.</span></div>';
+    el('banners').innerHTML = html;
+    var count = (kill ? 1 : 0) + (showLive ? 1 : 0);
+    el('ver').textContent = v === '137' ? 'v1.3.7' : 'v1.3.8';
+    el('ctx').innerHTML = s.site ? 'Old Grey Mare &middot; <span style="font-family:var(--mono)">6832</span>' : 'New Call';
+    el('homeCard').style.display = s.site ? 'none' : 'block';
+    el('wsCard').className = 'card ws' + (s.site ? ' show' : '');
+    el('wsWarn').style.display = s.site && s.wsDegraded ? 'block' : 'none';
+    var v1 = el('verdict');
+    v1.textContent = count + (count === 1 ? ' banner showing' : ' banners showing') + (count === 2 ? ' - contradictory' : ' - one clear signal');
+    v1.className = 'verdict ' + (count === 2 ? 'bad' : 'good');
+    el('why').textContent = s.why;
+    var meDeg = v === '137' ? !s.healthyOld : !!s.lastError;
+    el('signals').textContent =
+      'GET /api/me\n  controlLive: ' + s.controlLive + '\n  degraded: ' + meDeg + (v === '137' ? '   (= !bridge.healthy)' : '   (= lastError is set)') +
+      '\n  killSwitch.global: ' + s.global + '\n  killSwitch.sites[6832]: ' + (s.siteKs ? 'set' : 'none') +
+      (s.site ? '\nworkspace.degraded: ' + !!s.wsDegraded : '') +
+      '\n\nGET /healthz  subsystems.bridge\n  healthy: ' + (v === '137' ? s.healthyOld : !s.lastError) + '\n  lastError: ' + (s.lastError && v === '138' ? '"' + s.lastError + '"' : 'null') +
+      (v === '138' ? '\n\npod log\n  [TB] start-up read probe: ' + s.probe : '\n\npod log\n  (no start-up probe in v1.3.7)');
+    el('raise').disabled = false; el('raise').textContent = 'Raise setpoint to 19.5 C';
+  }
+
+  STATES.forEach(function (s, i) {
+    var b = document.createElement('button');
+    b.textContent = s.label;
+    b.setAttribute('aria-pressed', i === 0 ? 'true' : 'false');
+    b.onclick = function () {
+      cur = s;
+      Array.prototype.forEach.call(el('states').children, function (c) { c.setAttribute('aria-pressed', 'false'); });
+      b.setAttribute('aria-pressed', 'true');
+      render();
+    };
+    el('states').appendChild(b);
+  });
+  el('v137').onclick = function () { ver = '137'; el('v137').setAttribute('aria-pressed', 'true'); el('v138').setAttribute('aria-pressed', 'false'); render(); };
+  el('v138').onclick = function () { ver = '138'; el('v138').setAttribute('aria-pressed', 'true'); el('v137').setAttribute('aria-pressed', 'false'); render(); };
+  el('raise').onclick = function () {
+    var k = killReason(cur, ver);
+    if (k) { el('mreason').textContent = k + '.'; el('modal').className = 'modal show'; }
+    else { el('raise').textContent = 'Sent - waiting for the thermostat to confirm 19.5 C'; el('raise').disabled = true; }
+  };
+  el('mok').onclick = function () { el('modal').className = 'modal'; };
+  el('navHome').onclick = function () { cur = STATES[0]; el('states').children[0].click(); };
+  render();
+})();
+</script>
+</body>
+</html>
