@@ -1064,6 +1064,41 @@ export function bridgeStatus() {
     };
 }
 
+/**
+ * OOHDASH-122 (Option A): ONE-SHOT start-up read probe. Proves the TB read path with a single
+ * site-independent, read-only request (list one device) so the degraded latch reflects reality
+ * before any handler opens a workspace. Never throws, never retries, never blocks start-up.
+ * Only writes the latch while it is still in its untouched boot state, so a real read always wins.
+ */
+const STARTUP_PROBE_PATH = '/api/tenant/devices?pageSize=1&page=0';
+export async function probeBridgeReadOnce({ timeoutMs = 8000 } = {}) {
+    if (config.dataMode !== 'live') return { outcome: 'skipped' };
+    const untouched = () => lastReadOk === false && lastReadError === null;
+    const started = Date.now();
+    let timer;
+    try {
+        const timeout = new Promise(r => { timer = setTimeout(() => r('timeout'), timeoutMs); timer.unref?.(); });
+        const call = readRequest('GET', STARTUP_PROBE_PATH).then(() => 'ok', err => err);
+        const result = await Promise.race([call, timeout]);
+        const ms = Date.now() - started;
+        if (result === 'ok') {
+            if (untouched()) { lastReadOk = true; lastReadError = null; }
+            return { outcome: 'ok', ms };
+        }
+        if (result === 'timeout') {
+            if (untouched()) lastReadError = `Start-up read probe timed out after ${timeoutMs}ms`;
+            return { outcome: 'timeout', ms };
+        }
+        if (result?.response?.status === 429) return { outcome: 'rate-limited', ms };  // back off: no retry, no error
+        if (untouched()) lastReadError = `Start-up read probe failed: ${result?.message || 'unknown error'}`;
+        return { outcome: 'failed', ms, error: result?.message };
+    } catch (err) {
+        return { outcome: 'failed', error: err?.message };   // belt and braces: never throw
+    } finally {
+        clearTimeout(timer);
+    }
+}
+
 /** Test/ops helper — clears the per-site live cache (test isolation; no bridge.js equivalent used).
  *  OOHDASH-85: also clears the freshness debounce state so poll-sequence tests start clean. */
 export function _resetCache() {

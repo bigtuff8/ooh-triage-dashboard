@@ -56,13 +56,20 @@ export { _notesIdempMap as _notesIdempMapForTest, _notesIdempCheck as _notesIdem
 
 /* ---------------- session / app context ---------------- */
 
+// OOHDASH-122: read-degraded means a REAL read failure has been recorded (lastError set),
+// not "not yet proven". A fresh pod with no read yet is not degraded. Used by /me AND the
+// workspace payload so the two degraded signals can never disagree in meaning.
+export function bridgeDegraded(status = bridge.bridgeStatus()) {
+    return !!status.lastError;
+}
+
 router.get('/me', wrap(async (req, res) => {
     const op = req.session.operator;
     res.json({
         operator: { name: op.name, role: op.role, roleLabel: op.roleLabel, email: op.email },
         killSwitch: await killswitch.killSwitchState(),
         notices: await notices.activeNotices(),
-        degraded: !bridge.bridgeStatus().healthy,
+        degraded: bridgeDegraded(),
         version: config.appVersion,
         dataMode: config.dataMode,
         // R8/S10: derived "control is live" signal for the OOHDASH-19 flip. Computed from
@@ -214,7 +221,7 @@ async function workspacePayload(site) {
         anyOffline: site.devices.some(d => !d.online),
         tickets,
         activeP1Tickets,
-        degraded: !bridge.bridgeStatus().healthy,
+        degraded: bridgeDegraded(),
         boilerControl: site.boilerControl ?? defaultBc
     };
 }

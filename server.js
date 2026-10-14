@@ -164,6 +164,12 @@ async function start() {
         } else {
             console.warn('[WRITE-LOCK] *** DEVICE WRITES ARE ENABLED *** WRITES_DISABLED=false — live actuations will fire.');
         }
+        // OOHDASH-122: one-shot, non-blocking start-up read probe (live only). Never awaited before listen.
+        if (config.dataMode === 'live') {
+            bridge.probeBridgeReadOnce()
+                .then(r => console.log(`[TB] start-up read probe: ${r.outcome}${r.ms !== undefined ? ` in ${r.ms}ms` : ''}${r.error ? ` (${r.error})` : ''}`))
+                .catch(() => { /* probeBridgeReadOnce never rejects; guard anyway */ });
+        }
     });
 }
 

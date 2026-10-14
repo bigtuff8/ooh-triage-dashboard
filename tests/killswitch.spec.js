@@ -20,6 +20,8 @@ test.describe.serial('F016 kill-switch', () => {
         await signIn(h, 'Test Handler');
         await expect(h.locator('[data-testid="kill-banner"]')).toContainText('switched off globally');
         await expect(h.locator('[data-testid="kill-banner"]')).toContainText('vendor cloud incident');
+        // OOHDASH-122 AC-2 E5: LIVE banner must be absent while the global kill-switch is engaged.
+        await expect(h.locator('[data-testid="control-live-banner"]')).toHaveCount(0);
         await confirmSite(h, '6832', 'Old Grey Mare'); // reads continue (F016 verification)
 
         // Control modal never opens — blocked with explanation; server also rejects (423)
@@ -55,6 +57,8 @@ test.describe.serial('F016 kill-switch', () => {
         await expect(iot.locator('[data-testid="admin-killswitch"]')).toContainText('Writes enabled');
         await h.reload();
         await expect(h.locator('[data-testid="kill-banner"]')).toHaveCount(0);
+        // OOHDASH-122 AC-2 E5: LIVE banner must be restored after the global kill-switch is cleared.
+        await expect(h.locator('[data-testid="control-live-banner"]')).toBeVisible();
         await iotCtx.close();
         await hCtx.close();
     });
