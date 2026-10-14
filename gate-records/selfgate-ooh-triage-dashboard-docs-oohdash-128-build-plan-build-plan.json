@@ -1,0 +1,21 @@
+{
+  "run": "selfgate-ooh-triage-dashboard-docs-oohdash-128-build-plan",
+  "phase": "build-plan",
+  "pr": 101,
+  "approvedBy": [
+    "bigtuff8"
+  ],
+  "reviewComments": [
+    "bigtuff8: - Live prototype — click through the actual screen: Looks right\n\n(submitted via the interactive gate review)\n\n<!-- gate:selected [{\"question\":\"Live prototype — click through the actual screen\",\"answer\":\"Looks right\"}] -->"
+  ],
+  "mergeCommit": "f7ebaf202338cb1e8deb76b4ffa66b1a70ebacef",
+  "phaseBranch": "docs/oohdash-128-build-plan",
+  "releaseBranch": "main",
+  "stamp": 1792009949244,
+  "selectedOptions": [
+    {
+      "question": "Live prototype — click through the actual screen",
+      "answer": "Looks right"
+    }
+  ]
+}
