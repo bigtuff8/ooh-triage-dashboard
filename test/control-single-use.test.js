@@ -2,7 +2,7 @@
  * C2 — confirm-token single-use (consume-before-write) unit tests.
  *
  * Proves the confirm token authorises EXACTLY ONE dispatch: a replay, a retry-after-success,
- * and two interleaved concurrent dispatches all resolve to a single tb.writeSharedAttribute
+ * and two interleaved concurrent dispatches all resolve to a single tb.writeServerScopeAttribute
  * call, with the surplus dispatch rejected 409 (resolution.consumeConfirmation deletes the
  * token synchronously on the matched path). Also proves a wrong-owner/wrong-site attempt is
  * denied and does NOT spend the legitimate owner's token.
@@ -32,14 +32,13 @@ process.env.WRITES_DISABLED = 'false';
 let writeCount = 0;
 mock.module('../services/tb-client.js', {
     namedExports: {
-        writeSharedAttribute: async () => { writeCount += 1; },
-        // Edge-aware confirm plane (D3): no current desired ⇒ classifyPreDispatch → 'dispatch', so
-        // the single-use property under test is exercised on the real write path. Registration gate
-        // (D9) passes. readControlState carries syncTs (timeseries shape) but stays pending here.
-        readDesiredState: async () => ({ desired: undefined, desiredTs: null }),
-        readControlState: async () => ({ sync: 'pending', syncTs: null, reported: null, reportedTs: null }),
+        // OOHDASH-123: the control write is now the SERVER_SCOPE Requested write. Count it.
+        writeServerScopeAttribute: async () => { writeCount += 1; return Date.now(); },
+        // readCommandState stays pending with NO matching telemetry so preDispatchCheck → dispatch and
+        // the single-use property is exercised on the real write path. Registration gate (D9) passes.
+        readCommandState: async () => ({ status: 'pending', statusTs: null, lastError: null, telemetryValue: null, telemetryTs: null }),
         hasPublishedState: async () => true,
-        tbStatus: () => ({ mode: 'fixture', read: true, write: true })
+        tbStatus: () => ({ mode: 'fixture', read: 'healthy', write: true })
     }
 });
 
@@ -80,7 +79,7 @@ test('happy path — a single dispatch with a fresh token writes exactly once an
     const action = await control.dispatch(payload(token));
 
     assert.equal(writeCount, 1, 'exactly one write on the happy path');
-    assert.equal(action.state, 'pending', 'pending action returned unchanged from today');
+    assert.equal(action.state, 'in-flight', 'in-flight action returned (OOHDASH-123 three-outcome model)');
     assert.equal(action.siteNo, SITE_NO);
     assert.equal(action.deviceId, DEVICE_ID);
     assert.ok(action.actionId, 'an actionId is minted');
@@ -110,7 +109,7 @@ test('concurrency — two interleaved same-token dispatches yield exactly one wr
     assert.equal(fulfilled.length, 1, 'exactly one dispatch succeeds');
     assert.equal(rejected.length, 1, 'exactly one dispatch is rejected');
     assert.equal(rejected[0].reason.status, 409, 'the loser is rejected 409');
-    assert.equal(writeCount, 1, 'writeSharedAttribute called exactly once');
+    assert.equal(writeCount, 1, 'writeServerScopeAttribute called exactly once');
 });
 
 test('retry-after-success denied — first write succeeds, response "lost", retry same token is 409 with no second write', async () => {
@@ -136,7 +135,7 @@ test('wrong-owner — a different operator cannot use the token, and it does NOT
     // Legitimate owner can still use their token exactly once.
     const action = await control.dispatch(payload(token, OPERATOR));
     assert.equal(writeCount, 1, 'owner dispatch still writes once — token was not spent by the intruder');
-    assert.equal(action.state, 'pending');
+    assert.equal(action.state, 'in-flight');
 });
 
 test('wrong-site — a token used against a mismatched siteNo is denied and does not spend the owner token', async () => {

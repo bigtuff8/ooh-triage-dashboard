@@ -23,7 +23,7 @@ import { zendeskStatus } from './services/zendesk.js';
 import { storeStatus, storeProbe } from './services/store.js';
 import { startWorker } from './services/overrides.js';
 import { activeAlerts } from './services/metrics.js';
-import { controlQueueStatus } from './services/control.js';
+import { controlQueueStatus, resumeInflight } from './services/control.js';
 import { startLivenessMonitor } from './services/liveness.js';
 import { runRefrigerationBootGuard } from './services/refrig-guard.js';
 
@@ -142,6 +142,14 @@ async function start() {
         console.log(`  store warm-up: ${store.mode} · healthy=${store.healthy}`);
     }
     startWorker(); // durable hold reverts resume after restart (F010 overrides)
+    // OOHDASH-123 (WU10) — save-and-resume: re-arm watchers for in-flight control actions a restart
+    // may have dropped (a minutes-long Salus confirm must still land). Best-effort; never blocks boot.
+    try {
+        const r = await resumeInflight();
+        if (r.resumed) console.log(`  control resume: re-armed ${r.resumed} in-flight action(s)`);
+    } catch (err) {
+        console.error(`[CONTROL] in-flight resume failed at boot: ${err.message}`);
+    }
     startLivenessMonitor(); // F010 — producer business-liveness self-check (no-overnight-activity)
     // Stream A / OOHDASH-19 runtime boot guard (§6.1): if writes are enabled but the refrigeration
     // switch-deny is missing from this image, keep writes LOCKED (via killswitch latch) and log hard.

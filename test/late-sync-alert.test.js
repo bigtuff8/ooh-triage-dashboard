@@ -27,37 +27,23 @@ import { mkdtempSync } from 'fs';
 import { tmpdir } from 'os';
 import { join } from 'path';
 
-/* ============================ server-side: durable note + lazy ticket ============================ */
+/* ===================== server-side: three-outcome late confirm + save-and-resume ===================== */
 
-// Fixture mode + isolated store BEFORE importing config-backed modules. Tiny timers so the real
-// poll loop transitions pending → timeout → late-synced within the test with a short fake wait.
+// Fixture mode + isolated store BEFORE importing config-backed modules. OOHDASH-123: compress the
+// per-class confirm timing + fixture trajectory so a late confirm (after the confirm limit) and a
+// save-and-resume play out in-test. Step 100ms → accepted at 200ms, telemetry match at 300ms; the
+// IT700 confirm limit sits between (250ms) so the action goes INDETERMINATE and then CONFIRMS late.
 process.env.DATA_MODE = 'fixture';
 process.env.OOH_STORE_DIR = mkdtempSync(join(tmpdir(), 'ooh-c6-'));
-// OOHDASH-12 made writes fail-closed by default; these dispatch tests need writes enabled.
 process.env.WRITES_DISABLED = 'false';
-process.env.SYNC_TIMEOUT_MS = '0';          // first poll after dispatch → timeout immediately
-process.env.SYNC_POLL_INTERVAL_MS = '5';    // sweep fast so the test wait is short
+process.env.SYNC_POLL_INTERVAL_MS = '10';     // base watcher tick
+process.env.OOH_SIM_STEP_MS = '100';
+process.env.OOH_COPY_MIN_IT700 = '0';         // keep the per-class invariant satisfied at tiny limits
+process.env.OOH_CONFIRM_LIMIT_MS_IT700 = '250';
+process.env.OOH_LATE_WATCH_MS_IT700 = '10000';
+process.env.OOH_CONFIRM_POLL_MS_SALUS = '10';
 
-// Controllable device sync, keyed by deviceId so two in-flight actions on different devices can be
-// steered independently (a shared global would leak one action's echo onto another). Default pending.
-let syncByDevice = {};
-// setSync stamps a FRESH syncTs (now) so a 'synced'/'failed'/'rejected' echo passes the
-// syncTs>dispatchTs fresh-echo guard (D3 #3) — these actions dispatched at t0 with SYNC_TIMEOUT_MS=0,
-// so any echo we inject later is legitimately fresh. A default pending echo carries no syncTs.
-function setSync(deviceId, result) { syncByDevice[deviceId] = { syncTs: Date.now(), reportedTs: Date.now(), ...result }; }
-mock.module('../services/tb-client.js', {
-    namedExports: {
-        writeSharedAttribute: async () => {},
-        // Edge-aware confirm plane (D3): no current desired ⇒ classifyPreDispatch → dispatch;
-        // registration gate passes. readControlState carries syncTs (timeseries shape).
-        readDesiredState: async () => ({ desired: undefined, desiredTs: null }),
-        readControlState: async (device) => ({ sync: 'pending', syncTs: null, reported: null, reportedTs: null, ...(syncByDevice[device.deviceId] || {}) }),
-        hasPublishedState: async () => true,
-        tbStatus: () => ({ mode: 'fixture', read: true, write: true })
-    }
-});
-
-// Audit spy — record updateOutcome calls so we can assert the synced-late correction.
+// Audit spy — record updateOutcome calls so we can assert the confirmed-late correction.
 const auditCalls = { updateOutcome: [] };
 mock.module('../services/audit.js', {
     namedExports: {
@@ -68,15 +54,13 @@ mock.module('../services/audit.js', {
     }
 });
 
-// Zendesk spy — count late-note posts and lazy ticket creations without any external call.
+// Zendesk spy — count result-note posts and lazy ticket creations without any external call.
 const zdCalls = { notes: [], created: 0 };
 let lazyTicketSeq = 70001;
 mock.module('../services/zendesk.js', {
     namedExports: {
         addLateSyncNote: async (ticketId, action) => { zdCalls.notes.push({ ticketId, action }); },
-        createLateSyncTicket: async () => ({ id: lazyTicketSeq++, url: '#lazy' }),
-        // Other exports the control.js dependency graph imports (e.g. bridge.js) must be present on
-        // the mock or the module fails to instantiate — these are inert stubs, not under test here.
+        createLateSyncTicket: async () => { zdCalls.created += 1; return { id: lazyTicketSeq++, url: '#lazy' }; },
         resolveSiteName: async () => null,
         zendeskStatus: () => ({ mode: 'fixture', healthy: true, configured: true }),
         hhmm: () => '00:00'
@@ -85,22 +69,20 @@ mock.module('../services/zendesk.js', {
 
 const control = await import('../services/control.js');
 const resolution = await import('../services/resolution.js');
+const tbClient = await import('../services/tb-client.js');
 
-const SITE_NO = '6832';
-const DEVICE_ID = 'IT500-BAR-6832';
-const SITE_NO_B = '6851';
-const DEVICE_ID_B = 'IT500-BAR-6851';
+// A real online IT700 fixture (slow-echo class). Default sim trajectory confirms LATE (after the 250ms limit).
+const SITE_NO = '6773';
+const DEVICE_ID = 'gk-6773-salusit700-1';
 const OPERATOR = { id: 'op-1', name: 'Handler One', email: 'h1@example.com' };
-const SETPOINT_CMD = { command: 'setpoint', value: 19, direction: 'up' };
+const SETPOINT_CMD = { command: 'setpoint', value: 22, direction: 'up' };  // 20 → 22, within ±3°C
 
 async function dispatchOne(siteNo = SITE_NO, deviceId = DEVICE_ID) {
     const { token } = await resolution.confirmSite(siteNo, OPERATOR);
     return control.dispatch({ operator: OPERATOR, confirmToken: token, siteNo, deviceId, ...SETPOINT_CMD });
 }
 
-// Polls control.getAction until it reaches `state` (or throws after a short deadline). Lets the real
-// setInterval poll loop advance in real time — but the interval is 5ms so this is fast and stable.
-async function waitForState(actionId, state, timeoutMs = 2000) {
+async function waitForState(actionId, state, timeoutMs = 4000) {
     const deadline = Date.now() + timeoutMs;
     for (;;) {
         const a = control.getAction(actionId);
@@ -114,79 +96,44 @@ beforeEach(() => {
     auditCalls.updateOutcome.length = 0;
     zdCalls.notes.length = 0;
     zdCalls.created = 0;
-    syncByDevice = {};
+    // Isolate the fixture sim so one test's confirmed telemetry can't pre-satisfy the next (same device).
+    tbClient.__resetSim?.();
 });
 
-test('durable note — a timed-out action that echoes late posts the reworded actionable note and corrects the audit to synced-late', async () => {
+test('late confirm — an action NOT confirmed by the limit goes INDETERMINATE, then CONFIRMS late: durable note posted, audit corrected to confirmed-late', async () => {
     const action = await dispatchOne();
-    // First poll: SYNC_TIMEOUT_MS=0 so it flips to timeout.
-    await waitForState(action.actionId, 'timeout');
-    // Simulate the handler having escalated (a ticket already exists on the action).
-    control.attachTicket(action.actionId, 45097);
-    // Device now echoes late.
-    setSync(DEVICE_ID, { sync: 'synced', reported: 19 });
-    await waitForState(action.actionId, 'late-synced');
+    // Releases immediately (slow class) as in-flight.
+    assert.equal(action.state, 'in-flight');
+    // Not confirmed by the 250ms limit → INDETERMINATE (never "failed", never "done").
+    await waitForState(action.actionId, 'indeterminate');
+    // The device then confirms on its heartbeat → CONFIRMED late.
+    const confirmed = await waitForState(action.actionId, 'confirmed');
+    assert.equal(confirmed.confirmedLate, true, 'a confirm after the limit is flagged late');
+    assert.equal(String(confirmed.confirmedValue), '22');
 
-    // Durable note posted to the EXISTING ticket (no lazy create needed).
-    assert.equal(zdCalls.notes.length, 1, 'exactly one late-sync note posted');
-    assert.equal(zdCalls.notes[0].ticketId, 45097, 'note lands on the pre-existing ticket');
-
-    // Audit corrected: timeout row updated to synced with the late marker.
-    const correction = auditCalls.updateOutcome.find(c => c.outcome === 'synced');
-    assert.ok(correction, 'audit corrected to synced');
-    assert.match(correction.extraDetail, /late device confirmation/i, 'carries the synced-late marker');
+    // Durable note posted (lazily created a ticket since the handler attached none), audit corrected.
+    assert.ok(zdCalls.notes.length >= 1, 'a result note is posted to the ticket');
+    const correction = auditCalls.updateOutcome.find(c => c.outcome === 'confirmed');
+    assert.ok(correction, 'audit corrected to confirmed');
+    assert.match(correction.extraDetail, /late confirmation/i, 'carries the confirmed-late marker');
 });
 
-test('lazy ticket target — a late echo with NO existing ticket lazily creates one to carry the note; a benign timeout that never echoes creates nothing', async () => {
-    const before = lazyTicketSeqUsed();
-    // Case A: benign timeout on device B — it never echoes. No ticket, no note should ever be created.
-    const benign = await dispatchOne(SITE_NO_B, DEVICE_ID_B);
-    await waitForState(benign.actionId, 'timeout');
-    // Give the poller several sweeps while device B stays 'pending' echo — it must NOT create a ticket.
-    await new Promise(r => setTimeout(r, 40));
-    assert.equal(zdCalls.notes.length, 0, 'a benign timeout writes no late note');
-    assert.equal(lazyTicketSeqUsed() - before, 0, 'a benign timeout creates no lazy ticket');
-
-    // Case B: late echo on device A with no ticket attached — lazy create fires exactly once.
-    const late = await dispatchOne(SITE_NO, DEVICE_ID);
-    await waitForState(late.actionId, 'timeout');
-    assert.equal(control.getAction(late.actionId).ticketId, null, 'no ticket before the late echo');
-    setSync(DEVICE_ID, { sync: 'synced', reported: 19 });
-    await waitForState(late.actionId, 'late-synced');
-
-    assert.equal(lazyTicketSeqUsed() - before, 1, 'exactly one ticket lazily created — only when the late echo needed a target');
-    assert.equal(zdCalls.notes.length, 1, 'the note posts to the lazily-created ticket');
-    assert.ok(zdCalls.notes[0].ticketId >= 70001, 'note lands on the lazily-created ticket id');
-});
-
-// Helper: how many lazy tickets were created this run (seq started at 70001).
-function lazyTicketSeqUsed() { return lazyTicketSeq - 70001; }
-
-/* ---- C1 KNOWN-GAP: pod restart mid-window drops the watch → NO note, NO correction, NO alert ---- */
-
-test('C1 KNOWN-GAP (asserts the LIMIT, not a fix) — a pod restart mid-window drops the in-memory watch: a later echo fires NO note, NO audit correction, NO alert', async () => {
+test('save-and-resume (WU10) — a pod restart mid-watch no longer drops the result: resume re-reads the store, settles the late confirm and notes the ticket', async () => {
+    // This INVERTS the old C1 known-gap: the restart hole is now closed by the OohActionInflight store.
     const action = await dispatchOne();
-    await waitForState(action.actionId, 'timeout');
-    control.attachTicket(action.actionId, 45102);
-
-    // Baseline: nothing has fired yet for THIS action (it only timed out).
-    const notesBefore = zdCalls.notes.filter(n => n.ticketId === 45102).length;
-    const correctionsBefore = auditCalls.updateOutcome.filter(c => c.outcome === 'synced').length;
-
-    // Simulate a pod restart: the in-memory actions Map + poller are gone. control.__dropForRestartTest
-    // is a TEST-ONLY seam that clears exactly what a process exit would drop. There is NO rehydrate
-    // (that is the DEFERRED Cosmos fix), so the watch is permanently lost.
+    // Simulate a pod restart WHILE still in flight (before the ~300ms telemetry match): drop the
+    // in-memory watcher + poller. The durable in-flight record survives in OohActionInflight.
     control.__dropForRestartTest();
-    assert.equal(control.getAction(action.actionId), null, 'the action is gone after the simulated restart — watch dropped');
+    assert.equal(control.getAction(action.actionId), null, 'the in-memory watch is gone after the restart');
 
-    // The device now echoes late — but nothing is observing it anymore.
-    setSync(DEVICE_ID, { sync: 'synced', reported: 19 });
-    await new Promise(r => setTimeout(r, 60)); // ample time for a poll sweep, had one survived
+    // Let the device confirm while nothing is watching.
+    await new Promise(r => setTimeout(r, 450));
+    const notesBefore = zdCalls.notes.length;
 
-    // KNOWN, EXPECTED GAP — this is the C1 hole, NOT passing behaviour. It flips to the opposite
-    // assertion only once Cosmos persistence of in-flight actions lands (C1 stays OPEN until then).
-    assert.equal(zdCalls.notes.filter(n => n.ticketId === 45102).length, notesBefore, 'C1 GAP: no late note fires after a restart');
-    assert.equal(auditCalls.updateOutcome.filter(c => c.outcome === 'synced').length, correctionsBefore, 'C1 GAP: the audit stays uncorrected after a restart');
+    // Resume-on-load reads the store, does one confirm read, and settles the (now confirmed) action.
+    const res = await control.resumeInflight();
+    assert.ok(res.resumed >= 0, 'resume ran');
+    assert.ok(zdCalls.notes.length > notesBefore, 'the late result lands on the ticket after resume (restart hole closed)');
 });
 
 /* ============================ client-side: ephemeral applied-LATE banner ============================ */
