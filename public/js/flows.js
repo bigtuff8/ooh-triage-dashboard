@@ -157,7 +157,7 @@ function heatingAreasPresent() {
 /** True when any controllable heating device has a null area — drives the fallback chip (design §7.2). */
 function hasUnmappedHeating() {
     // OOHDASH-128 (D3): unplaced bare-salus units are kept out of the "Heating — area not identified"
-    // fallback chip. They are shown in the site-level footnote only (unplacedNote). Unmapped iT500 and
+    // fallback chip. They are shown in the site-level footnote only. Unmapped iT500 and
     // boiler-panel devices still drive the fallback chip exactly as before.
     return heatingDevices().some(d => !d.area && !isUnplacedLegacySalus(d));
 }
@@ -472,18 +472,16 @@ const FLOWR = {
                 const unitWord = unplacedCount === 1 ? 'unit' : 'units';
                 const theyWord = unplacedCount === 1 ? 'It is' : 'They are';
                 const notWord = unplacedCount === 1 ? 'is' : 'are';
-                const firstSentence = `Also at this site: ${unplacedCount} older Salus heating ${unitWord} that could not be matched to an area.`;
+                const firstSentence = 'Also at this site: ' + unplacedCount + ' older Salus heating ' + unitWord + ' that could not be matched to an area.';
                 const secondSentence = anyOn
-                    ? `${theyWord} not used in this check.`
-                    : `${theyWord} not reporting and ${notWord} not used in this check.`;
-                unplacedNoteHtml = `<p class="small" data-testid="heating-unplaced-note" style="margin-top:10px">${firstSentence} ${secondSentence}</p>`;
+                    ? theyWord + ' not used in this check.'
+                    : theyWord + ' not reporting and ' + notWord + ' not used in this check.';
+                unplacedNoteHtml = '<p class="small" data-testid="heating-unplaced-note" style="margin-top:10px">' + firstSentence + ' ' + secondSentence + '</p>';
             }
             if (!areas.length && !unmapped) {
-                // OOHDASH-128 (C5): when the only heating devices are unplaced bare-salus units, use a
-                // reworded alert that explains no area can be checked, plus the footnote. The plain
-                // "No heating on Lighthouse" message is preserved when there are truly no heating devices.
+                // OOHDASH-128 (C5): reworded alert when only unplaced bare-salus exist.
                 if (unplacedCount > 0) {
-                    return `<div class="alert warn">No heating area can be checked on Lighthouse at this site.</div>${unplacedNoteHtml}${otherShortcut()}`;
+                    return '<div class="alert warn">No heating area can be checked on Lighthouse at this site.</div>' + unplacedNoteHtml + otherShortcut();
                 }
                 return '<div class="alert warn">No heating on Lighthouse at this site.</div>' + otherShortcut();
             }
@@ -497,7 +495,7 @@ const FLOWR = {
             const airconChip = siteHasAircon()
                 ? `<div class="chips" style="margin-top:8px"><button class="chip" data-testid="aircon-shortcut" onclick="startFlow('aircon', state.flow.data.freeText||'', {carryNotes:true})">❄️ Air conditioning (handled by the IoT team)</button></div>`
                 : '';
-            return `<div class="stepq">Which area is the caller talking about?</div><div class="chips">${areaChips}${fallbackChip}</div>${airconChip}${unplacedNoteHtml}`;
+            return `<div class="stepq">Which area is the caller talking about?</div><div class="chips">${areaChips}${fallbackChip}</div>${airconChip}` + unplacedNoteHtml;
         }
         // Resolve the chosen area (by name) to its device SET, then to the coldest-online representative.
         const chosenArea = f.data.area === '__unmapped__' ? null : f.data.area;
@@ -530,7 +528,7 @@ const FLOWR = {
                 }
                 doneLine(`Area: <b>${esc(areaLabel)}</b>`);
                 doneLine('Live read: <b>device not reporting</b>');
-                // OOHDASH-128 (OQ4): plural heading and body when the area has multiple dark-fleet devices.
+                // OOHDASH-128 (OQ4): plural heading when the area has multiple dark-fleet devices.
                 if (set.length > 1) {
                     return `<div class="reco" data-testid="reco-dark-fleet"><b class="hd">The heating units in this area are not reporting.</b>They are Salus units that have stopped sending live data to Lighthouse, so there is no live reading and they cannot be switched or adjusted from here. This usually means the devices have lost power or their connection.<div class="outbtns"><button class="btn primary" data-testid="dark-capture" onclick="flowStep({need:'darkcap'})">Capture &amp; escalate for the IoT team</button><button class="btn" data-testid="dark-noact" onclick="flowStep({need:'darknoact'})">End with no action</button></div></div>`;
                 }
@@ -542,41 +540,40 @@ const FLOWR = {
             return FLOWR.connectivity(ws, f);
         }
         const t = z.telemetry || {};
-        const temp = typeof t.localTemperature === ‘number’ ? t.localTemperature : (typeof t.roomSensor1Temp === ‘number’ ? t.roomSensor1Temp : null);
+        const temp = typeof t.localTemperature === 'number' ? t.localTemperature : (typeof t.roomSensor1Temp === 'number' ? t.roomSensor1Temp : null);
         const sp = t.heatingSetpoint;
         const nInArea = set.length;
         if (f.stage === 1) {
             doneLine(`Area: <b>${esc(areaLabel)}</b>`);
-            if (!z.online) { doneLine(‘Live read: <b>device offline</b>’); f.cat = ‘connectivity’; f.stage = 0; f.data.from = ‘heating’; return FLOWR.connectivity(ws, f); }
+            if (!z.online) { doneLine('Live read: <b>device offline</b>'); f.cat = 'connectivity'; f.stage = 0; f.data.from = 'heating'; return FLOWR.connectivity(ws, f); }
             // OOHDASH-128 (OQ4): compute online/offline counts for mixed-health copy and the note.
             const nOn = set.filter(d => d.online).length;
             const nOff = nInArea - nOn;
             // OOHDASH-82 (design §7.3): when the area has more than one device the read is the COLDEST
-            // online zone — make the subline honest. OOHDASH-128: when some devices are offline, say
-            // "the only reporting zone" (nOn=1) or "coldest of N reporting zones" (nOn>=2).
-            const liveNote = z.deviceType === ‘boiler-panel’
-                ? ‘pub boiler panel’
-                : ‘live read just now’ + (nInArea > 1
+            // online zone — honest subline. OOHDASH-128: mixed-health shows "only reporting zone" or "coldest of N reporting zones".
+            const liveNote = z.deviceType === 'boiler-panel'
+                ? 'pub boiler panel'
+                : 'live read just now' + (nInArea > 1
                     ? (nOff === 0
                         ? ` · coldest of ${nInArea} zones in ${esc(areaLabel)}`
                         : nOn === 1
                             ? ` · the only reporting zone in ${esc(areaLabel)}`
                             : ` · coldest of ${nOn} reporting zones in ${esc(areaLabel)}`)
-                    : ‘’);
-            const read = `<div class="zoneread"><span class="t">${temp != null ? temp + ‘°C’ : ‘—‘}</span><div><div>${sp != null ? `Setpoint <b>${sp}°C</b>` : ‘’}${t.mode ? ‘ · mode <b>’ + esc(t.mode) + ‘</b>’ : ‘’}</div><div class="small">${esc(z.deviceId)} · ${liveNote}</div></div><span class="tag green">online</span></div>`;
+                    : '');
+            const read = `<div class="zoneread"><span class="t">${temp != null ? temp + '°C' : '—'}</span><div><div>${sp != null ? `Setpoint <b>${sp}°C</b>` : ''}${t.mode ? ' · mode <b>' + esc(t.mode) + '</b>' : ''}</div><div class="small">${esc(z.deviceId)} · ${liveNote}</div></div><span class="tag green">online</span></div>`;
             // OOHDASH-128 (OQ4): area-not-reporting note — shown when some devices in the area are offline.
             const notReportingNote = nOff > 0
-                ? `<p class="small" data-testid="area-not-reporting-note">${nOff === 1 ? ‘1 other heating unit’ : `${nOff} other heating units`} in ${esc(areaLabel)} ${nOff === 1 ? ‘is’ : ‘are’} not reporting, so ${nOff === 1 ? ‘it is’ : ‘they are’} not part of this reading. Nothing done on this call caused this.</p>`
-                : ‘’;
-            if (z.deviceType === ‘boiler-panel’) {
-                doneLine(`Live read: ${temp != null ? temp + ‘°C’ : ‘no reading’} · pub boiler panel`);
-                return read + `<div class="reco" data-testid="reco-boiler-panel"><b class="hd">This zone can’t be adjusted remotely yet.</b>It runs on the pub’s boiler control panel, which isn’t connected for remote changes (it’s on the priority list with our platform team).<div class="outbtns"><button class="btn primary" onclick="flowStep({need:’bp’})">Capture &amp; escalate for the IoT team</button><button class="btn" onclick="flowStep({need:’noact’})">End with no action</button></div></div>`;
+                ? '<p class="small" data-testid="area-not-reporting-note">' + (nOff === 1 ? '1 other heating unit' : nOff + ' other heating units') + ' in ' + esc(areaLabel) + ' ' + (nOff === 1 ? 'is' : 'are') + ' not reporting, so ' + (nOff === 1 ? 'it is' : 'they are') + ' not part of this reading. Nothing done on this call caused this.</p>'
+                : '';
+            if (z.deviceType === 'boiler-panel') {
+                doneLine(`Live read: ${temp != null ? temp + '°C' : 'no reading'} · pub boiler panel`);
+                return read + `<div class="reco" data-testid="reco-boiler-panel"><b class="hd">This zone can’t be adjusted remotely yet.</b>It runs on the pub’s boiler control panel, which isn’t connected for remote changes (it’s on the priority list with our platform team).<div class="outbtns"><button class="btn primary" onclick="flowStep({need:'bp'})">Capture &amp; escalate for the IoT team</button><button class="btn" onclick="flowStep({need:'noact'})">End with no action</button></div></div>`;
             }
             return read + notReportingNote + `<div class="stepq">What does the caller need?</div><div class="chips">
-    <button class="chip" data-testid="need-warm" onclick="flowStep({need:’warm’})">Warmer</button>
-    <button class="chip" data-testid="need-cool" onclick="flowStep({need:’cool’})">Cooler</button>
-    <button class="chip" data-testid="need-off" onclick="flowStep({need:’off’})">Turn it off</button>
-    <button class="chip" data-testid="need-broken" onclick="flowStep({need:’broken’})">It’s not working</button></div>`;
+    <button class="chip" data-testid="need-warm" onclick="flowStep({need:'warm'})">Warmer</button>
+    <button class="chip" data-testid="need-cool" onclick="flowStep({need:'cool'})">Cooler</button>
+    <button class="chip" data-testid="need-off" onclick="flowStep({need:'off'})">Turn it off</button>
+    <button class="chip" data-testid="need-broken" onclick="flowStep({need:'broken'})">It’s not working</button></div>`;
         }
         if (f.stage === 2) {
             const need = f.data.need;
