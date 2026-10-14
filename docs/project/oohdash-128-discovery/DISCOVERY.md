@@ -6,7 +6,7 @@ SECTION: Root cause (PROVEN)
 fetchLiveSitesByNumber searches ThingsBoard using textSearch=gk-{siteNo} then applies an anchored client-side filter ^gk-({siteNo})(?![0-9]) over the NORMALISED device name. normaliseName strips parentheticals before token matching. Bare-salus devices use the old naming convention gk_{sitename}_salus_{serial} ({siteNo}-{letter}-{n}): the site number appears only inside a trailing parenthetical which is stripped during normalisation. The normalised name gk-{sitename}-salus-{serial} does not start with gk-{siteNo}-, so it never matches the anchored filter, and the device is never loaded into the site workspace. OOHDASH-108 and OOHDASH-123 both operate downstream of this load step and have no effect on devices that never arrive.
 
 SECTION: Affected population (live sweep 2026-10-14, read-only, no writes)
-385 bare-salus devices total on the estate. 153 are restaurant controllers (letter r or b) across 74 distinct sites. 202 are accommodation (s or f). 30 have an unparseable or absent letter. 10 have no parenthetical at all (edge case, discussed below). Every sampled device has SERVER_SCOPE active: false -- the entire bare-salus fleet is dark (not reporting live telemetry). After the fix, bare-salus devices will load and the Bar/Restaurant area will surface; because all sampled devices are offline, the honest "device not reporting" branch activates per the OOHDASH-123 dark-fleet path. CLIENT_SCOPE site is populated on confirmed devices (e.g., site: "(5694-r-2)") and is already the primary source for deriveArea. The parenthetical fallback coded under OOHDASH-108 is also available. Bare-salus is the only device family using the old underscore-naming convention (no other family affected). All sampled affected sites also carry modern gk-{siteNo}-salusit500-* devices that do currently load; for sites where the modern devices include no r or b letter, Bar/Restaurant is absent entirely from the heating path (total failure). Where modern r/b devices exist, the area surfaces from them but bare-salus thermostats for the same zone are still absent from the workspace (partial failure). Open question OQ1 quantifies the split.
+385 bare-salus devices total on the estate. 153 are restaurant controllers (letter r or b) across 74 distinct sites. 202 are accommodation (s or f). 30 have an unparseable or absent letter. 9 have no parenthetical at all (edge case, discussed in D2). Every sampled device has SERVER_SCOPE active: false -- the entire bare-salus fleet is dark (not reporting live telemetry). After the fix, bare-salus devices will load and the Bar/Restaurant area will surface; because all sampled devices are offline, the honest "device not reporting" branch activates per the OOHDASH-123 dark-fleet path. CLIENT_SCOPE site is populated on confirmed devices (e.g., site: "(5694-r-2)") and is already the primary source for deriveArea. The parenthetical fallback coded under OOHDASH-108 is also available. Bare-salus is the only device family using the old underscore-naming convention (no other family affected). OQ1 RESOLVED (second sweep 2026-10-14): 72 of the 74 affected sites have partial failure -- Bar/Restaurant already surfaces from modern gk-{siteNo}-salusit500-r/b devices; bare-salus thermostats for the same zone are additionally absent from the workspace. 2 sites have total failure (Bar/Restaurant completely absent): site 5791 has a no-paren restaurant thermostat (gk_unknown_salus_STA10108795 5791-r-2) that is not addressable by Option A alone; site 5191 has only accommodation bare-salus (f-2) and no r/b device in TB at all, suggesting no restaurant heating at that site. After Option A lands, 72 sites are fully addressed and site 5191 is also resolved (its accommodation bare-salus loads correctly). Site 5791 remains a gap for Bar/Restaurant via Option A alone; the no-paren fix path (see D2) is needed for that one site.
 
 SECTION: Fix options and recommendation
 Three options exist. Option A is recommended. Option A (code change -- parenthetical supplementary fetch): in fetchLiveSitesByNumber, add a supplementary textSearch=(${siteNo}- query (verified to return all bare-salus for a given site, e.g. exactly 6 for site 5694) and extend the client-side filter to accept devices that pass a strict bare-salus parenthetical check (name contains _salus_ AND parenthetical leading digit group equals the target site number). The existing siteNameFilter is unchanged; modern devices continue to load via the existing path. No downstream changes needed: classifyDevice already assigns deviceType=salus for these devices (OOHDASH-108), deriveArea already resolves the area from CLIENT_SCOPE.site or the raw name parenthetical (OOHDASH-108), and heatingDevices() and isDarkFleet already include salus type (OOHDASH-123). One extra TB request per 30-second cache window per site -- negligible cost. Option B (site-aliases.json data entries): add 74 entries mapping siteNo to site-name token. DISPROVED as effective: live sweep confirmed that textSearch=gk-wingfieldfarm returns only modern gk-wingfieldfarm-* devices, NOT the old-convention gk_wingfieldfarm_salus_... devices. ThingsBoard normalises underscores to dashes internally, so the alias token does not reach bare-salus names. Option B does not fix the problem. Option C (TB device rename): rename all 385 devices to modern gk-{siteNo}-salus-... convention. Correct long-term but requires Spencer Thompson approval, a bulk write of 385 devices, and risk analysis for any integrations that reference old names. Out of scope for this ticket; viable as a separate cleanup. Recommendation: Option A in this ticket. Option C as a planned follow-on if Spencer confirms no integration dependency on old names.
@@ -18,13 +18,13 @@ SECTION: Cost and silent-running evaluation
 Option A adds one TB HTTP request per site query per 30-second cache window. No background polling, no idle token spend, no new service or daemon. The supplementary request is request-driven only (fires when an operator opens a site) and is bounded by the existing TTL. Cost: negligible. Silent-running: fully met.
 
 SECTION: What we still need
-OQ1: how many of the 74 affected sites have no modern gk-{siteNo}-salusit500-r/b device -- i.e. sites where Bar/Restaurant is entirely absent (total failure) versus sites where it appears from modern devices but bare-salus thermostats are also missing (partial). This affects priority but not the fix approach. OQ2: the 10 bare-salus devices with no trailing parenthetical (e.g., gk_unknown_salus_STA10109372 5669-S-1 -- space-separated site code, no parens) are not addressable by Option A. Should these be included in this ticket with a second fix path, or deferred to a follow-on?
+OQ1 RESOLVED -- see population section above. OQ2: the 9 bare-salus devices with no trailing parenthetical use a space-separated site code (e.g., 5669-S-1) or have no site code at all. They are not addressable by Option A. Full breakdown: 3 are Salus r10a gateways (gk-6858/6099/6758-salus-r10a) that classify as gateways by matchAssetIntent and are irrelevant to the heating path. 4 genuine thermostat devices have a space-separated site code (s=1 at site 5669, r=1 at site 5791, f=2 at site 5791). 2 have no parseable site code at all. parseSiteCodeLetter handles uppercase correctly (lowercases before matching; 5669-S-1 resolves to s). The 1 restaurant thermostat (5791-r-2) is the only no-paren device that matters for the Bar/Restaurant gap -- it is at the one total-failure site (5791) that Option A alone does not fix. The decision is whether to include a secondary no-paren fix in this ticket.
 
 DECISION: Fix approach | Option A (parenthetical supplementary fetch -- code change in fetchLiveSitesByNumber) | Option C (TB device rename -- separate ticket, Spencer approval required)
-DETAIL: Option B (alias data) is ruled out: live sweep proved TB does not return bare-salus devices when searching by site-name token. Option A is surgical and self-contained. Option C is clean long-term but requires external approval and a bulk write.
+DETAIL: Option B (alias data) is ruled out: live sweep proved TB does not return bare-salus devices when searching by site-name token. Option A fixes 72 of 74 sites fully and site 5191 (accommodation bare-salus loads correctly). Option C is clean long-term but requires external approval and a bulk write.
 
-DECISION: Edge-case devices with no parenthetical (10 devices) | Defer to a follow-on ticket -- low count, different fix path needed | Address in this ticket with a secondary fix path keyed on the space-separated code in the device name
-DETAIL: These 10 devices have a space-separated rather than parenthetical site code (e.g. 5669-S-1 with no parens). Option A does not find them because textSearch=(5669- does not match a name with no parenthesis. A second fix path would be needed (e.g. textSearch={siteNo}- without parens). Given only 10 devices and all are s-letter (accommodation), the immediate user impact of deferral is low.
+DECISION: No-paren edge-case devices (9 devices, 1 restaurant thermostat at site 5791) | Defer to a follow-on ticket -- only 1 device affects the heating gap; different fix path needed | Address in this ticket with a secondary fix path keyed on the space-separated site code in the device name
+DETAIL: 8 of the 9 no-paren devices are either gateways (irrelevant to heating) or accommodation thermostats. Only 1 -- gk_unknown_salus_STA10108795 5791-r-2 -- is a restaurant thermostat and it is the reason site 5791 remains a gap even after Option A. A secondary path (e.g., also search textSearch={siteNo}- without the opening paren and filter by space-separated site code pattern) would close this 1-device gap. Original D2 claim that all no-paren devices are s-letter (accommodation) was wrong and is corrected here; the evidence file has the full per-device breakdown.
 -->
 
 # DISCOVERY -- OOHDASH-128
@@ -97,15 +97,20 @@ The bug is entirely in the fetch and filter layer.
 | Restaurant controllers (letter r or b) | 153 |
 | Accommodation (letter s or f) | 202 |
 | Other / no usable letter | 30 |
-| No parenthetical at all (edge case) | 10 |
+| No parenthetical at all (edge case) | 9 |
 | Distinct site numbers affected | 74 |
 | SERVER_SCOPE active: true in sample (15 devices) | 0 |
 
 All 15 sampled devices have active: false. The bare-salus fleet is entirely dark (not reporting live telemetry). After the fix, these devices will load and the Bar/Restaurant area will surface; the honest "device not reporting" branch activates per the OOHDASH-123 dark-fleet path (no controllable state shown, no control available -- correct).
 
-**Site-loading failure type:**
+**Site-loading failure type (OQ1 -- RESOLVED, second sweep 2026-10-14, all 74 sites checked):**
 
-All 8 sampled affected sites also carry modern gk-{siteNo}-salusit500-* devices that do load. For sites where the modern set includes no r/b letter device, Bar/Restaurant is entirely absent from the heating path (total failure). Where the modern set includes a r/b device, Bar/Restaurant surfaces from modern devices but the bare-salus thermostats for the same zone are missing from the workspace (partial failure, no regression risk from the fix).
+| Failure type | Sites | Meaning |
+|---|---|---|
+| Partial | 72 | Bar/Restaurant already surfaces from modern gk-{siteNo}-salusit500-r/b devices; bare-salus thermostats for the same zone additionally absent from workspace |
+| Total | 2 (5191, 5791) | No modern r/b device loads; Bar/Restaurant completely absent |
+
+Site 5791 is the more significant total-failure case: it has a restaurant thermostat in the no-paren format (gk_unknown_salus_STA10108795 5791-r-2) that is not retrievable by Option A. Site 5191 has only accommodation bare-salus in TB (f-2); no restaurant heating device exists there. Option A resolves 73 of 74 sites; site 5791 Bar/Restaurant remains a gap unless D2 includes the secondary no-paren fix path.
 
 **Other device families:**
 
@@ -155,7 +160,7 @@ One extra TB HTTP request per site query per 30-second cache window. Request-dri
 
 **Residual case:**
 
-10 devices with no trailing parenthetical (e.g., gk_unknown_salus_STA10109372 5669-S-1) are not addressed by this path. All identified instances have letter S (accommodation), so the immediate user impact is low. Decision OQ2 determines scope.
+9 devices have no trailing parenthetical and are not addressed by this path. Of these, 3 are Salus r10a gateways (classify as gateways, irrelevant to the heating path). The 4 genuine thermostat devices have space-separated site codes: 3 at site 5791 (r-2, f-2, f-1) and 1 at site 5669 (S-1). parseSiteCodeLetter handles uppercase correctly (lowercases before matching; S-1 resolves to s). The 1 restaurant thermostat (5791-r-2) is the only device in this set that affects Bar/Restaurant -- it is at the one total-failure site (5791) not resolved by Option A alone. Decision D2 determines scope. The original D2 claim that all no-paren devices are s-letter (accommodation) was incorrect and is corrected here.
 
 ### Option B -- data/site-aliases.json entries
 
@@ -206,7 +211,7 @@ Test 5 (no parenthetical edge case): given a bare-salus device with no trailing 
 | Risk | Likelihood | Impact | Mitigation |
 |---|---|---|---|
 | Cross-site contamination via parenthetical fetch | Low | High | Exact-siteNo guard in client filter; sweep shows parenthetical is always the site number |
-| Edge-case devices (no parenthetical, 10 devices) not loaded | Certain | Low (all accommodation letter, not restaurant) | Accept as residual; defer to follow-on or D2 |
+| No-paren restaurant thermostat (site 5791) not loaded by Option A | Certain | Low (1 device, 1 site) | Accept as residual unless D2 chooses to include secondary fix path |
 | Dark-fleet devices surfacing controllable state incorrectly | None | High | isDarkFleet and freshness gates already handle this per OOHDASH-123 |
 | Option A regresses modern iT500/iT700 sites | None | High | siteNameFilter is unchanged; supplementary path is purely additive |
 | TB rename (Option C) breaks upstream integrations | UNVERIFIED | High | Blocker for Option C; needs Spencer review of any name-referencing integrations |
@@ -215,11 +220,11 @@ Test 5 (no parenthetical edge case): given a bare-salus device with no trailing 
 
 ## Open questions
 
-| ID | Question | Owner | Impact if unresolved |
+| ID | Question | Owner | Status |
 |---|---|---|---|
-| OQ1 | How many of the 74 sites have no modern gk-{siteNo}-salusit500-r/b device (total Bar/Restaurant failure vs partial)? | Discovery / design sweep | Priority signal; does not change the fix |
-| OQ2 | Should the 10 no-parenthetical devices be addressed in this ticket or deferred? | James | Scope of this ticket |
-| OQ3 | Is there any upstream integration (non-OOH system) that references bare-salus device names by their old name format (relevant only if Option C is a future target)? | Spencer Thompson | Option C viability |
+| OQ1 | How many of the 74 sites have total vs partial Bar/Restaurant failure? | Discovery sweep | RESOLVED: 72 partial, 2 total (5191 and 5791). Option A fixes 73; site 5791 remains a gap (no-paren r-letter device). |
+| OQ2 | Should the 9 no-paren devices (1 restaurant thermostat at site 5791) be included in this ticket? | James | Open -- D2 decision |
+| OQ3 | Does any non-OOH integration reference bare-salus device names by old name format? | Spencer Thompson | Open -- relevant only if Option C is a future target |
 
 ---
 
