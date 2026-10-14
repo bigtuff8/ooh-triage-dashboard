@@ -1,0 +1,517 @@
+{
+  "sweep_date": "2026-10-14T18:17:44.501Z",
+  "total_salus_from_tb": 1199,
+  "total_bare_salus": 385,
+  "rb_count": 153,
+  "sf_count": 202,
+  "other_no_letter": 30,
+  "no_parenthetical": 10,
+  "affected_sites_count": 74,
+  "affected_site_numbers": [
+    "1666",
+    "1734",
+    "1771",
+    "1793",
+    "4744",
+    "5183",
+    "5184",
+    "5185",
+    "5186",
+    "5187",
+    "5188",
+    "5189",
+    "5190",
+    "5191",
+    "5192",
+    "5193",
+    "5194",
+    "5196",
+    "5197",
+    "5198",
+    "5199",
+    "5200",
+    "5201",
+    "5203",
+    "5204",
+    "5205",
+    "5206",
+    "5207",
+    "5208",
+    "5209",
+    "5212",
+    "5213",
+    "5214",
+    "5215",
+    "5217",
+    "5384",
+    "5667",
+    "5668",
+    "5669",
+    "5670",
+    "5671",
+    "5673",
+    "5674",
+    "5690",
+    "5691",
+    "5692",
+    "5694",
+    "5695",
+    "5696",
+    "5697",
+    "5698",
+    "5788",
+    "5789",
+    "5790",
+    "5791",
+    "5793",
+    "5794",
+    "5795",
+    "5797",
+    "5799",
+    "6275",
+    "6283",
+    "6315",
+    "6329",
+    "6338",
+    "6356",
+    "6384",
+    "6385",
+    "6395",
+    "6599",
+    "6738",
+    "6771",
+    "7828",
+    "7896"
+  ],
+  "sample_bare_salus_devices": [
+    {
+      "name": "gk_unknown_salus_STA10109372 5669-S-1",
+      "siteNo": null,
+      "letter": null,
+      "paren": null,
+      "hasSiteNo": false
+    },
+    {
+      "name": "gk_wingfieldfarm_salus_STA10108576 (5694-r-2)",
+      "siteNo": "5694",
+      "letter": "r",
+      "paren": "5694-r-2",
+      "hasSiteNo": true
+    },
+    {
+      "name": "gk_cedartreefarm_salus_STA10111271 (5205-f-3)",
+      "siteNo": "5205",
+      "letter": "f",
+      "paren": "5205-f-3",
+      "hasSiteNo": true
+    },
+    {
+      "name": "gk_dycefarm_salus_STA10109239 (5695-s-1)",
+      "siteNo": "5695",
+      "letter": "s",
+      "paren": "5695-s-1",
+      "hasSiteNo": true
+    },
+    {
+      "name": "gk_maypolefarm_salus_STA10109715 (5690-f-1)",
+      "siteNo": "5690",
+      "letter": "f",
+      "paren": "5690-f-1",
+      "hasSiteNo": true
+    },
+    {
+      "name": "gk_coppicewoodfarm_salus_STA10108825 (5794-f-3)",
+      "siteNo": "5794",
+      "letter": "f",
+      "paren": "5794-f-3",
+      "hasSiteNo": true
+    },
+    {
+      "name": "gk_evenwoodfarm_salus_STA10108377 (5188-f-1)",
+      "siteNo": "5188",
+      "letter": "f",
+      "paren": "5188-f-1",
+      "hasSiteNo": true
+    },
+    {
+      "name": "gk_unknown_salus_STA10109254 (5203-s-1)",
+      "siteNo": "5203",
+      "letter": "s",
+      "paren": "5203-s-1",
+      "hasSiteNo": true
+    },
+    {
+      "name": "gk_wallacewellfarm_salus_STA10108365 (5215-r-2)",
+      "siteNo": "5215",
+      "letter": "r",
+      "paren": "5215-r-2",
+      "hasSiteNo": true
+    },
+    {
+      "name": "gk_brindleyfarm_salus_STA10109193 (5696-r-2)",
+      "siteNo": "5696",
+      "letter": "r",
+      "paren": "5696-r-2",
+      "hasSiteNo": true
+    },
+    {
+      "name": "gk_middlemarchfarm_salus_STA10108323 (6283-f-3)",
+      "siteNo": "6283",
+      "letter": "f",
+      "paren": "6283-f-3",
+      "hasSiteNo": true
+    },
+    {
+      "name": "gk_evenwoodfarm_salus_STA10108776 (5188-r-2)",
+      "siteNo": "5188",
+      "letter": "r",
+      "paren": "5188-r-2",
+      "hasSiteNo": true
+    },
+    {
+      "name": "gk_windmillfarm_salus_STA10108395 (6395-r-2)",
+      "siteNo": "6395",
+      "letter": "r",
+      "paren": "6395-r-2",
+      "hasSiteNo": true
+    },
+    {
+      "name": "gk_beechwoodfarm_salus_STA10109555 (5668-f-3)",
+      "siteNo": "5668",
+      "letter": "f",
+      "paren": "5668-f-3",
+      "hasSiteNo": true
+    },
+    {
+      "name": "gk_peartreefarm_salus_STA10110214 (5198-f-3)",
+      "siteNo": "5198",
+      "letter": "f",
+      "paren": "5198-f-3",
+      "hasSiteNo": true
+    },
+    {
+      "name": "gk_brindleyfarm_salus_STA10108398 (5696-f-1)",
+      "siteNo": "5696",
+      "letter": "f",
+      "paren": "5696-f-1",
+      "hasSiteNo": true
+    },
+    {
+      "name": "gk_elmwoodfarm_salus_STA10108875 (5197-f-2)",
+      "siteNo": "5197",
+      "letter": "f",
+      "paren": "5197-f-2",
+      "hasSiteNo": true
+    },
+    {
+      "name": "gk_willowfarm_salus_STA10109104 (5193-r-1)",
+      "siteNo": "5193",
+      "letter": "r",
+      "paren": "5193-r-1",
+      "hasSiteNo": true
+    },
+    {
+      "name": "gk_wingfieldfarm_salus_STA10108599 (5694-f-1)",
+      "siteNo": "5694",
+      "letter": "f",
+      "paren": "5694-f-1",
+      "hasSiteNo": true
+    },
+    {
+      "name": "gk_heathfieldfarm_salus_STA10108413 (5217-s-1)",
+      "siteNo": "5217",
+      "letter": "s",
+      "paren": "5217-s-1",
+      "hasSiteNo": true
+    },
+    {
+      "name": "gk_larchwoodfarm_salus_STA10109324 (5799-r-2)",
+      "siteNo": "5799",
+      "letter": "r",
+      "paren": "5799-r-2",
+      "hasSiteNo": true
+    },
+    {
+      "name": "gk_redwoodfarm_salus_STA10109344 (5208-r-3)",
+      "siteNo": "5208",
+      "letter": "r",
+      "paren": "5208-r-3",
+      "hasSiteNo": true
+    },
+    {
+      "name": "gk_primrosefarm_salus_STA10108595 (5797-f-1)",
+      "siteNo": "5797",
+      "letter": "f",
+      "paren": "5797-f-1",
+      "hasSiteNo": true
+    },
+    {
+      "name": "gk_juniperfarm_salus_STA10108788 (6356-f-2)",
+      "siteNo": "6356",
+      "letter": "f",
+      "paren": "6356-f-2",
+      "hasSiteNo": true
+    },
+    {
+      "name": "gk_westgatefarm_salus_STA10108352 (5697-f-2)",
+      "siteNo": "5697",
+      "letter": "f",
+      "paren": "5697-f-2",
+      "hasSiteNo": true
+    },
+    {
+      "name": "gk_manorfarm_salus_STA10108521 (6315-r-2)",
+      "siteNo": "6315",
+      "letter": "r",
+      "paren": "6315-r-2",
+      "hasSiteNo": true
+    },
+    {
+      "name": "gk_coppicewoodfarm_salus_STA10108410 (5794-f-1)",
+      "siteNo": "5794",
+      "letter": "f",
+      "paren": "5794-f-1",
+      "hasSiteNo": true
+    },
+    {
+      "name": "gk_oaktreefarm_salus_STA10109230 (5196-r-1)",
+      "siteNo": "5196",
+      "letter": "r",
+      "paren": "5196-r-1",
+      "hasSiteNo": true
+    },
+    {
+      "name": "gk_dearnevalleyfarm_salus_STA10109136 (5698-f-2)",
+      "siteNo": "5698",
+      "letter": "f",
+      "paren": "5698-f-2",
+      "hasSiteNo": true
+    },
+    {
+      "name": "gk_sycamorefarm_salus_STA10108632 (5190-f-2)",
+      "siteNo": "5190",
+      "letter": "f",
+      "paren": "5190-f-2",
+      "hasSiteNo": true
+    }
+  ],
+  "active_status_sample": [
+    {
+      "name": "gk_unknown_salus_STA10109372 5669-S-1",
+      "active": false
+    },
+    {
+      "name": "gk_wingfieldfarm_salus_STA10108576 (5694-r-2)",
+      "active": false
+    },
+    {
+      "name": "gk_cedartreefarm_salus_STA10111271 (5205-f-3)",
+      "active": false
+    },
+    {
+      "name": "gk_dycefarm_salus_STA10109239 (5695-s-1)",
+      "active": false
+    },
+    {
+      "name": "gk_maypolefarm_salus_STA10109715 (5690-f-1)",
+      "active": false
+    },
+    {
+      "name": "gk_coppicewoodfarm_salus_STA10108825 (5794-f-3)",
+      "active": false
+    },
+    {
+      "name": "gk_evenwoodfarm_salus_STA10108377 (5188-f-1)",
+      "active": false
+    },
+    {
+      "name": "gk_unknown_salus_STA10109254 (5203-s-1)",
+      "active": false
+    },
+    {
+      "name": "gk_wallacewellfarm_salus_STA10108365 (5215-r-2)",
+      "active": false
+    },
+    {
+      "name": "gk_brindleyfarm_salus_STA10109193 (5696-r-2)",
+      "active": false
+    },
+    {
+      "name": "gk_middlemarchfarm_salus_STA10108323 (6283-f-3)",
+      "active": false
+    },
+    {
+      "name": "gk_evenwoodfarm_salus_STA10108776 (5188-r-2)",
+      "active": false
+    },
+    {
+      "name": "gk_windmillfarm_salus_STA10108395 (6395-r-2)",
+      "active": false
+    },
+    {
+      "name": "gk_beechwoodfarm_salus_STA10109555 (5668-f-3)",
+      "active": false
+    },
+    {
+      "name": "gk_peartreefarm_salus_STA10110214 (5198-f-3)",
+      "active": false
+    }
+  ],
+  "sites_with_modern_devices": [],
+  "sites_without_modern_devices": [],
+  "rb_sample": [
+    {
+      "name": "gk_wingfieldfarm_salus_STA10108576 (5694-r-2)",
+      "siteNo": "5694",
+      "letter": "r"
+    },
+    {
+      "name": "gk_wallacewellfarm_salus_STA10108365 (5215-r-2)",
+      "siteNo": "5215",
+      "letter": "r"
+    },
+    {
+      "name": "gk_brindleyfarm_salus_STA10109193 (5696-r-2)",
+      "siteNo": "5696",
+      "letter": "r"
+    },
+    {
+      "name": "gk_evenwoodfarm_salus_STA10108776 (5188-r-2)",
+      "siteNo": "5188",
+      "letter": "r"
+    },
+    {
+      "name": "gk_windmillfarm_salus_STA10108395 (6395-r-2)",
+      "siteNo": "6395",
+      "letter": "r"
+    },
+    {
+      "name": "gk_willowfarm_salus_STA10109104 (5193-r-1)",
+      "siteNo": "5193",
+      "letter": "r"
+    },
+    {
+      "name": "gk_larchwoodfarm_salus_STA10109324 (5799-r-2)",
+      "siteNo": "5799",
+      "letter": "r"
+    },
+    {
+      "name": "gk_redwoodfarm_salus_STA10109344 (5208-r-3)",
+      "siteNo": "5208",
+      "letter": "r"
+    },
+    {
+      "name": "gk_manorfarm_salus_STA10108521 (6315-r-2)",
+      "siteNo": "6315",
+      "letter": "r"
+    },
+    {
+      "name": "gk_oaktreefarm_salus_STA10109230 (5196-r-1)",
+      "siteNo": "5196",
+      "letter": "r"
+    },
+    {
+      "name": "gk_platform5_salus_STA10108870 (1793-b-1)",
+      "siteNo": "1793",
+      "letter": "b"
+    },
+    {
+      "name": "gk_chapelfordfarm_salus_STA10106906 (5200-r-1)",
+      "siteNo": "5200",
+      "letter": "r"
+    },
+    {
+      "name": "gk_applewoodfarm_salus_STA10108817 (5194-r-2)",
+      "siteNo": "5194",
+      "letter": "r"
+    },
+    {
+      "name": "gk_halfpennyfarm_salus_STA10108829 (6384-r-2)",
+      "siteNo": "6384",
+      "letter": "r"
+    },
+    {
+      "name": "gk_linwoodfarm_salus_STA10109219 (5206-r-1)",
+      "siteNo": "5206",
+      "letter": "r"
+    },
+    {
+      "name": "gk_redburnfarm_salus_STA10109635 (5671-r-1)",
+      "siteNo": "5671",
+      "letter": "r"
+    },
+    {
+      "name": "gk_kingsmillfarm_salus_STA10109124 (4744-r-2)",
+      "siteNo": "4744",
+      "letter": "r"
+    },
+    {
+      "name": "gk_grovefarm_salus_STA10109683 (5667-r-1)",
+      "siteNo": "5667",
+      "letter": "r"
+    },
+    {
+      "name": "gk_kingswayfarm_salus_STA10109634 (1771-r-1)",
+      "siteNo": "1771",
+      "letter": "r"
+    },
+    {
+      "name": "gk_gynsillsfarm_salus_STA10109813 (6329-r-1)",
+      "siteNo": "6329",
+      "letter": "r"
+    }
+  ],
+  "sf_sample": [
+    {
+      "name": "gk_cedartreefarm_salus_STA10111271 (5205-f-3)",
+      "siteNo": "5205",
+      "letter": "f"
+    },
+    {
+      "name": "gk_dycefarm_salus_STA10109239 (5695-s-1)",
+      "siteNo": "5695",
+      "letter": "s"
+    },
+    {
+      "name": "gk_maypolefarm_salus_STA10109715 (5690-f-1)",
+      "siteNo": "5690",
+      "letter": "f"
+    },
+    {
+      "name": "gk_coppicewoodfarm_salus_STA10108825 (5794-f-3)",
+      "siteNo": "5794",
+      "letter": "f"
+    },
+    {
+      "name": "gk_evenwoodfarm_salus_STA10108377 (5188-f-1)",
+      "siteNo": "5188",
+      "letter": "f"
+    },
+    {
+      "name": "gk_unknown_salus_STA10109254 (5203-s-1)",
+      "siteNo": "5203",
+      "letter": "s"
+    },
+    {
+      "name": "gk_middlemarchfarm_salus_STA10108323 (6283-f-3)",
+      "siteNo": "6283",
+      "letter": "f"
+    },
+    {
+      "name": "gk_beechwoodfarm_salus_STA10109555 (5668-f-3)",
+      "siteNo": "5668",
+      "letter": "f"
+    },
+    {
+      "name": "gk_peartreefarm_salus_STA10110214 (5198-f-3)",
+      "siteNo": "5198",
+      "letter": "f"
+    },
+    {
+      "name": "gk_brindleyfarm_salus_STA10108398 (5696-f-1)",
+      "siteNo": "5696",
+      "letter": "f"
+    }
+  ],
+  "notes": "Read-only sweep. No writes. Bare-salus = contains 'salus' but not 'salusit'."
+}
