@@ -18,7 +18,8 @@ import { join, dirname } from 'path';
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const root = join(__dirname, '..');
 
-const EXPECTED_CALL_COUNT = 5;
+// OOHDASH-123: +1 for the DD-WAIT-HANDOFF ctlRelease outcome post (slow-class "sent, awaiting confirm").
+const EXPECTED_CALL_COUNT = 6;
 
 function checkFile(relPath) {
     const src = readFileSync(join(root, relPath), 'utf8');

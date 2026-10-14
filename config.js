@@ -118,12 +118,6 @@ export const config = {
         // registry.capabilitiesContractFor. syncPollIntervalMs is retained as the server watcher's
         // BASE tick — each in-flight action is read at its own class confirmPollMs cadence on top of it.
         syncPollIntervalMs: parseInt(env('SYNC_POLL_INTERVAL_MS', '3000'), 10),
-        // DEPRECATED (OOHDASH-123): the global decide-now / late-watch / mid-wait timers are superseded
-        // by the per-class `classes` block below and removed from the control plane in WU4/WU6. They are
-        // retained here only until the last consumer migrates, so no commit is left half-wired.
-        syncTimeoutMs: parseInt(env('SYNC_TIMEOUT_MS', '90000'), 10),
-        lateSyncWatchMs: parseInt(env('LATE_SYNC_WATCH_MS', '600000'), 10),
-        midWaitPromptMs: parseInt(env('MID_WAIT_PROMPT_MS', '30000'), 10),
         // OOHDASH-24: freshness window for the /healthz active read-probe. A probe result older
         // than this is stale ⇒ the read tri-state can no longer report green off it (amber/unknown
         // until a fresh probe runs). Env-overridable; default 60s.
@@ -203,11 +197,6 @@ export const config = {
  */
 export function validateConfig() {
     const problems = [];
-    // DEPRECATED invariant (removed with midWaitPromptMs in WU6): retained while the legacy timer
-    // still exists so the mid-wait config tests stay green until the client prompt is reworked.
-    if (!(config.control.midWaitPromptMs > 0 && config.control.midWaitPromptMs <= config.control.syncTimeoutMs)) {
-        problems.push('MID_WAIT_PROMPT_MS must satisfy 0 < midWaitPromptMs <= syncTimeoutMs (SYNC_TIMEOUT_MS)');
-    }
     // OOHDASH-123: per-class control timing invariant. For each controllable class:
     // 0 < copyMinutes*60000 (when set) <= confirmLimitMs <= lateWatchMs, and confirmPollMs > 0.
     for (const [cls, c] of Object.entries(config.control.classes)) {

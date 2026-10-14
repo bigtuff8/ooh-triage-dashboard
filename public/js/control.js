@@ -1,52 +1,28 @@
 /**
- * Control modal + sync tracker (design §3.4; F002/F005/F006/F007/F008/F010).
+ * Control modal + three-outcome tracker (OOHDASH-123 Rosetta Stone; design §5, build plan WU6/WU9/WU11).
  *
- * The ONLY way a write happens — always from a flow, never freestanding.
- * "Applied" is shown ONLY when the server reports the device echo (synced).
- * The stepper cannot compose an out-of-range value (server enforces the same
- * window and rejects anything else — F009 defence in depth).
+ * The ONLY way a write happens — always from a flow, never freestanding. The dashboard writes a
+ * *Requested key to SERVER_SCOPE; the device's OWN reading is what proves a change. Exactly three
+ * outcomes are ever shown, and only CONFIRMED renders as success:
+ *   CONFIRMED      — green: the device echoed the change in its own telemetry, after we sent.
+ *   NOT DELIVERED  — red: a gate/vendor rejection, shown as a plain sentence (raw text on the ticket).
+ *   NOT CONFIRMED  — amber: accepted-but-unproven at the per-vendor limit. Never "failed", never "done".
+ *
+ * DD-RESEND-UX (James override): NO resend. A not-confirmed command is never re-fired; the watcher keeps
+ * watching and updates the ticket. There is no resend button and no "keep waiting" affordance.
+ * DD-WAIT-HANDOFF: for slow (Salus) classes the handler is released at once ("about N minutes"); a
+ * detached background watcher toasts the result and the server updates the ticket when it lands.
  */
 
 window.ctl = null;
 let ctlPollTimer = null;
-// R11/C7: one-shot mid-wait decision-prompt timer. Armed on entering the confirm/waiting phase,
-// fires once at midWaitPromptMs (default 30s, before the 90s server timeout) to interrupt the
-// silent spinner with an active keep-on-hold / escalate / stop-waiting choice. Cleared at every
-// teardown/settle site alongside ctlPollTimer. UX-only — the server clock is never touched.
-let ctlMidWaitTimer = null;
+let ctlBgTimer = null; // detached background watch for a released (slow) action — toasts the late result
 
-// Client-side mid-wait horizon delivered by the server via /api/me (config.control.midWaitPromptMs).
-// Falls back to 30s if /me hasn't loaded (defensive; the panel arrives after auth in practice).
-function ctlMidWaitMs() {
-    const ms = state.me?.control?.midWaitPromptMs;
-    return Number.isFinite(ms) && ms > 0 ? ms : 30000;
-}
-
-// Phases in which an action has SETTLED — a mid-wait prompt must never fire (or stay) over one.
-const CTL_SETTLED_PHASES = ['done', 'done-late', 'failed', 'rejected', 'timeout'];
-
-// Arm the one-shot mid-wait timer. Only fires while the action is genuinely still in-flight
-// (phase 'confirm', not settled, prompt not already showing).
-function armCtlMidWait() {
-    clearTimeout(ctlMidWaitTimer);
-    ctlMidWaitTimer = setTimeout(() => {
-        const c = window.ctl;
-        if (!c || c.phase !== 'confirm' || CTL_SETTLED_PHASES.includes(c.phase) || c.midWait) return;
-        c.midWait = true;   // interrupt-precedence: the card lives inside the confirm-phase tracker,
-        drawControl();      // never over the (now-closed) confirm modal or a settled state.
-    }, ctlMidWaitMs());
-    ctlMidWaitTimer.unref?.();
-}
-
-// Dismiss the mid-wait card and stop the one-shot timer (used by keep-on-hold and every teardown).
-function clearCtlMidWait() {
-    clearTimeout(ctlMidWaitTimer);
-    ctlMidWaitTimer = null;
-    if (window.ctl) window.ctl.midWait = false;
-}
-
-const CTL_TITLES = { up: 'Raise setpoint', down: 'Lower setpoint', frost: 'Turn heating off (frost-hold)', modeoff: 'Turn off (mode)', switchon: 'Turn ON', switchoff: 'Turn OFF', boost: 'Hot-water boost' };
-const CTL_WHAT = { up: 'Setpoint raise', down: 'Setpoint lower', frost: 'Heating off (frost-hold)', modeoff: 'Heating off (mode)', switchon: 'Switch ON', switchoff: 'Switch OFF', boost: 'HW boost' };
+const CTL_TITLES = { up: 'Raise setpoint', down: 'Lower setpoint', frost: 'Turn heating off (frost-hold)', modeoff: 'Turn off (mode)', switchon: 'Turn ON', switchoff: 'Turn OFF' };
+const CTL_WHAT = { up: 'Setpoint raise', down: 'Setpoint lower', frost: 'Heating off (frost-hold)', modeoff: 'Heating off (mode)', switchon: 'Switch ON', switchoff: 'Switch OFF' };
+const CTL_VERB = { up: 'raise the setpoint', down: 'lower the setpoint', frost: 'set a frost-hold', modeoff: 'turn off', switchon: 'switch on', switchoff: 'switch off' };
+// The "not confirmed yet" sentence (mirrors services/errors.js NOT_CONFIRMED_MESSAGE).
+const CTL_NOT_CONFIRMED = "We sent the command but the device hasn't confirmed it yet. It may still take effect — check again in a few minutes, or raise a ticket if it does not respond.";
 
 function openControl(device, mode) {
     const blocked = writesDisabled(state.siteNo);
@@ -61,14 +37,10 @@ function openControl(device, mode) {
     const c = window.ctl;
     if (mode === 'up' || mode === 'down') c.val = (t.heatingSetpoint ?? 20) + (mode === 'up' ? 1 : -1) * (device.setpointWindow?.step ?? 0.5) * 2;
     if (mode === 'frost') c.val = 5;
-    // D10 SAFETY: mode vocabulary is lowercase end-to-end — the bridge treats any non-'off' mode as
-    // ON, so a capitalised 'Off' could switch an AC ON. (modeoff itself is HELD in v1 and no longer
-    // reachable — the Intesis off flow redirects to capture-and-escalate — but keep it safe if wired.)
+    // D10 SAFETY: mode vocabulary is lowercase end-to-end — the bridge treats any non-'off' mode as ON.
     if (mode === 'modeoff') c.val = 'off';
-    // switchon/switchoff carry a strict boolean value (Tuya single-gang, D10). Plain confirm, no stepper.
     if (mode === 'switchon') c.val = true;
     if (mode === 'switchoff') c.val = false;
-    if (mode === 'boost') c.val = 2;
     c.hold = (mode === 'frost') ? '07:00' : 'none';
     clampCtlVal();
     drawControl();
@@ -84,7 +56,6 @@ function clampCtlVal() {
 
 function holdRevertAt(hold) {
     if (hold === '4h') return new Date(Date.now() + 4 * 3600e3);
-    // 07:00 tomorrow (or today if before 07:00)
     const d = new Date();
     if (d.getHours() >= 7) d.setDate(d.getDate() + 1);
     d.setHours(7, 0, 0, 0);
@@ -116,7 +87,6 @@ function ctlStep(dx) {
 }
 
 function ctlValTxt(c = window.ctl) {
-    if (c.mode === 'boost') return c.val + 'h boost';
     if (c.mode === 'modeoff') return 'Mode Off';
     if (c.mode === 'switchon') return 'ON';
     if (c.mode === 'switchoff') return 'OFF';
@@ -124,11 +94,8 @@ function ctlValTxt(c = window.ctl) {
 }
 
 /**
- * B0/R0 · C9 — the confirm-modal site-identity block. Site identity is the MOST prominent
- * element: the recognisable name is the largest/boldest line, the house number is a secondary
- * chip, and the device/zone are demoted to a technical sub-line. When no human name resolved
- * (site.nameUnverified) we NEVER present the bare accountId as if it were the site — we show an
- * explicit "confirm the house number by voice" warning and de-emphasise the raw accountId.
+ * The confirm-modal site-identity block (B0/R0 · C9). Site identity is the most prominent element; an
+ * unverified site shows a confirm-by-voice warning and never presents the bare accountId as the site.
  */
 function ctlTargetBlock(site, device) {
     const dev = `<div class="target-tech"><span class="mono">${esc(site.siteNo)}</span> → <span class="mono">${esc(device.deviceId)}</span> · ${esc(device.zone)}</div>`;
@@ -157,8 +124,7 @@ function drawControl() {
         }
         if (c.mode === 'frost') body = `<div style="text-align:center;margin:10px 0"><span class="val" style="font-size:34px;font-weight:700">5°C frost-hold</span></div><p class="guard">Heating stays off unless the building risks freezing.</p>${holdPicker()}`;
         if (c.mode === 'modeoff') body = `<div style="text-align:center;margin:10px 0"><span class="val" style="font-size:34px;font-weight:700">Mode → Off</span></div><p class="guard">Intesis native Off. Current mode: ${esc(d.telemetry?.mode || '—')}.</p>${holdPicker()}`;
-        if (c.mode === 'switchon' || c.mode === 'switchoff') body = `<div style="text-align:center;margin:10px 0"><span class="val" style="font-size:34px;font-weight:700">Switch → ${c.mode === 'switchon' ? 'ON' : 'OFF'}</span></div><p class="guard" data-testid="switch-guard">This turns the <b>${esc(d.zone)}</b> circuit ${c.mode === 'switchon' ? 'ON' : 'OFF'} (single relay). Applied only when the device confirms.</p>`;
-        if (c.mode === 'boost') body = `<div class="stepper"><button data-testid="stepper-down" onclick="ctlStep(-1)" ${c.val <= 1 ? 'disabled' : ''}>−</button><span class="val" data-testid="stepper-value">${c.val}h</span><button data-testid="stepper-up" onclick="ctlStep(1)" ${c.val >= 9 ? 'disabled' : ''}>+</button></div><p class="guard">Hot-water boost 1–9 hours (device-native timer — reverts by itself).</p>`;
+        if (c.mode === 'switchon' || c.mode === 'switchoff') body = `<div style="text-align:center;margin:10px 0"><span class="val" style="font-size:34px;font-weight:700">Switch → ${c.mode === 'switchon' ? 'ON' : 'OFF'}</span></div><p class="guard" data-testid="switch-guard">This turns the <b>${esc(d.zone)}</b> circuit ${c.mode === 'switchon' ? 'ON' : 'OFF'} (single relay). Shown as done only when the device confirms.</p>`;
         openModal(`<div class="mh">${CTL_TITLES[c.mode]}<button class="btn link" onclick="ctlCancel()">✕</button></div><div class="mb">
    <div class="target" data-testid="control-target">${ctlTargetBlock(ws.site, d)}</div>
    ${c.error ? `<div class="alert err" data-testid="control-error">${esc(c.error)}</div>` : ''}${body}
@@ -166,45 +132,68 @@ function drawControl() {
         return;
     }
 
-    // Sync tracker phases: sent → confirming → applied / failed / rejected / timeout
-    const ph = c.phase;
+    // ---- three-outcome tracker ----
+    const a = c.action || {};
+    const st = a.state;
+    const slow = !!a.slowEchoDevice;
+    const n = a.copyMinutes;
+    // Progress strip: Sent → Gate pending → Accepted → Confirmed (honest, device-proven).
+    const confirmedP = st === 'confirmed' || st === 'already-set';
+    const acceptedP = confirmedP || a.status === 'accepted';
+    const badP = st === 'non-delivery';
+    const indP = st === 'indeterminate';
+    const cls = (ok, bad) => bad ? 'bad' : ok ? 'ok' : (st === 'in-flight' ? 'on' : '');
     const steps = `<div class="syncsteps" data-testid="sync-steps">
-   <div class="ss ${ph !== 'sent' ? 'ok' : 'on'}">1. Sent</div>
-   <div class="ss ${ph === 'confirm' ? 'on wait' : ['done', 'done-late'].includes(ph) ? 'ok' : ['failed', 'rejected', 'timeout'].includes(ph) ? 'bad' : ''}">2. Device confirming…</div>
-   <div class="ss ${['done', 'done-late'].includes(ph) ? 'ok' : ['failed', 'rejected', 'timeout'].includes(ph) ? 'bad' : ''}">${ph === 'failed' ? '✕ Failed' : ph === 'rejected' ? '✕ Rejected' : ph === 'timeout' ? '⚠ No confirmation' : ph === 'done-late' ? '⚠→✅ Applied LATE' : '3. Applied'}</div></div>`;
+   <div class="ss ok">1. Sent</div>
+   <div class="ss ${acceptedP ? 'ok' : badP ? 'bad' : 'on'}">2. Accepted by the gate</div>
+   <div class="ss ${confirmedP ? 'ok' : badP ? 'bad' : indP ? 'bad' : 'on'}">${confirmedP ? '✅ Confirmed' : badP ? '✕ Not delivered' : indP ? '⚠ Not confirmed' : '3. Device confirming…'}</div></div>`;
+
     let tail = '';
-    // R11/C7 mid-wait decision prompt — a one-shot interrupt over the confirm-phase spinner.
-    // It replaces the passive "waiting" copy with an active caller-on-hold decision. Only rendered
-    // while genuinely still confirming (never over a settled phase); the confirm modal is already
-    // closed by this point, so it cannot stack on it. (Forward-compat: a late-sync applied-late
-    // banner supersedes this stale card by settling the phase to 'done' before it can show.)
-    if (ph === 'confirm' && c.midWait) {
-        tail = `<div class="alert warn" data-testid="sync-midwait" aria-live="assertive">⏳ <b>Still no confirmation from the device.</b>${c.action?.slowEchoDevice ? ' This unit (IT700) can be slow to echo.' : ''} It may still land — but you have a caller on hold. <b>What do you want to do?</b></div>
-   <div style="display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap"><button class="btn" data-testid="midwait-hold" onclick="ctlMidWaitHold()">Keep caller on hold</button><button class="btn" data-testid="midwait-stop" onclick="ctlMidWaitStop()">Stop waiting</button><button class="btn primary" data-testid="midwait-escalate" onclick="ctlEscalate()">Escalate</button></div>`;
-    } else if (ph === 'sent' || ph === 'confirm') tail = `<p class="small" style="text-align:center" aria-live="polite">Waiting for the device to echo the change back — usually under 30 seconds. <b>“Applied” only means device-confirmed.</b></p>`;
-    if (ph === 'done') tail = `<div class="alert ok" data-testid="sync-applied" aria-live="polite">✅ <b>Applied — device confirmed ${ctlValTxt()} at ${new Date(c.action.settledAt).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}.</b>${c.hold !== 'none' ? ` Hold active: reverts at ${holdRevertText(c.hold)}.` : ''}</div><div style="text-align:right"><button class="btn primary" data-testid="sync-done" onclick="ctlFinish()">Done</button></div>`;
-    // C6 applied-LATE — a device that echoed AFTER we told the handler "not applied" (timeout).
-    // Distinct from the plain "Applied" card so the handler is told to go back to the caller. This
-    // is the EPHEMERAL in-session channel (best-effort, lost on restart / once the tracker closes);
-    // the durable cross-shift signal is the Zendesk late-sync ticket note. Interrupt-precedence: the
-    // poller already cleared any stale mid-wait card on settle before this renders.
-    if (ph === 'done-late') tail = `<div class="alert warn" data-testid="sync-applied-late" aria-live="assertive">⚠️→✅ <b>Applied LATE</b> — this change was reported as <b>not applied</b>, but the device has now confirmed ${ctlValTxt()} at ${new Date(c.action.settledAt).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}. <b>Tell the caller it's now done, and check nothing was actioned twice.</b>${c.hold !== 'none' ? ` Hold active: reverts at ${holdRevertText(c.hold)}.` : ''}</div><div style="text-align:right"><button class="btn primary" data-testid="sync-done" onclick="ctlFinish()">Done</button></div>`;
-    if (ph === 'failed' || ph === 'rejected') tail = `<div class="alert err" data-testid="sync-failed" aria-live="assertive">❌ <b>The device ${ph === 'rejected' ? 'rejected' : 'refused'} this command</b> (<span class="mono">${ph}</span>). Nothing has changed on site — do not tell the caller it’s done.</div><div style="text-align:right;display:flex;gap:8px;justify-content:flex-end"><button class="btn" onclick="ctlRetry()">Try again</button><button class="btn primary" data-testid="sync-escalate" onclick="ctlEscalate()">Escalate instead</button></div>`;
-    if (ph === 'timeout') tail = `<div class="alert warn" data-testid="sync-timeout" aria-live="assertive">⏱️ <b>The device hasn’t confirmed yet.</b>${c.action?.slowEchoDevice ? ' This unit (IT700) can be slow to echo.' : ''} <b>Treat the change as NOT applied.</b> We’ll keep watching in the background and update the ticket if it lands.</div><div style="text-align:right;display:flex;gap:8px;justify-content:flex-end"><button class="btn" data-testid="sync-wait" onclick="ctlWaitMore()">Keep waiting (30s)</button><button class="btn primary" data-testid="sync-escalate" onclick="ctlEscalate()">Escalate</button></div>`;
+    const holdSuffix = (c.hold && c.hold !== 'none') ? ` Hold active: reverts at ${holdRevertText(c.hold)}.` : '';
+
+    if (st === 'already-set') {
+        tail = `<div class="alert ok" data-testid="sync-confirmed" aria-live="polite">✅ <b>Already at the requested value — ${esc(ctlValTxt(c))}.</b> The device already reads this, so no change was needed.${holdSuffix}</div><div style="text-align:right"><button class="btn primary" data-testid="sync-done" onclick="ctlFinish()">Done</button></div>`;
+    } else if (st === 'in-flight' && slow) {
+        // DD-WAIT-HANDOFF: release the handler immediately for a slow (Salus) class.
+        tail = `<div class="alert info" data-testid="sync-sent-slow" aria-live="polite">📨 <b>Sent to the device.</b> It should take effect within about <b>${n} minutes</b> — you can carry on with the caller; we’ll watch it in the background, show the result here and update the ticket when the thermostat confirms.</div>
+   <div style="text-align:right"><button class="btn primary" data-testid="sync-release" onclick="ctlRelease()">Done — carry on</button></div>`;
+    } else if (st === 'in-flight') {
+        if (a.status === 'accepted') {
+            tail = `<p class="small" style="text-align:center" aria-live="polite"><span class="spin"></span> <b>Accepted by the system</b> — waiting for the device to show the change in its own reading. <b>“Confirmed” only means device-proven.</b></p>`;
+        } else {
+            tail = `<p class="small" style="text-align:center" aria-live="polite"><span class="spin"></span> Sent to the device — waiting for it to confirm… <b>“Confirmed” only means the device’s own reading proved it.</b></p>`;
+        }
+    } else if (st === 'confirmed') {
+        tail = `<div class="alert ok" data-testid="sync-confirmed" aria-live="polite">✅ <b>Confirmed — device reports ${esc(confirmReadingText(c))}${a.confirmedLate ? ' (confirmed late)' : ''}.</b> This is the only outcome we ever show as success.${a.confirmedLate ? ' This came in after we told you it was not yet confirmed — tell the caller it’s now done.' : ''}${holdSuffix}</div><div style="text-align:right"><button class="btn primary" data-testid="sync-done" onclick="ctlFinish()">Done</button></div>`;
+    } else if (st === 'non-delivery') {
+        tail = `<div class="alert err" data-testid="sync-notdelivered" aria-live="assertive">❌ <b>Not delivered.</b> ${esc(a.operatorError || 'The change could not be sent.')} <b>Nothing has changed on site — do not tell the caller it’s done.</b></div><div style="text-align:right"><button class="btn primary" data-testid="sync-escalate" onclick="ctlEscalate()">Capture &amp; escalate</button></div>`;
+    } else if (st === 'indeterminate') {
+        // NOT CONFIRMED — NO resend button (DD-RESEND-UX). The watcher keeps watching.
+        tail = `<div class="alert warn" data-testid="sync-notconfirmed" aria-live="assertive">⚠️ <b>Not confirmed yet.</b> ${esc(a.operatorError || CTL_NOT_CONFIRMED)} We’re still watching in the background and will update the ticket if it lands — <b>please don’t treat this as done.</b></div><div style="text-align:right"><button class="btn primary" data-testid="sync-escalate" onclick="ctlEscalate()">Capture &amp; escalate</button></div>`;
+    }
+
     const trackerName = ws.site.nameUnverified
         ? `⚠ <span class="muted">Unrecognised site <span class="mono">${esc(ws.site.accountId || ws.site.siteName)}</span></span>`
         : `<b>${esc(ws.site.siteName)}</b>`;
     openModal(`<div class="mh">${CTL_TITLES[c.mode]}</div><div class="mb"><div class="target"><span class="target-name">${trackerName}</span> <span class="mono">${esc(ws.site.siteNo)}</span> → <span class="mono">${esc(d.deviceId)}</span> · ${ctlValTxt()}</div>${steps}${tail}</div>`, false);
 }
 
+/** Human reading text for a confirmed outcome (switch → ON/OFF, setpoint → N°C). */
+function confirmReadingText(c = window.ctl) {
+    if (c.mode === 'switchon') return 'ON';
+    if (c.mode === 'switchoff') return 'OFF';
+    if (c.mode === 'modeoff') return 'off';
+    return ctlValTxt(c);
+}
+
 async function ctlSend() {
     const c = window.ctl;
     c.error = null;
-    c.phase = 'sent';
+    c.phase = 'tracker';
+    c.action = { state: 'in-flight', status: 'pending' };
     drawControl();
-    const command = { up: 'setpoint', down: 'setpoint', frost: 'frost', modeoff: 'mode', switchon: 'switch', switchoff: 'switch', boost: 'hwboost' }[c.mode];
+    const command = { up: 'setpoint', down: 'setpoint', frost: 'frost', modeoff: 'mode', switchon: 'switch', switchoff: 'switch' }[c.mode];
     const hold = c.hold !== 'none' ? { revertAt: holdRevertAt(c.hold).toISOString(), label: c.hold === '4h' ? 'For 4 hours' : 'Until 07:00 tomorrow' } : null;
-    // D10 SAFETY: 'off' is lowercase (never 'Off'); switch carries a strict boolean.
     const dispatchValue = c.mode === 'modeoff' ? 'off'
         : c.mode === 'switchon' ? true
         : c.mode === 'switchoff' ? false
@@ -220,24 +209,19 @@ async function ctlSend() {
             hold
         });
         c.action = action;
-        // D3: an already-satisfied request is a terminal no-write success — the device is already at
-        // the requested value. Settle straight to 'done' (no polling, no mid-wait); the applied card
-        // is honest ("already confirmed"). Any other state enters the normal confirm/poll loop.
-        if (action.state === 'already-set') {
-            c.phase = 'done';
-            c.midWait = false;
+        if (action.state === 'already-set' || action.state === 'confirmed') {
             drawControl();
             return;
         }
-        c.phase = 'confirm';
-        c.midWait = false;
+        // in-flight: a slow class is released at once (the tracker shows the "carry on" card); a fast
+        // class polls to its quick outcome.
         drawControl();
         startCtlPolling();
-        armCtlMidWait();   // R11/C7: one-shot mid-wait prompt fires at midWaitPromptMs if still pending
     } catch (err) {
-        // Guardrail (422), kill-switch (423), confirmation (409) → back to compose with the reason
+        // Guardrail (422), kill-switch (423), confirmation (409) → back to compose with the reason.
         c.phase = 'compose';
         c.error = err.message;
+        c.action = null;
         drawControl();
     }
 }
@@ -251,74 +235,89 @@ function startCtlPolling() {
         try {
             ({ action } = await api.get(`/api/control/actions/${c.action.actionId}`));
         } catch { return; /* transient — keep polling */ }
+        if (!action) return;
+        const prev = c.action.state;
         c.action = action;
-        // R11/C7: any settle cancels the pending mid-wait prompt so it can never fire (or linger)
-        // over a resolved action. late-sync applied-late (→ 'done') supersedes a stale mid-wait card.
-        if (['synced', 'late-synced', 'failed', 'rejected', 'timeout'].includes(action.state)) clearCtlMidWait();
-        // C6: split late-synced from a normal synced. A device that echoes AFTER we already told the
-        // handler "not applied" (timeout) settles to a DISTINCT 'done-late' phase with its own
-        // applied-LATE banner — never the plain "Applied" card. This also supersedes any stale
-        // mid-wait card (clearCtlMidWait above already ran). Ephemeral by design: only a handler
-        // still on the tracker sees it; the durable cross-shift signal is the Zendesk ticket note.
-        if (action.state === 'late-synced' && c.phase !== 'done-late') { c.phase = 'done-late'; drawControl(); }
-        else if (action.state === 'synced' && c.phase !== 'done') { c.phase = 'done'; drawControl(); }
-        else if (['failed', 'rejected'].includes(action.state) && !['failed', 'rejected'].includes(c.phase)) { c.phase = action.state; drawControl(); }
-        else if (action.state === 'timeout' && c.phase !== 'timeout') { c.phase = 'timeout'; drawControl(); }
-        if (['synced', 'late-synced', 'failed', 'rejected'].includes(action.state)) clearInterval(ctlPollTimer);
+        // Redraw on any meaningful change (status pending→accepted, or a terminal/indeterminate state).
+        drawControl();
+        if (['confirmed', 'non-delivery'].includes(action.state)) {
+            clearInterval(ctlPollTimer);
+        }
+        // indeterminate is NOT terminal — keep polling so a late confirm flips the card to CONFIRMED.
     }, 2000);
 }
 
-async function ctlWaitMore() {
+/**
+ * DD-WAIT-HANDOFF — the operator releases a slow (Salus) action and carries on. We record the outcome
+ * ticket now ("sent, awaiting confirmation"), attach it so the server watcher updates THAT ticket, and
+ * start a detached background watch that toasts the result when it lands. No resend, ever.
+ */
+async function ctlRelease() {
     const c = window.ctl;
+    clearInterval(ctlPollTimer);
+    const action = c.action;
+    const what = CTL_WHAT[c.mode];
+    const additionalNotes = state.flow?.data?.additionalNotes || null;
+    const holdTxt = c.hold !== 'none' ? `Hold until ${holdRevertText(c.hold)} — will revert automatically (durable)` : null;
+    let ticketId = null;
     try {
-        const { action } = await api.post(`/api/control/actions/${c.action.actionId}/wait`);
-        c.action = action;
-        c.phase = 'confirm';
-        c.midWait = false;
-        drawControl();
-        startCtlPolling();
-        armCtlMidWait();   // re-arm for the fresh wait window (keeps behaviour consistent on re-wait)
+        const res = await api.post('/api/outcomes', {
+            type: 'capture',
+            additionalNotes,
+            actionId: action?.actionId,
+            siteNo: state.workspace.site.siteNo,
+            siteName: state.workspace.site.siteName,
+            subject: `${what} — sent, awaiting device confirmation`,
+            detail: `${what} (${ctlValTxt(c)}) sent to ${c.device.deviceId}. This unit can take a few minutes to confirm; the result will be added to this ticket when the device confirms. Treat as not-yet-applied until confirmed.`,
+            callerWords: state.flow?.data?.freeText || null,
+            holdText: holdTxt,
+            OohCaptureClass: 'control-awaiting-confirm'
+        });
+        ticketId = res?.ticket?.id || null;
+        notesDraftClear();
+        if (state.flow?.data) state.flow.data._ticketId = ticketId;
+        registerIssue(`${what} — awaiting confirmation`, 'blue', ticketId);
     } catch (err) {
         toast(`⚠️ ${esc(err.message)}`);
     }
+    // Detached background watch — toast the result; the server also writes it to the ticket.
+    startCtlBgWatch(action?.actionId, what);
+    const html = `<div class="outcome captured" data-testid="outcome-awaiting"><h3>📨 Sent — awaiting the device</h3>
+  <p>${what} (${ctlValTxt(c)}) is on its way to <span class="mono">${esc(c.device.deviceId)}</span>. It should take effect within about <b>${action?.copyMinutes} minutes</b>. We’re watching in the background and will update the ticket when the device confirms.</p>
+  <div class="script">“That’s gone to the thermostat now — it can take a few minutes to take effect. I’ve logged it, and we’ll keep an eye on it; if it doesn’t respond we’ll follow it up.”</div>
+  ${ticketId ? `<p class="small">Ticket <b>#${ticketId}</b></p>` : ''}%%NOTESPOST%%${outButtons()}</div>`;
+    window.ctl = null;
+    closeModal();
+    if (state.flow) { state.flow.stage = 99; state.flow.data._outcomeHtml = html; }
+    render();
 }
 
-/**
- * R11/C7 mid-wait choice — KEEP CALLER ON HOLD. Dismiss the prompt and stay in the confirm
- * wait: no server change, the existing 2s client poll keeps running. The one-shot timer is spent
- * (not re-armed) so the handler isn't nagged again for this wait window.
- */
-function ctlMidWaitHold() {
-    clearCtlMidWait();
-    drawControl();
-}
-
-/**
- * R11/C7 mid-wait choice — STOP WAITING. Adopt the existing timeout-card treatment immediately
- * (treat as not-yet-confirmed) WITHOUT burning the residual time to the 90s server deadline. The
- * server lifecycle is untouched: the background watch keeps polling, and if the device echoes
- * late the client poller flips this to 'done' (applied-late). The timeout card's honest copy tells
- * the handler the change may still land and where they'll be told (ticket note / applied-late
- * banner if the tracker stays open).
- */
-function ctlMidWaitStop() {
-    clearCtlMidWait();
-    window.ctl.phase = 'timeout';
-    drawControl();
-}
-
-function ctlRetry() {
-    const c = window.ctl;
-    clearInterval(ctlPollTimer);
-    clearCtlMidWait();
-    c.phase = 'compose';
-    c.action = null;
-    drawControl();
+/** Detached watch for a released action — toasts the final outcome (CONFIRMED / NOT DELIVERED / NOT CONFIRMED). */
+function startCtlBgWatch(actionId, what) {
+    clearInterval(ctlBgTimer);
+    if (!actionId) return;
+    let elapsed = 0;
+    ctlBgTimer = setInterval(async () => {
+        elapsed += 15000;
+        let action;
+        try { ({ action } = await api.get(`/api/control/actions/${actionId}`)); } catch { return; }
+        if (!action) { if (elapsed > 10 * 60000) clearInterval(ctlBgTimer); return; }
+        if (action.state === 'confirmed') {
+            toast(`✅ <b>Confirmed</b> — ${esc(what)} is now device-confirmed.`);
+            clearInterval(ctlBgTimer);
+        } else if (action.state === 'non-delivery') {
+            toast(`❌ <b>Not delivered</b> — ${esc(what)}: ${esc(action.operatorError || 'the device rejected it')}. It’s on the ticket.`);
+            clearInterval(ctlBgTimer);
+        } else if (action.state === 'indeterminate' && elapsed > 2 * 60000) {
+            toast(`⚠️ <b>Not confirmed yet</b> — ${esc(what)} hasn’t confirmed. Still watching; it’s on the ticket.`);
+        }
+        if (elapsed > 95 * 60000) clearInterval(ctlBgTimer);
+    }, 15000);
+    ctlBgTimer.unref?.();
 }
 
 function ctlCancel() {
     clearInterval(ctlPollTimer);
-    clearCtlMidWait();
     window.ctl = null;
     closeModal();
     if (state.flow) state.flow.stage = Math.max(0, state.flow.stage - 1);
@@ -326,44 +325,40 @@ function ctlCancel() {
 }
 
 /**
- * Synced → record the outcome ticket (server links it to the dispatch audit entry
- * and any hold), render the applied outcome card.
+ * CONFIRMED (or already-set) → record the outcome ticket and render the applied outcome card.
  */
 async function ctlFinish() {
     const c = window.ctl;
     clearInterval(ctlPollTimer);
-    clearCtlMidWait();
     window.ctl = null;
     closeModal();
     const holdTxt = c.hold !== 'none' ? `Hold until ${holdRevertText(c.hold)} — will revert automatically (durable)` : null;
     const what = CTL_WHAT[c.mode];
+    const reading = confirmReadingText(c);
     const script = {
         up: `Done — I’ve set it to ${c.val} degrees and the device has confirmed. ${holdTxt ? 'It’ll hold until the morning schedule.' : 'The site schedule takes back over at the next slot.'}`,
         down: `Done — lowered to ${c.val} degrees and confirmed by the device.`,
         frost: `The heating’s now off on a frost-hold — it’ll only kick in if the building gets near freezing${holdTxt ? ', and normal service resumes at 7am' : ''}.`,
         modeoff: 'That’s the system switched off — confirmed by the unit itself.',
         switchon: `That circuit is now switched ON — confirmed by the device.`,
-        switchoff: `That circuit is now switched OFF — confirmed by the device.`,
-        boost: `Hot water boost is on for ${c.val} hours — it’ll switch back by itself.`
+        switchoff: `That circuit is now switched OFF — confirmed by the device.`
     }[c.mode];
-    const detail = `${what} to <b>${ctlValTxt(c)}</b> on <span class="mono">${esc(c.device.deviceId)}</span>, device-confirmed (<span class="mono">synced</span>).`;
-
-    // OOHDASH-119: carry any notes typed before the control was sent
+    const detail = `${what} to <b>${esc(reading)}</b> on <span class="mono">${esc(c.device.deviceId)}</span>, device-confirmed.`;
     const additionalNotes = state.flow?.data?.additionalNotes || null;
     let html;
     try {
         const res = await api.post('/api/outcomes', {
             type: c.action.actionType,
-            additionalNotes, // OOHDASH-119
+            additionalNotes,
             actionId: c.action.actionId,
             siteNo: state.workspace.site.siteNo,
             siteName: state.workspace.site.siteName,
             subject: `${what} — ${c.device.zone}`,
-            detail: `${what} to ${ctlValTxt(c)} on ${c.device.deviceId}, device-confirmed (synced).`,
+            detail: `${what} to ${reading} on ${c.device.deviceId}, device-confirmed.`,
             callerWords: state.flow?.data?.freeText || null,
             holdText: holdTxt
         });
-        notesDraftClear(); // OOHDASH-119: clear sessionStorage draft on success
+        notesDraftClear();
         if (state.flow?.data) { state.flow.data._ticketId = res.ticket.id; }
         const notesEcho = additionalNotes
             ? `<div class="stepdone small" data-testid="addnotes-echo"><span>📝</span>Note added — for the ticket and morning review: "${esc(additionalNotes)}"</div>`
@@ -371,7 +366,7 @@ async function ctlFinish() {
         registerIssue(`${what} — ${c.device.zone}`, 'green', res.ticket.id);
         html = `<div class="outcome applied" data-testid="outcome-applied"><h3>✅ Change applied — device confirmed</h3><p>${detail}</p>${holdTxt ? `<p style="margin-top:4px">⏱️ ${holdTxt}</p>` : ''}
   ${notesEcho}<div class="script">"${script}"</div><p class="small">Recorded on ticket <b>#${res.ticket.id}</b> · reviewed by the IoT team next working day (in the IoT Support dashboard)</p>%%NOTESPOST%%${outButtons()}</div>`;
-        toast(`✅ <b>${esc(state.workspace.site.siteName)}</b>: ${what} ${ctlValTxt(c)} — device confirmed`);
+        toast(`✅ <b>${esc(state.workspace.site.siteName)}</b>: ${what} ${reading} — device confirmed`);
     } catch (err) {
         html = `<div class="outcome applied" data-testid="outcome-applied"><h3>✅ Change applied — device confirmed</h3><p>${detail}</p>
   <div class="alert err">The change IS applied, but recording the ticket failed: ${esc(err.message)}. Tell the IoT team via Tonight → Raise a query so the audit trail is complete.</div>
@@ -382,46 +377,43 @@ async function ctlFinish() {
 }
 
 /**
- * Failed / rejected / timeout → honest capture-and-escalate outcome (never success).
+ * NOT DELIVERED / NOT CONFIRMED → honest capture-and-escalate outcome (never success). No resend.
  */
 async function ctlEscalate() {
     const c = window.ctl;
     clearInterval(ctlPollTimer);
-    clearCtlMidWait();
     window.ctl = null;
     closeModal();
     const what = CTL_WHAT[c.mode];
-    const why = c.action?.state === 'timeout' ? 'no sync confirmation (timeout)' : `write ${c.action?.state || 'failed'} (vendor ${c.action?.state || 'failed'})`;
-    const isTimeout = c.action?.state === 'timeout';
-    // OOHDASH-119: carry any notes typed before the control was attempted
+    const stateNow = c.action?.state;
+    const notConfirmed = stateNow === 'indeterminate';
+    const why = notConfirmed
+        ? 'the device has not confirmed the change (not confirmed)'
+        : `the change was not delivered (${esc(c.action?.operatorError || 'rejected')})`;
     const additionalNotes = state.flow?.data?.additionalNotes || null;
     let html;
     try {
         const res = await api.post('/api/outcomes', {
             type: 'capture',
-            additionalNotes, // OOHDASH-119
-            actionId: c.action?.actionId, // links the failed dispatch's audit entry + late-sync ticket updates
+            additionalNotes,
+            actionId: c.action?.actionId,
             siteNo: state.workspace.site.siteNo,
             siteName: state.workspace.site.siteName,
             subject: `${what} — NOT applied, escalated`,
-            detail: `Attempted ${what} (${ctlValTxt(c)}) on ${c.device.deviceId} but ${why}. Change must be treated as not applied.`,
+            detail: `Attempted ${what} (${ctlValTxt(c)}) on ${c.device.deviceId} but ${notConfirmed ? 'the device did not confirm' : 'the change was not delivered'}. Change must be treated as not applied.`,
             callerWords: state.flow?.data?.freeText || null,
             OohCaptureClass: 'control-failure'
         });
-        notesDraftClear(); // OOHDASH-119
+        notesDraftClear();
         if (state.flow?.data) { state.flow.data._ticketId = res.ticket.id; }
         registerIssue(`${what} — NOT applied`, 'blue', res.ticket.id);
         html = `<div class="outcome captured" data-testid="outcome-escalated"><h3>📥 Captured for the IoT team</h3>
-  <p>Attempted ${what} (${ctlValTxt(c)}) on <span class="mono">${esc(c.device.deviceId)}</span> but ${esc(why)}. <b>The change must be treated as not applied.</b></p>
-  <div class="script">“I tried to make that change remotely but the device hasn’t confirmed it, so I’m not going to tell you it’s done when it may not be. I’ve logged it as a priority instead${isTimeout ? ' — it may still land, and the team will check' : ''}.”</div>
-
+  <p>Attempted ${what} (${ctlValTxt(c)}) on <span class="mono">${esc(c.device.deviceId)}</span> but ${why}. <b>The change must be treated as not applied.</b></p>
+  <div class="script">“I tried to make that change remotely but the device hasn’t confirmed it, so I’m not going to tell you it’s done when it may not be. I’ve logged it as a priority instead${notConfirmed ? ' — it may still land, and the team will check' : ''}.”</div>
   <p class="small">Ticket <b>#${res.ticket.id}</b></p>%%NOTESPOST%%${outButtons()}</div>`;
     } catch (err) {
         html = `<div class="alert err">Couldn’t record the escalation: ${esc(err.message)} — raise it via Tonight → Raise a query so it isn’t lost.</div>${outButtons()}`;
-
     }
     if (state.flow) { state.flow.stage = 99; state.flow.data._outcomeHtml = html; }
     render();
 }
-
-

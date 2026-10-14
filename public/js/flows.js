@@ -572,29 +572,18 @@ const FLOWR = {
         // OOHDASH-114-F1: DHW controllability is now determined by the boilerControl workspace field
         // (Sam Day spec - V1/V2 shared-attribute check). The old devices.find was testing for a device
         // type that live inventory never emits. ws.boilerControl is always present (defaulted server-side).
-        const dhw = ws.boilerControl?.dhwControllable ? ws.boilerControl : null;
         if (f.stage === 0) {
-            if (!dhw) {
-                doneLine('Hot water not controllable here — capture & escalate');
-                return `<div class="alert info">Hot water is not controllable from here — it’s boiler-side, not on a boostable Lighthouse device. Capture the details and escalate.</div><div class="chips"><button class="chip" onclick="flowStep({cap:1})">Capture &amp; escalate</button><button class="chip" onclick="flowStep({sc:1})">Scope guidance (boiler fault?)</button></div>`;
-            }
-            // OOHDASH-114-F1: online check removed - boilerControl is a summary object, not a live device.
-            doneLine('Live read: boiler DHW controllable via Lighthouse');
-            return '<div class="zoneread"><div><div><b>Hot water control</b> - DHW boost available via boiler panel</div><div class="small">' + (dhw.isV1 ? 'V1 - boiler panel (output relay)' : dhw.isV2 ? 'V2 - boiler panel (DHW.use_boiler)' : 'Boiler panel (variant unknown)') + '</div></div><span class="tag green">controllable</span></div>' +
-                '<div class="stepq">Boost the hot water now?</div><div class="chips"><button class="chip" data-testid="hw-boost-yes" onclick="flowStep({boost:1})">Yes \u2014 set a boost</button><button class="chip" onclick="flowStep({cap:1})">No \u2014 capture &amp; escalate</button></div>';
+            doneLine('Hot water - boiler-side, not controllable from here; captured for the IoT team');
+            return `<div class="alert info">Hot water here runs on the boiler panel, which this dashboard monitors but can't control - there's no remote boost. We'll capture the details with the site boiler guidance and escalate to the IoT team, so you still have a next step for the caller.</div>
+   <div class="chips"><button class="chip" data-testid="hw-capture" onclick="flowStep({cap:1})">Log and escalate to IoT team</button><button class="chip" data-testid="hw-scope" onclick="flowStep({sc:1})">Scope guidance (boiler fault?)</button></div>`;
         }
         if (f.stage === 1) {
-            const dhwDev = ws.boilerControl?.dhwControllable ? ws.boilerControl : null;
-            // Presence-guarded: the compose/boost path is reachable ONLY when a genuinely
-            // controllable DHW device is present. Without one, a boost intent falls through
-            // to the deterministic capture-and-escalate default (never openControl on nothing).
-            if (f.data.boost && dhwDev) { openControl(dhwDev, 'boost'); return ctlPlaceholder(); }
-            if (f.data.cap || f.data.boost) {
+            if (!f.data.sc) {
                 doneLine('Outcome: captured');
                 return outcomeCaptured(f, 'cap', {
-                    subject: 'Hot water issue — not resolvable remotely tonight',
-                    detail: `Caller reports hot-water problems${dhwDev ? ' beyond what a boost resolves' : ' and no boostable device exists here'}. Needs IoT/boiler-side investigation.`,
-                    script: 'I’ve logged this for the IoT team as a priority for the morning. If it’s urgent overnight the boiler’s own override panel may help — and if a boiler engineer attends, remember a visit can be chargeable if the fault isn’t Lighthouse equipment.',
+                    subject: 'Hot water issue - not resolvable remotely tonight',
+                    detail: 'Caller reports hot-water problems. Hot water is boiler-side (monitor-only on Lighthouse) - there is no remote boost. Needs IoT/boiler-side investigation.',
+                    script: "I've logged this for the IoT team as a priority for the morning. If it's urgent overnight the boiler's own override panel may help - and if a boiler engineer attends, remember a visit can be chargeable if the fault isn't Lighthouse equipment.",
                     OohCaptureClass: 'hot-water'
                 });
             }

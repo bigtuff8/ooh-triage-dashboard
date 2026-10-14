@@ -169,9 +169,10 @@ test('flow: before-compose out-of-scope — HW complaint front-loads "not contro
     const { ctx, state } = loadClient(ws);
     state.flow = { stage: 0, done: [], data: {} };
     const html = ctx.FLOWR.hotwater(ws, state.flow);
-    assert.match(html, /not controllable from here/i, 'the out-of-scope message is front-loaded before any compose affordance');
-    assert.doesNotMatch(html, /hw-boost-yes/, 'the boost/compose chip must NOT render for a live combi');
-    assert.match(html, /Capture &amp; escalate/, 'capture-and-escalate is the deterministic default path');
+    // OOHDASH-123 (J5/D-BOOST): hot water is now always capture-and-escalate — no boost, no compose.
+    assert.match(html, /can't control|not controllable/i, 'the out-of-scope message is front-loaded before any compose affordance');
+    assert.doesNotMatch(html, /hw-boost-yes/, 'the boost/compose chip is removed');
+    assert.match(html, /Log and escalate to IoT team/, 'capture-and-escalate is the deterministic path');
 });
 
 test('flow: compose chip never renders from live-shaped inventory, and no boost/openControl path is reachable', async () => {
@@ -198,9 +199,9 @@ test('flow: capture-and-escalate outcome logs a hot-water class ticket (OohCaptu
     assert.equal(captured[0].type, 'capture');
 });
 
-test('flow OOHDASH-114-F1: hw-boost-yes chip renders when ws.boilerControl.dhwControllable=true', async () => {
+test('flow OOHDASH-123 (J5/D-BOOST): the boost chip is GONE even when boilerControl.dhwControllable=true', async () => {
     const [site] = await bridge.getSitesByNumber('6261');
-    // Workspace with boilerControl.dhwControllable=true makes the boost chip appear.
+    // Even a dhwControllable boiler no longer offers a boost — boost is removed, capture-and-escalate only.
     const ws = {
         site: { siteName: site.siteName },
         devices: workspaceDevices(site),
@@ -210,11 +211,6 @@ test('flow OOHDASH-114-F1: hw-boost-yes chip renders when ws.boilerControl.dhwCo
     const { ctx, state } = loadClient(ws);
     state.flow = { stage: 0, done: [], data: {} };
     const html = ctx.FLOWR.hotwater(ws, state.flow);
-    assert.match(html, /hw-boost-yes/, 'the boost chip renders when boilerControl.dhwControllable=true');
-    // No boost chip when dhwControllable=false.
-    const wsOff = { site: { siteName: site.siteName }, devices: workspaceDevices(site), scope: scopeOf(site), boilerControl: { present: false, dhwControllable: false } };
-    const { ctx: ctx2, state: state2 } = loadClient(wsOff);
-    state2.flow = { stage: 0, done: [], data: {} };
-    const html2 = ctx2.FLOWR.hotwater(wsOff, state2.flow);
-    assert.doesNotMatch(html2, /hw-boost-yes/, 'no boost chip when dhwControllable=false');
+    assert.doesNotMatch(html, /hw-boost-yes/, 'no boost chip — boost is removed (dishonest offer)');
+    assert.match(html, /hw-capture/, 'the capture-and-escalate chip is shown instead');
 });
