@@ -11,6 +11,7 @@
 
 import axios from 'axios';
 import { config } from '../config.js';
+import * as registry from './registry.js';
 
 const ATTRIBUTE_FAMILY = {
     switchDesired: { reported: 'switchReported', sync: 'switchSyncStatus' },
@@ -275,6 +276,95 @@ function simHasPublished(device) {
 }
 
 /* ------------------------------------------------------------------ */
+/* OOHDASH-123 Rosetta Stone — fixture sim for the SERVER_SCOPE Requested write +          */
+/* the three-outcome confirm read (status + LastError attrs, confirming telemetry).        */
+/* ------------------------------------------------------------------ */
+
+// deviceId -> { requested, requestedTs, demo, baseTs, prevTel, prevTelTs, swallowed }
+const cmdSim = new Map();
+// Trajectory step (ms). Small by default so unit/e2e exercise all phases quickly; env-overridable.
+function simStepMs() { return parseInt(process.env.OOH_SIM_STEP_MS || '700', 10); }
+function telemetryOf(device, contract) {
+    const t = device?.telemetry || {};
+    for (const k of (contract.confirmKeys || [])) { if (t[k] !== undefined) return t[k]; }
+    return null;
+}
+
+/**
+ * Fixture write of a *Requested key. The `_demo` flag steers the confirm trajectory simReadCommand
+ * then plays out. Returns the server-assigned dispatchTs (here: the write time).
+ */
+function simWriteRequested(device, value) {
+    const demo = device._demo || null;
+    const now = Date.now();
+    const contract = registry.capabilitiesContractFor(device.deviceType);
+    const prev = cmdSim.get(device.deviceId);
+    const prevTel = prev ? prev.prevTel : telemetryOf(device, contract);
+    const prevTelTs = now - 60000;
+    const swallowed = demo === 'swallowed';
+    cmdSim.set(device.deviceId, { requested: value, requestedTs: now, demo, baseTs: now, prevTel, prevTelTs, swallowed });
+    return now;
+}
+
+/**
+ * Fixture confirm read → { status, statusTs, lastError, telemetryValue, telemetryTs }. Models every
+ * design §5 scenario via `_demo`: (default) confirm, pending, rejected(-gate/-vendor), noecho,
+ * match-pending (cross-clock guard), echo-first (echo-before-accepted), swallowed (no pending advance).
+ */
+function simReadCommand(device, contract) {
+    const c = cmdSim.get(device.deviceId);
+    if (!c) {
+        // No command in flight — the device's current confirming telemetry (pre-dispatch read).
+        const tv = telemetryOf(device, contract);
+        return { status: null, statusTs: null, lastError: null, telemetryValue: tv, telemetryTs: tv == null ? null : Date.now() - 60000 };
+    }
+    // Swallowed write: the Requested write landed but the gate wrote NO new pending — statusTs never
+    // advances past dispatchTs, which the dispatch-sanity check (WU5) must catch.
+    if (c.swallowed) {
+        return { status: 'pending', statusTs: c.baseTs - 60000, lastError: null, telemetryValue: c.prevTel, telemetryTs: c.prevTelTs };
+    }
+    const step = simStepMs();
+    const base = c.baseTs;
+    const el = Date.now() - base;
+    const matchVal = c.requested;
+    let status = 'pending', statusTs = base + 1, lastError = null;
+    let telemetryValue = c.prevTel, telemetryTs = c.prevTelTs;
+    const setTel = (off) => { if (el >= off) { telemetryValue = matchVal; telemetryTs = base + off; } };
+    const setAccepted = (off) => { if (el >= off) { status = 'accepted'; statusTs = base + off; } };
+
+    switch (c.demo) {
+        case 'pending':
+            break; // stays pending forever
+        case 'rejected':
+        case 'rejected-gate':
+            if (el >= 2 * step) { status = 'rejected'; statusTs = base + 2 * step; lastError = 'gate: device offline'; }
+            break;
+        case 'rejected-vendor':
+            if (el >= 2 * step) { status = 'rejected'; statusTs = base + 2 * step; lastError = `vendor: No active Tuya session owns device ${device.deviceId}`; }
+            break;
+        case 'fail': // legacy alias → gate internal fault rejection
+            if (el >= 2 * step) { status = 'rejected'; statusTs = base + 2 * step; lastError = 'gate: internal fault'; }
+            break;
+        case 'noecho':
+        case 'accepted-noecho':
+        case 'slow': // legacy IT700 slow-echo → accepted, telemetry never matches within window
+            setAccepted(2 * step);
+            break;
+        case 'match-pending':
+            setTel(1 * step); // telemetry matches but status stays pending → NOT confirmed (guard)
+            break;
+        case 'echo-first': // echo-before-accepted: telemetry first, accepted later → confirms on accepted
+            setTel(1 * step);
+            setAccepted(3 * step);
+            break;
+        default: // 'confirm' happy path
+            setAccepted(2 * step);
+            setTel(3 * step);
+    }
+    return { status, statusTs, lastError, telemetryValue, telemetryTs };
+}
+
+/* ------------------------------------------------------------------ */
 /* Public API                                                          */
 /* ------------------------------------------------------------------ */
 
@@ -293,6 +383,77 @@ export async function writeSharedAttribute(device, attribute, value) {
     if (config.writesDisabled) throw Object.assign(new Error('Device writes are disabled at deploy time (WRITES_DISABLED)'), { status: 423 });
     const uuid = await tbDeviceUuid(device.deviceId);
     await writeSession.request('POST', `/api/plugins/telemetry/DEVICE/${uuid}/attributes/SHARED_SCOPE`, { [attribute]: value });
+}
+
+/**
+ * OOHDASH-123 Rosetta Stone (WU2) — the NEW control write. Writes a *Requested key to SERVER_SCOPE so
+ * Spencer's IoT Command Gate validates it, writes `pending`, rewrites Desired and rings the bridge.
+ * Returns the server-assigned dispatchTs (the Requested key's lastUpdateTs) for the fresh-echo guard.
+ * Allow-listed against registry.REQUESTED_KEYS; honours the WRITES_DISABLED deploy-time lock.
+ */
+export async function writeServerScopeAttribute(device, attribute, value) {
+    if (!registry.REQUESTED_KEYS.includes(attribute)) {
+        throw new Error(`Attribute ${attribute} is not a permitted control request attribute`);
+    }
+    if (config.dataMode === 'fixture') return simWriteRequested(device, value);
+    // D6 — WRITES_DISABLED primitive guard (belt-and-braces to the killswitch): refuse the LIVE write
+    // with 423 before any TB POST fires. Prod ThingsBoard is READ-ONLY for this release (no prod writes).
+    if (config.writesDisabled) throw Object.assign(new Error('Device writes are disabled at deploy time (WRITES_DISABLED)'), { status: 423 });
+    const uuid = await tbDeviceUuid(device.deviceId);
+    await writeSession.request('POST', `/api/plugins/telemetry/DEVICE/${uuid}/attributes/SERVER_SCOPE`, { [attribute]: value });
+    // Record the server-assigned lastUpdateTs as dispatchTs (ThingsBoard server clock domain — the
+    // same domain the confirm read's statusTs/telemetryTs are in, so the fresh-echo guard is apples-to-apples).
+    try {
+        const attrs = await readSession.request('GET', `/api/plugins/telemetry/DEVICE/${uuid}/values/attributes/SERVER_SCOPE?keys=${encodeURIComponent(attribute)}`);
+        const row = (attrs || []).find(a => a.key === attribute);
+        if (row && row.lastUpdateTs != null) return Number(row.lastUpdateTs);
+    } catch (err) {
+        console.error(`[TB] dispatchTs read-back failed for ${device.deviceId}: ${err.message}`);
+    }
+    return Date.now();
+}
+
+/**
+ * OOHDASH-123 Rosetta Stone (WU3) — the NEW confirm read. Returns
+ * { status, statusTs, lastError, telemetryValue, telemetryTs } for the device's class:
+ *   - status + lastError from the gate's SERVER_SCOPE attributes (statusTs = the attr lastUpdateTs);
+ *   - the confirming telemetry (first present confirmKey) from timeseries, KEEPING series[0].ts as
+ *     telemetryTs (the ts that was discarded at tb-device.js:809 is retained here for the staleness guard).
+ * Clock-domain note (build-plan divergence 3): ThingsBoard returns a server-RECEIPT ts on both the
+ * attribute lastUpdateTs and the telemetry sample, so statusTs/telemetryTs and the dispatchTs recorded
+ * by writeServerScopeAttribute are all in the server clock domain — the cross-clock guard is sound.
+ */
+export async function readCommandState(device, deviceType) {
+    const contract = registry.capabilitiesContractFor(deviceType);
+    if (config.dataMode === 'fixture') return simReadCommand(device, contract);
+    const uuid = await tbDeviceUuid(device.deviceId);
+    const attrKeys = [contract.statusKey, contract.errorKey].filter(Boolean);
+    let attrs = [];
+    if (attrKeys.length) {
+        attrs = await readSession.request('GET', `/api/plugins/telemetry/DEVICE/${uuid}/values/attributes/SERVER_SCOPE?keys=${encodeURIComponent(attrKeys.join(','))}`);
+    }
+    const row = (k) => (Array.isArray(attrs) ? attrs : []).find(a => a.key === k);
+    const sRow = contract.statusKey ? row(contract.statusKey) : null;
+    const eRow = contract.errorKey ? row(contract.errorKey) : null;
+    let telemetryValue = null, telemetryTs = null;
+    if (contract.confirmKeys && contract.confirmKeys.length) {
+        const ts = await readSession.request('GET', `/api/plugins/telemetry/DEVICE/${uuid}/values/timeseries?keys=${encodeURIComponent(contract.confirmKeys.join(','))}`);
+        for (const key of contract.confirmKeys) {
+            const series = ts?.[key];
+            if (Array.isArray(series) && series.length) {
+                telemetryValue = series[0].value;
+                telemetryTs = Number(series[0].ts);
+                break;
+            }
+        }
+    }
+    return {
+        status: sRow ? sRow.value : null,
+        statusTs: sRow && sRow.lastUpdateTs != null ? Number(sRow.lastUpdateTs) : null,
+        lastError: eRow ? eRow.value : null,
+        telemetryValue,
+        telemetryTs
+    };
 }
 
 /**
@@ -349,6 +510,7 @@ export async function hasPublishedState(device) {
 /** TEST-ONLY seam — clears the fixture sim state so edge/settle tests don't leak across each other. */
 export function __resetSim() {
     simState.clear();
+    cmdSim.clear();
 }
 
 /**

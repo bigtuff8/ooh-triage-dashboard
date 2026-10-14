@@ -42,7 +42,7 @@ test('validateCommand: in-range setpoint accepted identically across all three S
         const dev = { deviceType, telemetry: { heatingSetpoint: 20 } };
         const res = validateCommand(dev, 'setpoint', 21);
         assert.equal(res.ok, true, `${deviceType}: 21°C accepted`);
-        assert.equal(res.attribute, 'setpointDesired', `${deviceType}: dispatches setpointDesired`);
+        assert.equal(res.attribute, 'setpointRequested', `${deviceType}: dispatches setpointDesired`);
         assert.equal(res.value, 21, `${deviceType}: value preserved`);
     }
 });
@@ -61,7 +61,7 @@ test('validateCommand: frost resolves to the 5°C setpoint identically across al
         const dev = { deviceType, telemetry: { heatingSetpoint: 20 } };
         const res = validateCommand(dev, 'frost');
         assert.equal(res.ok, true, `${deviceType}: frost accepted`);
-        assert.equal(res.attribute, 'setpointDesired');
+        assert.equal(res.attribute, 'setpointRequested');
         assert.equal(res.value, 5, `${deviceType}: frost → 5°C`);
     }
 });

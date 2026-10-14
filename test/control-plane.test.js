@@ -28,6 +28,17 @@ process.env.WRITES_DISABLED = 'false';       // fixture writes don't hit the gua
 // happy dispatch settles 'synced' (not 'timeout'→'late-synced') and the poll sweep is snappy.
 process.env.SYNC_TIMEOUT_MS = '30000';
 process.env.SYNC_POLL_INTERVAL_MS = '10';
+// OOHDASH-123: compress the per-class confirm timings + fixture trajectory so the real watcher settles
+// quickly in the test (production defaults are seconds–minutes).
+process.env.OOH_SIM_STEP_MS = '30';
+process.env.OOH_CONFIRM_POLL_MS_TUYA = '10';
+process.env.OOH_CONFIRM_POLL_MS_SALUS = '10';
+process.env.OOH_CONFIRM_LIMIT_MS_TUYA = '5000';
+process.env.OOH_CONFIRM_LIMIT_MS_IT500 = '5000';
+process.env.OOH_CONFIRM_LIMIT_MS_IT700 = '5000';
+process.env.OOH_LATE_WATCH_MS_TUYA = '8000';
+process.env.OOH_LATE_WATCH_MS_IT500 = '8000';
+process.env.OOH_LATE_WATCH_MS_IT700 = '8000';
 
 const { config } = await import('../config.js');
 const registry = await import('../services/registry.js');
@@ -83,8 +94,8 @@ test('range validation — Salus IT500 window boundaries (±3 of current, within
 
 test('switch validation — strict boolean only; single-gang; non-boolean rejected', () => {
     const dt = { deviceType: 'tuya', telemetry: { switch_1: false } };
-    assert.deepEqual(registry.validateCommand(dt, 'switch', true), { ok: true, attribute: 'switchDesired', value: true });
-    assert.deepEqual(registry.validateCommand(dt, 'switch', false), { ok: true, attribute: 'switchDesired', value: false });
+    assert.deepEqual(registry.validateCommand(dt, 'switch', true), { ok: true, attribute: 'switchRequested', value: true });
+    assert.deepEqual(registry.validateCommand(dt, 'switch', false), { ok: true, attribute: 'switchRequested', value: false });
     assert.equal(registry.validateCommand(dt, 'switch', 1).ok, false, 'numeric 1 is not a boolean');
     assert.equal(registry.validateCommand(dt, 'switch', 'true').ok, false, 'string "true" is not a boolean');
     assert.equal(registry.validateCommand(dt, 'switch', 'on').ok, false, 'string "on" is not a boolean');
@@ -138,15 +149,15 @@ beforeEach(() => {
     tb.__resetSim?.();
 });
 
-test('happy dispatch — a genuine change writes and settles synced on a fresh echo', async () => {
+test('happy dispatch — a genuine change writes and settles CONFIRMED on accepted + fresh telemetry match', async () => {
     // Setpoint on a fixture IT500 at 18 → 19 (within window). Dispatch, then let the sim settle.
     const action = await control.dispatch({
         operator: OPERATOR, confirmToken: await token(), siteNo: SITE_NO,
         deviceId: 'IT500-BAR-6832', command: 'setpoint', value: 19, direction: 'up'
     });
-    assert.equal(action.state, 'pending');
-    const settled = await waitForState(action.actionId, 'synced');
-    assert.equal(String(settled.reported), '19');
+    assert.equal(action.state, 'in-flight');
+    const settled = await waitForState(action.actionId, 'confirmed');
+    assert.equal(String(settled.confirmedValue), '19');
 });
 
 test('edge-trigger no-op — already-satisfied returns a terminal already-set with NO write', async () => {
@@ -179,40 +190,32 @@ test('registration gate — an unregistered device is rejected 409 (registration
     );
 });
 
-test('dispatch already-satisfied — a prior command already at the value returns terminal already-set with NO write', async () => {
-    // Simulate a prior command already confirmed at switch=true on this device (desired + fresh synced).
-    const site = (await import('../services/bridge.js')).getSitesByNumber;
-    const sites = await site('6901');
+test('dispatch already-satisfied — the device already reads the requested value → terminal already-set, NO write', async () => {
+    // OOHDASH-123 (WU5): "already satisfied" is judged from the device's OWN confirming telemetry, not
+    // from Desired. The fixture TUYA-SW-6901 reads switch_1=false, so a dispatch of false is a no-write
+    // honest success (already at the requested value).
+    const sites = await (await import('../services/bridge.js')).getSitesByNumber('6901');
     const dev = sites[0].devices.find(d => d.deviceId === 'TUYA-SW-6901');
-    await tb.writeSharedAttribute(dev, 'switchDesired', true);   // desired now true
-    await sleep(2700);                                            // let it settle synced (fresh echo)
-    const before = await tb.readControlState(dev, 'switchDesired');
-    assert.equal(before.sync, 'synced');
+    assert.equal(dev.telemetry.switch_1, false, 'fixture reads switch_1=false');
 
-    // A dispatch of the SAME value is already-satisfied: terminal already-set, no state change on the sim.
     const action = await control.dispatch({
         operator: OPERATOR, confirmToken: await token('6901'), siteNo: '6901',
-        deviceId: 'TUYA-SW-6901', command: 'switch', value: true
+        deviceId: 'TUYA-SW-6901', command: 'switch', value: false
     });
-    assert.equal(action.state, 'already-set', 'terminal already-set, not pending');
-    assert.equal(String(action.reported), 'true');
+    assert.equal(action.state, 'already-set', 'terminal already-set, not in-flight');
+    assert.equal(String(action.confirmedValue), 'false');
 });
 
-test('dispatch duplicate-pending — an identical in-flight change is rejected 409 (duplicatePending)', async () => {
-    const getByNumber = (await import('../services/bridge.js')).getSitesByNumber;
-    const dev = (await getByNumber('6901'))[0].devices.find(d => d.deviceId === 'TUYA-DUP-6901');
-    // Seed an in-flight (never-confirming) desired=true via a prior write (_demo:'duplicate' stays pending).
-    await tb.writeSharedAttribute(dev, 'switchDesired', true);
-    const st = await tb.readControlState(dev, 'switchDesired');
-    assert.equal(st.sync, 'pending');
-    // A dispatch of the same value must surface duplicate-pending, not silently do nothing.
-    await assert.rejects(
-        control.dispatch({
-            operator: OPERATOR, confirmToken: await token('6901'), siteNo: '6901',
-            deviceId: 'TUYA-DUP-6901', command: 'switch', value: true
-        }),
-        err => { assert.equal(err.status, 409); assert.equal(err.duplicatePending, true); return true; }
-    );
+test('no 409 dead-end — a dispatch where the device has not confirmed PROCEEDS (DD-RESEND-UX removed duplicate-pending)', async () => {
+    // Under the old model an identical in-flight change was dead-ended with a 409. James's no-resend
+    // decision removes that dead-end: the operator is never blocked; a genuine change is dispatched.
+    const dev = (await (await import('../services/bridge.js')).getSitesByNumber('6901'))[0].devices.find(d => d.deviceId === 'TUYA-DUP-6901');
+    // The device reads switch_1=false; requesting true differs from the telemetry → dispatch, no throw.
+    const action = await control.dispatch({
+        operator: OPERATOR, confirmToken: await token('6901'), siteNo: '6901',
+        deviceId: 'TUYA-DUP-6901', command: 'switch', value: true
+    });
+    assert.equal(action.state, 'in-flight', 'the dispatch proceeds — no 409 dead-end');
 });
 
 /* ============================ confirm loop: stale-synced trap + fresh terminals ============================ */

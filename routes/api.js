@@ -258,13 +258,20 @@ router.post('/control/actions/:id/wait', wrap(async (req, res) => {
 
 // Sync-state → human transcript line. Keeps the raw code out of the timeline while the
 // anchor Outcome: line stays a bare code for the consumer's server parser.
+// OOHDASH-123 three-outcome vocabulary (plus the legacy keys for any in-flight record mid-migration).
 const SYNC_STEP_TEXT = {
-    synced: 'Sync: device confirmed (synced)',
-    'late-synced': 'Sync: late confirmation (late-synced)',
-    timeout: 'Sync: timed out — not confirmed',
-    failed: 'Sync: write failed',
-    rejected: 'Sync: rejected by device',
-    pending: 'Sync: awaiting device confirmation'
+    confirmed: 'Outcome: CONFIRMED — the device confirmed the change in its own reading',
+    'non-delivery': 'Outcome: NOT DELIVERED — the gate/vendor rejected the command',
+    indeterminate: 'Outcome: NOT CONFIRMED — accepted but the device had not confirmed by the limit (still watching)',
+    'already-set': 'Outcome: already at the requested value — no change dispatched',
+    'in-flight': 'Outcome: in flight — awaiting device confirmation',
+    // legacy (pre-Rosetta) values, kept so an older record still renders a line
+    synced: 'Outcome: CONFIRMED (synced)',
+    'late-synced': 'Outcome: CONFIRMED late (late-synced)',
+    timeout: 'Outcome: NOT CONFIRMED (timeout)',
+    failed: 'Outcome: NOT DELIVERED (failed)',
+    rejected: 'Outcome: NOT DELIVERED (rejected)',
+    pending: 'Outcome: awaiting device confirmation'
 };
 
 /** Friendly Europe/London day+time for a hold revert (e.g. "Sat 07:00"). */
@@ -289,7 +296,11 @@ export function buildOutcomeTranscript({ action, type, siteNo, siteName, detail,
         if (action.zone) steps.push({ time: hhmm(t0), text: `Zone: ${action.zone}` });
         if (action.previousValue != null) steps.push({ time: hhmm(t0), text: `Live read: ${action.attribute} = ${action.previousValue}` });
         steps.push({ time: hhmm(t0), text: `Dispatched value: ${action.attribute} → ${action.value}${action.previousValue != null ? ` (was ${action.previousValue})` : ''}` });
-        steps.push({ time: hhmm(action.settledAt || t0), text: SYNC_STEP_TEXT[action.state] || `Sync: ${action.state}` });
+        steps.push({ time: hhmm(action.settledAt || t0), text: SYNC_STEP_TEXT[action.state] || `Outcome: ${action.state}` });
+        // OOHDASH-123 §9: the raw gate/vendor LastError goes to the ticket (never to the operator's screen).
+        if (action.state === 'non-delivery' && action.lastErrorRaw) {
+            steps.push({ time: hhmm(action.settledAt || t0), text: `Vendor reason (raw): ${String(action.lastErrorRaw).slice(0, 300)}` });
+        }
         if (action.hold?.revertAt) steps.push({ time: hhmm(action.settledAt || t0), text: `Hold: until ${friendlyHold(action.hold.revertAt)}` });
     } else {
         steps.push({ time: hhmm(outcomeTime), text: `Site selected: ${siteName || 'unknown'} (${siteNo})` });

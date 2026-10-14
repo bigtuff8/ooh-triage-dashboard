@@ -92,10 +92,10 @@ let writeCount = 0;
 let lastAuditSiteName = null;
 mock.module('../services/tb-client.js', {
     namedExports: {
-        writeSharedAttribute: async () => { writeCount += 1; },
-        // Edge-aware confirm plane (D3): no current desired ⇒ dispatch; registration gate passes.
-        readDesiredState: async () => ({ desired: undefined, desiredTs: null }),
-        readControlState: async () => ({ sync: 'pending', syncTs: null, reported: null, reportedTs: null }),
+        // OOHDASH-123: the control write is the SERVER_SCOPE Requested write; readCommandState stays
+        // pending with no matching telemetry so preDispatchCheck → dispatch (registration gate passes).
+        writeServerScopeAttribute: async () => { writeCount += 1; return Date.now(); },
+        readCommandState: async () => ({ status: 'pending', statusTs: null, lastError: null, telemetryValue: null, telemetryTs: null }),
         hasPublishedState: async () => true,
         // tb-device.js resolves readRequest lazily on the live read path; delegate to axios so the
         // adapter above serves the TB device/telemetry responses (the real readSession is bypassed).

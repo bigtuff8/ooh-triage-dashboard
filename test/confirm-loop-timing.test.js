@@ -246,10 +246,13 @@ test('server lifecycle unchanged: control.js still stamps deadline/watchUntil of
     // is still config.control.syncTimeoutMs, the watch is still config.control.lateSyncWatchMs, and
     // the timeout still fires at the deadline. (Behavioural single-use/late-sync coverage lives in
     // control-single-use.test.js; here we guard against a stray edit to the server clock.)
+    // OOHDASH-123: the server lifecycle is now per-class (design §5). The global deadline/watchUntil
+    // off syncTimeoutMs/lateSyncWatchMs is replaced by confirmLimitAt/lateWatchUntil off the contract,
+    // and NOT CONFIRMED (indeterminate) fires at the confirm limit — never "failed", never "done".
     const src = readFileSync(new URL('../services/control.js', import.meta.url), 'utf8');
-    assert.match(src, /deadline:\s*Date\.now\(\)\s*\+\s*config\.control\.syncTimeoutMs/, 'deadline still off syncTimeoutMs');
-    assert.match(src, /watchUntil:\s*Date\.now\(\)\s*\+\s*config\.control\.lateSyncWatchMs/, 'watch still off lateSyncWatchMs');
-    assert.match(src, /a\.state\s*===\s*'pending'\s*&&\s*Date\.now\(\)\s*>\s*a\.deadline/, 'timeout still fires at the deadline');
+    assert.match(src, /confirmLimitAt:\s*dispatchTs\s*\+\s*confirmLimitMs/, 'confirm limit off the per-class contract');
+    assert.match(src, /lateWatchUntil:\s*dispatchTs\s*\+\s*lateWatchMs/, 'late watch off the per-class contract');
+    assert.match(src, /a\.state\s*===\s*'in-flight'\s*&&\s*Date\.now\(\)\s*>\s*a\.confirmLimitAt/, 'NOT CONFIRMED fires at the confirm limit');
     // No mid-wait knob leaked into the server lifecycle.
     assert.doesNotMatch(src, /midWaitPromptMs/, 'the mid-wait prompt is client-only — must not appear in services/control.js');
 });

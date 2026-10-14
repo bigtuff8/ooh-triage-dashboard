@@ -182,11 +182,13 @@ export function validateCommand(device, command, value) {
             const v = Number(value);
             if (!Number.isFinite(v)) return { ok: false, reason: 'Setpoint must be a number' };
             if (v < w.min || v > w.max) return { ok: false, reason: `Setpoint ${v}°C is outside the allowed ${w.min}–${w.max}°C window (±3°C of current, max 25°C)` };
-            return { ok: true, attribute: 'setpointDesired', value: v };
+            // OOHDASH-123: write the Requested key to SERVER_SCOPE so the IoT Command Gate dispatches
+            // (the gate rewrites Desired + rings the bridge). Writing Desired directly bypassed the gate.
+            return { ok: true, attribute: 'setpointRequested', value: v };
         }
         case 'frost': {
             if (!entry.commands.includes('frost')) return { ok: false, reason: `${entry.label} does not support a frost-hold` };
-            return { ok: true, attribute: 'setpointDesired', value: entry.frostSetpoint };
+            return { ok: true, attribute: 'setpointRequested', value: entry.frostSetpoint };
         }
         case 'switch': {
             // DEFENCE-IN-DEPTH backstop (Stream A / OOHDASH-19). A refrigeration asset is monitor-only
@@ -201,7 +203,7 @@ export function validateCommand(device, command, value) {
             // guardrail is the primary guard, not the bridge.
             if (!entry.commands.includes('switch')) return { ok: false, reason: `${entry.label} does not support remote on/off switching` };
             if (typeof value !== 'boolean') return { ok: false, reason: 'Switch value must be true (on) or false (off)' };
-            return { ok: true, attribute: 'switchDesired', value };
+            return { ok: true, attribute: 'switchRequested', value };
         }
         case 'mode': {
             // HELD in v1 (D10): no deviceType carries 'mode', so this rejects everywhere. The lowercase
@@ -209,7 +211,7 @@ export function validateCommand(device, command, value) {
             if (!entry.commands.includes('mode')) return { ok: false, reason: `${entry.label} does not support mode changes` };
             const lower = String(value).toLowerCase();
             if (!entry.modes.includes(lower)) return { ok: false, reason: `Mode "${value}" is not one of ${entry.modes.join('/')}` };
-            return { ok: true, attribute: 'modeDesired', value: lower };
+            return { ok: true, attribute: 'modeRequested', value: lower };
         }
         case 'hwboost': {
             if (!entry.commands.includes('hwboost')) return { ok: false, reason: `${entry.label} is not a boostable hot-water device` };

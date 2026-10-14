@@ -12,6 +12,7 @@
  *   OohAuditLog    — app action audit entries (F011/F021/F022)
  *   OohAppConfig   — kill-switch, notices, data-quality flags (F016 + admin)
  *   OohSmsLog      — P1 escalation dispatch/ack records (F014)
+ *   OohActionInflight — in-flight control actions for save-and-resume (OOHDASH-123 §7)
  */
 
 import { mkdirSync, readFileSync, writeFileSync, existsSync, renameSync } from 'fs';
@@ -132,7 +133,7 @@ class CosmosCollection {
 /* Store factory                                                       */
 /* ------------------------------------------------------------------ */
 
-const COLLECTIONS = ['OohOverrides', 'OohAuditLog', 'OohAppConfig', 'OohSmsLog'];
+const COLLECTIONS = ['OohOverrides', 'OohAuditLog', 'OohAppConfig', 'OohSmsLog', 'OohActionInflight'];
 const collections = new Map();
 let cosmosReady = null;
 let storeHealthy = true;
@@ -170,7 +171,7 @@ async function initCosmos() {
                 partitionKey: { paths: ['/storePartition'] },
                 indexingPolicy: {
                     indexingMode: 'consistent',
-                    includedPaths: [{ path: '/storePartition/?' }, { path: '/OohOverrideRevertAt/?' }, { path: '/OohActionAt/?' }, { path: '/status/?' }],
+                    includedPaths: [{ path: '/storePartition/?' }, { path: '/OohOverrideRevertAt/?' }, { path: '/OohActionAt/?' }, { path: '/status/?' }, { path: '/OohActionState/?' }, { path: '/OohActionConfirmLimitAt/?' }],
                     excludedPaths: [{ path: '/*' }]
                 }
             }));
