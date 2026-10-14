@@ -1,0 +1,23 @@
+[OQ6 5694] total=14 devices: gk-5694-salusit500-f1, gk-5694-salusit500-f2, gk-5694-salusit500-f3, gk-5694-salusit500-r1, gk-5694-salusit500-r2, gk-5694-salusit500-s1, gk-5694-Z0079894-1, gk-5694-Z0079913-1, gk_wingfieldfarm_salus_STA10108576 (5694-r-2), gk_wingfieldfarm_salus_STA10108599 (5694-f-1), gk_wingfieldfarm_salus_STA10109203 (5694-f-3), gk_wingfieldfarm_salus_STA10109240 (5694-r-1), gk_wingfieldfarm_salus_STA10109421 (5694-s-1), gk_wingfieldfarm_salus_STA10109797 (5694-f-2)
+[OQ6 5694] PASS — 6 older unit(s) found, all guard-checked.
+✔ LIVE OQ6: site 5694 (discovery baseline) — older-unit guard and expected codes (317.1374ms)
+[OQ6 5204] total=13 devices: gk-5204-salusit500-f1, gk-5204-salusit500-f2, gk-5204-salusit500-f3, gk-5204-salusit500-r2, gk-5204-salusit500-r3, gk-5204-salusit500-z1, gk-5204-Z0116104-1, gk_bramleyfarm_salus_STA10108308 (5204-f-3), gk_bramleyfarm_salus_STA10108828 (5204-r-2), gk_bramleyfarm_salus_STA10108889 (5204-r-3), gk_bramleyfarm_salus_STA10109369 (5204-z-1), gk_bramleyfarm_salus_STA10109725 (5204-f-1), gk_bramleyfarm_salus_STA10111270 (5204-f-2)
+[OQ6 5204] PASS — 6 older unit(s) found, all guard-checked.
+✔ LIVE OQ6: site 5204 (malformed letter z alongside well-formed codes) — older-unit guard and expected codes (201.8546ms)
+[OQ6 5788] total=11 devices: gk-5788-salusit500-f1, gk-5788-salusit500-f2, gk-5788-salusit500-f3, gk-5788-salusit500-r1, gk-5788-salusit500-r2, gk_mulberrytreefarm_salus_STA10108994 (5788-f-1), gk_mulberrytreefarm_salus_STA10109005 (5788-f-3), gk_mulberrytreefarm_salus_STA10109291 (5788-r-2), gk_mulberrytreefarm_salus_STA10109605 (5788-r-1), gk_mulberrytreefarm_salus_STA10111194 (5788-f-2), gk_unknown_salus_STA10108639 (5788-1-s)
+[OQ6 5788] PASS — 6 older unit(s) found, all guard-checked.
+✔ LIVE OQ6: site 5788 (swapped code 1-s alongside well-formed codes) — older-unit guard and expected codes (290.0901ms)
+[OQ6 5191] total=2 devices: gk-5191-salusit500-f2, gk_cherrytreefarm_salus_STA10108309 (5191-f-2)
+[OQ6 5191] PASS — 1 older unit(s) found, all guard-checked.
+✔ LIVE OQ6: site 5191 (total-failure site — only older units in TB) — older-unit guard and expected codes (209.3107ms)
+[OQ6 5791] total=2 devices: gk-5791-salusit500-z1, gk_pinetreefarm_salus_STA10109673 (5791-z-1)
+[OQ6 5791] PASS — 1 older unit(s) found, all guard-checked.
+✔ LIVE OQ6: site 5791 (z-1 present; no-bracket units deferred (D2 OOHDASH-129)) — older-unit guard and expected codes (198.6308ms)
+ℹ tests 5
+ℹ suites 0
+ℹ pass 5
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 1478.8379
