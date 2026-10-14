@@ -1,0 +1,29 @@
+{
+  "run": "selfgate-ooh-triage-dashboard-oohdash-128-site-load-filter",
+  "phase": "design",
+  "pr": 100,
+  "approvedBy": [
+    "bigtuff8"
+  ],
+  "reviewComments": [
+    "bigtuff8: - Where the three no-area older units are acknowledged (D3): Footnote under the heating area question only — keep them out of the \"Heating - area not identified\" button\n- Release version (D4): Patch release v1.4.1 — a bug fix: devices that should always have loaded now load\n- Live prototype — click through the actual screen: Looks right\n\n(submitted via the interactive gate review)\n\n<!-- gate:selected [{\"question\":\"Where the three no-area older units are acknowledged (D3)\",\"answer\":\"Footnote under the heating area question only — keep them out of the \\\"Heating - area not identified\\\" button\"},{\"question\":\"Release version (D4)\",\"answer\":\"Patch release v1.4.1 — a bug fix: devices that should always have loaded now load\"},{\"question\":\"Live prototype — click through the actual screen\",\"answer\":\"Looks right\"}] -->"
+  ],
+  "mergeCommit": "6cced285f5d4ba6e877ae71c8fe6628d828fb88e",
+  "phaseBranch": "design/oohdash-128-site-load-filter",
+  "releaseBranch": "main",
+  "stamp": 1792008868977,
+  "selectedOptions": [
+    {
+      "question": "Where the three no-area older units are acknowledged (D3)",
+      "answer": "Footnote under the heating area question only — keep them out of the \"Heating - area not identified\" button"
+    },
+    {
+      "question": "Release version (D4)",
+      "answer": "Patch release v1.4.1 — a bug fix: devices that should always have loaded now load"
+    },
+    {
+      "question": "Live prototype — click through the actual screen",
+      "answer": "Looks right"
+    }
+  ]
+}
