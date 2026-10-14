@@ -1,12 +1,12 @@
 <!-- gate:contract
 SECTION: What this plan covers
-This is the independent test plan for OOHDASH-122, the degraded-mode banner false negative fix. It covers every check that must pass before the build may be released, and the live-proof steps for James to complete after release. The plan was authored by the independent tester working on branch test/oohdash-122-degraded-banner (cut from build branch feat/oohdash-122-degraded-banner at commit 0856514). The tester does not fix code and does not redesign; this document records the results of running the full unit suite (381 tests) and the full e2e suite (134 passed, 2 failed, 1 flaky), the outcome of each check, and findings with routes. Three source-check tests found in the builder's suite are flagged for removal. One genuine cold-start check (TF-122-01, two sub-cases) was added as a tester-owned scripted check because the builder's wiring pin test was a source-check that could not substitute for observed behaviour.
+This is the independent test plan for OOHDASH-122, the degraded-mode banner false negative fix. It covers every check that must pass before the build may be released, and the live-proof steps for James to complete after release. The plan was authored by the independent tester working on branch test/oohdash-122-degraded-banner. It was first written against build 0856514 and updated after the hardening pass (cb9efc9). The hardening pass resolved F-01: source-check tests U4, U15, and P10 were deleted; U1-U3 now import and call the real bridgeDegraded export from routes/api.js; P11 was added to confirm probeBridgeReadOnce always resolves. The tester does not fix code and does not redesign; this document records results of the full unit suite (379 tests, 378 pass, 1 skip) and the full e2e suite (139 tests, 133 passed, 3 failed pre-existing, 1 flaky pre-existing, 2 skipped).
 
 SECTION: Scope binding
 This plan tests the decisions James approved at the design gate: Option B (degraded = !!lastError), the LIVE banner guard on !kill covering all five red-banner triggers, the startup probe running once in live mode only, AC-3 as probe-only with no tri-state, and thingsboardRead TTL left as-is. F11 (refrigeration lock) and F12 (mid-call outage) are accepted known behaviour and are not tested or flagged here. No automation was run against the live site. Live proof is James's post-release click-through.
 
 SECTION: Entry state
-Unit suite result at 0856514: 381 tests, 380 pass, 0 fail, 1 skipped (the 1 skip is the pre-existing ThingsBoard credentials skip, expected on any machine without that secrets file). E2e suite result: 134 passed, 2 failed, 1 flaky, 2 skipped. The 2 failures (tests/control.spec.js F008 and tests/tester/oohdash-119.tester.spec.js TF-33) and the 1 flaky (tests/control.spec.js F005) are pre-existing: a git diff of the affected files against origin/main produces zero lines of difference, confirming the OOHDASH-122 build did not introduce or regress these tests. They are a separate finding (F-02) routed to a new ticket.
+Unit suite result at cb9efc9: 379 tests, 378 pass, 0 fail, 1 skipped. The 1 skip is the pre-existing IOT_REPO_PATH drift check (expected on any machine without that path set). E2e suite result at cb9efc9: 139 tests, 133 passed, 3 failed (all pre-existing, see F-02), 1 flaky (pre-existing), 2 skipped. Git diff of control.spec.js and the affected tester spec against origin/main produces zero lines of difference, confirming OOHDASH-122 did not introduce or regress any of those tests.
 
 SECTION: Hygiene
 All new and changed files are LF-only (verified with cat -A: no ^M characters in any line). No curly quotes were introduced by the diff. The em-dash in the LIVE banner text (U+2014) is pre-existing and appears unchanged on both sides of the diff.
@@ -15,7 +15,7 @@ All new and changed files are LF-only (verified with cat -A: no ^M characters in
 # TEST PLAN -- OOHDASH-122
 ## One banner at a time: degraded-mode banner false negative, LIVE guard, start-up probe
 
-**Ticket:** OOHDASH-122 | **Stage:** Test | **Date:** 2026-10-14 | **Branch under test:** feat/oohdash-122-degraded-banner @ 0856514
+**Ticket:** OOHDASH-122 | **Stage:** Test | **Date:** 2026-10-14 | **Build SHA tested:** cb9efc9
 **Test branch:** test/oohdash-122-degraded-banner
 **Tester-owned check:** test/TF-122-01-coldstart.test.js
 
@@ -29,10 +29,10 @@ All builder checks run as part of the full suites (npm run test:unit and npx pla
 
 | ID | AC | Case | Method | Result |
 |----|-----|------|--------|--------|
-| U1 | AC-1 | Boot state (healthy:false, lastError:null) | bridgeDegraded({healthy:false, lastError:null}) | PASS: false |
-| U2 | AC-2 | After good read (healthy:true, lastError:null) | bridgeDegraded({healthy:true, lastError:null}) | PASS: false |
-| U3 | AC-2 | After failed read (lastError set) | bridgeDegraded({healthy:false, lastError:'...503'}) | PASS: true |
-| U4 | AC-1 | Source pin: routes/api.js uses bridgeDegraded() twice, old form absent | readFileSync + matchAll | PASS [source-check, see F-01] |
+| U1 | AC-1 | Boot state (healthy:false, lastError:null) | bridgeDegraded({healthy:false, lastError:null}) -- real export from routes/api.js | PASS: false |
+| U2 | AC-2 | After good read (healthy:true, lastError:null) | bridgeDegraded({healthy:true, lastError:null}) -- real export | PASS: false |
+| U3 | AC-2 | After failed read (lastError set) | bridgeDegraded({healthy:false, lastError:'...503'}) -- real export | PASS: true |
+| U4 | AC-1 | Source pin: routes/api.js uses bridgeDegraded() | REMOVED (hardening pass cb9efc9) -- was a source-check; behaviour covered by U1/U5/E1 |
 | U5 | AC-1 | Cold-start module state: bridgeDegraded(bridgeStatus()) before any read or probe | Fresh import of tb-device with tb-client mocked | PASS: false; bridgeStatus()={healthy:false,lastError:null} |
 | U6 | AC-2 | S1: cold start, me.degraded now false | vm sandbox render, me.degraded=false, controlLive=true | PASS: green only |
 | U7 | AC-2 | S2: account-level read failure, me.degraded=true | vm sandbox render, me.degraded=true | PASS: red only |
@@ -43,7 +43,7 @@ All builder checks run as part of the full suites (npm run test:unit and npx pla
 | U12 | AC-2 | S7: global kill-switch on, writes enabled | vm sandbox render, ks.global=true | PASS: red only |
 | U13 | AC-2 | S8: site kill-switch on, that site open | vm sandbox render, ks.sites[6832] set, siteNo=6832 | PASS: red only |
 | U14 | AC-2 | S9: site kill-switch on, different site | vm sandbox render, ks.sites[9999] set, siteNo=6832 | PASS: green only |
-| U15 | AC-2 | Comment pin: OOHDASH-122 AC-2 present in app.js above const kill | readFileSync + indexOf | PASS [source-check, see F-01] |
+| U15 | AC-2 | Comment pin: OOHDASH-122 AC-2 comment in app.js | REMOVED (hardening pass cb9efc9) -- was a source-check; behaviour covered by U6-U14 |
 
 ### 1.2 Unit checks (test/bridge-startup-probe.test.js)
 
@@ -58,7 +58,8 @@ All builder checks run as part of the full suites (npm run test:unit and npx pla
 | P7 | AC-3 | Never throws: sync throw and non-Error reject both resolve to outcome failed | PASS |
 | P8 | AC-3 | Fixture mode: outcome skipped, readRequest never called | PASS |
 | P9 | AC-3 | No secret leakage: err.config with password not in lastError | PASS |
-| P10 | AC-3 | Wiring pin: server.js calls bridge.probeBridgeReadOnce() inside app.listen, guarded, not awaited | PASS [source-check, see F-01; now redundant given TF-122-01] |
+| P10 | AC-3 | Wiring pin: server.js calls bridge.probeBridgeReadOnce() | REMOVED (hardening pass cb9efc9) -- was a source-check; wiring proven behaviourally by TF-122-01 |
+| P11 | AC-3 | probeBridgeReadOnce always resolves, never rejects (fire-and-forget .catch() safety) | PASS: resolved with outcome object; rejected=false |
 
 ### 1.3 E2e checks (tests/degraded-banner.spec.js + tests/killswitch.spec.js)
 
@@ -87,25 +88,32 @@ Genuine cold-start integration test. Boots the real server.js as a subprocess in
 
 ## 2. Full suite counts
 
-Unit: 381 tests, 380 pass, 0 fail, 1 skipped. The 1 skipped is the pre-existing ThingsBoard credentials skip (expected on any machine without that secrets file).
+Unit (at cb9efc9): 379 tests, 378 pass, 0 fail, 1 skipped. The 1 skipped is the pre-existing IOT_REPO_PATH drift check (expected on any machine without that path set). Net change from 0856514: U4/U15/P10 removed (-3), P11 added (+1) = 2 fewer tests total; all OOHDASH-122 checks pass.
 
-E2e: 134 passed, 2 failed (pre-existing, see F-02), 1 flaky (pre-existing, same file as F-02), 2 skipped (Playwright retries counted separately).
+E2e (at cb9efc9): 139 tests, 133 passed, 3 failed (all pre-existing, see F-02), 1 flaky (pre-existing, passed on retry), 2 skipped. The 3 failed are: control.spec.js F008 Robin Hood restaurant, control.spec.js F008 IT700 Jolly Scotchman, and oohdash-119.tester.spec.js TF-28. The flaky is oohdash-119.tester.spec.js TF-25 (passed on retry #1). None of these are in files changed by OOHDASH-122.
 
 ---
 
 ## 3. Findings
 
-### F-01 -- Source-check tests U4, U15, P10 (low severity; routes to builder)
+### F-01 -- Source-check tests U4, U15, P10 -- RESOLVED (hardening pass cb9efc9)
 
-U4 in test/degraded-banner.test.js reads routes/api.js as a text file and asserts the string "degraded: bridgeDegraded()" appears exactly twice and the old form is absent. U15 reads public/js/app.js and asserts the maintenance comment string "OOHDASH-122 AC-2" is present. P10 in test/bridge-startup-probe.test.js reads server.js and asserts "bridge.probeBridgeReadOnce()" appears inside the app.listen block, guarded by dataMode === 'live', and is not preceded by "await". All three verify string presence in source, not observed behaviour. Each is banned by the test-stage protocol.
+Original finding: U4 in test/degraded-banner.test.js read routes/api.js as text and asserted a string count. U15 read public/js/app.js and asserted a comment string. P10 in test/bridge-startup-probe.test.js read server.js and asserted wiring text. All three verified string presence, not observed behaviour, and were banned by the test-stage protocol.
 
-For U4 and U15, the behaviour they guard is already covered by U1/U5/E1 (U4) and exists only in comments (U15). Both should be removed. For P10, the wiring is now proven behaviourally by TF-122-01 CS-A and CS-B: a subprocess that boots with the probe wired and both the success and failure outcomes observed on /healthz. P10 is therefore redundant and should be removed. Since the behaviour of all three is covered elsewhere, none blocks the release. The builder should remove all three tests as a clean-up before or as part of the release PR.
+Resolution at cb9efc9: U4 and U15 are deleted. P10 is deleted. U1-U3 now call the real bridgeDegraded function imported from routes/api.js via a dynamic import in the before() hook (after env and mocks are in place); they assert on the function's return value, not on source text. P11 was added: it calls probeBridgeReadOnce() with a throwing mock and asserts the promise resolves (never rejects), covering the fire-and-forget .catch() in server.js behaviourally. F-01 is fully resolved; no source-check tests remain in the OOHDASH-122 suite.
 
-The design gate specified these as "source pins" and "wiring pins." Future design gates should not specify source-check tests; the build stage should not implement them.
+### F-02 -- Pre-existing e2e failures (medium severity; pre-existing on main, not introduced by OOHDASH-122)
 
-### F-02 -- Two pre-existing e2e failures (medium severity; routes to separate ticket)
+This run (cb9efc9): three e2e tests fail. All three are confirmed pre-existing: git diff of control.spec.js and oohdash-119.tester.spec.js against origin/main produces zero changed lines.
 
-tests/control.spec.js F008 ("IT700 slow echo: timeout state, keep-waiting, escalate") and tests/tester/oohdash-119.tester.spec.js TF-33 ("single-quote in note is escaped in HTML attribute on sessionStorage restore") both fail in the e2e run on this branch. Git diff of both files against origin/main produces zero changed lines, confirming the OOHDASH-122 build did not introduce or regress them. The failures are pre-existing on the build branch. The e2e CI check is listed as required for merge to main. These pre-existing failures mean the e2e CI check is currently non-green on main regardless of this build. Route: raise a separate ticket; do not block OOHDASH-122 release on this finding.
+Failures:
+- control.spec.js:106 F008 "failed write is reported honestly -- never success (Robin Hood restaurant)": sync-failed element not found within 20s. Pre-existing fixture/timing issue unrelated to OOHDASH-122.
+- control.spec.js:124 F008 "IT700 slow echo: timeout state, keep-waiting, escalate (Jolly Scotchman)": same element missing. Pre-existing.
+- oohdash-119.tester.spec.js:970 TF-28 "mobile 390x844 -- notes box visible, no horizontal scroll, font-size >= 16px": scrollWidth exceeds clientWidth. Pre-existing mobile overflow from the open-tickets row in views.js; attributed to OOHDASH-127.
+
+Flaky: oohdash-119.tester.spec.js:886 TF-25 failed on first attempt and passed on retry #1 (operator-name element not found; sign-in timing). Pre-existing race, attributed to OOHDASH-127.
+
+Route: TF-28 and TF-25 are being fixed by OOHDASH-127. The control.spec.js F008 failures require a separate ticket. Do not block OOHDASH-122 release on any of these.
 
 ---
 
@@ -113,9 +121,9 @@ tests/control.spec.js F008 ("IT700 slow echo: timeout state, keep-waiting, escal
 
 | AC | Requirement | Evidence from this test run |
 |----|-------------|------------------------------|
-| AC-1 | No false red banner on clean restart | U1: bridgeDegraded returns false for boot state (lastError:null). U5: cold-start module import; bridgeDegraded(bridgeStatus())=false confirmed. E1: fixture-mode sign-in shows green only, no kill-banner. TF-122-01 CS-A: live-mode subprocess; bridge.healthy:true after probe success. |
+| AC-1 | No false red banner on clean restart | U1: bridgeDegraded (real export) returns false for boot state (lastError:null). U5: cold-start module import; bridgeDegraded(bridgeStatus())=false confirmed. E1: fixture-mode sign-in shows green only, no kill-banner. TF-122-01 CS-A: live-mode subprocess; bridge.healthy:true after probe success. |
 | AC-2 | Red and green never show together across all five causes | U6-U14: all nine states (S1-S9) from design section 5 verified in vm sandbox; no state renders both banners. E1-E6 plus E5 in killswitch.spec.js: five cause paths driven in real browser. |
-| AC-3 | /healthz bridge reflects a real probe after start-up | P1-P9: probe function tested from boot state for success, failure, timeout, 429, race, secret-leakage. TF-122-01 CS-A: live-mode subprocess; /healthz shows bridge.healthy:true within 2s of boot after probe success. TF-122-01 CS-B: /healthz shows bridge.healthy:false and lastError set after probe failure. E7: fixture-mode /healthz healthy after confirmed workspace. DECISION 2 accepted: a few-second window at boot where /healthz shows status:degraded (bridge.healthy:false, lastError:null) before the probe settles is expected and correct. |
+| AC-3 | /healthz bridge reflects a real probe after start-up | P1-P9, P11: probe function tested from boot state for success, failure, timeout, 429, race, secret-leakage, and always-resolves. TF-122-01 CS-A: live-mode subprocess; /healthz shows bridge.healthy:true within 2s of boot after probe success. TF-122-01 CS-B: /healthz shows bridge.healthy:false and lastError set after probe failure. E7: fixture-mode /healthz healthy after confirmed workspace. DECISION 2 accepted: a few-second window at boot where /healthz shows status:degraded (bridge.healthy:false, lastError:null) before the probe settles is expected and correct. |
 
 ---
 
@@ -123,7 +131,7 @@ tests/control.spec.js F008 ("IT700 slow echo: timeout state, keep-waiting, escal
 
 These are the steps to perform after the v1.3.8 pod has restarted and is ready. No automation runs against live. Capture screenshots at each step as evidence.
 
-L1 — Within 60 seconds of the new pod reporting ready, open the /healthz endpoint in a browser or curl. The result must show version 1.3.8, subsystems.bridge.mode:live, subsystems.bridge.healthy:true, and subsystems.bridge.lastError:null. The subsystems.thingsboard.read field may show unknown on the 60-second TTL cycle; that is expected (DECISION 3, out of scope) and is not a failure.
+L1 -- Within 60 seconds of the new pod reporting ready, open the /healthz endpoint in a browser or curl. The result must show version 1.3.8, subsystems.bridge.mode:live, subsystems.bridge.healthy:true, and subsystems.bridge.lastError:null. The subsystems.thingsboard.read field may show unknown on the 60-second TTL cycle; that is expected (DECISION 3, out of scope) and is not a failure.
 
 L2 -- In the pod log (Kubernetes log viewer or kubectl logs) for the new pod, confirm there is exactly one "[TB] start-up read probe: ok in Nms" line and no retry lines. If the log shows "failed" or "timed out" instead of "ok", check whether ThingsBoard was briefly unreachable at the restart time before treating it as a defect. A genuine probe failure here shows a real error and clears on the first handler-triggered workspace load; it is not a false alarm.
 
