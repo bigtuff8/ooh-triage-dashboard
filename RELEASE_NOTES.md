@@ -1,5 +1,25 @@
 # Release Notes — OOH Dashboard
 
+## v1.3.8 — OOHDASH-122 degraded-mode banner false negative + OOHDASH-127 CI/mobile overflow fix
+
+**Date:** 2026-10-14 · **Bump type:** patch · **Ships from:** main at 123a72f (release commit adds version bump + this entry)
+
+**Gate lineage:** 122 discovery PR #86, design PR #89, build plan PR #90, build PR #92, test PR (branch test/oohdash-122-degraded-banner cb9efc9). 127 fix PR #94. Release-preflight PR #96.
+
+### What changed
+
+**OOHDASH-122:** `routes/api.js` exports `bridgeDegraded()` which derives degraded from `!!status.lastError`; `/me` and `workspacePayload()` both call it. `services/tb-device.js` adds `probeBridgeReadOnce()` — a one-shot non-blocking start-up read probe (live only, fires inside `app.listen` callback). `public/js/app.js` LIVE banner gains guard `controlLive && !kill` so green and red banners are mutually exclusive across all nine states. `server.js` wires the probe fire-and-forget with a `.catch()` that logs one sanitised line. 23 new unit tests (U1-U14 truth table + P1-P9 + P11 probe suite) and 7 new e2e journeys (E1-E7).
+
+**OOHDASH-127:** `public/css/styles.css` both mobile breakpoints changed from `grid-template-columns:1fr` to `minmax(0,1fr)`. `public/js/views.js` subject span gains `min-width:0` overflow ellipsis. `tests/tonight-callback.spec.js` F015 waits for thread fetch before typing. `tests/oohdash-127.spec.js` regression test added.
+
+### Accepted known behaviours
+
+- F11 (refrigeration lock shows red when writes enabled but refrig assets locked — by design, Stream A deny)
+- F12 (mid-call TB outage shows red — clears on workspace reload, by design)
+- F015 live-note-race (a brief Loading state before typing in tonight callback — stabilised in test, rare in production)
+
+**Follow-up:** OOHDASH-124 (thingsboardRead TTL improvement, DECISION 3 out of scope for this release).
+
 ## v1.2.0 — SD-586 go-live build: alignment to Spencer's secure prod model (harness cycle 2026-07-27T12-29-00)
 
 **Date:** 2026-07-27 · **Mode:** Airedale · **Design gate approved:** 2026-07-27 · **Test phase:** PASS (0 rework) · **Critical Thinker:** 0 critical / 3 important / 3 advisory · **Branch:** `feature/go-live-sd586` (commit `7d4b5f2`, **NOT deployed** — gated on F10 Azure RBAC + SteerCo go/no-go)
