@@ -113,22 +113,71 @@ export const config = {
     iotDashBaseUrl: env('IOT_DASH_BASE_URL', 'https://zendesk-uat.airedale-api.co.uk'),
 
     control: {
+        // OOHDASH-123 (Rosetta Stone): the single global 90s decide-now / 10-min late-watch / 30s
+        // mid-wait block is REPLACED by per-class confirm timing (see `classes` below), consumed via
+        // registry.capabilitiesContractFor. syncPollIntervalMs is retained as the server watcher's
+        // BASE tick — each in-flight action is read at its own class confirmPollMs cadence on top of it.
         syncPollIntervalMs: parseInt(env('SYNC_POLL_INTERVAL_MS', '3000'), 10),
-        // R11/C7: the server "decide now"/timeout deadline. 90s is JUSTIFIED-PROVISIONAL — it is
-        // NOT yet calibrated against measured device echo latency; that calibration is a proof
-        // obligation on B3/OOHDASH-18 (owner Spencer/IoT, not run). Do NOT treat this as closed.
-        // The decide-now (90s) vs late-echo-watch (10min) split is real in the model — keep it split.
+        // DEPRECATED (OOHDASH-123): the global decide-now / late-watch / mid-wait timers are superseded
+        // by the per-class `classes` block below and removed from the control plane in WU4/WU6. They are
+        // retained here only until the last consumer migrates, so no commit is left half-wired.
         syncTimeoutMs: parseInt(env('SYNC_TIMEOUT_MS', '90000'), 10),
         lateSyncWatchMs: parseInt(env('LATE_SYNC_WATCH_MS', '600000'), 10),
-        // R11/C7: client-side mid-wait decision prompt horizon. A one-shot prompt fires this long
-        // into the confirm/waiting phase (default 30s, before the 90s decide-now deadline) so the
-        // handler makes an ACTIVE caller-on-hold decision instead of a silent 90s spinner. UX-only;
-        // the server clock is untouched. Invariant: 0 < midWaitPromptMs <= syncTimeoutMs.
         midWaitPromptMs: parseInt(env('MID_WAIT_PROMPT_MS', '30000'), 10),
         // OOHDASH-24: freshness window for the /healthz active read-probe. A probe result older
         // than this is stale ⇒ the read tri-state can no longer report green off it (amber/unknown
         // until a fresh probe runs). Env-overridable; default 60s.
-        healthProbeTtlMs: parseInt(env('HEALTH_PROBE_TTL_MS', '60000'), 10)
+        healthProbeTtlMs: parseInt(env('HEALTH_PROBE_TTL_MS', '60000'), 10),
+        // OOHDASH-123 / DD-RESEND-UX: the SQ-09 Salus dedup fallback is repurposed under no-resend as a
+        // one-shot dispatch-sanity check. If the Salus status attr lastUpdateTs does not advance within
+        // this window after the SINGLE dispatch write, surface the humane "may not have reached the
+        // device" warning and note the ticket (a swallowed write stays visible; nothing is re-fired).
+        dispatchSanityMs: parseInt(env('OOH_DISPATCH_SANITY_MS', '5000'), 10),
+        // OOHDASH-123 / DD-SCHED-DISPLAY (James override: decoded display ON by default). dayOrder + tz
+        // are single invertible constants so an SQ-13 correction is a config change, not a rebuild.
+        schedule: {
+            dayOrder: env('OOH_SCHED_DAY_ORDER', 'mon-first'),   // 'mon-first' | 'sun-first'
+            tz: env('OOH_SCHED_TZ', 'Europe/London'),
+            decoded: env('OOH_SCHED_DECODED', 'on') !== 'off'
+        },
+        // Per-class confirm timing (ms) + operator copy minutes + offline threshold hours. Defaults
+        // from design §5 / build plan §3. Every value is env-overridable with no release.
+        classes: {
+            tuya: {
+                confirmLimitMs: parseInt(env('OOH_CONFIRM_LIMIT_MS_TUYA', '10000'), 10),
+                lateWatchMs: parseInt(env('OOH_LATE_WATCH_MS_TUYA', '120000'), 10),
+                confirmPollMs: parseInt(env('OOH_CONFIRM_POLL_MS_TUYA', '3000'), 10),
+                copyMinutes: null,
+                offlineHours: parseInt(env('OOH_OFFLINE_HOURS_TUYA', '3'), 10)
+            },
+            'salus-it700': {
+                confirmLimitMs: parseInt(env('OOH_CONFIRM_LIMIT_MS_IT700', '2700000'), 10),
+                lateWatchMs: parseInt(env('OOH_LATE_WATCH_MS_IT700', '5400000'), 10),
+                confirmPollMs: parseInt(env('OOH_CONFIRM_POLL_MS_SALUS', '60000'), 10),
+                copyMinutes: parseInt(env('OOH_COPY_MIN_IT700', '5'), 10),
+                offlineHours: parseInt(env('OOH_OFFLINE_HOURS_IT700', '3'), 10)
+            },
+            'salus-it500': {
+                confirmLimitMs: parseInt(env('OOH_CONFIRM_LIMIT_MS_IT500', '2100000'), 10),
+                lateWatchMs: parseInt(env('OOH_LATE_WATCH_MS_IT500', '3600000'), 10),
+                confirmPollMs: parseInt(env('OOH_CONFIRM_POLL_MS_SALUS', '60000'), 10),
+                copyMinutes: parseInt(env('OOH_COPY_MIN_IT500', '15'), 10),
+                offlineHours: parseInt(env('OOH_OFFLINE_HOURS_IT500', '3'), 10)
+            },
+            salus: {
+                confirmLimitMs: parseInt(env('OOH_CONFIRM_LIMIT_MS_IT500', '2100000'), 10),
+                lateWatchMs: parseInt(env('OOH_LATE_WATCH_MS_IT500', '3600000'), 10),
+                confirmPollMs: parseInt(env('OOH_CONFIRM_POLL_MS_SALUS', '60000'), 10),
+                copyMinutes: parseInt(env('OOH_COPY_MIN_IT500', '15'), 10),
+                offlineHours: parseInt(env('OOH_OFFLINE_HOURS_IT500', '3'), 10)
+            },
+            // Monitor-only classes (boiler panels, intesis, refrigeration, gateways) — never dispatched;
+            // only offlineHours is meaningful (48h, boiler/monitor devices report infrequently).
+            monitor: {
+                confirmLimitMs: 0, lateWatchMs: 0, confirmPollMs: 0, copyMinutes: null,
+                offlineHours: parseInt(env('OOH_OFFLINE_HOURS_MONITOR', '48'), 10)
+            }
+        }
     },
 
     // OOHDASH-119: optional additional notes. One shared constant so the limit is changed in one place.
@@ -154,10 +203,19 @@ export const config = {
  */
 export function validateConfig() {
     const problems = [];
-    // R11/C7: the mid-wait prompt must fire strictly inside the decide-now window — a prompt at 0
-    // (or negative) or one at/after the 90s timeout is a misconfiguration, not a nudge.
+    // DEPRECATED invariant (removed with midWaitPromptMs in WU6): retained while the legacy timer
+    // still exists so the mid-wait config tests stay green until the client prompt is reworked.
     if (!(config.control.midWaitPromptMs > 0 && config.control.midWaitPromptMs <= config.control.syncTimeoutMs)) {
         problems.push('MID_WAIT_PROMPT_MS must satisfy 0 < midWaitPromptMs <= syncTimeoutMs (SYNC_TIMEOUT_MS)');
+    }
+    // OOHDASH-123: per-class control timing invariant. For each controllable class:
+    // 0 < copyMinutes*60000 (when set) <= confirmLimitMs <= lateWatchMs, and confirmPollMs > 0.
+    for (const [cls, c] of Object.entries(config.control.classes)) {
+        if (cls === 'monitor') continue;
+        const copyMs = (c.copyMinutes || 0) * 60000;
+        if (!(c.confirmLimitMs > 0 && c.confirmLimitMs <= c.lateWatchMs && c.confirmPollMs > 0 && copyMs <= c.confirmLimitMs)) {
+            problems.push(`control.classes.${cls} timing invalid: require 0 < copyMinutes*60000 <= confirmLimitMs <= lateWatchMs and confirmPollMs > 0`);
+        }
     }
     if (config.isProduction) {
         if (config.authMode !== 'oidc') problems.push('AUTH_MODE must be "oidc" in production (fail-secure)');

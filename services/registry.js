@@ -6,7 +6,15 @@
  *
  * App policy reconciles the design guardrails (±3°C of current, cap 25°C) with the
  * SD-492 device ranges (Salus 5–35, Intesis 16–30, HW boost 0–9).
+ *
+ * OOHDASH-123 Rosetta Stone: this module is also the natural home (alongside `slowEcho`) for the
+ * per-class READ/CONTROL/FEEDBACK contract (CONTROL_CONTRACT + capabilitiesContractFor). Static key
+ * names + value semantics live here; the timing values come from config.control.classes so they are
+ * env-tunable without a release. Every flow reads ONE object via capabilitiesContractFor(deviceType);
+ * no Requested key, status key or confirm key is hard-coded in a flow.
  */
+
+import { config } from '../config.js';
 
 const REGISTRY = {
     'salus-it500': {
@@ -75,6 +83,69 @@ const APP_POLICY = {
     setpointDeltaMax: 3,   // ±3°C of the current setpoint
     setpointCap: 25        // absolute app-policy ceiling
 };
+
+/**
+ * OOHDASH-123 Rosetta Stone — per-class READ / CONTROL / FEEDBACK contract (design §4, build plan §2).
+ * `requestedKey` is written to SERVER_SCOPE (the IoT Command Gate's input); `statusKey`/`errorKey` are
+ * the gate's SERVER_SCOPE confirmation attributes; `confirmKeys` is the device's own telemetry that
+ * proves the change (first present key wins). The timing/offline values are merged in from config.
+ */
+const CONTROL_CONTRACT = {
+    tuya: {
+        requestedKey: 'switchRequested', scope: 'SERVER_SCOPE',
+        statusKey: 'switchSyncStatus', errorKey: 'switchLastError',
+        confirmKeys: ['switch_1', 'switch'], valueType: 'bool', compareRule: 'norm-lower-string',
+        controllable: true, timingClass: 'tuya'
+    },
+    'salus-it700': {
+        requestedKey: 'setpointRequested', scope: 'SERVER_SCOPE',
+        statusKey: 'setpointSyncStatus', errorKey: 'setpointLastError',
+        // IT700 confirms on heatingSetpoint ONLY — setPoint is event-driven and can be months stale.
+        confirmKeys: ['heatingSetpoint'], valueType: 'number', compareRule: 'numeric-0.25',
+        controllable: true, unproven: true, timingClass: 'salus-it700'   // SQ-05: path unproven
+    },
+    'salus-it500': {
+        requestedKey: 'setpointRequested', scope: 'SERVER_SCOPE',
+        statusKey: 'setpointSyncStatus', errorKey: 'setpointLastError',
+        confirmKeys: ['setPoint'], valueType: 'number', compareRule: 'numeric-0.25',
+        controllable: false, dark: true, timingClass: 'salus-it500'       // D-DARK-FLEETS: dark today
+    },
+    salus: {
+        requestedKey: 'setpointRequested', scope: 'SERVER_SCOPE',
+        statusKey: 'setpointSyncStatus', errorKey: 'setpointLastError',
+        confirmKeys: ['setPoint'], valueType: 'number', compareRule: 'numeric-0.25',
+        controllable: false, dark: true, timingClass: 'salus'            // dark since ~2 Jun
+    }
+};
+
+// Monitor-only / non-controllable classes — carried for the offline threshold + an explicit
+// non-controllable contract (hot water ex-boost, boiler panels, intesis AC, refrigeration, gateways).
+const MONITOR_ONLY = ['intesis', 'salus-it500-dhw', 'boiler-panel', 'refrigeration', 'tb-rulechain', 'gateway'];
+
+/**
+ * The single per-class contract a flow reads. Merges the static CONTROL_CONTRACT key names with the
+ * env-tunable timings from config.control.classes. A non-controllable / unknown type returns a
+ * monitor-only contract (no requestedKey, 48h offline threshold) so callers never hard-code a key.
+ */
+export function capabilitiesContractFor(deviceType) {
+    const base = CONTROL_CONTRACT[deviceType];
+    if (base) {
+        const t = config.control.classes[base.timingClass] || config.control.classes.monitor;
+        return { deviceType, ...base, ...t };
+    }
+    const t = config.control.classes.monitor;
+    return {
+        deviceType, requestedKey: null, scope: null, statusKey: null, errorKey: null,
+        confirmKeys: [], valueType: null, compareRule: null, controllable: false,
+        monitorOnly: true, ...t
+    };
+}
+
+// The set of Requested keys the write primitive allow-lists against (defence-in-depth, mirrors the
+// old ATTRIBUTE_FAMILY allow-list). Exported so tb-client can validate without re-deriving.
+export const REQUESTED_KEYS = Object.freeze(
+    [...new Set(Object.values(CONTROL_CONTRACT).map(c => c.requestedKey))].concat('modeRequested')
+);
 
 /**
  * Returns the registry entry for a device type (null if unknown).
