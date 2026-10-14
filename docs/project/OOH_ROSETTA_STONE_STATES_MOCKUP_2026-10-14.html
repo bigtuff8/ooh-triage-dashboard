@@ -1,0 +1,400 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Rosetta Command States</title>
+<style>
+:root{
+  --primary:#594AE2;--success-light:#D1FAE5;--danger-light:#FEE2E2;--info-light:#DBEAFE;--warning-light:#FEF3C7;
+  --surface:#FFFFFF;--background:#F1F5F9;--sidebar-bg:#1E293B;--sidebar-text:#94A3B8;--sidebar-active:#334155;
+  --text-primary:#1E293B;--text-secondary:#64748B;--border:#E2E8F0;--radius-md:8px;--radius-lg:12px;
+  --mono:ui-monospace,Consolas,'Cascadia Mono',monospace;
+  --kill-text:#991B1B;--kill-border:#FECACA;--live-text:#065F46;--live-border:#A7F3D0;--warn-text:#92400E;
+  --accent-wait:#2563EB;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --surface:#1E293B;--background:#0F172A;--text-primary:#E2E8F0;--text-secondary:#94A3B8;--border:#334155;
+    --success-light:#064E3B;--danger-light:#450A0A;--warning-light:#451A03;--info-light:#1E3A8A;
+    --kill-text:#FECACA;--kill-border:#7F1D1D;--live-text:#A7F3D0;--live-border:#065F46;--warn-text:#FDE68A;
+    --accent-wait:#60A5FA;
+  }
+}
+:root[data-theme="dark"]{
+  --surface:#1E293B;--background:#0F172A;--text-primary:#E2E8F0;--text-secondary:#94A3B8;--border:#334155;
+  --success-light:#064E3B;--danger-light:#450A0A;--warning-light:#451A03;--info-light:#1E3A8A;
+  --kill-text:#FECACA;--kill-border:#7F1D1D;--live-text:#A7F3D0;--live-border:#065F46;--warn-text:#FDE68A;
+  --accent-wait:#60A5FA;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:Inter,system-ui,-apple-system,'Segoe UI',sans-serif;background:var(--background);color:var(--text-primary);font-size:14px;line-height:1.45}
+.wrap{max-width:1120px;margin:0 auto;padding:16px}
+h1{font-size:18px;margin-bottom:4px}
+.lede{color:var(--text-secondary);margin-bottom:14px;max-width:820px}
+.controls{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:10px}
+.seg{display:inline-flex;border:1px solid var(--border);border-radius:var(--radius-md);overflow:hidden;background:var(--surface)}
+.seg button{border:0;background:transparent;color:var(--text-primary);padding:7px 12px;font:inherit;cursor:pointer}
+.seg button[aria-pressed="true"]{background:var(--primary);color:#fff}
+.seglabel{font-size:12px;color:var(--text-secondary);text-transform:uppercase;letter-spacing:.04em;margin-right:4px}
+.states{display:flex;flex-wrap:wrap;gap:6px;margin:10px 0 14px}
+.states button{border:1px solid var(--border);background:var(--surface);color:var(--text-primary);border-radius:999px;padding:6px 12px;font:inherit;font-size:13px;cursor:pointer}
+.states button[aria-pressed="true"]{border-color:var(--primary);box-shadow:0 0 0 2px var(--primary) inset}
+.grid{display:grid;grid-template-columns:1.1fr .9fr;gap:14px}
+.frame{border:1px solid var(--border);border-radius:var(--radius-lg);overflow:hidden;background:var(--surface);min-height:420px;display:flex;flex-direction:column}
+.topbar{display:flex;justify-content:space-between;align-items:center;padding:10px 18px;border-bottom:1px solid var(--border);font-weight:600}
+.topbar .ver{color:var(--text-secondary);font-weight:400;font-family:var(--mono);font-size:12px}
+.banner{padding:8px 18px;font-size:13px;font-weight:500;display:flex;align-items:center;gap:10px;background:var(--success-light);color:var(--live-text);border-bottom:1px solid var(--live-border)}
+.dot{width:10px;height:10px;border-radius:50%;flex:none;background:#10B981}
+.content{padding:16px 18px;display:flex;flex-direction:column;gap:12px}
+.devcard{border:1px solid var(--border);border-radius:var(--radius-md);padding:14px}
+.devhead{display:flex;justify-content:space-between;align-items:flex-start;gap:8px;margin-bottom:6px}
+.devname{font-family:var(--mono);font-size:12px;color:var(--text-secondary)}
+.reading{font-size:22px;font-weight:700}
+.reading small{font-size:13px;font-weight:400;color:var(--text-secondary)}
+.why{color:var(--text-secondary);font-size:13px}
+.act{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
+.btn{border:1px solid var(--border);background:var(--surface);color:var(--text-primary);padding:9px 14px;border-radius:var(--radius-md);font:inherit;cursor:pointer}
+.btn.primary{background:var(--primary);border-color:var(--primary);color:#fff}
+.btn:disabled{opacity:.55;cursor:not-allowed}
+.outcome{border-radius:var(--radius-md);padding:12px 14px;font-size:13.5px;display:flex;gap:10px;align-items:flex-start}
+.outcome .ic{font-weight:700;font-size:15px;line-height:1.2;flex:none}
+.outcome.sent{background:var(--info-light);color:#1E3A8A}
+.outcome.wait{background:var(--info-light);color:#1E3A8A}
+.outcome.good{background:var(--success-light);color:var(--live-text)}
+.outcome.bad{background:var(--danger-light);color:var(--kill-text)}
+.outcome.ind{background:var(--warning-light);color:var(--warn-text)}
+.outcome.off{background:var(--background);color:var(--text-secondary);border:1px solid var(--border)}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]) .outcome.sent,:root:not([data-theme="light"]) .outcome.wait{color:#BFDBFE}}
+:root[data-theme="dark"] .outcome.sent,:root[data-theme="dark"] .outcome.wait{color:#BFDBFE}
+.outcome b{display:block;margin-bottom:2px}
+.spin{display:inline-block;width:12px;height:12px;border:2px solid currentColor;border-right-color:transparent;border-radius:50%;animation:sp .8s linear infinite;flex:none;margin-top:2px}
+@keyframes sp{to{transform:rotate(360deg)}}
+@media (prefers-reduced-motion:reduce){.spin{animation:none}}
+.progress{display:flex;gap:4px;margin-top:10px}
+.step{flex:1;height:6px;border-radius:3px;background:var(--border)}
+.step.on{background:var(--accent-wait)}
+.step.ok{background:#10B981}
+.step.err{background:#DC2626}
+.steplabels{display:flex;gap:4px;margin-top:4px;font-size:10.5px;color:var(--text-secondary);text-transform:uppercase;letter-spacing:.03em}
+.steplabels span{flex:1;text-align:center}
+.panel{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);padding:14px}
+.panel h2{font-size:12px;text-transform:uppercase;letter-spacing:.04em;color:var(--text-secondary);margin-bottom:8px}
+pre{font-family:var(--mono);font-size:11.5px;white-space:pre-wrap;word-break:break-word;color:var(--text-primary);line-height:1.5}
+.tkt{margin-top:12px;border-top:1px dashed var(--border);padding-top:10px}
+.tkt h3{font-size:12px;text-transform:uppercase;letter-spacing:.04em;color:var(--text-secondary);margin-bottom:6px}
+.tkt .line{font-size:12.5px;color:var(--text-primary);margin-bottom:3px}
+.toast{position:fixed;left:50%;bottom:22px;transform:translateX(-50%);background:var(--sidebar-bg);color:#fff;padding:12px 16px;border-radius:var(--radius-md);box-shadow:0 8px 24px rgba(0,0,0,.25);max-width:420px;font-size:13px;display:none;z-index:40}
+.toast.show{display:block}
+.toast b{display:block;margin-bottom:2px}
+.legend{font-size:12px;color:var(--text-secondary);margin-top:10px}
+.legend code{font-family:var(--mono);background:var(--background);padding:1px 5px;border-radius:4px}
+@media (max-width:820px){.grid{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>OOHDASH-123 Rosetta Stone - command outcome states</h1>
+  <p class="lede">This is the operator-facing experience of sending a device command under Spencer's new ThingsBoard IoT Command Gate contract. Pick a device, then press the action and watch the honest three-outcome model play out: sent, then confirmed / not confirmed / not delivered. Tuya finishes in about half a second; Salus heating takes minutes, so the operator is released at once and told the result later. Nothing ever shows as success unless the device's own reading proves it. All device names and readings are real estate values.</p>
+
+  <div class="controls">
+    <span class="seglabel">Device</span>
+    <div class="seg" id="devSeg" role="group" aria-label="Device">
+      <button data-dev="tuya" aria-pressed="true">Light (Tuya, fast)</button>
+      <button data-dev="salus" aria-pressed="false">Heating (Salus, minutes)</button>
+    </div>
+  </div>
+  <div class="states" id="states" role="group" aria-label="Scenario to simulate"></div>
+
+  <div class="grid">
+    <div class="frame">
+      <div class="topbar"><span id="ctx">The Red Lion - 6261</span><span class="ver">v1.4.0</span></div>
+      <div class="banner"><span class="dot"></span><span><b>Device control is LIVE</b> - changes you send reach real equipment.</span></div>
+      <div class="content">
+        <div class="devcard">
+          <div class="devhead">
+            <div>
+              <h3 id="devTitle">External lighting - car park</h3>
+              <div class="devname" id="devName">gk-6237-externallighting-1</div>
+            </div>
+            <div style="text-align:right">
+              <div class="reading" id="reading">ON</div>
+              <div class="why" id="readingTs">reading 3 min ago</div>
+            </div>
+          </div>
+          <p class="why" id="devBlurb">Caller reports the car park lights are still on at 02:10. Turn them off.</p>
+          <div class="act" id="actRow">
+            <button class="btn primary" id="actBtn">Switch OFF</button>
+            <button class="btn" id="resetBtn">Reset</button>
+          </div>
+          <div id="outcomeBox" style="margin-top:12px"></div>
+          <div id="progressBox"></div>
+          <div class="tkt" id="tktBox" style="display:none">
+            <h3>Zendesk ticket note</h3>
+            <div id="tktLines"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div>
+      <div class="panel">
+        <h2>Why this is honest</h2>
+        <p class="why" id="rationale"></p>
+      </div>
+      <div class="panel" style="margin-top:14px">
+        <h2>Signals behind it (what the dashboard reads)</h2>
+        <pre id="signals"></pre>
+      </div>
+      <p class="legend">Confirmed means the device's own reading matched the request (<code>switch_1</code> for Tuya, <code>heatingSetpoint</code> for Salus IT700), with a timestamp after we sent. Accepted only means the gate took the request. The dashboard never shows accepted as success.</p>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<script>
+(function(){
+  var el=function(id){return document.getElementById(id);};
+  var timers=[];
+  function clearTimers(){timers.forEach(clearTimeout);timers=[];}
+  function later(fn,ms){var t=setTimeout(fn,ms);timers.push(t);return t;}
+
+  var DEVICES={
+    tuya:{
+      title:'External lighting - car park', name:'gk-6237-externallighting-1', ctx:'The Red Lion - 6261',
+      reading:'ON', readingTs:'reading 3 min ago', blurb:'Caller reports the car park lights are still on at 02:10. Turn them off.',
+      action:'Switch OFF', verb:'switch off', copyN:null, confirmKey:'switch', requestKey:'switchRequested',
+      confirmMs:1400
+    },
+    salus:{
+      title:'Bar / Restaurant heating', name:'gk-6261-salusit700-1', ctx:'The Red Lion - 6261',
+      reading:'16.5', readingUnit:'C', readingTs:'setpoint reading 11 min ago', blurb:'Caller reports the bar is cold. Raise the heating setpoint to 19.5 C.',
+      action:'Raise setpoint to 19.5 C', verb:'raise the setpoint', copyN:5, confirmKey:'heatingSetpoint', requestKey:'setpointRequested',
+      confirmMs:3200
+    }
+  };
+
+  var SCENARIOS=[
+    {id:'confirmed',label:'Confirmed (happy path)'},
+    {id:'accepted',label:'Accepted, waiting to confirm'},
+    {id:'notconfirmed',label:'Not confirmed at the limit'},
+    {id:'rejected',label:'Rejected (vendor error)'},
+    {id:'offline',label:'Device not reporting'},
+    {id:'boost',label:'Hot-water boost (removed)'}
+  ];
+
+  var devKey='tuya', scen='confirmed';
+
+  function setDevice(k){
+    devKey=k;
+    Array.prototype.forEach.call(el('devSeg').children,function(b){b.setAttribute('aria-pressed', b.getAttribute('data-dev')===k?'true':'false');});
+    reset();
+  }
+
+  function renderStatic(){
+    var d=DEVICES[devKey];
+    el('ctx').textContent=d.ctx;
+    el('devTitle').textContent=scen==='boost'?'Hot water':d.title;
+    el('devName').textContent=scen==='boost'?'gk-6261-boilercontrol-1':d.name;
+    el('devBlurb').textContent=scen==='boost'?'Caller reports no hot water in the accommodation block.':(scen==='offline'?offlineBlurb(d):d.blurb);
+    var r=el('reading');
+    if(scen==='offline'){r.textContent='--';el('readingTs').textContent='no reading for 13 days';}
+    else if(scen==='boost'){r.textContent='off';el('readingTs').textContent='boiler panel - monitor only';}
+    else{r.innerHTML=d.readingUnit?(d.reading+' <small>'+d.readingUnit+'</small>'):d.reading;el('readingTs').textContent=d.readingTs;}
+  }
+
+  function offlineBlurb(d){
+    return devKey==='salus'
+      ? 'This IT500 thermostat has not reported since 1 October. We cannot send it a command or confirm a change.'
+      : 'This unit has not reported in over 3 hours. We cannot confirm a change, so control is not offered.';
+  }
+
+  function setActionRow(){
+    var d=DEVICES[devKey];
+    var btn=el('actBtn');
+    if(scen==='offline'){
+      btn.textContent='Control unavailable';btn.disabled=true;btn.className='btn';
+    }else if(scen==='boost'){
+      btn.textContent='Log and escalate to IoT team';btn.disabled=false;btn.className='btn primary';
+    }else{
+      btn.textContent=d.action;btn.disabled=false;btn.className='btn primary';
+    }
+  }
+
+  function clearOutput(){
+    el('outcomeBox').innerHTML='';el('progressBox').innerHTML='';
+    el('tktBox').style.display='none';el('tktLines').innerHTML='';
+    el('toast').className='toast';
+  }
+
+  function reset(){
+    clearTimers();
+    clearOutput();
+    renderStatic();
+    setActionRow();
+    rationale();
+    signals('idle');
+  }
+
+  function outcome(cls,icon,title,body){
+    el('outcomeBox').innerHTML='<div class="outcome '+cls+'"><span class="ic">'+icon+'</span><div><b>'+title+'</b>'+body+'</div></div>';
+  }
+  function waiting(title,body){
+    el('outcomeBox').innerHTML='<div class="outcome wait"><span class="spin"></span><div><b>'+title+'</b>'+body+'</div></div>';
+  }
+  function progress(states){
+    var labels=['Sent','Gate pending','Accepted','Confirmed'];
+    var h='<div class="progress">';
+    for(var i=0;i<4;i++){h+='<div class="step '+(states[i]||'')+'"></div>';}
+    h+='</div><div class="steplabels">';
+    labels.forEach(function(l){h+='<span>'+l+'</span>';});
+    h+='</div>';
+    el('progressBox').innerHTML=h;
+  }
+  function ticket(lines){
+    el('tktBox').style.display='block';
+    el('tktLines').innerHTML=lines.map(function(l){return '<div class="line">'+l+'</div>';}).join('');
+  }
+  function toast(title,body){
+    el('toast').innerHTML='<b>'+title+'</b>'+body;
+    el('toast').className='toast show';
+    later(function(){el('toast').className='toast';},6000);
+  }
+
+  function run(){
+    var d=DEVICES[devKey];
+    clearTimers();clearOutput();
+    if(scen==='offline')return;
+    if(scen==='boost'){
+      outcome('off','!','Hot-water boost is not something this dashboard can send.',
+        'The boiler panel is monitor-only, so we have removed the boost button that could never work. We have logged the request and escalated it to the IoT team with the site boiler guidance attached.');
+      ticket(['02:14 - OOH handler logged: no hot water, accommodation block, The Red Lion (6261).','Routed to IoT team (capture-and-escalate). Boiler guidance pack attached. No remote command attempted.']);
+      el('actBtn').disabled=true;el('actBtn').textContent='Logged and escalated';
+      signals('boost');
+      return;
+    }
+    el('actBtn').disabled=true;
+    // Phase 1: sent
+    if(d.copyN){
+      waiting('Sent to the device','We have asked the thermostat to '+d.verb+'. It should take effect within about '+d.copyN+' minutes - you can carry on; we will tell you the result and update the ticket.');
+    }else{
+      waiting('Sent to the device','Asking the light to '+d.verb+' and waiting for it to confirm...');
+    }
+    progress(['on','','','']);
+    signals('sent');
+    // Salus: release the operator immediately with a toast
+    if(d.copyN){
+      later(function(){
+        toast('You can move on','We are watching '+d.name+' in the background. The result will pop up here and on the ticket when the thermostat confirms.');
+      },900);
+    }
+    // Phase 2: gate pending
+    later(function(){progress(['ok','on','','']);signals('pending');},d.copyN?700:350);
+    // Phase 3: accepted
+    later(function(){
+      if(scen==='rejected'){
+        progress(['ok','on','err','']);
+        var reason=devKey==='tuya'
+          ? {screen:'We could not reach the light just now. This is usually temporary - try again in a moment, or raise a ticket if it keeps happening.',vendor:'vendor: No active Tuya session owns device 6237'}
+          : {screen:'The thermostat was not reachable - it may be offline at the site. Try again shortly, or raise a ticket if it persists.',vendor:'gate: device offline'};
+        outcome('bad','x','Not delivered',reason.screen);
+        ticket(['02:10 - OOH handler sent "'+d.action+'" to '+d.name+'.','02:10 - Not delivered. Vendor reason recorded: "'+reason.vendor+'".']);
+        signals('rejected',reason.vendor);
+        el('actBtn').disabled=false;el('actBtn').textContent='Try again';
+        return;
+      }
+      // accepted
+      progress(['ok','ok','on','']);
+      waiting('Accepted by the system','The command was accepted. Now waiting for the '+(devKey==='tuya'?'light':'thermostat')+' to show the change in its own reading.');
+      signals('accepted');
+      // Phase 4: confirm / not-confirm
+      if(scen==='confirmed'){
+        later(function(){
+          progress(['ok','ok','ok','ok']);
+          if(devKey==='tuya'){
+            el('reading').textContent='OFF';el('readingTs').textContent='reading just now';
+            outcome('good','check','Confirmed - the light is now OFF','The light reported switch = off at 02:10:11, just after we sent. This is the only outcome we ever show as success.');
+            ticket(['02:10:09 - Sent "Switch OFF" to '+d.name+'.','02:10:11 - Confirmed OFF by the device reading.']);
+          }else{
+            el('reading').innerHTML='19.5 <small>C</small>';el('readingTs').textContent='setpoint reading just now';
+            outcome('good','check','Confirmed - heating now set to 19.5 C','The thermostat reported heatingSetpoint = 19.5 on its next heartbeat, after we sent. Confirmed.');
+            ticket(['02:14 - Sent "Raise setpoint to 19.5 C" to '+d.name+'.','02:18 - Confirmed: thermostat now reads 19.5 C.']);
+            toast('Heating confirmed','The Red Lion bar heating is now set to 19.5 C.');
+          }
+          signals('confirmed');
+          el('actBtn').disabled=false;el('actBtn').textContent='Done';
+        },d.confirmMs);
+      }else{
+        // accepted then stays unconfirmed to the limit
+        later(function(){
+          progress(['ok','ok','ok','err']);
+          var lim=d.copyN?'45 minutes':'10 seconds';
+          outcome('ind','~','Not confirmed yet',
+            'The command was accepted but the '+(devKey==='tuya'?'light':'thermostat')+' has not shown the change within '+lim+'. It may still take effect - we are still watching, and we will update the ticket if it lands. Please do not treat this as done.');
+          ticket(['02:14 - Sent "'+d.action+'" to '+d.name+' (accepted by the gate).','02:'+(d.copyN?'59':'14')+' - Not confirmed at the limit. Still watching. Device reading unchanged.']);
+          signals('notconfirmed');
+          el('actBtn').disabled=false;el('actBtn').textContent='Resend';
+          if(d.copyN)toast('Not confirmed yet','The Red Lion heating was accepted but not confirmed at 45 min. Still watching.');
+        },d.confirmMs);
+      }
+    },d.copyN?1500:700);
+  }
+
+  function rationale(){
+    var map={
+      confirmed:'A command is only ever shown as success when the device echoes the change in its own telemetry, timestamped after we sent. Accepted alone is never shown as success - that is what caused the old OOHDASH-102 false-success bug.',
+      accepted:'Accepted means the gate took the request and rang the bridge. It is an honest in-between state, not success. The dashboard keeps waiting for the device reading and shows a clear spinner so the operator knows it is still in flight.',
+      notconfirmed:'If the device has not confirmed by the per-vendor limit, we say "not confirmed" - never "failed" (it may still land) and never "done". We keep watching and update the ticket. The operator always has a next step: resend.',
+      rejected:'A rejection carries a vendor error. We translate it into plain English on screen and keep the raw vendor text on the ticket for the IoT team. The operator is never shown a raw "gate:" or "vendor:" string.',
+      offline:'Devices that have not reported within the offline threshold (3 hours for live classes; whole dark fleets like the 731 IT500 and bare-salus units) are shown as "device not reporting" with no control offered. Sending would only earn a "gate: device offline" rejection.',
+      boost:'Hot-water boost could never dispatch on the boiler panel - the button was dishonest. We remove it and route the need to capture-and-escalate with the boiler guidance, so the operator still gets help to the caller.'
+    };
+    el('rationale').textContent=map[scen]||'';
+  }
+
+  function signals(phase,vendor){
+    var d=DEVICES[devKey];
+    var lines=[];
+    if(scen==='offline'){
+      lines=['device: '+d.name,'lastActivityTime: '+(devKey==='salus'?'2026-10-01T04:12Z (13d ago)':'2026-10-14T00:40Z (>3h ago)'),'offline threshold: 3h (configurable per class)','control offered: NO ("device not reporting")'];
+      el('signals').textContent=lines.join('\n');return;
+    }
+    if(scen==='boost'){
+      el('signals').textContent=['device: gk-6261-boilercontrol-1','profile: boilerControl (monitor-only)','gate capability map: switch, setpoint, mode, hwBoostHours','boiler panel routes to gate: NO','action: capture-and-escalate'].join('\n');return;
+    }
+    var write='WRITE '+d.requestKey+' -> SERVER_SCOPE';
+    var m={
+      idle:['(no command in flight)','read key: '+d.confirmKey+' (telemetry)','confirm limit: '+(d.copyN?'45 min':'10 s')],
+      sent:[write+' = '+(devKey==='tuya'?'false':'19.5'),'dispatchTs recorded'],
+      pending:[write,'gate -> SyncStatus = pending (SERVER_SCOPE)','gate -> Desired rewritten; doorbell rung'],
+      accepted:['SyncStatus = accepted (SERVER_SCOPE)','LastError = ""','awaiting '+d.confirmKey+' with ts > dispatchTs'],
+      confirmed:['SyncStatus = accepted',''+d.confirmKey+' = '+(devKey==='tuya'?'off':'19.5')+'  (ts > dispatchTs)','outcome: CONFIRMED'],
+      notconfirmed:['SyncStatus = accepted',''+d.confirmKey+': no fresh value (ts <= dispatchTs)','outcome: INDETERMINATE (keep watching)'],
+      rejected:['SyncStatus = rejected','LastError = "'+(vendor||'')+'"','outcome: NON-DELIVERY']
+    };
+    el('signals').textContent=(m[phase]||m.idle).join('\n');
+  }
+
+  // wire up
+  SCENARIOS.forEach(function(s,i){
+    var b=document.createElement('button');
+    b.textContent=s.label;b.setAttribute('aria-pressed',i===0?'true':'false');
+    b.onclick=function(){
+      scen=s.id;
+      Array.prototype.forEach.call(el('states').children,function(c){c.setAttribute('aria-pressed','false');});
+      b.setAttribute('aria-pressed','true');
+      reset();
+    };
+    el('states').appendChild(b);
+  });
+  Array.prototype.forEach.call(el('devSeg').children,function(b){
+    b.onclick=function(){setDevice(b.getAttribute('data-dev'));};
+  });
+  el('actBtn').onclick=run;
+  el('resetBtn').onclick=reset;
+  reset();
+})();
+</script>
+</body>
+</html>

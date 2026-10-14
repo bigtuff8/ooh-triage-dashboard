@@ -228,7 +228,7 @@ function renderP1Banner(ws) {
 function siteTickets(ws) {
     if (!ws.tickets.length) return '<p class="small">No tickets in the last 90 days.</p>';
     return ws.tickets.map(t =>
-        `<div class="stepdone" style="cursor:pointer" onclick="openTicketDrawer(${t.id})"><span class="tag ${t.visit ? 'amber' : t.status.raw === 'open' ? 'blue' : 'violet'}">${esc(t.status.agent)}</span> <span style="flex:1;font-size:13px">${esc(t.subject)}</span> <span class="small">#${t.id}</span></div>`).join('');
+        `<div class="stepdone" style="cursor:pointer" onclick="openTicketDrawer(${t.id})"><span class="tag ${t.visit ? 'amber' : t.status.raw === 'open' ? 'blue' : 'violet'}">${esc(t.status.agent)}</span> <span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:13px">${esc(t.subject)}</span> <span class="small">#${t.id}</span></div>`).join('');
 }
 
 function endCall() {

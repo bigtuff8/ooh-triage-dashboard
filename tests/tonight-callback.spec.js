@@ -80,6 +80,10 @@ test.describe('tonight & callback', () => {
         await page.keyboard.press('ArrowDown');
         await page.keyboard.press('Enter');
         await page.locator('[data-testid="callback-results"] .stepdone').first().click();
+        // Wait for the thread fetch to complete before typing — avoids a race where the second
+        // paintDrawer() call (after the async GET /api/tickets/:id/thread resolves) replaces the
+        // entire drawer DOM and detaches the textarea that pressSequentially is mid-way through.
+        await expect(page.locator('.drawer #thread')).not.toContainText('Loading');
         await page.locator('[data-testid="note-input"]').pressSequentially('Caller rang back — situation unchanged', { delay: 15 });
         await page.locator('[data-testid="note-send"]').click();
         await expect(page.locator('.toast').last()).toContainText('Note added');
