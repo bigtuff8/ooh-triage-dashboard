@@ -27,7 +27,7 @@ process.env.OOH_STORE_DIR = mkdtempSync(join(tmpdir(), 'ooh-c2-'));
 process.env.WRITES_DISABLED = 'false';
 
 // Replace the device-write with a counting stub BEFORE control.js imports tb-client, so
-// control.dispatch() calls our stub. Fixture-mode readControlState/tbStatus are preserved so
+// control.dispatch() calls our stub. Fixture-mode readCommandState/tbStatus are preserved so
 // the sync-poll loop control starts stays inert and harmless in the test.
 let writeCount = 0;
 mock.module('../services/tb-client.js', {
