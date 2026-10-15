@@ -37,7 +37,7 @@ As of: dashboard v1.4.1 (live, 15 October 2026). Ticket: OOHDASH-131.
    - The server does not check whether a device is marked not controllable before it sends a command, so a request made outside the screens would also be carried out.
    - If any iT500 or older Salus thermostat in an area is reporting, the Heating flow offers Warmer, Cooler and Turn it off for it.
    - The same applies to devices treated as switches from their name alone, without a switch reading: the flows offer Turn ON or OFF and the server accepts it.
-   - Raised as a Bug - see linked ticket OOHDASH-BUG.
+   - Raised as a Bug - see linked ticket OOHDASH-132.
 4. Lighting and Extractor fans show only the first circuit at a site. A site with several lighting or fan circuits shows, and can switch, just one.
 5. No temperature or status readings are shown for fridges, air conditioning or the boiler panel, so a handler cannot check a caller's report against live data for those.
 6. The boiler control panel is not recognised as its own type, so the planned "pub boiler panel" reading and guidance never appears. It shows as an unknown device.
