@@ -1,0 +1,78 @@
+# OOH Triage Dashboard - Device Capability Table
+
+What this is: one row per type of device the live OOH Triage Dashboard recognises, showing what a call handler can see and do for it today. It covers device types and models, not the individual devices installed at each site.
+As of: dashboard v1.4.1 (live, 15 October 2026). Ticket: OOHDASH-131.
+
+## How to read this
+
+- The dashboard does not have a "device list" screen. Handlers see device information inside the guided flows (Heating, External lighting, and so on), in the "What Lighthouse controls at this site" panel, and in the red "Some Lighthouse equipment at this site is not responding" banner.
+- "Not reporting" or "offline" means the device has sent no data recently: 3 hours for thermostats and switched circuits, 48 hours for everything else.
+- Every change a handler makes is checked against the confirmed site, and is only shown as done once the device itself reports the new value.
+- "None" means nothing is available. "(unconfirmed)" means the statement comes from research notes, not from the dashboard code, and could not be confirmed from the code.
+
+## The table
+
+| Device | What it is | What the dashboard shows today | What the dashboard can control today | Limits / notes |
+|---|---|---|---|---|
+| Salus iT700 thermostat | The main modern room thermostat for accommodation heating zones. | In the Heating flow: room temperature, target temperature, heating mode, and online or offline. Where an area has several, it shows the coldest reporting one and says how many others are not reporting. | Raise or lower the target temperature (up to 3 degrees either way, never above 25 C). "Turn it off" sets a frost-hold at 5 C. Optional hold: until the next schedule slot, until 07:00 tomorrow, or for 4 hours, then it reverts by itself. | Always treated as Accommodation. Changes take minutes: the handler is told "about 5 minutes" and can carry on, and the result appears later and is added to the ticket. No true off switch. A confirmed Salus change had not been seen live when the current version was designed (unconfirmed). |
+| Salus iT500 thermostat | An older Salus thermostat model used for heating zones at some sites. | "This heating device is not reporting" with no reading. The whole iT500 fleet had stopped reporting at the 14 October check (unconfirmed). | None (the units are not reporting). | Area comes from the site code letter: Staff or Flats means Accommodation, Restaurant or Bar means Bar/Restaurant. With no letter it appears under "Heating - area not identified". If a unit started reporting again, the dashboard would offer the same controls as the iT700, even though it is meant to be not controllable. |
+| Older Salus thermostat (older naming, model unknown) | Salus thermostats installed under an older naming scheme, about 380 units. | "Not reporting" with no reading, or a grey line "N other heating units in this area are not reporting". Units with no area get a footnote under the area question. These units had stopped reporting around 2 June (unconfirmed). | None (the units are not reporting). | Area comes from the site code in the device name. Units named without a bracketed site code are not loaded at all yet (follow-up OOHDASH-129, for example site 5791 Bar/Restaurant). The same "would be offered controls if it reported again" risk applies as for the iT500. |
+| Air conditioning unit (Intesis or Modbus air-con) | Air conditioning units, from two different hardware families. | No readings. Its presence adds an "Air conditioning (handled by the IoT team)" shortcut in the Heating flow. | None - captured and referred to the IoT team. | Both air-con families are handled the same way. Typing "air con" or "cooling" suggests the referral. |
+| Kitchen appliance circuit (fryer, grill, bain marie, pot wash, oven, dishwasher) | A smart switch or meter on a kitchen appliance's power supply. | Only whether all kitchen circuits are reachable ("The kitchen circuits are reachable"). No per-appliance on or off state. | None. If the kitchen is needed for service right now it becomes a P1; otherwise it is captured for the next working day. | If any kitchen circuit is offline, the flow moves to the connection check. The site panel can say Kitchen equipment is "Controllable from here" when switchable kitchen hardware exists, but the flow never offers switching. |
+| PowerPause power circuit (Tongou or Owon unit, contactor or relay) | The scheduled power controller that turns kitchen supplies on and off at set times. | Treated as a kitchen circuit: reachable or not. Its next scheduled change can appear in the capture note. | None remotely. The "Contractor on site" flow reads out the local override-button steps for Tongou and Owon units. | Site 6786 (Donkey Derby) has no local override; the flow escalates as P1 instead. The schedule shown in the note comes from the first kitchen device found, which may not be the PowerPause unit. |
+| Other smart switch with an unrecognised name (for example over-door heater, immersion heater, festoon lights, supply or loft fan) | Any switched circuit whose name the dashboard does not recognise. | Grouped with kitchen circuits: reachable or not. | None. | Because they are grouped as kitchen, fans and lights with these names are not offered in the Extractor fans or External lighting flows. |
+| External lighting circuit | A smart switch on the outside or car park lights. | In the External lighting flow: on or off, and online or not responding. | Turn ON or Turn OFF (only the opposite of its current state is offered). Shown as done only when the device confirms, usually within seconds. | Only the first lighting circuit at a site is shown. If it cannot be switched, the handler gets dusk-sensor and fuse-board guidance and can capture or escalate as P1. |
+| Extractor fan | A smart switch on a kitchen extract fan. | In the Extractor fans flow: on or off, and online or not responding. | Turn ON or Turn OFF, confirmed by the device, usually within seconds. A schedule or time request can also be captured. | Only the first fan at a site is shown. A cellar fan is allowed to be switched. Schedule changes are not possible, only captured. |
+| Refrigeration (fridge, freezer, chiller, cold room, cellar cooling) | Cold-storage units and cellar cooling. | No readings. The flow says Lighthouse monitors but does not control fridges. | None - blocked on purpose, even when switch hardware is fitted. | A P1 if stock is at risk; otherwise logged as "monitored only". Cellar lights and fans are not treated as refrigeration. |
+| Site hub gateway (the wall-mounted Lighthouse unit) | The unit that connects the site's equipment to Lighthouse. | In the connection check: "the site is reachable" or "the wall-mounted Lighthouse unit is offline", with a script for checking power and the router. | None. | A site without one is described as a "direct-connection site" and devices are checked one by one. If the hub is offline, the dashboard still lets a handler send changes to devices that show as online. |
+| Equipment-group gateway (for example the boiler, main distribution board, kitchen or heating receiver) | A local receiver that connects one group of equipment. | In the connection check: which equipment groups are not responding while the site itself is reachable. | None. | Counted as offline only after 48 hours of silence. |
+| Boiler control panel (pub heating and hot water panel, two versions) | The central panel that runs pub heating zones and hot water at some pubs. | No readings. Its presence shortens the site panel to five rows and marks Heating as "Controllable from here", and Hot water as controllable if the panel serves hot water. | None. The Hot water flow is always "log and escalate" or "boiler fault" guidance. | The panel is not recognised as its own type and counts as an "Unknown device". The site panel's "Controllable" labels for heating and hot water do not match what the flows allow. Its schedule is read but not shown. |
+| Unknown or monitor-only device (meters, warewash monitors, ambient, door and gas-valve sensors, connected ovens, anything not recognised) | Any device the dashboard cannot place in a category. | Nothing on its own. If it goes silent for 48 hours, it triggers the red "Some Lighthouse equipment at this site is not responding" banner. | None. | A kitchen-named meter (for example a bain marie meter) appears as a kitchen circuit instead. |
+
+## Key gaps worth a look
+
+1. Switched devices with unrecognised names (over-door heaters, immersion heaters, festoon lights, supply, loft or bar fans) are all grouped as "kitchen", so a handler cannot switch them, and they never appear in the Lighting or Fans flows.
+2. The "What Lighthouse controls at this site" panel can say "Controllable from here" for Kitchen equipment, Heating (any pub with a boiler panel) and Hot water, while the flows offer no control for those. A handler could tell a caller something can be changed when it cannot.
+3. iT500 and older Salus thermostats are labelled as not controllable, but nothing enforces that. If one starts reporting again, the dashboard would offer temperature changes on it. Today this is only prevented by the units being offline.
+4. Lighting and Extractor fans show only the first circuit at a site. A site with several lighting or fan circuits shows, and can switch, just one.
+5. No temperature or status readings are shown for fridges, air conditioning or the boiler panel, so a handler cannot check a caller's report against live data for those.
+6. The boiler control panel is not recognised as its own type, so the planned "pub boiler panel" reading and guidance never appears. It shows as an unknown device.
+7. Remote changes are still offered when the site hub is offline, as long as the device itself shows online.
+8. Older Salus units named without a bracketed site code are still missing (OOHDASH-129).
+
+## Cost and benefit of acting on these gaps
+
+These are rough estimates for James's review and have not been sized by the build team.
+
+- Gaps 1, 2 and 4 are the cheapest and most valuable: each is a small change to how devices are grouped or labelled, about 0.5 to 2 days each including tests. The benefit is that handlers stop being told something is controllable when it is not, and they gain switching on fans and lights they cannot reach today.
+- Gap 3 is about half a day: one server check that refuses commands to units marked as not controllable. It has low benefit today, because the units are offline, but it removes a latent risk.
+- Gaps 5 and 6 are larger, about 3 to 10 days each, because the readings need to be designed, worded and tested. The benefit is better triage of fridge, air-con and pub-heating calls. They need James to decide whether they are worth doing.
+- Gap 7 is a design decision rather than a fix. The risk of leaving it is low for cloud-connected switches, and higher for Salus thermostats.
+
+## Appendix - Sources and confidence
+
+**Code read (authoritative), worktree at v1.4.1 (commit cdf480e):**
+
+- services/tb-device.js: device classification (classifyDevice, ASSET_INTENT name tokens, refrigeration deny), area rules (deriveArea), readings mapped (mapTelemetry), offline rule (3 hours or 48 hours via the per-class contract), boiler panel version check (deriveBoilerControl), and the older Salus lookup.
+- services/registry.js: commands allowed per type, temperature window (3 degrees, cap 25 C, frost 5 C) and the per-class control contract.
+- services/control.js: the single write path (site confirm, kill switch, online check, registration check, guardrails, write, three-outcome watcher).
+- routes/api.js: the workspace sent to the browser and the "What Lighthouse controls" levels.
+- public/js/flows.js, public/js/control.js and public/js/views.js: what each flow shows and offers, the control window, hold options and the not-reporting wording.
+- config.js: per-class timings (iT700 "about 5 minutes", offline hours). k8s/deployment.yaml: the write lock is set to "false", so device writes are enabled.
+- The classifier was run locally against sample device names, without any network access, to confirm the groupings in rows 5 to 14 and gap 1.
+
+**Docs cross-checked:** docs/project/OOH_DEVICE_DATA_DICTIONARY_2026-09-16.md, docs/project/ooh-dashboard/DEVICE_NAME_MAPPING.md, docs/project/OOH_ROSETTA_STONE_MATRIX_2026-10-14.md (and its research folder), docs/project/oohdash-128-design/DESIGN.md, docs/project/DATA_DICTIONARY.md and RELEASE_NOTES.md.
+
+**Unconfirmed cells:** the iT500 and older Salus fleets being silent (row 2 and row 3; from the 14 October estate sweep in the Rosetta Stone research, not code), and "a confirmed Salus change had not been seen live" (row 1; a note in registry.js and the Rosetta Stone matrix). Whether device writes are switched on in the running cluster is taken from the deployment file and cannot be read from code.
+
+**Where code and docs disagree (code followed):**
+
+1. OOH_DEVICE_DATA_DICTIONARY (16 Sep) lists air conditioning as "read + control", and Salus mode and hot-water boost as controllable. The code allows no air-con control (OOHDASH-82), and for Salus allows only target temperature and frost-hold. Older release notes (v1.0) also list Intesis Off and hot-water boost, and these are now superseded.
+2. The data dictionary says monitor-only devices get a read-only tile with readings. The code has no per-device tile, and these devices only feed the offline banner.
+3. The data dictionary uses three freshness bands (live under 3 hours, quiet 3 to 12 hours, offline over 12 hours). The code has two states: offline after 3 hours for controllable types, 48 hours for the rest.
+4. The OOHDASH-128 design (DESIGN.md) states that control of older Salus units "is refused at the server whatever the screen shows". In the code, the "not controllable" flag in the registry contract is never checked when a command is sent, and the registry still lists temperature and frost commands for these types. They are blocked only because they are offline.
+5. Code comments in flows.js and registry.js refer to a "pub boiler panel" type, and api.js notes that the classifier never produces it. The panel is classified as an unknown device, so that branch never runs.
+6. DEVICE_NAME_MAPPING proposes separate Ventilation, Heating and Warewash groups (for example supply fan, immersion heater, glasswasher). The code puts any unrecognised switched device into the kitchen group and anything else into "unknown".
+7. The data dictionary says warewash and cellar devices with a switch are controllable. The code always blocks cellar units, and warewash units fall into the kitchen group, where no switching is offered.
+8. The Rosetta Stone matrix (written against v1.3.7) records defects such as the wrong write path, unmapped plain switch readings and a dead hot-water boost button. All of these are fixed in the v1.4.x code. The matrix also says the deployment file holds writes locked, but the file now has writes enabled.
+9. RELEASE_NOTES.md has no v1.4.0 entry for the OOHDASH-123 Rosetta Stone release, even though that code is live.

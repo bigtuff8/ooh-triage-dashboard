@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>OOH Device Capabilities</title>
+<meta name="description" content="What the live OOH Triage Dashboard (v1.4.1) shows and can control for each device type.">
+<style>
+:root {
+  --bg: #f7f7f5; --surface: #ffffff; --text: #1d1d1b; --muted: #5c5c57;
+  --border: #dedcd5; --accent: #1f5f8b; --head: #eef1f4; --none: #8a8a84;
+  --unc-bg: #fff3d6; --unc-text: #7a5300;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #161716; --surface: #1f201f; --text: #ecebe6; --muted: #a8a7a0;
+    --border: #3a3b38; --accent: #7cb7e0; --head: #272a2d; --none: #8f8e88;
+    --unc-bg: #3d3216; --unc-text: #f3d48a;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #161716; --surface: #1f201f; --text: #ecebe6; --muted: #a8a7a0;
+  --border: #3a3b38; --accent: #7cb7e0; --head: #272a2d; --none: #8f8e88;
+  --unc-bg: #3d3216; --unc-text: #f3d48a;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; }
+body { background: var(--bg); color: var(--text); font: 15px/1.5 -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; overflow-wrap: anywhere; }
+main { max-width: 1280px; margin: 0 auto; padding: 24px 16px 48px; }
+h1 { font-size: 1.6rem; line-height: 1.25; margin: 0 0 8px; }
+h2 { font-size: 1.15rem; margin: 32px 0 10px; }
+p, li { max-width: 80ch; }
+.lede { color: var(--muted); margin: 0 0 4px; }
+.unc { background: var(--unc-bg); color: var(--unc-text); border-radius: 4px; padding: 0 4px; font-size: 0.85em; white-space: nowrap; }
+table { width: 100%; border-collapse: collapse; background: var(--surface); border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
+th, td { text-align: left; vertical-align: top; padding: 10px 12px; border-bottom: 1px solid var(--border); font-size: 0.92rem; }
+thead th { background: var(--head); font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.03em; color: var(--muted); }
+th.dev { font-weight: 650; color: var(--accent); min-width: 150px; }
+td[data-none] { color: var(--none); }
+tbody tr:last-child th, tbody tr:last-child td { border-bottom: 0; }
+.note { color: var(--muted); font-size: 0.85rem; margin-top: 32px; border-top: 1px solid var(--border); padding-top: 12px; }
+@media (max-width: 760px) {
+  table, tbody, tr, th, td { display: block; width: 100%; }
+  table { border: 0; background: transparent; }
+  thead { display: none; }
+  tr { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; margin-bottom: 14px; overflow: hidden; }
+  th.dev { background: var(--head); font-size: 1rem; }
+  td { border-bottom: 1px solid var(--border); }
+  td::before { content: attr(data-label); display: block; font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.04em; color: var(--muted); margin-bottom: 2px; }
+  tr td:last-child { border-bottom: 0; }
+}
+</style>
+</head>
+<body>
+<main>
+<h1>OOH Triage Dashboard - Device Capability Table</h1>
+<p class="lede">One row per type of device the live OOH Triage Dashboard recognises: what a call handler can see and do for it today. Device types and models, not individual installed devices.</p>
+<p class="lede">As of dashboard v1.4.1 (live, 15 October 2026). Ticket OOHDASH-131.</p>
+
+<h2>How to read this</h2>
+<ul><li>The dashboard does not have a "device list" screen. Handlers see device information inside the guided flows (Heating, External lighting, and so on), in the "What Lighthouse controls at this site" panel, and in the red "Some Lighthouse equipment at this site is not responding" banner.</li><li>"Not reporting" or "offline" means the device has sent no data recently: 3 hours for thermostats and switched circuits, 48 hours for everything else.</li><li>Every change a handler makes is checked against the confirmed site, and is only shown as done once the device itself reports the new value.</li><li>"None" means nothing is available. "<span class="unc">(unconfirmed)</span>" means the statement comes from research notes, not from the dashboard code, and could not be confirmed from the code.</li></ul>
+
+<h2>The table</h2>
+<table>
+<thead><tr><th scope="col">Device</th><th scope="col">What it is</th><th scope="col">What the dashboard shows today</th><th scope="col">What the dashboard can control today</th><th scope="col">Limits / notes</th></tr></thead>
+<tbody>
+<tr><th scope="row" class="dev" data-label="Device">Salus iT700 thermostat</th><td data-label="What it is">The main modern room thermostat for accommodation heating zones.</td><td data-label="What the dashboard shows today">In the Heating flow: room temperature, target temperature, heating mode, and online or offline. Where an area has several, it shows the coldest reporting one and says how many others are not reporting.</td><td data-label="What the dashboard can control today">Raise or lower the target temperature (up to 3 degrees either way, never above 25 C). "Turn it off" sets a frost-hold at 5 C. Optional hold: until the next schedule slot, until 07:00 tomorrow, or for 4 hours, then it reverts by itself.</td><td data-label="Limits / notes">Always treated as Accommodation. Changes take minutes: the handler is told "about 5 minutes" and can carry on, and the result appears later and is added to the ticket. No true off switch. A confirmed Salus change had not been seen live when the current version was designed <span class="unc">(unconfirmed)</span>.</td></tr>
+<tr><th scope="row" class="dev" data-label="Device">Salus iT500 thermostat</th><td data-label="What it is">An older Salus thermostat model used for heating zones at some sites.</td><td data-label="What the dashboard shows today">"This heating device is not reporting" with no reading. The whole iT500 fleet had stopped reporting at the 14 October check <span class="unc">(unconfirmed)</span>.</td><td data-label="What the dashboard can control today" data-none="1">None (the units are not reporting).</td><td data-label="Limits / notes">Area comes from the site code letter: Staff or Flats means Accommodation, Restaurant or Bar means Bar/Restaurant. With no letter it appears under "Heating - area not identified". If a unit started reporting again, the dashboard would offer the same controls as the iT700, even though it is meant to be not controllable.</td></tr>
+<tr><th scope="row" class="dev" data-label="Device">Older Salus thermostat (older naming, model unknown)</th><td data-label="What it is">Salus thermostats installed under an older naming scheme, about 380 units.</td><td data-label="What the dashboard shows today">"Not reporting" with no reading, or a grey line "N other heating units in this area are not reporting". Units with no area get a footnote under the area question. These units had stopped reporting around 2 June <span class="unc">(unconfirmed)</span>.</td><td data-label="What the dashboard can control today" data-none="1">None (the units are not reporting).</td><td data-label="Limits / notes">Area comes from the site code in the device name. Units named without a bracketed site code are not loaded at all yet (follow-up OOHDASH-129, for example site 5791 Bar/Restaurant). The same "would be offered controls if it reported again" risk applies as for the iT500.</td></tr>
+<tr><th scope="row" class="dev" data-label="Device">Air conditioning unit (Intesis or Modbus air-con)</th><td data-label="What it is">Air conditioning units, from two different hardware families.</td><td data-label="What the dashboard shows today">No readings. Its presence adds an "Air conditioning (handled by the IoT team)" shortcut in the Heating flow.</td><td data-label="What the dashboard can control today" data-none="1">None - captured and referred to the IoT team.</td><td data-label="Limits / notes">Both air-con families are handled the same way. Typing "air con" or "cooling" suggests the referral.</td></tr>
+<tr><th scope="row" class="dev" data-label="Device">Kitchen appliance circuit (fryer, grill, bain marie, pot wash, oven, dishwasher)</th><td data-label="What it is">A smart switch or meter on a kitchen appliance's power supply.</td><td data-label="What the dashboard shows today">Only whether all kitchen circuits are reachable ("The kitchen circuits are reachable"). No per-appliance on or off state.</td><td data-label="What the dashboard can control today" data-none="1">None. If the kitchen is needed for service right now it becomes a P1; otherwise it is captured for the next working day.</td><td data-label="Limits / notes">If any kitchen circuit is offline, the flow moves to the connection check. The site panel can say Kitchen equipment is "Controllable from here" when switchable kitchen hardware exists, but the flow never offers switching.</td></tr>
+<tr><th scope="row" class="dev" data-label="Device">PowerPause power circuit (Tongou or Owon unit, contactor or relay)</th><td data-label="What it is">The scheduled power controller that turns kitchen supplies on and off at set times.</td><td data-label="What the dashboard shows today">Treated as a kitchen circuit: reachable or not. Its next scheduled change can appear in the capture note.</td><td data-label="What the dashboard can control today" data-none="1">None remotely. The "Contractor on site" flow reads out the local override-button steps for Tongou and Owon units.</td><td data-label="Limits / notes">Site 6786 (Donkey Derby) has no local override; the flow escalates as P1 instead. The schedule shown in the note comes from the first kitchen device found, which may not be the PowerPause unit.</td></tr>
+<tr><th scope="row" class="dev" data-label="Device">Other smart switch with an unrecognised name (for example over-door heater, immersion heater, festoon lights, supply or loft fan)</th><td data-label="What it is">Any switched circuit whose name the dashboard does not recognise.</td><td data-label="What the dashboard shows today">Grouped with kitchen circuits: reachable or not.</td><td data-label="What the dashboard can control today" data-none="1">None.</td><td data-label="Limits / notes">Because they are grouped as kitchen, fans and lights with these names are not offered in the Extractor fans or External lighting flows.</td></tr>
+<tr><th scope="row" class="dev" data-label="Device">External lighting circuit</th><td data-label="What it is">A smart switch on the outside or car park lights.</td><td data-label="What the dashboard shows today">In the External lighting flow: on or off, and online or not responding.</td><td data-label="What the dashboard can control today">Turn ON or Turn OFF (only the opposite of its current state is offered). Shown as done only when the device confirms, usually within seconds.</td><td data-label="Limits / notes">Only the first lighting circuit at a site is shown. If it cannot be switched, the handler gets dusk-sensor and fuse-board guidance and can capture or escalate as P1.</td></tr>
+<tr><th scope="row" class="dev" data-label="Device">Extractor fan</th><td data-label="What it is">A smart switch on a kitchen extract fan.</td><td data-label="What the dashboard shows today">In the Extractor fans flow: on or off, and online or not responding.</td><td data-label="What the dashboard can control today">Turn ON or Turn OFF, confirmed by the device, usually within seconds. A schedule or time request can also be captured.</td><td data-label="Limits / notes">Only the first fan at a site is shown. A cellar fan is allowed to be switched. Schedule changes are not possible, only captured.</td></tr>
+<tr><th scope="row" class="dev" data-label="Device">Refrigeration (fridge, freezer, chiller, cold room, cellar cooling)</th><td data-label="What it is">Cold-storage units and cellar cooling.</td><td data-label="What the dashboard shows today">No readings. The flow says Lighthouse monitors but does not control fridges.</td><td data-label="What the dashboard can control today" data-none="1">None - blocked on purpose, even when switch hardware is fitted.</td><td data-label="Limits / notes">A P1 if stock is at risk; otherwise logged as "monitored only". Cellar lights and fans are not treated as refrigeration.</td></tr>
+<tr><th scope="row" class="dev" data-label="Device">Site hub gateway (the wall-mounted Lighthouse unit)</th><td data-label="What it is">The unit that connects the site's equipment to Lighthouse.</td><td data-label="What the dashboard shows today">In the connection check: "the site is reachable" or "the wall-mounted Lighthouse unit is offline", with a script for checking power and the router.</td><td data-label="What the dashboard can control today" data-none="1">None.</td><td data-label="Limits / notes">A site without one is described as a "direct-connection site" and devices are checked one by one. If the hub is offline, the dashboard still lets a handler send changes to devices that show as online.</td></tr>
+<tr><th scope="row" class="dev" data-label="Device">Equipment-group gateway (for example the boiler, main distribution board, kitchen or heating receiver)</th><td data-label="What it is">A local receiver that connects one group of equipment.</td><td data-label="What the dashboard shows today">In the connection check: which equipment groups are not responding while the site itself is reachable.</td><td data-label="What the dashboard can control today" data-none="1">None.</td><td data-label="Limits / notes">Counted as offline only after 48 hours of silence.</td></tr>
+<tr><th scope="row" class="dev" data-label="Device">Boiler control panel (pub heating and hot water panel, two versions)</th><td data-label="What it is">The central panel that runs pub heating zones and hot water at some pubs.</td><td data-label="What the dashboard shows today">No readings. Its presence shortens the site panel to five rows and marks Heating as "Controllable from here", and Hot water as controllable if the panel serves hot water.</td><td data-label="What the dashboard can control today" data-none="1">None. The Hot water flow is always "log and escalate" or "boiler fault" guidance.</td><td data-label="Limits / notes">The panel is not recognised as its own type and counts as an "Unknown device". The site panel's "Controllable" labels for heating and hot water do not match what the flows allow. Its schedule is read but not shown.</td></tr>
+<tr><th scope="row" class="dev" data-label="Device">Unknown or monitor-only device (meters, warewash monitors, ambient, door and gas-valve sensors, connected ovens, anything not recognised)</th><td data-label="What it is">Any device the dashboard cannot place in a category.</td><td data-label="What the dashboard shows today">Nothing on its own. If it goes silent for 48 hours, it triggers the red "Some Lighthouse equipment at this site is not responding" banner.</td><td data-label="What the dashboard can control today" data-none="1">None.</td><td data-label="Limits / notes">A kitchen-named meter (for example a bain marie meter) appears as a kitchen circuit instead.</td></tr>
+</tbody>
+</table>
+
+<h2>Key gaps worth a look</h2>
+<ol><li>Switched devices with unrecognised names (over-door heaters, immersion heaters, festoon lights, supply, loft or bar fans) are all grouped as "kitchen", so a handler cannot switch them, and they never appear in the Lighting or Fans flows.</li><li>The "What Lighthouse controls at this site" panel can say "Controllable from here" for Kitchen equipment, Heating (any pub with a boiler panel) and Hot water, while the flows offer no control for those. A handler could tell a caller something can be changed when it cannot.</li><li>iT500 and older Salus thermostats are labelled as not controllable, but nothing enforces that. If one starts reporting again, the dashboard would offer temperature changes on it. Today this is only prevented by the units being offline.</li><li>Lighting and Extractor fans show only the first circuit at a site. A site with several lighting or fan circuits shows, and can switch, just one.</li><li>No temperature or status readings are shown for fridges, air conditioning or the boiler panel, so a handler cannot check a caller's report against live data for those.</li><li>The boiler control panel is not recognised as its own type, so the planned "pub boiler panel" reading and guidance never appears. It shows as an unknown device.</li><li>Remote changes are still offered when the site hub is offline, as long as the device itself shows online.</li><li>Older Salus units named without a bracketed site code are still missing (OOHDASH-129).</li></ol>
+
+<h2>Cost and benefit of acting on these gaps</h2>
+<p>These are rough estimates for James's review and have not been sized by the build team.</p><ul><li>Gaps 1, 2 and 4 are the cheapest and most valuable: each is a small change to how devices are grouped or labelled, about 0.5 to 2 days each including tests. The benefit is that handlers stop being told something is controllable when it is not, and they gain switching on fans and lights they cannot reach today.</li><li>Gap 3 is about half a day: one server check that refuses commands to units marked as not controllable. It has low benefit today, because the units are offline, but it removes a latent risk.</li><li>Gaps 5 and 6 are larger, about 3 to 10 days each, because the readings need to be designed, worded and tested. The benefit is better triage of fridge, air-con and pub-heating calls. They need James to decide whether they are worth doing.</li><li>Gap 7 is a design decision rather than a fix. The risk of leaving it is low for cloud-connected switches, and higher for Salus thermostats.</li></ul>
+
+<p class="note">Source: checked against the live dashboard code at v1.4.1 and the project's in-repo device documents. Where they disagreed, the code was followed. The Markdown version of this page lists the full sources and the differences found.</p>
+</main>
+</body>
+</html>
