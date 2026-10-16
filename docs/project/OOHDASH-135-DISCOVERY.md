@@ -62,11 +62,11 @@ Entry: setpointRequested to SERVER_SCOPE. Gate: salusDevice profile, 451 prod en
 
 ### Salus iT500 - older heating thermostat, FHI accommodation sites
 
-Entry: setpointRequested to SERVER_SCOPE. Gate: salusDevice profile, 346 prod entities. Identity: CLIENT_SCOPE vendor_device_id = Arrayent device ID (numeric), exactly one entity. Echo: setPoint. Status: PROVEN-BENCH - UAT bench proven 16 Oct, bridge v8 prod live, 9 of 61 accounts have devices. Timing: device confirms in 3-9 seconds. Dashboard today: the entire iT500 fleet stopped reporting around 2 Oct (vendor link switched off). The CONTROL_CONTRACT in code has controllable: false and dark: true - so the dashboard would not offer temperature control even if units came back online, until that flag is changed. If reporting is restored AND the controllable flag is corrected, the command path is now proven. Hot-water boost (hwBoostHoursRequested): BUILT with a code defect (see Code Verification Finding 1 - current code writes hwBoostHoursDesired, not hwBoostHoursRequested). This defect must be fixed and the command bench-tested before offering. iT500 mode: NOT SUPPORTED.
+Entry: setpointRequested to SERVER_SCOPE. Gate: salusDevice profile, 346 prod entities. Identity: CLIENT_SCOPE vendor_device_id = Arrayent device ID (numeric), exactly one entity. Echo: setPoint. Status: PROVEN-BENCH - UAT bench proven 16 Oct, bridge v8 prod live, 9 of 61 accounts have devices. Timing: device confirms in 3-9 seconds. Dashboard today: the entire iT500 fleet stopped reporting around 2 Oct (vendor link switched off). The CONTROL_CONTRACT in code has controllable: false and dark: true - so the dashboard would not offer temperature control even if units came back online, until that flag is changed. Code note: iT500 currently has controllable: false in the CONTROL_CONTRACT. A dashboard code change is needed to re-enable iT500 control, not just fleet restoration. If reporting is restored AND the controllable flag is corrected, the command path is now proven. Hot-water boost (hwBoostHoursRequested): BUILT with a code defect (see Code Verification Finding 1 - current code writes hwBoostHoursDesired, not hwBoostHoursRequested). This defect must be fixed and the command bench-tested before offering. iT500 mode: NOT SUPPORTED.
 
 ### Intesis air conditioning
 
-Entry: setpointRequested to SERVER_SCOPE. Gate: default profile, 12 prod Intesis entities (vendor_id = intesis in CLIENT_SCOPE). Identity: CLIENT_SCOPE vendor_device_id = Intesis device_id, exactly one entity. Echo: setPoint. Setpoint status: PROVEN-BENCH - vendor accepted in 0.45-0.47s on bench 16 Oct; TB echo waits up to 15-min poll. Mode (modeRequested): BUILT, not tested end to end. Dashboard today: Intesis air con is NOT shown with readings and control is NOT offered - the flow refers to the IoT team. This is deliberate design per OOHDASH-82. Enabling AC control requires changes in both registry.js and tb-device.js (see Code Verification Finding 4). This is a design decision for James (Q1). Modbus air con (246 units on airConditioningProfile): NO write path, read only, not in scope for this spike.
+Entry: setpointRequested to SERVER_SCOPE. Gate: default profile, 12 prod Intesis entities (vendor_id = intesis in CLIENT_SCOPE). Identity: CLIENT_SCOPE vendor_device_id = Intesis device_id, exactly one entity. Echo: setPoint. Setpoint status: PROVEN-BENCH - vendor accepted in 0.45-0.47s on bench 16 Oct; TB echo waits up to 15-min poll. Mode (modeRequested): BUILT, not tested end to end. Dashboard today: Intesis air con is NOT shown with readings and control is NOT offered - the flow refers to the IoT team. This is deliberate design per OOHDASH-82. Enabling AC control requires changes in BOTH registry.js (add setpoint/mode to commands[]) AND tb-device.js (remove or condition the Intesis force-non-controllable block at lines 475-478) - two files must change, not one (see Code Verification Finding 4). This is a design decision for James (Q1). Modbus air con (246 units on airConditioningProfile): NO write path, read only, not in scope for this spike.
 
 ### Boiler control panels - boilerControl profile
 
@@ -115,11 +115,11 @@ In registry.js line 222, the hwboost case returns "attribute: 'hwBoostHoursDesir
 Priority 1 - small, high value, no Spencer dependency, suitable for next patch:
 - Fix first-circuit-only for lighting and fans (Gap 2). About 1 day including tests. Show every circuit individually with its own on/off state and switch button. James specifically asked for this.
 - Fix "Controllable" label inconsistency (Gap 5). About 0.5 day. Derive the label from the capability evidence (WORKS/PARTLY/BUILT/NOT-SUPPORTED per type and the device live state), not from hardware presence alone.
-- Fix hwBoostHoursDesired to hwBoostHoursRequested (Gap 7, code defect). About 0.5 day including test. One-line registry.js change. Must be done before any boost bench test.
 
 Priority 2 - small, closes latent risk:
+- Fix hwBoostHoursDesired to hwBoostHoursRequested in registry.js (Gap 7, code defect). About 0.25 day. One-line change. Currently latent because iT500 fleet is offline; must be fixed before any bench test of iT500 hot-water boost is attempted.
+- Fix iT500 controllable: false in CONTROL_CONTRACT (Gap 9). About 0.25 day. Change controllable: false to controllable: true in the salus-it500 contract, remove dark: true. Required before fleet restoration can restore iT500 control - the fleet coming back online alone is not sufficient without this code change.
 - Enforce "not controllable" server-side (Gap 3, OOHDASH-132). About 0.5-1 day. One check in validateCommand or capabilitiesContractFor that refuses commands to types with controllable: false in the CONTROL_CONTRACT, regardless of the commands list.
-- Correct iT500 CONTROL_CONTRACT controllable flag (Gap 9). About 0.5 day. Change controllable: false to controllable: true in the salus-it500 contract, remove dark: true. Conditional on IoT team restoring fleet reporting and Spencer confirming the bench result is sufficient.
 
 Priority 3 - medium, depends on James decision:
 - Surface boiler panel readings (Gap 4, Q2). About 3-5 days. Add a name-token row or profile-based branch to classifyDevice that produces 'boiler-panel' type; map the telemetry; wire readings into the Heating and Hot water flows. Control is a separate decision.
@@ -150,7 +150,7 @@ PROVEN-BENCH - bench only, prod path deployed but no live customer command yet:
 - Salus iT700 setpoint (bench UAT Downstairs + Office + Upstairs, 16 Oct, MQTT fix, watched at unit)
 
 BUILT not tested end to end:
-- Salus iT500 hot-water boost (key-stem bridge bug fixed, dashboard code defect found - writes Desired not Requested)
+- Salus iT500 hot-water boost (key-stem bridge bug fixed, dashboard code defect found - writes Desired not Requested). Also: dashboard-side registry.js writes hwBoostHoursDesired instead of hwBoostHoursRequested - this key write defect must be patched before any test can succeed.
 - Intesis mode (BUILT, no bench run)
 
 NOT SUPPORTED by spec this phase:
