@@ -2,7 +2,7 @@
 
 ## v1.4.2 — OOHDASH-134 P1 Escalation in the Something else flow
 
-**Date:** TBD (release doer cuts with `npm run release`) · **Bump type:** patch · **Branch:** `feat/oohdash-134-other-p1`
+**Date:** 2026-10-16 (release doer cuts with `npm run release`) · **Bump type:** patch · **Branch:** `feat/oohdash-134-other-p1`
 
 ### What changed
 
