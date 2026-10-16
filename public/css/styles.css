@@ -102,6 +102,12 @@ table.tbl tr.rowoff td{background:var(--danger-light)}
 .chip{border:1.5px solid var(--border);background:var(--surface);border-radius:var(--radius-md);padding:9px 16px;font-size:14px;font-weight:500;cursor:pointer;min-height:40px}
 .chip:hover{border-color:var(--primary);color:var(--primary)}
 .chip.sel{border-color:var(--primary);background:var(--primary-light);color:var(--primary-dark);font-weight:600}
+.chip.p1{border-color:var(--danger);color:#991B1B;background:var(--surface);font-weight:600}
+.chip.p1:hover{background:var(--danger-light);border-color:var(--danger);color:#991B1B}
+.chip:disabled,.chip:disabled:hover{opacity:.5;cursor:not-allowed;border-color:var(--border);color:inherit;background:var(--surface)}
+.p1-explainer{font-size:13px;line-height:19px;color:var(--text-secondary);border-left:3px solid var(--danger);padding:6px 12px;margin:12px 0 4px}
+.p1-explainer p{margin:0 0 4px}
+.p1-blocked-note{color:#991B1B;margin:4px 0 8px}
 .zoneread{border:1px solid var(--border);border-radius:var(--radius-md);padding:10px 14px;margin:8px 0;display:flex;align-items:center;gap:14px;flex-wrap:wrap}
 .zoneread .t{font-size:20px;font-weight:700}
 .script{background:var(--surface-variant);border-left:3px solid var(--primary);border-radius:0 var(--radius-md) var(--radius-md) 0;padding:11px 14px;font-size:14px;font-style:italic;margin:10px 0;line-height:21px}
