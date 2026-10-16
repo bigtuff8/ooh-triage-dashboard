@@ -1,0 +1,115 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Something else P1</title>
+<style>
+:root{--primary:#594AE2;--primary-dark:#4338CA;--primary-light:#EEF2FF;--danger:#EF4444;--danger-light:#FEE2E2;--danger-text:#991B1B;--info-light:#DBEAFE;--info-text:#1E40AF;--success-light:#D1FAE5;--surface:#FFFFFF;--background:#F1F5F9;--text:#1E293B;--text2:#64748B;--border:#E2E8F0}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){--primary:#8B80F0;--primary-dark:#C7C2FA;--primary-light:#2A2550;--danger:#F87171;--danger-light:#3B1414;--danger-text:#FCA5A5;--info-light:#172554;--info-text:#BFDBFE;--success-light:#064E3B;--surface:#1E293B;--background:#0F172A;--text:#E2E8F0;--text2:#94A3B8;--border:#334155}}
+:root[data-theme="dark"]{--primary:#8B80F0;--primary-dark:#C7C2FA;--primary-light:#2A2550;--danger:#F87171;--danger-light:#3B1414;--danger-text:#FCA5A5;--info-light:#172554;--info-text:#BFDBFE;--success-light:#064E3B;--surface:#1E293B;--background:#0F172A;--text:#E2E8F0;--text2:#94A3B8;--border:#334155}
+*{box-sizing:border-box}
+body{margin:0;background:var(--background);color:var(--text);font:15px/1.45 system-ui,-apple-system,"Segoe UI",sans-serif}
+.wrap{max-width:420px;margin:0 auto;padding:16px}
+.top{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px}
+.top h1{font-size:16px;margin:0}
+.top button{font-size:12px;background:none;border:1px solid var(--border);color:var(--text2);border-radius:6px;padding:4px 8px;cursor:pointer}
+.card{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:14px}
+.site{font-size:12px;color:var(--text2);margin-bottom:8px}
+.stepq{font-weight:600;margin-bottom:8px}
+.stepdone{font-size:13px;color:var(--text2);margin-bottom:8px}
+textarea{width:100%;font:inherit;padding:8px;border:1.5px solid var(--border);border-radius:8px;background:var(--surface);color:var(--text);margin-bottom:10px}
+.chips{display:flex;flex-wrap:wrap;gap:8px}
+.chip{border:1.5px solid var(--border);background:var(--surface);color:var(--text);border-radius:8px;padding:9px 14px;font-size:14px;font-weight:500;cursor:pointer;min-height:40px;text-align:left}
+.chip:hover{border-color:var(--primary);color:var(--primary)}
+.chip.p1{border-color:var(--danger);color:var(--danger-text)}
+.chip.p1:hover{background:var(--danger-light)}
+.sign{margin-top:12px;border-left:3px solid var(--danger);padding:4px 0 4px 10px;font-size:13px;color:var(--text2)}
+.sign p{margin:0 0 6px}
+.sign b{color:var(--text)}
+.alert{border-radius:8px;padding:10px;font-size:14px;margin-bottom:8px}
+.alert.info{background:var(--info-light);color:var(--info-text)}
+.alert.err{background:var(--danger-light);color:var(--danger-text)}
+.btn{background:var(--primary);color:#fff;border:0;border-radius:8px;padding:10px 16px;font-size:14px;font-weight:600;cursor:pointer;min-height:40px}
+.outcome{border-radius:10px;padding:12px;margin-top:4px}
+.outcome.p1{background:var(--danger-light);border:1.5px solid var(--danger)}
+.outcome.cap{background:var(--primary-light);border:1.5px solid var(--primary)}
+.outcome h3{margin:0 0 6px;font-size:16px}
+.outcome p{margin:0 0 6px;font-size:14px}
+.script{font-style:italic;border-left:3px solid var(--border);padding-left:8px;margin:8px 0;font-size:14px}
+.small{font-size:12px;color:var(--text2)}
+.meta{margin-top:14px;font-size:12px;color:var(--text2)}
+.meta code{word-break:break-all}
+.toggles{display:flex;gap:6px;flex-wrap:wrap;margin-top:12px}
+.toggles label{font-size:12px;color:var(--text2)}
+</style>
+</head>
+<body>
+<div class="wrap">
+ <div class="top"><h1>OOHDASH-134 prototype</h1><button id="theme" type="button">Toggle theme</button></div>
+ <div class="card">
+  <div class="site">Site 6749 - Angel Inn - Something else</div>
+  <div id="stage"></div>
+ </div>
+ <div class="toggles">
+  <label><input type="checkbox" id="optErr"> Simulate save error</label>
+ </div>
+ <div class="meta" id="meta"></div>
+</div>
+<script>
+(function(){
+ var s={stage:0,text:'',path:null,ticket:50412};
+ var el=document.getElementById('stage'), meta=document.getElementById('meta');
+ function esc(t){return String(t).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];});}
+ function summary(t){t=(t||'').trim().replace(/\s+/g,' ');if(!t)return 'Something else - see ticket';var x='Something else: '+t;return x.length>80?x.slice(0,77)+'...':x;}
+ function render(){
+  meta.innerHTML='';
+  if(s.stage===0){
+   el.innerHTML='<div class="stepq">Describe the issue in the caller\'s words</div>'+
+   '<textarea id="otxt" rows="2" placeholder="e.g. the voltage optimiser needs resetting - is that you?">'+esc(s.text)+'</textarea>'+
+   '<div class="chips"><button class="chip" data-p="check">Check if it\'s Lighthouse-controlled</button>'+
+   '<button class="chip" data-p="cap">Capture &amp; escalate as described</button>'+
+   '<button class="chip p1" data-p="p1">Escalate as P1 - urgent, pages on-duty manager</button></div>'+
+   '<div class="sign"><p><b>P1 = urgent tonight and it can\'t wait until morning.</b> For example: kitchen off during service, stock at risk in a fridge or freezer, external lighting out after the override failed, or a contractor on site who needs IoT support now.</p>'+
+   '<p><b>Not a P1:</b> anything that can wait until the next working day. Use "Capture &amp; escalate as described" instead. It is logged, not lost.</p></div>';
+   Array.prototype.forEach.call(el.querySelectorAll('.chip'),function(b){b.onclick=function(){s.text=document.getElementById('otxt').value;s.path=b.getAttribute('data-p');s.stage=1;render();};});
+   return;
+  }
+  var q=s.text.trim()||'(not specified)';
+  var done='<div class="stepdone">Issue: "'+esc(q)+'"</div>';
+  if(s.path==='check'){
+   el.innerHTML=done+'<div class="stepq">Which of these is it closest to?</div><div class="chips"><button class="chip">Heating</button><button class="chip">Hot water</button><button class="chip">Lighting</button><button class="chip">Refrigeration</button></div><p class="small">Unchanged from v1.4.1. <a href="#" id="back">Back</a></p>';
+   document.getElementById('back').onclick=function(e){e.preventDefault();s.stage=0;render();};return;
+  }
+  var p1=s.path==='p1';
+  var subject=p1?'Something else - urgent, escalated as P1':'General issue captured';
+  var detail=p1?'Caller reported: '+q+'. Did not fit a specific tile; handler judged it urgent tonight.':'Caller reported: '+q+'. Captured verbatim for the IoT team.';
+  if(s.stage===1){
+   el.innerHTML=done+'<div class="alert info"><b>'+esc(subject)+'</b><div style="margin-top:4px;font-size:.9em">'+esc(detail)+'</div></div>'+
+   '<button class="btn" id="rec">Record outcome</button> <button class="chip" id="bk" style="margin-left:6px">Back</button>';
+   document.getElementById('rec').onclick=function(){s.stage=2;render();setTimeout(function(){s.stage=document.getElementById('optErr').checked?4:3;render();},700);};
+   document.getElementById('bk').onclick=function(){s.stage=0;render();};
+  } else if(s.stage===2){
+   el.innerHTML=done+'<div class="alert info">Recording the outcome...</div>';
+  } else if(s.stage===4){
+   el.innerHTML=done+'<div class="alert err">Couldn\'t record the outcome: network error <button class="chip" id="retry" style="margin-left:8px">Try again</button></div>';
+   document.getElementById('retry').onclick=function(){document.getElementById('optErr').checked=false;s.stage=1;render();};
+  } else {
+   if(p1){
+    var line='The P1 is logged as ticket <b>#'+s.ticket+'</b> in the IoT Support dashboard, which pages the on-duty manager.';
+    var script=honest()?'I\'ve escalated this as urgent and logged it for our on-duty manager, who will call you back.':'I\'ve escalated this as urgent - a text has gone to our on-duty manager and someone will call you back shortly.';
+    el.innerHTML=done+'<div class="outcome p1"><h3>Escalated - P1</h3><p>'+esc(detail)+'</p><p>'+line+'</p><div class="script">"'+script+'"</div><p class="small">Ticket <b>#'+s.ticket+'</b></p></div>';
+    meta.innerHTML='Sent p1Summary ('+summary(s.text).length+' chars): <code>'+esc(summary(s.text))+'</code>';
+   } else {
+    el.innerHTML=done+'<div class="outcome cap"><h3>Captured for the IoT team</h3><p>'+esc(detail)+'</p><p>This will be actioned on the <b>next working day</b> - it is logged, not lost.</p><p class="small">Ticket <b>#'+s.ticket+'</b> - no page sent</p></div>';
+   }
+   el.innerHTML+='<div class="chips" style="margin-top:10px"><button class="chip" id="again">Start again</button></div>';
+   document.getElementById('again').onclick=function(){s={stage:0,text:'',path:null,ticket:s.ticket+1};render();};
+  }
+ }
+ document.getElementById('theme').onclick=function(){var r=document.documentElement;var d=r.getAttribute('data-theme')==='dark'||(!r.getAttribute('data-theme')&&matchMedia('(prefers-color-scheme: dark)').matches);r.setAttribute('data-theme',d?'light':'dark');};
+ render();
+})();
+</script>
+</body>
+</html>
