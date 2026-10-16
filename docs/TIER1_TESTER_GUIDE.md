@@ -47,6 +47,7 @@ real customer sites while you learn.
    - **Scope-only** — you've investigated and scoped it, but no further action needed now.
    - **No-action** — nothing wrong / nothing to do.
    - **Escalate P1** — genuine out-of-hours priority-1; this triggers the P1 escalation path.
+   - **Something else** (v1.4.2): Capture & escalate now offers **P1 Escalation** (needs a reason; texts the escalation manager on the IoT Support team) or **Raise a Normal Priority ticket** (the usual capture).
 5. The outcome is written back to the Zendesk ticket as the handover summary.
 
 > Escalate P1 only for genuine priority-1 situations — it pages people. When practising, use

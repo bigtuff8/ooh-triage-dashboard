@@ -63,6 +63,7 @@ test('E4: confirm step shown on chip click; Record outcome fires the POST', asyn
     await page.locator('[data-testid="tile-other"]').click();
     await page.locator('[data-testid="other-text"]').pressSequentially('test confirm step', { delay: 20 });
     await page.locator('[data-testid="other-capture"]').click();
+    await page.locator('[data-testid="other-normal"]').click(); // OOHDASH-134: Capture -> normal priority
 
     // Confirm step must show before any POST
     const confirmStep = page.locator('[data-testid="confirm-step"]');
@@ -86,6 +87,7 @@ test('E5: additionalNotes carried in the POST body when notes are entered', asyn
     await page.locator('[data-testid="other-text"]').pressSequentially('fryer issue', { delay: 20 });
     await page.locator('#addnotes').fill(NOTE);
     await page.locator('[data-testid="other-capture"]').click();
+    await page.locator('[data-testid="other-normal"]').click(); // OOHDASH-134: Capture -> normal priority
     await expect(page.locator('[data-testid="confirm-step"]')).toBeVisible();
 
     const postPromise = page.waitForRequest(r => r.url().includes('/api/outcomes') && r.method() === 'POST');
@@ -104,6 +106,7 @@ test('E6: addnotes-echo element present when notes were entered', async ({ page 
     await page.locator('[data-testid="other-text"]').pressSequentially('boiler issue', { delay: 20 });
     await page.locator('#addnotes').fill(NOTE);
     await page.locator('[data-testid="other-capture"]').click();
+    await page.locator('[data-testid="other-normal"]').click(); // OOHDASH-134: Capture -> normal priority
     await page.locator('[data-testid="record-outcome"]').click();
 
     const echo = page.locator('[data-testid="addnotes-echo"]');
@@ -118,6 +121,7 @@ test('E7: no addnotes-echo when notes field left empty', async ({ page }) => {
     await page.locator('[data-testid="tile-other"]').click();
     await page.locator('[data-testid="other-text"]').pressSequentially('no notes test', { delay: 20 });
     await page.locator('[data-testid="other-capture"]').click();
+    await page.locator('[data-testid="other-normal"]').click(); // OOHDASH-134: Capture -> normal priority
     await page.locator('[data-testid="record-outcome"]').click();
     await expect(page.locator('[data-testid="outcome-captured"]')).toBeVisible();
     await expect(page.locator('[data-testid="addnotes-echo"]')).toHaveCount(0);
@@ -130,6 +134,7 @@ test('E8: additionalNotes is null in POST when field is empty', async ({ page })
     await page.locator('[data-testid="tile-other"]').click();
     await page.locator('[data-testid="other-text"]').pressSequentially('null notes test', { delay: 20 });
     await page.locator('[data-testid="other-capture"]').click();
+    await page.locator('[data-testid="other-normal"]').click(); // OOHDASH-134: Capture -> normal priority
     const postPromise = page.waitForRequest(r => r.url().includes('/api/outcomes') && r.method() === 'POST');
     await page.locator('[data-testid="record-outcome"]').click();
     const req = await postPromise;
@@ -144,6 +149,7 @@ test('E9: post-submit notes link/box rendered after outcome captured', async ({ 
     await page.locator('[data-testid="tile-other"]').click();
     await page.locator('[data-testid="other-text"]').pressSequentially('e9 post-submit', { delay: 20 });
     await page.locator('[data-testid="other-capture"]').click();
+    await page.locator('[data-testid="other-normal"]').click(); // OOHDASH-134: Capture -> normal priority
     await page.locator('[data-testid="record-outcome"]').click();
     await expect(page.locator('[data-testid="outcome-captured"]')).toBeVisible();
     // Post-submit notes box (or its link) must appear after the outcome
@@ -158,6 +164,7 @@ test('E10: post-submit notes box fires POST /api/tickets/:id/notes', async ({ pa
     await page.locator('[data-testid="tile-other"]').click();
     await page.locator('[data-testid="other-text"]').pressSequentially('e10 test', { delay: 20 });
     await page.locator('[data-testid="other-capture"]').click();
+    await page.locator('[data-testid="other-normal"]').click(); // OOHDASH-134: Capture -> normal priority
     await page.locator('[data-testid="record-outcome"]').click();
     await expect(page.locator('[data-testid="outcome-captured"]')).toBeVisible();
 
@@ -204,6 +211,7 @@ test('E12: draft cleared after "Add another issue"', async ({ page }) => {
     await page.locator('[data-testid="other-text"]').pressSequentially('first issue', { delay: 20 });
     await page.locator('#addnotes').fill('E12 note that should be gone after another issue');
     await page.locator('[data-testid="other-capture"]').click();
+    await page.locator('[data-testid="other-normal"]').click(); // OOHDASH-134: Capture -> normal priority
     await page.locator('[data-testid="record-outcome"]').click();
     await expect(page.locator('[data-testid="outcome-captured"]')).toBeVisible();
 
@@ -270,6 +278,7 @@ test('E15: whitespace-only notes sends null in POST (not empty string)', async (
     await page.locator('[data-testid="other-text"]').pressSequentially('whitespace notes test', { delay: 20 });
     await page.locator('#addnotes').fill('   ');
     await page.locator('[data-testid="other-capture"]').click();
+    await page.locator('[data-testid="other-normal"]').click(); // OOHDASH-134: Capture -> normal priority
     const postPromise = page.waitForRequest(r => r.url().includes('/api/outcomes') && r.method() === 'POST');
     await page.locator('[data-testid="record-outcome"]').click();
     const req = await postPromise;
@@ -353,6 +362,7 @@ test('E19: confirm step shows outcome subject and Record outcome button', async 
     await page.locator('[data-testid="tile-other"]').click();
     await page.locator('[data-testid="other-text"]').pressSequentially('confirm step ui test', { delay: 20 });
     await page.locator('[data-testid="other-capture"]').click();
+    await page.locator('[data-testid="other-normal"]').click(); // OOHDASH-134: Capture -> normal priority
 
     const confirm = page.locator('[data-testid="confirm-step"]');
     await expect(confirm).toBeVisible();
@@ -371,6 +381,7 @@ test('E20: double-click on Record outcome does not fire two POSTs', async ({ pag
     await page.locator('[data-testid="tile-other"]').click();
     await page.locator('[data-testid="other-text"]').pressSequentially('double fire guard', { delay: 20 });
     await page.locator('[data-testid="other-capture"]').click();
+    await page.locator('[data-testid="other-normal"]').click(); // OOHDASH-134: Capture -> normal priority
     await expect(page.locator('[data-testid="confirm-step"]')).toBeVisible();
 
     let postCount = 0;
@@ -412,6 +423,7 @@ test('E22: post-submit save failure keeps typed text in the box for retry', asyn
     await page.locator('[data-testid="tile-other"]').click();
     await page.locator('[data-testid="other-text"]').pressSequentially('e22 test', { delay: 20 });
     await page.locator('[data-testid="other-capture"]').click();
+    await page.locator('[data-testid="other-normal"]').click(); // OOHDASH-134: Capture -> normal priority
     await page.locator('[data-testid="record-outcome"]').click();
     await expect(page.locator('[data-testid="outcome-captured"]')).toBeVisible({ timeout: 8000 });
 
@@ -456,6 +468,7 @@ test('E23: XSS payload in notes field is escaped — no element or script create
 
     // Sink 2: confirm-step echo (payload.subject — not additionalNotes, but verify no bleed-through)
     await page.locator('[data-testid="other-capture"]').click();
+    await page.locator('[data-testid="other-normal"]').click(); // OOHDASH-134: Capture -> normal priority
     await expect(page.locator('[data-testid="confirm-step"]')).toBeVisible();
 
     // Proceed to outcome
@@ -509,6 +522,7 @@ test('E24: two different notes saved sequentially on the same ticket — both wr
     await page.locator('[data-testid="tile-other"]').click();
     await page.locator('[data-testid="other-text"]').pressSequentially('e24 idempotency test', { delay: 20 });
     await page.locator('[data-testid="other-capture"]').click();
+    await page.locator('[data-testid="other-normal"]').click(); // OOHDASH-134: Capture -> normal priority
     await page.locator('[data-testid="record-outcome"]').click();
     await expect(page.locator('[data-testid="outcome-captured"]')).toBeVisible({ timeout: 8000 });
     await expect(page.locator('[data-testid="addnotes-post-open"]')).toBeVisible({ timeout: 4000 });
@@ -553,6 +567,7 @@ test('E25: server 500 on first save does not deduplicate the retry — note is w
     await page.locator('[data-testid="tile-other"]').click();
     await page.locator('[data-testid="other-text"]').pressSequentially('e25 retry test', { delay: 20 });
     await page.locator('[data-testid="other-capture"]').click();
+    await page.locator('[data-testid="other-normal"]').click(); // OOHDASH-134: Capture -> normal priority
     await page.locator('[data-testid="record-outcome"]').click();
     await expect(page.locator('[data-testid="outcome-captured"]')).toBeVisible({ timeout: 8000 });
     await expect(page.locator('[data-testid="addnotes-post-open"]')).toBeVisible({ timeout: 4000 });
@@ -600,6 +615,7 @@ test('E26: whitespace-only notes sends null (DF-01 trim fix) and no echo is show
     await page.locator('[data-testid="other-text"]').pressSequentially('DF-01 whitespace test', { delay: 20 });
     await page.locator('#addnotes').fill('   ');
     await page.locator('[data-testid="other-capture"]').click();
+    await page.locator('[data-testid="other-normal"]').click(); // OOHDASH-134: Capture -> normal priority
     const postPromise = page.waitForRequest(r => r.url().includes('/api/outcomes') && r.method() === 'POST');
     await page.locator('[data-testid="record-outcome"]').click();
     const req = await postPromise;

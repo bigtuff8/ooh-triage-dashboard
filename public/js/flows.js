@@ -341,6 +341,71 @@ function outcomeP1(f, key, { subject, detail, script, p1Summary, OohCaptureClass
   <div class="script">“${script}”</div><p class="small">Ticket <b>#${res.ticket.id}</b></p></div>`);
 }
 
+/* ------------------------ OOHDASH-134: P1 Escalation in "Something else" ------------------------ */
+
+const OTHER_P1_SUMMARY_MAX = 80;
+
+/**
+ * Text-message summary for a "Something else" P1: whitespace collapsed, prefixed, and cut to at most
+ * 80 characters (77 + "..."). The full reason stays in the ticket detail.
+ */
+function otherP1Summary(text) {
+    const t = String(text == null ? '' : text).replace(/\s+/g, ' ').trim();
+    if (!t) return 'Something else - see ticket'; // defensive only: the UI guard blocks an empty reason
+    const s = 'Something else: ' + t;
+    return s.length > OTHER_P1_SUMMARY_MAX ? s.slice(0, OTHER_P1_SUMMARY_MAX - 3) + '...' : s;
+}
+
+/** The reason for a "Something else" P1: the stage-0 caller words, else the inline reason box. Blank = ''. */
+function otherP1Reason(f) {
+    const typed = String(f.data.qraw || '').trim();
+    return typed || String(f.data.p1reason || '').trim();
+}
+
+/** Choice step after "Capture & escalate as described": P1 Escalation or Raise a Normal Priority ticket. */
+function otherP1Choice(f) {
+    const hasStage0Text = !!String(f.data.qraw || '').trim();
+    const blocked = !otherP1Reason(f);
+    const reasonBox = hasStage0Text ? '' : `<div class="formrow" style="margin-top:10px"><label for="op1reason">Reason for a P1 (required to escalate)</label>
+   <textarea id="op1reason" data-testid="other-p1-reason" rows="2" oninput="otherP1ReasonInput(this.value)">${esc(f.data.p1reason || '')}</textarea></div>
+   <p class="small p1-blocked-note" data-testid="other-p1-blocked-note"${blocked ? '' : ' hidden'}>Type the reason this is a P1 before escalating.</p>`;
+    return `<div class="stepq">How should this be raised?</div>${reasonBox}
+   <div class="chips">
+    <button class="chip p1" data-testid="other-p1" onclick="raiseOtherP1()"${blocked ? ' disabled aria-disabled="true"' : ''}>P1 Escalation</button>
+    <button class="chip" data-testid="other-normal" onclick="flowStep({path:'normal'})">Raise a Normal Priority ticket</button>
+   </div>
+   <div class="p1-explainer" data-testid="other-p1-explainer">
+    <p>A P1 is anything that is immediately health and safety or business trading affecting.</p>
+    <p>Please only use this option after you've attempted to follow through one of the circumstance tiles.</p>
+    <p>P1 escalation will send a text to the escalation manager on the IoT Support team immediately upon submission.</p>
+   </div>`;
+}
+
+/** Inline reason box handler: keeps the value across re-renders and enables P1 only for a non-blank reason. */
+function otherP1ReasonInput(value) {
+    const f = state.flow;
+    if (!f) return;
+    f.data.p1reason = value;
+    const ok = !!otherP1Reason(f);
+    const btn = document.querySelector('[data-testid="other-p1"]');
+    if (btn) { btn.disabled = !ok; if (ok) btn.removeAttribute('aria-disabled'); else btn.setAttribute('aria-disabled', 'true'); }
+    const note = document.querySelector('[data-testid="other-p1-blocked-note"]');
+    if (note) note.hidden = ok;
+}
+
+/** P1 button: re-checks the reason guard (D4) so a blank reason can never be escalated. */
+function raiseOtherP1() {
+    const f = state.flow;
+    if (!f) return;
+    const reason = otherP1Reason(f);
+    if (!reason) {
+        const note = document.querySelector('[data-testid="other-p1-blocked-note"]');
+        if (note) note.hidden = false;
+        return;
+    }
+    flowStep({ path: 'p1', p1reason: reason });
+}
+
 function outcomeScope(f, key, { subject, evidence, script }) {
     return finishOutcome(f, key,
         { type: 'scope-only', subject, detail: evidence, issueLabel: subject, issueCls: 'grey' },
@@ -1035,22 +1100,38 @@ const FLOWR = {
    <div class="formrow"><textarea id="otxt" data-testid="other-text" rows="2" placeholder="e.g. “the voltage optimiser needs resetting — is that you?”">${esc(f.data.freeText || '')}</textarea></div>
    <div class="chips">
     <button class="chip" data-testid="other-check" onclick="flowStep({q:document.getElementById('otxt').value||'(not specified)',path:'check'})">Check if it’s Lighthouse-controlled</button>
-    <button class="chip" data-testid="other-capture" onclick="flowStep({q:document.getElementById('otxt').value||'(not specified)',path:'cap'})">Capture &amp; escalate as described</button>
+    <button class="chip" data-testid="other-capture" onclick="flowStep({q:document.getElementById('otxt').value||'(not specified)',qraw:document.getElementById('otxt').value,path:'cap'})">Capture &amp; escalate as described</button>
    </div>`;
         }
         if (f.stage === 1) {
             if (!f.data._oline) { doneLine('Issue: “' + esc(f.data.q) + '”'); f.data._oline = 1; }
-            if (f.data.path === 'cap') {
-                return outcomeCaptured(f, 'cap', {
-                    subject: 'General issue captured',
-                    detail: `Caller reported: ${f.data.q}. Captured verbatim for the IoT team.`,
-                    script: 'I’ve logged exactly what you’ve described for the IoT team — they’ll pick it up on the next working day. If it gets urgent tonight, ring back and we’ll escalate.',
-                    OohCaptureClass: 'general'
-                });
-            }
+            // OOHDASH-134: Capture now opens a two-button choice (P1 Escalation / normal priority).
+            if (f.data.path === 'cap') return otherP1Choice(f);
             return `<div class="stepq">Which of these is it closest to?</div><div class="chips">
     ${state.workspace.scope.map(g => `<button class="chip" data-testid="scope-${g.key}" onclick="flowStep({g:'${g.key}'})">${esc(g.label)}</button>`).join('')}</div>
    <p class="small" style="margin-top:8px">This checks the live device inventory for <b>this site</b> — it can say with certainty what is and isn’t on Lighthouse here. What it can’t always settle is a fault <i>inside</i> shared kit (e.g. the boiler behind our controls).</p>`;
+        }
+        if (f.stage === 2 && f.data.path === 'normal') {
+            // OOHDASH-134: identical to the pre-v1.4.2 Capture outcome.
+            if (!f.data._nline) { doneLine('Raised as a normal priority ticket'); f.data._nline = 1; }
+            return outcomeCaptured(f, 'cap', {
+                subject: 'General issue captured',
+                detail: `Caller reported: ${f.data.q}. Captured verbatim for the IoT team.`,
+                script: 'I’ve logged exactly what you’ve described for the IoT team — they’ll pick it up on the next working day. If it gets urgent tonight, ring back and we’ll escalate.',
+                OohCaptureClass: 'general'
+            });
+        }
+        if (f.stage === 2 && f.data.path === 'p1') {
+            // OOHDASH-134: same shared P1 signal as the lighting/kitchen/contractor flows
+            // (escalate-p1 via outcomeP1; no capture class, no actionId).
+            if (!f.data._pline) { doneLine('P1 Escalation chosen'); f.data._pline = 1; }
+            const reason = f.data.p1reason;
+            return outcomeP1(f, 'p1', {
+                subject: 'Something else - urgent, escalated as P1',
+                detail: `Caller reported: ${reason}. Did not fit a specific tile; handler judged it urgent tonight.`,
+                script: 'I’ve escalated this as urgent — a text has gone to our on-duty manager and someone will call you back shortly.',
+                p1Summary: otherP1Summary(reason)
+            });
         }
         if (f.stage === 2) {
             const g = state.workspace.scope.find(x => x.key === f.data.g);
