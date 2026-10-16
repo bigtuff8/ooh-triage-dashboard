@@ -1,5 +1,32 @@
 # Release Notes — OOH Dashboard
 
+## v1.4.2 — OOHDASH-134 P1 Escalation in the Something else flow
+
+**Date:** TBD (release doer cuts with `npm run release`) · **Bump type:** patch · **Branch:** `feat/oohdash-134-other-p1`
+
+### What changed
+
+**OOHDASH-134 (feature):** In the "Something else" flow the first step is unchanged (Check if it's Lighthouse-controlled | Capture & escalate as described). Choosing Capture now opens a new step with two buttons:
+
+- **P1 Escalation** (red) — raises a P1 through the shared `outcomeP1` helper, exactly the same P1 signal as the lighting, kitchen and contractor flows (outcome type `escalate-p1`, urgent priority, `ooh` + `ooh_p1` tags, Ticket Category, `[OOH]` subject, escalation text). Subject "Something else - urgent, escalated as P1"; the caller's full text is kept in the ticket detail; the text-message summary is "Something else: <reason>" cut to 80 characters.
+- **Raise a Normal Priority ticket** — identical to the previous Capture outcome ("General issue captured", class `general`, next working day).
+
+Under the buttons a short explanation says what a P1 is (immediately health and safety or business trading affecting), to use it only after trying a circumstance tile, and that it texts the escalation manager on the IoT Support team immediately.
+
+**No server change.** UI only: `public/js/flows.js` (new `otherP1Choice`, `otherP1Summary`, `otherP1Reason`, `otherP1ReasonInput`, `raiseOtherP1`), `public/css/styles.css` (`.chip.p1`, `.chip:disabled`, `.p1-explainer`, `.p1-blocked-note`).
+
+**Tests:** new e2e `tests/oohdash-134-other-p1.spec.js` (134-A..H incl. lighting-P1 parity and the blocked-reason cases), new unit `test/other-p1-summary.test.js`; existing Capture tests now press "Raise a Normal Priority ticket".
+
+### Accepted known behaviours
+
+- The P1 button is blocked until a non-blank reason exists. If the caller-words box was left empty, an inline reason box appears on the choice step; whitespace does not count.
+- The Something else P1 has no capture class (same as the lighting P1), so audit metrics show it as unclassified.
+- The Check if it's Lighthouse-controlled path is unchanged.
+
+### Rollback
+
+Redeploy the v1.4.1 image (built from cdf480e). No data, setting or migration to undo.
+
 ## v1.4.1 — OOHDASH-128 legacy bare-salus thermostat load
 
 **Date:** TBD (release doer cuts with `npm run release:patch`) · **Bump type:** patch · **Branch:** `build/oohdash-128-legacy-salus-load`
