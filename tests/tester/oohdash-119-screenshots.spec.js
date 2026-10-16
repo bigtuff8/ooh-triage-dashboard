@@ -27,6 +27,7 @@ test('SS-02: confirm step with note text filled', async ({ page }) => {
     await page.locator('[data-testid="other-text"]').pressSequentially('boiler not working', { delay: 20 });
     await page.locator('#addnotes').pressSequentially('Engineer due at 7am - called ahead', { delay: 5 });
     await page.locator('[data-testid="other-capture"]').click();
+    await page.locator('[data-testid="other-normal"]').click(); // OOHDASH-134: Capture -> normal priority
     await expect(page.locator('[data-testid="confirm-step"]')).toBeVisible();
     await page.screenshot({ path: DIR + '/02-confirm-step.png' });
 });
@@ -50,6 +51,7 @@ test('SS-04: post-submit box — idle state', async ({ page }) => {
     await page.locator('[data-testid="other-text"]').pressSequentially('fryer issue', { delay: 20 });
     await page.locator('#addnotes').pressSequentially('Note for post-submit test', { delay: 5 });
     await page.locator('[data-testid="other-capture"]').click();
+    await page.locator('[data-testid="other-normal"]').click(); // OOHDASH-134: Capture -> normal priority
     await expect(page.locator('[data-testid="confirm-step"]')).toBeVisible();
     await page.locator('[data-testid="record-outcome"]').click();
     await expect(page.locator('[data-testid="outcome-captured"]')).toBeVisible();
@@ -69,6 +71,7 @@ test('SS-05: 500 error state from post-submit save', async ({ page }) => {
     await page.locator('[data-testid="tile-other"]').click();
     await page.locator('[data-testid="other-text"]').pressSequentially('error test', { delay: 20 });
     await page.locator('[data-testid="other-capture"]').click();
+    await page.locator('[data-testid="other-normal"]').click(); // OOHDASH-134: Capture -> normal priority
     await expect(page.locator('[data-testid="confirm-step"]')).toBeVisible();
     await page.locator('[data-testid="record-outcome"]').click();
     await expect(page.locator('[data-testid="outcome-captured"]')).toBeVisible();

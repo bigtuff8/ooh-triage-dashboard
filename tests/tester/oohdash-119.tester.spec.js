@@ -60,6 +60,7 @@ test('TF-01: confirm step shown on chip click; no POST until Record outcome', as
         if (req.url().includes('/api/outcomes') && req.method() === 'POST') postFired = true;
     });
     await page.locator('[data-testid="other-capture"]').click();
+    await page.locator('[data-testid="other-normal"]').click(); // OOHDASH-134: Capture -> normal priority
 
     const confirmStep = page.locator('[data-testid="confirm-step"]');
     await expect(confirmStep).toBeVisible();
@@ -96,6 +97,7 @@ test('TF-02: N1 appears in echo and in the fixture ticket body (TRG-STEP)', asyn
     await page.locator('[data-testid="other-text"]').pressSequentially('fryer issue', { delay: 20 });
     await page.locator('#addnotes').pressSequentially(N1, { delay: 5 });
     await page.locator('[data-testid="other-capture"]').click();
+    await page.locator('[data-testid="other-normal"]').click(); // OOHDASH-134: Capture -> normal priority
     await expect(page.locator('[data-testid="confirm-step"]')).toBeVisible();
 
     // Capture both request body (POST payload) and fire the outcome
@@ -151,6 +153,7 @@ test('TF-03: XSS — N6 is escaped in echo; no script executes; raw in sessionSt
     expect(stored.value).toBe(N6); // raw, unescaped
 
     await page.locator('[data-testid="other-capture"]').click();
+    await page.locator('[data-testid="other-normal"]').click(); // OOHDASH-134: Capture -> normal priority
     await expect(page.locator('[data-testid="confirm-step"]')).toBeVisible();
     await page.locator('[data-testid="record-outcome"]').click();
     await expect(page.locator('[data-testid="outcome-captured"]')).toBeVisible();
@@ -176,6 +179,7 @@ test('TF-04: whitespace-only note sends null; no TRG-STEP in ticket body', async
     await page.locator('[data-testid="other-text"]').pressSequentially('whitespace test', { delay: 20 });
     await page.locator('#addnotes').fill('   ');
     await page.locator('[data-testid="other-capture"]').click();
+    await page.locator('[data-testid="other-normal"]').click(); // OOHDASH-134: Capture -> normal priority
     await expect(page.locator('[data-testid="confirm-step"]')).toBeVisible();
 
     const postPromise = page.waitForRequest(
@@ -373,6 +377,7 @@ test('TF-10: delimiter-injection strings are neutralised in the ticket body', as
     // Use N-adv1 (Operator:) as the note
     await page.locator('#addnotes').fill(N_adv1);
     await page.locator('[data-testid="other-capture"]').click();
+    await page.locator('[data-testid="other-normal"]').click(); // OOHDASH-134: Capture -> normal priority
     await expect(page.locator('[data-testid="confirm-step"]')).toBeVisible();
 
     const postPromise = page.waitForRequest(
@@ -485,6 +490,7 @@ test('TF-13: post-submit box: open → save → saved state; save button absent'
     await page.locator('[data-testid="tile-other"]').click();
     await page.locator('[data-testid="other-text"]').pressSequentially('post box test', { delay: 20 });
     await page.locator('[data-testid="other-capture"]').click();
+    await page.locator('[data-testid="other-normal"]').click(); // OOHDASH-134: Capture -> normal priority
     await page.locator('[data-testid="record-outcome"]').click();
     await expect(page.locator('[data-testid="outcome-captured"]')).toBeVisible();
 
@@ -532,6 +538,7 @@ test('TF-14: post-submit save 500 error shows user-visible error state', async (
     await page.locator('[data-testid="tile-other"]').click();
     await page.locator('[data-testid="other-text"]').pressSequentially('error path test', { delay: 20 });
     await page.locator('[data-testid="other-capture"]').click();
+    await page.locator('[data-testid="other-normal"]').click(); // OOHDASH-134: Capture -> normal priority
     await page.locator('[data-testid="record-outcome"]').click();
     await expect(page.locator('[data-testid="outcome-captured"]')).toBeVisible();
 
@@ -815,6 +822,7 @@ test('TF-22: sessionStorage cleared after outcome is recorded', async ({ page })
     await page.waitForTimeout(700);
 
     await page.locator('[data-testid="other-capture"]').click();
+    await page.locator('[data-testid="other-normal"]').click(); // OOHDASH-134: Capture -> normal priority
     await page.locator('[data-testid="record-outcome"]').click();
     await expect(page.locator('[data-testid="outcome-captured"]')).toBeVisible();
 
@@ -861,6 +869,7 @@ test('TF-24: draft cleared on Add another issue; second flow starts empty', asyn
     await page.locator('[data-testid="other-text"]').pressSequentially('first issue', { delay: 20 });
     await page.locator('#addnotes').fill(N1);
     await page.locator('[data-testid="other-capture"]').click();
+    await page.locator('[data-testid="other-normal"]').click(); // OOHDASH-134: Capture -> normal priority
     await page.locator('[data-testid="record-outcome"]').click();
     await expect(page.locator('[data-testid="outcome-captured"]')).toBeVisible();
 
@@ -948,6 +957,7 @@ test('TF-27: double-click Record outcome fires exactly one POST', async ({ page 
     await page.locator('[data-testid="tile-other"]').click();
     await page.locator('[data-testid="other-text"]').pressSequentially('double fire', { delay: 20 });
     await page.locator('[data-testid="other-capture"]').click();
+    await page.locator('[data-testid="other-normal"]').click(); // OOHDASH-134: Capture -> normal priority
     await expect(page.locator('[data-testid="confirm-step"]')).toBeVisible();
 
     let postCount = 0;
@@ -1030,6 +1040,7 @@ test('TF-30: empty notes produces null in POST and no TRG-STEP in ticket body', 
     await expect(page.locator('#addnotes')).toHaveValue('');
 
     await page.locator('[data-testid="other-capture"]').click();
+    await page.locator('[data-testid="other-normal"]').click(); // OOHDASH-134: Capture -> normal priority
     await expect(page.locator('[data-testid="confirm-step"]')).toBeVisible();
 
     const [reqPromise, respPromise] = [
@@ -1065,6 +1076,7 @@ test('TF-31: two sequential post-submit notes on the same ticket both reach the 
     await page.locator('[data-testid="tile-other"]').click();
     await page.locator('[data-testid="other-text"]').pressSequentially('two-note test', { delay: 20 });
     await page.locator('[data-testid="other-capture"]').click();
+    await page.locator('[data-testid="other-normal"]').click(); // OOHDASH-134: Capture -> normal priority
     await page.locator('[data-testid="record-outcome"]').click();
     await expect(page.locator('[data-testid="outcome-captured"]')).toBeVisible();
 
@@ -1202,6 +1214,7 @@ test('TF-34: note with pipe — POST body has raw pipe; echo renders note safely
     await page.locator('[data-testid="other-text"]').pressSequentially('fryer issue', { delay: 20 });
     await page.locator('#addnotes').pressSequentially(NOTE_WITH_PIPE, { delay: 5 });
     await page.locator('[data-testid="other-capture"]').click();
+    await page.locator('[data-testid="other-normal"]').click(); // OOHDASH-134: Capture -> normal priority
     await expect(page.locator('[data-testid="confirm-step"]')).toBeVisible();
 
     // Intercept POST and assert raw pipe is sent (client does not normalise)
