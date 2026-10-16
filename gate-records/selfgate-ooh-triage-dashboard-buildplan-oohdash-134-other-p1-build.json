@@ -1,0 +1,22 @@
+{
+  "run": "selfgate-ooh-triage-dashboard-buildplan-oohdash-134-other-p1",
+  "phase": "build",
+  "pr": 106,
+  "approvedBy": [
+    "bigtuff8"
+  ],
+  "reviewComments": [
+    "bigtuff8: - Three questions left open — not blocking this build: Approve this part — note: 1. tool is not used in normal working hours - its for out of hours only. 2. no. 6. i gave you the wording i wanted you to provide around explaining P1 on the last document\n\n(submitted via the interactive gate review)\n\n<!-- gate:selected [{\"question\":\"Three questions left open — not blocking this build\",\"answer\":\"Approve this part\",\"comment\":\"1. tool is not used in normal working hours - its for out of hours only. 2. no. 6. i gave you the wording i wanted you to provide around explaining P1 on the last document\"}] -->"
+  ],
+  "mergeCommit": "23ff4fabaaed45f82cc5b60bb6e7747287390e3d",
+  "phaseBranch": "buildplan/oohdash-134-other-p1",
+  "releaseBranch": "main",
+  "stamp": 1792166823669,
+  "selectedOptions": [
+    {
+      "question": "Three questions left open — not blocking this build",
+      "answer": "Approve this part",
+      "comment": "1. tool is not used in normal working hours - its for out of hours only. 2. no. 6. i gave you the wording i wanted you to provide around explaining P1 on the last document"
+    }
+  ]
+}
