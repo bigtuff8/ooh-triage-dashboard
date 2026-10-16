@@ -142,6 +142,9 @@ function notesDraftRestore(siteNo, flowKey) {
  * cancelFlow, anotherIssue, endCall. NOT called at startFlow or openSite.
  */
 function notesDraftClear() {
+    // OOHDASH-134: also cancel a pending debounced save, so a draft typed <300 ms before submit /
+    // Add another issue cannot be re-written after the clear (and restored into the next flow).
+    if (typeof _notesDraftTimer !== 'undefined') clearTimeout(_notesDraftTimer);
     try { sessionStorage.removeItem(NOTES_DRAFT_KEY); } catch { /* ignore */ }
 }
 
