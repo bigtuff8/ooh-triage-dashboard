@@ -97,7 +97,7 @@ textarea{width:100%;font:inherit;padding:8px;border:1.5px solid var(--border);bo
   } else {
    if(p1){
     var line='The P1 is logged as ticket <b>#'+s.ticket+'</b> in the IoT Support dashboard, which pages the on-duty manager.';
-    var script=honest()?'I\'ve escalated this as urgent and logged it for our on-duty manager, who will call you back.':'I\'ve escalated this as urgent - a text has gone to our on-duty manager and someone will call you back shortly.';
+    var script='I\'ve escalated this as urgent - a text has gone to our on-duty manager and someone will call you back shortly.';
     el.innerHTML=done+'<div class="outcome p1"><h3>Escalated - P1</h3><p>'+esc(detail)+'</p><p>'+line+'</p><div class="script">"'+script+'"</div><p class="small">Ticket <b>#'+s.ticket+'</b></p></div>';
     meta.innerHTML='Sent p1Summary ('+summary(s.text).length+' chars): <code>'+esc(summary(s.text))+'</code>';
    } else {
