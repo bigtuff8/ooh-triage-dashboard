@@ -219,7 +219,10 @@ export function validateCommand(device, command, value) {
             if (!Number.isInteger(v) || v < entry.boostRange.min || v > entry.boostRange.max) {
                 return { ok: false, reason: `Boost hours must be a whole number ${entry.boostRange.min}–${entry.boostRange.max} (0 cancels)` };
             }
-            return { ok: true, attribute: 'hwBoostHoursDesired', value: v };
+            // OOHDASH-135 Item 2: write hwBoostHoursRequested to SERVER_SCOPE (IoT Command Gate input),
+            // NOT hwBoostHoursDesired (SHARED_SCOPE, bypasses the gate). Convention matches all other
+            // Requested keys (setpointRequested, switchRequested) — verified via OOHDASH-123 Rosetta Stone.
+            return { ok: true, attribute: 'hwBoostHoursRequested', value: v };
         }
         default:
             return { ok: false, reason: `Unknown command "${command}"` };
