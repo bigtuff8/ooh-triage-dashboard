@@ -5,16 +5,17 @@ PHASE: design
 QUESTIONS:
 Q1: James -- for the boiler panel feature (item 5): Spencer's spec identifies the boilerControl device profile but has not confirmed the exact ThingsBoard telemetry key names OR their semantic meaning. Before item 5 build starts, Spencer must confirm: (a) the panel on/off key name AND that it means the panel is commanding the boiler (not a secondary output); (b) the hot-water temperature key name AND that it measures customer hot-water temperature (not flow temperature, primary temperature, or boiler return); (c) that the sanity band [0, 95] °C is correct for that specific measurement; and (d) the expected push interval for a healthy boilerControl device under normal operating conditions (needed to set the staleness threshold — see Q4). Should we hold the entire boiler panel feature until Spencer confirms all four, or ship hot-water temperature only if (b), (c), and (d) can be confirmed first and add the on/off state in a follow-up? Note: if you choose the partial (temperature only), the design requires a permanent inline caveat that panel command state is unmonitored — see Track 2 below for the exact wording and why omitting it risks misdiagnosis.
 Q2: James -- for the scope label on a pure-heating site (iT700 present, no DHW panel, no iT500 DHW unit): the Hot water scope row currently evaluates to "not available" because there is no hot-water signal device and no DHW capability. Is that the right label, or should it say something like "not on Lighthouse here" to distinguish "we have no hot water data at all" from "hot water exists but is not Lighthouse-controlled"?
-Q3: James / IoT -- WRITES_DISABLED current state and fleet reconnection: Item 3 makes iT500 setpoint control go live automatically the moment the heating fleet reconnects — there is no separate activation step. The current runtime value of WRITES_DISABLED must therefore be confirmed and recorded BEFORE the fleet reconnects, not merely before an explicit "write-path go-live" action. If the fleet reconnects before this check is done, setpoint commands become available to handlers and the gate value is unknown. Please confirm the current WRITES_DISABLED value and record the date checked. This design does not change it.
+Q3: James / IoT -- WRITES_DISABLED confirmation before SALUS_IT500_CTL_ENABLED flag flip: Item 3 ships in Track 1 with SALUS_IT500_CTL_ENABLED=false. iT500 setpoint control does NOT go live when the heating fleet reconnects — it goes live only when James or the IoT team deliberately sets SALUS_IT500_CTL_ENABLED=true and redeploys. Fleet reconnection alone does not activate setpoint commands; the flag is the gate. This design does not change WRITES_DISABLED. Before flipping the flag, James or the IoT team must confirm the current runtime value of WRITES_DISABLED and record the date checked. Record: [value and date to be filled by James/IoT — required before flag flip, not before Track 1 ships].
 Q4: Spencer -- boilerControl healthy push cadence: what is the expected interval between telemetry pushes from a healthy boilerControl device under normal operating conditions (e.g. on-change only, every 2 minutes, every 15 minutes)? This is required to set the staleness threshold correctly. A threshold anchored to the dashboard's 30-second refresh cycle risks warning fatigue (if healthy panels push slowly) or false reassurance (if they push frequently and the threshold is too loose). The threshold cannot ship as a fixed constant until this cadence is confirmed.
 SECTION: What We Are Building
-This design covers five targeted changes to the OOH Triage Dashboard (v1.4.2) that follow from the OOHDASH-135 discovery of Spencer Thompson's SD-446 ThingsBoard command specification. The changes split into two tracks. Track 1 is a patch of four small, self-contained fixes that ship together in a single release. Track 2 is a new boiler panel read path that ships as a separate minor increment once Spencer confirms the ThingsBoard telemetry key names, their semantic meaning, and the device push cadence. No new control commands are added in either track. The hot-water boost write path (salus-it500-dhw device type) is NOT enabled by this design: three independent gates keep it closed — the WRITES_DISABLED kill switch (unchanged), the salus-it500-dhw CONTROL_CONTRACT controllable: false flag (unchanged, a separate entry from salus-it500), and the Spencer bench-test sign-off requirement. Items 2 and 3 do not open any of these gates. Item 2 corrects the attribute name so the boost command will route correctly when boost is eventually enabled by a future, separately-designed change; item 3 makes the heating thermostat (salus-it500) controllable for setpoint commands only and does not touch the DHW device (salus-it500-dhw). Critically: item 3 makes iT500 setpoint control go live automatically when the heating fleet reconnects — WRITES_DISABLED state must be confirmed before that reconnection event.
+This design covers five targeted changes to the OOH Triage Dashboard (v1.4.2) that follow from the OOHDASH-135 discovery of Spencer Thompson's SD-446 ThingsBoard command specification. The changes split into two tracks. Track 1 is a patch of four small, self-contained fixes that ship together in a single release. Track 2 is a new boiler panel read path that ships as a separate minor increment once Spencer confirms the ThingsBoard telemetry key names, their semantic meaning, and the device push cadence. No new control commands are added in either track. The hot-water boost write path (salus-it500-dhw device type) is NOT enabled by this design: three independent gates keep it closed — the WRITES_DISABLED kill switch (unchanged), the salus-it500-dhw CONTROL_CONTRACT controllable: false flag (unchanged, a separate entry from salus-it500), and the Spencer bench-test sign-off requirement. Items 2 and 3 do not open any of these gates. Item 2 corrects the attribute name so the boost command will route correctly when boost is eventually enabled by a future, separately-designed change; item 3 makes the heating thermostat (salus-it500) controllable for setpoint commands only and does not touch the DHW device (salus-it500-dhw). Critically: item 3 ships with a default-off configuration flag (SALUS_IT500_CTL_ENABLED=false). iT500 setpoint control does NOT go live when the heating fleet reconnects — it goes live only when James or the IoT team explicitly sets this flag to true and redeploys. WRITES_DISABLED must be confirmed before that flag flip (Q3), not before the Track 1 patch ships.
 SECTION: Track 1 - Quick Wins (items 1-4)
-Items 1 through 4 are each small code changes. All four ship together in one patch release because they are independent of each other and of the boiler panel track. Total estimated build time across all four is roughly 2 days.
+Items 1 through 4 are each small code changes. All four ship together in one patch release because they are independent of each other and of the boiler panel track. Total estimated build time across all four is roughly 2 days. Item 3 ships with SALUS_IT500_CTL_ENABLED=false so that Track 1 can be deployed without any timing dependency on WRITES_DISABLED confirmation or fleet reconnection. Activating iT500 setpoint control is a deliberate two-step operator action after the patch ships: (1) James/IoT confirms WRITES_DISABLED and records the value, then (2) sets SALUS_IT500_CTL_ENABLED=true and redeploys. These two steps are a controlled operator decision, not an automatic consequence of reconnection.
 SECTION: Track 2 - Boiler Panel Readings (item 5)
 Item 5 adds a new device classification for boilerControl profile devices and surfaces their telemetry read-only in the dashboard. It is blocked on Spencer confirming the exact ThingsBoard telemetry key names and their semantic meaning (see Q1), and on Spencer confirming the healthy push cadence for boilerControl devices (see Q4). The staleness guard threshold cannot be hardcoded until Q4 is answered — the constant must be set to Spencer's confirmed cadence plus a reasonable buffer, not derived from the dashboard's own refresh cycle. The design includes the staleness guard as a mandatory safety feature; its threshold value is provisional until Spencer's answer is recorded. If James chooses the Q1 partial (hwTempC only, no boilerOnOff), the temperature display must carry a permanent inline caveat that panel command state is unmonitored — without this, a handler can mistake a healthy temperature for a healthy call and close a still-broken job. It ships as a separate minor increment. Estimated build time is 3 to 5 days once the key names, semantic meaning, and push cadence are known.
 DECISION: Track 1 -- patch release (items 1-4) and Track 2 -- boiler panel minor increment (item 5) ship separately.
-DECISION: salus-it500-dhw controllable flag -- this design does NOT change it. The boost write path stays fully gated. A future, separately-scoped design change enables boost by changing salus-it500-dhw to controllable: true — and that change must begin by confirming WRITES_DISABLED state (Q3) and receiving Spencer's bench-test sign-off.
+DECISION: salus-it500-dhw controllable flag -- this design does NOT change it. The boost write path stays fully gated. A future, separately-scoped design change enables boost; that change must begin by confirming WRITES_DISABLED state (Q3) and receiving Spencer's bench-test sign-off.
+DECISION: Item 3 activation -- item 3 ships in Track 1 with SALUS_IT500_CTL_ENABLED=false. Activation is a deliberate two-step operator action: (1) James/IoT confirms and records the WRITES_DISABLED value (Q3), then (2) sets SALUS_IT500_CTL_ENABLED=true and redeploys. Fleet reconnection alone does not activate setpoint control. This is code-enforced, not procedural.
 DECISION: Q1 to James -- hold item 5 until Spencer confirms all four items (key names, semantic meaning for each, sanity band, push cadence), OR ship hot-water temperature only (partial) if the temperature key semantics, sanity band, and push cadence can be confirmed first and the panel on/off key is added in a follow-up. James to decide.
 DECISION: Q2 to James -- Hot water scope label for pure-heating sites. James to confirm whether "not available" or a distinct label is correct.
 DECISION: Staleness threshold -- provisional at 5 minutes. Must be replaced with Spencer's confirmed healthy push cadence (plus a reasonable buffer, e.g. 3× cadence) before Track 2 ships. The constant must be parameterised in config, not hardcoded in application code.
@@ -22,7 +23,7 @@ DECISION: Staleness threshold -- provisional at 5 minutes. Must be replaced with
 
 # OOHDASH-135 Design: SD-446 Command Spec Changes to OOH Dashboard
 
-**Version:** 1.2
+**Version:** 1.3
 **Date:** 2026-10-19
 **Author:** Design doer (Claude Sonnet 4.6)
 **Ticket:** OOHDASH-135
@@ -51,7 +52,7 @@ Reading the four key files before designing revealed five corrections to the dis
 
 **Correction 2: iT500 CONTROL_CONTRACT location.** The discovery brief said the iT500 CONTROL_CONTRACT with `controllable: false` is in tb-device.js. It is in registry.js, lines 107-112, in the `CONTROL_CONTRACT` object. Build must edit registry.js for this change, not tb-device.js.
 
-**Correction 3: salus-it500 and salus-it500-dhw are separate CONTROL_CONTRACT entries.** The discovery brief treated the iT500 as a single device type. In registry.js, there are two distinct CONTROL_CONTRACT entries: `'salus-it500'` (the heating thermostat, which receives setpoint commands) and `'salus-it500-dhw'` (the DHW hot-water device, which receives the hwboost command). Both currently have `controllable: false, dark: true`. These entries are independent: making one controllable does not affect the other. Item 3 of this design changes only `salus-it500` (thermostat). The `salus-it500-dhw` entry is not changed by this design and is not intended to be — the boost path stays gated until Spencer's bench test is complete and a future design separately enables it.
+**Correction 3: salus-it500 and salus-it500-dhw are separate CONTROL_CONTRACT entries.** The discovery brief treated the iT500 as a single device type. In registry.js, there are two distinct CONTROL_CONTRACT entries: `'salus-it500'` (the heating thermostat, which receives setpoint commands) and `'salus-it500-dhw'` (the DHW hot-water device, which receives the hwboost command). Both currently have `controllable: false, dark: true`. These entries are independent: making one controllable does not affect the other. Item 3 of this design changes only `'salus-it500'` (thermostat). The `'salus-it500-dhw'` entry is not changed by this design and is not intended to be — the boost path stays gated until Spencer's bench test is complete and a future design separately enables it.
 
 **Correction 4: Scope label logic is already partially evidence-based.** The discovery brief described the Controllable label as deriving from "hardware presence" only. In fact, routes/api.js already uses evidence-based logic in the SCOPE_GROUPS for kitchen, lighting, and fan (switchControllable, which checks command list), and for hot water (boilerControl.dhwControllable). The gap is specifically in the heating row: it falls through to "monitored" for Salus iT700 and iT500 sites because those are not boilerControl sites, even though the dashboard genuinely offers setpoint control for iT700. Item 4 targets this remaining gap.
 
@@ -99,18 +100,18 @@ Change the return statement to `attribute: 'hwBoostHoursRequested'`. This ensure
 | services/registry.js | Line 222: change `'hwBoostHoursDesired'` to `'hwBoostHoursRequested'` in the hwboost case return statement. One character change in one line. |
 
 **Build verification requirement — check against the actual gate code, not the spec.**
-Before closing item 2, Build must verify that `hwBoostHoursRequested` is the attribute name the IoT Command Gate actually reads from SERVER_SCOPE in its production code, not merely as described in the SD-446 spec pattern. If the gate code uses a different attribute name or a different scope scope convention, this fix addresses the wrong value. Read the IoT Command Gate source directly and confirm the exact attribute key it expects before landing this change.
+Before closing item 2, Build must verify that `hwBoostHoursRequested` is the attribute name the IoT Command Gate actually reads from SERVER_SCOPE in its production code, not merely as described in the SD-446 spec pattern. If the gate code uses a different attribute name or a different scope convention, this fix addresses the wrong value. Read the IoT Command Gate source directly and confirm the exact attribute key it expects before landing this change.
 
 **Why this is latent today — two independent gates are closed.**
 The boost write path is gated by two conditions that are each independently blocking it today:
 
 1. **The iT500 DHW fleet is offline.** No salus-it500-dhw device is reporting, so no handler can reach a live DHW device.
-2. **salus-it500-dhw has `controllable: false` in its own CONTROL_CONTRACT entry.** This is a separate registry entry from `salus-it500` (the thermostat). Because `controllable: false`, the dashboard flows do not offer the boost affordance in the UI, and the control dispatch endpoint will refuse a boost request for a non-controllable device.
+2. **salus-it500-dhw has `controllable: false` in its own CONTROL_CONTRACT entry.** This is a separate registry entry from `'salus-it500'` (the thermostat). Because `controllable: false`, the dashboard flows do not offer the boost affordance in the UI, and the control dispatch endpoint will refuse a boost request for a non-controllable device.
 
 This attribute-name fix does not change either of those gates. It is a correctness fix only — the wrong attribute name would cause a silent misroute when boost is eventually activated. Fixing it now prevents a second, harder-to-debug failure when the fleet returns and a future change deliberately enables boost. The boost write path does not become reachable through this design.
 
 **What this design does NOT do.**
-This design does NOT change `salus-it500-dhw` to `controllable: true`. That change is deliberately deferred and separately gated on Spencer's bench-test sign-off plus a confirmed WRITES_DISABLED state (see Q3).
+This design does NOT change `'salus-it500-dhw'` to `controllable: true`. That change is deliberately deferred and separately gated on Spencer's bench-test sign-off plus a confirmed WRITES_DISABLED state (see Q3).
 
 **Cost and token impact.** No LLM calls involved. No ongoing cost.
 
@@ -121,24 +122,54 @@ This design does NOT change `salus-it500-dhw` to `controllable: true`. That chan
 **Problem.**
 In registry.js, the CONTROL_CONTRACT entry for `'salus-it500'` (the heating thermostat) has `controllable: false, dark: true`. This means that even when the iT500 heating fleet is restored to reporting, the dashboard will not offer temperature control — `capabilitiesContractFor('salus-it500')` returns `controllable: false` and the flows gate the setpoint control affordance on this.
 
-**Designed behaviour.**
-Change `controllable: false` to `controllable: true` and `dark: true` to `dark: false` (or remove the `dark` field if it defaults to false) in the `salus-it500` CONTROL_CONTRACT entry only. The iT500 setpoint command path is bench-proven. Once the heating fleet comes back, handlers will be offered setpoint control on iT500-heated sites.
+The prior design coupled go-live to an uncontrolled reconnection event — the moment the fleet reconnected, setpoint commands would have become available to handlers. That coupling is unsafe: reconnect timing is unpredictable once the patch ships, and the only protection was a procedural reminder to confirm WRITES_DISABLED beforehand. This version eliminates the coupling with a default-off configuration flag.
 
-**Critical timing constraint — WRITES_DISABLED must be confirmed before fleet reconnection.**
-This code change makes iT500 setpoint control go live automatically the moment the heating fleet reconnects — there is no separate activation step, no feature flag, and no further deploy required beyond landing this item. WRITES_DISABLED state (Q3) must therefore be confirmed and recorded before the iT500 fleet reconnects, not merely before an explicit "write-path go-live" action. If the fleet reconnects first, setpoint commands become available to handlers and the gate value is unknown. James and the IoT team must record the confirmed WRITES_DISABLED value and the date checked in Q3 above before this item ships.
+**Designed behaviour — two parts.**
+
+**Part A: CONTROL_CONTRACT change.**
+Change `controllable: false` to `controllable: true` and `dark: true` to `dark: false` (or remove the `dark` field if it defaults to false) in the `'salus-it500'` CONTROL_CONTRACT entry only. This records the intended final state for the device type: when fully activated, iT500 thermostats are controllable for setpoint commands.
+
+**Part B: Default-off activation flag — SALUS_IT500_CTL_ENABLED.**
+Add a named server configuration constant `SALUS_IT500_CTL_ENABLED`, defaulting to `false`. This flag is read when building the per-device effective controllable field in the workspace payload. For `'salus-it500'` devices, the effective controllable value is:
+
+```
+effectiveControllable = CONTROL_CONTRACT.controllable && SALUS_IT500_CTL_ENABLED
+```
+
+For all other device types, effective controllable is `CONTROL_CONTRACT.controllable` as before. The flag is a named constant — not a magic boolean in application logic — so its purpose is self-documenting and its value is visible in the configuration alongside the other named constants.
+
+When `SALUS_IT500_CTL_ENABLED=false` (the default after Track 1 ships):
+- All salus-it500 devices in the workspace have `d.controllable = false`.
+- The flows do not offer the setpoint affordance, regardless of whether devices are online or offline.
+- Fleet reconnection has no effect on what handlers can do. Setpoint commands are not available.
+
+When `SALUS_IT500_CTL_ENABLED=true` (after activation step):
+- salus-it500 devices that are online have `d.controllable = true`.
+- The flows offer the setpoint affordance on those devices.
+- Setpoint commands become available to handlers.
+
+**Activation step — deliberate operator action, not automatic.**
+Activating iT500 setpoint control is a two-step operator action that takes place after Track 1 ships, at a time of James's and the IoT team's choosing:
+
+1. James or the IoT team confirms the current runtime value of WRITES_DISABLED and records the date checked (Q3 above). This must happen before step 2.
+2. James or the IoT team sets `SALUS_IT500_CTL_ENABLED=true` in the server configuration and redeploys.
+
+The redeployment is the controlled moment of go-live. Fleet reconnection is irrelevant to timing — the flag is false until the operator decides to flip it. The Track 1 patch itself can ship at any time, with no dependency on WRITES_DISABLED confirmation, fleet reconnection state, or any IoT team action.
 
 **Scope of this change — thermostat only, not DHW.**
-This change touches only the `salus-it500` entry. The `salus-it500-dhw` entry (the DHW device) is a separate CONTROL_CONTRACT entry in registry.js and is NOT changed by this item. The boost affordance for DHW devices stays off. Making the heating thermostat controllable does not open the boost write path in any way — the two device types have separate entries, separate command lists, and separate controllable flags.
+This change touches only the `'salus-it500'` entry. The `'salus-it500-dhw'` entry (the DHW device) is a separate CONTROL_CONTRACT entry in registry.js and is NOT changed by this item. The boost affordance for DHW devices stays off. Making the heating thermostat controllable does not open the boost write path in any way — the two device types have separate entries, separate command lists, and separate controllable flags.
 
-**File changed.**
+**Files changed.**
 
 | File | Change |
 |---|---|
 | services/registry.js | Lines 111-112: change `controllable: false, dark: true` to `controllable: true` in the salus-it500 CONTROL_CONTRACT entry only. The salus-it500-dhw entry is untouched. |
+| config (new constant) | Add `SALUS_IT500_CTL_ENABLED = false`. This is a named server configuration constant, not a value buried in application code. Stored in the project's configuration module (e.g. `config/control.js` or equivalent), consistent with how other named constants are managed in this codebase. |
+| services/tb-device.js or routes/api.js | Wherever the workspace device shape is built: apply the flag gate when computing effective controllable for salus-it500 devices. |
 
-**Note on the salus bare-type entry.** The `salus` (old-convention, bare) entry at lines 113-118 also has `controllable: false, dark: true`. The discovery brief did not include this in scope. These devices have stopped reporting and the fix for them depends on IoT team action on the legacy fleet; this design does not change the `salus` entry.
+**Note on the salus bare-type entry.** The `'salus'` (old-convention, bare) entry at lines 113-118 also has `controllable: false, dark: true`. The discovery brief did not include this in scope. These devices have stopped reporting and the fix for them depends on IoT team action on the legacy fleet; this design does not change the `'salus'` entry. There is no flag gate needed for the bare salus type — it stays off by CONTROL_CONTRACT.
 
-**Cost and token impact.** No LLM calls involved. No ongoing cost.
+**Cost and token impact.** No LLM calls involved. No polling or background work. Zero ongoing cost. The flag is evaluated once per workspace fetch for each salus-it500 device — a boolean read, negligible compute.
 
 ---
 
@@ -147,25 +178,41 @@ This change touches only the `salus-it500` entry. The `salus-it500-dhw` entry (t
 **Problem.**
 The SCOPE_GROUPS in routes/api.js, `key: 'heating'`, evaluates to 'ctl' only when `s.boilerControl?.heatingControllable` is true. boilerControl is set only when a site has a boilerControl profile device (pub C&B sites). Salus iT700 and iT500 sites have no boilerControl device, so the heating level falls through to 'mon' (monitored, because `s.devices.some(d => d.kind === 'heating')` is true). This means the "other" flow's scope check tells a handler "Heating is monitored only at this site" even at a site where the dashboard genuinely offers iT700 setpoint control.
 
+**Static vs live controllable — a distinction that matters.**
+The `d.controllable` field in the workspace device shape is an effective per-device controllable flag (see item 3). For salus-it500 devices it incorporates the SALUS_IT500_CTL_ENABLED gate; for other device types it derives from the static CONTROL_CONTRACT. In both cases, `d.controllable` reflects what the system will allow for that device type — it does not reflect whether the specific device instance is currently online and reachable.
+
+The scope check must not use `d.controllable` alone. A device that is contractually controllable (`d.controllable === true`) but currently offline must show heating scope as 'mon', not 'ctl'. Showing 'ctl' for an offline device would invert the problem item 4 is meant to fix: telling handlers "you can control heating here" when the device cannot actually receive commands. This is especially important after item 3: the CONTROL_CONTRACT for salus-it500 will be `controllable: true`, and the iT500 fleet is currently offline. A scope check on contract alone would immediately produce dishonest 'ctl' labels for every iT500 site.
+
+The scope check must therefore AND `d.controllable` with `d.online` (or the equivalent live-state field in the device shape). Only a device that is both contractually controllable AND currently online warrants 'ctl'.
+
 **Designed behaviour.**
-The heating scope level must be 'ctl' when the site has any classified heating device with `controllable: true` in the devices array. Add a check for this before the existing device-presence fallback. The three-way result remains 'ctl', 'mon', or 'none'.
+The heating scope level must be 'ctl' when the site has any classified heating device that is both `controllable: true` (effective, after the flag gate where applicable) and `online: true`. Add a check for this before the existing device-presence fallback. The three-way result remains 'ctl', 'mon', or 'none'.
 
 The full evaluation order for heating:
 
-1. boilerControl.heatingControllable true: 'ctl' (pub C&B site, boiler panel).
-2. Any device with `d.kind === 'heating'` and `d.controllable === true`: 'ctl' (iT700 online; iT500 after fleet restoration and item 3 landing).
-3. Any device with `d.kind === 'heating'` and `d.controllable !== true`: 'mon' (heating on Lighthouse but not currently controllable — dark-fleet Salus; boiler-panel only before item 5 lands).
+1. `boilerControl.heatingControllable === true`: 'ctl' (pub C&B site, boiler panel controls heating and is actively reporting).
+2. Any device: `d.kind === 'heating' && d.controllable === true && d.online === true`: 'ctl' (live, contractually-controllable heating device — iT700 online; iT500 after fleet restoration and SALUS_IT500_CTL_ENABLED=true).
+3. Any device: `d.kind === 'heating'` (present but not currently live-controllable — offline; or contractually not controllable; or controllable but flag=false): 'mon'.
 4. No heating device: 'none'.
+
+Explicit scenario verification against the evaluation order:
+
+- iT700 site, device online: step 2 fires → 'ctl'. Correct.
+- iT500 site, fleet offline, SALUS_IT500_CTL_ENABLED=false (Track 1 shipped, not yet activated): `d.controllable=false` (flag gate), step 2 does not fire → step 3 fires → 'mon'. Correct: iT500 is on Lighthouse but not currently controllable.
+- iT500 site, fleet offline, SALUS_IT500_CTL_ENABLED=true (activated but fleet still down): `d.controllable=true`, `d.online=false` → step 2 does not fire → step 3 fires → 'mon'. Correct: configured for control but not reachable.
+- iT500 site, fleet online, SALUS_IT500_CTL_ENABLED=true (fully activated): step 2 fires → 'ctl'. Correct.
+- Dark-fleet salus (bare type), offline: `d.controllable=false` (CONTROL_CONTRACT unchanged) → step 3 fires → 'mon'. Correct.
+- No heating device: step 4 → 'none'. Correct.
 
 **File changed.**
 
 | File | Change |
 |---|---|
-| routes/api.js | SCOPE_GROUPS heating level function: add a check for `s.devices.some(d => d.kind === 'heating' && d.controllable)` between the boilerControl check and the device-presence fallback. |
+| routes/api.js | SCOPE_GROUPS heating level function: add a check for `s.devices.some(d => d.kind === 'heating' && d.controllable && d.online)` between the boilerControl check and the device-presence fallback. |
 
 **Hot water scope.** The existing hot water logic (`hasControllableDhw(s) ? 'ctl' : hasHotWaterSignal(s) ? 'mon' : 'none'`) is accurate for the current product. No change needed here unless James answers Q2 with a different label requirement for sites that have no hot water device at all.
 
-**Cost and token impact.** No LLM calls involved. No ongoing cost.
+**Cost and token impact.** No LLM calls involved. No ongoing cost. The additional check is one `Array.prototype.some` call on an array of in-memory objects.
 
 ---
 
@@ -196,6 +243,8 @@ James's Q1 decision governs whether to wait for all four confirmations or ship a
 
 **Classifier change (tb-device.js: classifyDevice function).**
 Add a profile-based early-return to classifyDevice, before the refrigeration deny and before the capability signal checks. When the raw profile parameter equals `'boilerControl'` (case-insensitive match), return immediately with `{ kind: 'heating', deviceType: 'boiler-panel', deviceTypeLabel: 'Pub boiler panel', controllable: false, control: null }`. Profile-based classification is justified here because boilerControl devices are specifically provisioned devices whose identity is authoritative by profile. The early return gives it highest precedence and prevents any subsequent name-token or telemetry path from reclassifying the device.
+
+Note: boiler-panel devices are always `controllable: false` by classification. The SALUS_IT500_CTL_ENABLED flag introduced in item 3 applies only to `'salus-it500'` device types and has no effect on boiler-panel classification.
 
 ---
 
@@ -266,8 +315,10 @@ For the hotwater flow, the existing text already says "Hot water here runs on th
 |---|---|---|
 | 1 | public/js/flows.js | Replace find with filter-and-loop for lighting and fan flows |
 | 2 | services/registry.js | Line 222: hwBoostHoursDesired to hwBoostHoursRequested in validateCommand return (verify against IoT Command Gate source before landing) |
-| 3 | services/registry.js | Lines 111-112: salus-it500 CONTROL_CONTRACT controllable: false to true, dark: true to false. salus-it500-dhw entry unchanged. WRITES_DISABLED must be confirmed before fleet reconnection. |
-| 4 | routes/api.js | SCOPE_GROUPS heating level: add controllable-device check before mon fallback |
+| 3 | services/registry.js | Lines 111-112: salus-it500 CONTROL_CONTRACT controllable: false to true, dark: true to false. salus-it500-dhw entry unchanged. |
+| 3 | config (new constant) | SALUS_IT500_CTL_ENABLED=false. Named server configuration constant; must be set to true and redeployed to activate iT500 setpoint control. Requires WRITES_DISABLED confirmed first (Q3). |
+| 3 | services/tb-device.js or routes/api.js | Apply SALUS_IT500_CTL_ENABLED flag gate when computing effective d.controllable for salus-it500 devices in the workspace payload. |
+| 4 | routes/api.js | SCOPE_GROUPS heating level: add controllable-AND-online device check before mon fallback |
 | 5 | services/tb-device.js | Profile-based early-return in classifyDevice for boilerControl; mapTelemetry boiler keys (pending Spencer semantic confirmation); staleness computation using cadence-based threshold |
 | 5 | routes/api.js | Add boilerPanelStaleMinutes to site workspace payload |
 | 5 | public/js/flows.js | Update boiler-panel heating text; add hwTempC / boilerOnOff display with staleness, sanity, and partial-mode caveat |
@@ -278,9 +329,9 @@ For the hotwater flow, the existing text already says "Hot water here runs on th
 
 - Intesis AC control (referring to IoT team, James Q1 decision).
 - Hot-water boost in the UI — the salus-it500-dhw CONTROL_CONTRACT `controllable: false` flag is unchanged by this design. The boost affordance is not offered in the dashboard. This gate is deliberately held pending Spencer's bench-test sign-off. A future, separately-scoped design change enables boost; that design must begin by confirming WRITES_DISABLED state (Q3) and receiving Spencer's sign-off.
-- The `salus-it500-dhw` CONTROL_CONTRACT entry (separate from salus-it500; unchanged; controllable: false).
-- The `salus` bare-type CONTROL_CONTRACT (legacy fleet, IoT team dependency).
-- The WRITES_DISABLED kill switch — unchanged and authoritative. Its current runtime value is not determined by this design. James and the IoT team must confirm and record the current state before the iT500 fleet reconnects (Q3 above). See also item 3's critical timing constraint.
+- The `'salus-it500-dhw'` CONTROL_CONTRACT entry (separate from salus-it500; unchanged; controllable: false).
+- The `'salus'` bare-type CONTROL_CONTRACT (legacy fleet, IoT team dependency).
+- The WRITES_DISABLED kill switch — unchanged and authoritative. Its current runtime value is not determined by this design. James and the IoT team must confirm and record the current state before setting SALUS_IT500_CTL_ENABLED=true (Q3 above).
 - Intesis mode command (Spencer bench test pending).
 - The Tuya switch command path.
 - The iT700 setpoint command path.
@@ -292,16 +343,17 @@ For the hotwater flow, the existing text already says "Hot water here runs on th
 
 ## Data Dictionary
 
-This design introduces new canonical internal field names for boiler panel telemetry and the staleness computation. All other field names in scope (switchRequested, setpointRequested, hwBoostHoursRequested, switch_1, heatingSetpoint, setPoint) already exist in the data dictionary (DATA_DICTIONARY.md). Build uses the canonical names below; the raw ThingsBoard key names and their semantic meaning are confirmed by Spencer before item 5 build starts.
+This design introduces new canonical internal field names for the activation flag, boiler panel telemetry, and the staleness computation. All other field names in scope (switchRequested, setpointRequested, hwBoostHoursRequested, switch_1, heatingSetpoint, setPoint) already exist in the data dictionary (DATA_DICTIONARY.md). Build uses the canonical names below; the raw ThingsBoard key names and their semantic meaning are confirmed by Spencer before item 5 build starts.
 
-| Canonical field | Device types | Description | Retention | Sensitivity |
+| Canonical field | Device types / scope | Description | Retention | Sensitivity |
 |---|---|---|---|---|
+| SALUS_IT500_CTL_ENABLED | Configuration constant | Named boolean constant controlling whether salus-it500 devices can receive setpoint commands. Default: false. Must be set to true (with redeployment) only after WRITES_DISABLED has been confirmed by James/IoT. Stored in the project configuration module, not in application logic. | N/A — configuration. | Low. |
 | boilerOnOff | boiler-panel | Whether the boiler control panel is currently commanding the boiler. Boolean. Sourced from the confirmed TB telemetry key for panel output state — Spencer must confirm both the key name and that the key semantically means the panel is commanding the boiler. Null if unconfirmed key (full-mode only; absent in Q1 partial). | Live workspace only. Not persisted. | Low. |
 | hwTempC | boiler-panel | Hot-water temperature as measured by the boiler panel sensor, degrees Celsius. Number. Sourced from the confirmed TB telemetry key for hot-water temperature — Spencer must confirm both the key name and that the key semantically measures customer hot-water temperature (not flow or primary circuit temperature). Null if value fails sanity check (see hwTempCOutOfRange). | Live workspace only. Not persisted. | Low. |
 | hwTempCOutOfRange | boiler-panel | True when the raw hwTempC value was present but outside [0, 95] (provisional band — confirm with Spencer). Companion to hwTempC: null. Drives "reading out of range" display. | Live workspace only. Not persisted. | Low. |
 | boilerOnOffUnrecognised | boiler-panel | True when the raw on/off telemetry value was present but not a recognisable boolean equivalent. Companion to boilerOnOff: null. Drives "panel command state unrecognised" display. | Live workspace only. Not persisted. | Low. |
 | boilerPanelStaleMinutes | boiler-panel | Integer minutes since the boilerControl device last pushed telemetry to ThingsBoard (derived from lastActivityTime). Null when the reading is fresh (below the cadence-based staleness threshold). Emitted on the boilerControl section of the site workspace. Drives the staleness warning and muted-value display. | Live workspace only. Not persisted. | Low. |
-| BOILER_PANEL_STALE_THRESHOLD_MINUTES | configuration constant | Named constant holding the staleness threshold in minutes. Derived from Spencer's confirmed healthy push cadence for boilerControl devices. Must not be hardcoded in application logic. Provisional value for design illustration: 5 minutes. Replace with confirmed value before Track 2 ships. | N/A — configuration. | Low. |
+| BOILER_PANEL_STALE_THRESHOLD_MINUTES | Configuration constant | Named constant holding the staleness threshold in minutes. Derived from Spencer's confirmed healthy push cadence for boilerControl devices. Must not be hardcoded in application logic. Provisional value for design illustration: 5 minutes. Replace with confirmed value before Track 2 ships. | N/A — configuration. | Low. |
 
 ---
 
@@ -328,26 +380,40 @@ Steps: Call validateCommand directly with device type 'salus-it500-dhw', command
 Expected: Returns `{ ok: true, attribute: 'hwBoostHoursRequested', value: 2 }`. The attribute name is NOT 'hwBoostHoursDesired'.
 Pre-ship check: Confirm the expected attribute name matches what the IoT Command Gate source code actually reads from SERVER_SCOPE before this test is written to the CI suite. If the gate code uses a different name, update both the fix and this test.
 
-**T1-4: iT500 offers setpoint control when reporting.**
-Precondition: fixture device classified as salus-it500 with heatingSetpoint 18 and online.
+**T1-4a: iT500 does NOT offer setpoint control when SALUS_IT500_CTL_ENABLED=false (default after Track 1 ships).**
+Precondition: fixture device classified as salus-it500, online, SALUS_IT500_CTL_ENABLED=false (config default).
 Steps: Confirm site. Open Heating flow. Select accommodation area.
-Expected: Setpoint control is offered (the setpoint window appears). The CONTROL_CONTRACT for the device has controllable: true.
+Expected: Setpoint control is NOT offered. The device's effective d.controllable is false (flag gate is closed). The flow does not present the setpoint window.
 
-**T1-4b: iT500 DHW device does NOT offer boost affordance.**
-Precondition: fixture device classified as salus-it500-dhw, online, in a site confirmed by the handler.
+**T1-4b: iT500 offers setpoint control when online AND SALUS_IT500_CTL_ENABLED=true.**
+Precondition: fixture device classified as salus-it500 with heatingSetpoint 18 and online. SALUS_IT500_CTL_ENABLED=true (as set during activation).
+Steps: Confirm site. Open Heating flow. Select accommodation area.
+Expected: Setpoint control is offered (the setpoint window appears). The CONTROL_CONTRACT for the device has controllable: true and the flag is true.
+
+**T1-4c: iT500 does NOT offer setpoint control when offline, even with SALUS_IT500_CTL_ENABLED=true.**
+Precondition: fixture device classified as salus-it500, offline (d.online=false), SALUS_IT500_CTL_ENABLED=true.
+Steps: Confirm site. Open Heating flow. Select accommodation area.
+Expected: Setpoint control is NOT offered. d.controllable=true but d.online=false; the scope check does not fire 'ctl'. The device row shows offline status. This test guards against the inverted-label risk identified in item 4.
+
+**T1-4d: iT500 DHW device does NOT offer boost affordance.**
+Precondition: fixture device classified as salus-it500-dhw, online, in a site confirmed by the handler. SALUS_IT500_CTL_ENABLED may be true or false — the salus-it500-dhw CONTROL_CONTRACT is unchanged in either case.
 Steps: Confirm site. Open Heating or Hot water flow.
-Expected: No boost or control button appears for the DHW device. The salus-it500-dhw CONTROL_CONTRACT controllable: false gates the affordance off.
-Note: This test verifies that item 3 did not inadvertently open the boost path.
+Expected: No boost or control button appears for the DHW device. The salus-it500-dhw CONTROL_CONTRACT controllable: false gates the affordance off. This test verifies that item 3 did not inadvertently open the boost path.
 
-**T1-5: Heating scope level is ctl for iT700 site.**
-Precondition: fixture site with an online salus-it700 device and no boilerControl device.
+**T1-5: Heating scope level is 'ctl' for iT700 site with online device.**
+Precondition: fixture site with an online salus-it700 device (d.controllable=true, d.online=true) and no boilerControl device.
 Steps: POST /sites/:siteNo/confirm. Read workspace.scope for key heating.
-Expected: level is ctl, not mon.
+Expected: level is 'ctl', not 'mon'.
 
-**T1-6: Heating scope level is mon for dark-fleet salus site.**
+**T1-5b: Heating scope level is 'mon' for iT700 site with offline device.**
+Precondition: fixture site with a salus-it700 device that is offline (d.online=false, d.controllable=true by CONTROL_CONTRACT).
+Steps: As T1-5.
+Expected: level is 'mon'. The device is contractually controllable but not currently reachable. Guards against showing 'ctl' for offline devices.
+
+**T1-6: Heating scope level is 'mon' for dark-fleet salus site.**
 Precondition: fixture site with a salus (bare-type) device, offline, controllable: false.
 Steps: As T1-5.
-Expected: level is mon.
+Expected: level is 'mon'.
 
 ### Track 2 tests (item 5, once telemetry keys, semantic meaning, and push cadence confirmed)
 
@@ -410,11 +476,13 @@ Expected: Temperature shows 61 °C. Panel commanding boiler shows "NO." No cavea
 
 ## Cost and Token Efficiency Evaluation
 
-Track 1 has zero LLM token cost and zero per-operation cost. All four items are pure code changes in a Node.js server and a browser JS file. There is no polling, no background worker, and no new API call added.
+Track 1 has zero LLM token cost and zero per-operation cost. All four items are pure code changes in a Node.js server and a browser JS file. There is no polling, no background worker, and no new API call added. The SALUS_IT500_CTL_ENABLED flag is a single boolean read per workspace fetch for salus-it500 devices — negligible compute, zero token or monetary cost.
 
 Track 2 adds two computed fields (boilerPanelStaleMinutes, sanity flags) to the existing per-site workspace fetch. The `lastActivityTime` field is already retrieved as part of the ThingsBoard device list request. The staleness computation is a subtraction of two integers, evaluated against a named configuration constant. The sanity checks are two range/type checks on the mapped telemetry values. The marginal cost is negligible: no extra HTTP round-trips, no LLM calls, and the additional JSON is a handful of scalar fields on an existing response.
 
 No new background or polling work is introduced by either track. The dashboard's existing 30-second workspace refresh already covers boiler panel telemetry on the same schedule as all other device telemetry.
+
+---
 
 ## Silent Running Evaluation
 
@@ -429,8 +497,8 @@ Neither track introduces any background component, daemon, polling job, schedule
 | Handler can see all lighting circuits, not just the first | Item 1: flows.js filter-and-loop renders every lighting device as its own row with its own switch state and button | Lighting flow, all circuit rows |
 | Handler can see all fans | Item 1: same pattern for fan devices | Fan flow, all fan rows |
 | Hot-water boost command actually reaches the IoT Command Gate (when eventually enabled) | Item 2: hwBoostHoursRequested fix routes the command to SERVER_SCOPE as the gate expects. Boost remains UI-gated in this release. Attribute name verified against IoT Command Gate source before landing. | Control dispatch path, backend only. Active when a future design enables salus-it500-dhw. |
-| iT500 setpoint control offered when heating fleet is restored | Item 3: salus-it500 controllable: true allows the flow to offer the setpoint window. DHW device unaffected. WRITES_DISABLED confirmed before fleet reconnection. | Heating flow, accommodation area |
-| Scope label "Controllable" is honest for iT700 sites | Item 4: scope heating level reads the device's actual controllable flag | "Other" flow scope check; workspace scope payload |
+| iT500 setpoint control offered when heating fleet is restored, without auto-go-live on reconnect | Item 3: salus-it500 CONTROL_CONTRACT controllable: true records the intended state; SALUS_IT500_CTL_ENABLED=false (default) holds activation until James/IoT confirms WRITES_DISABLED and deliberately flips the flag. Reconnection alone does not activate commands. DHW device unaffected. | Heating flow, accommodation area. Config constant, operator-controlled activation. |
+| Scope label "Controllable" is honest — only shown for devices that are both contractually controllable AND currently online | Item 4: scope heating level checks d.controllable AND d.online. Offline devices (including offline iT500 fleet after item 3 CONTROL_CONTRACT change) show 'mon', not 'ctl'. | "Other" flow scope check; workspace scope payload |
 | Handler can read boiler panel state to diagnose no-heat calls | Item 5: boilerControl devices classified as boiler-panel and their telemetry surfaced in the heating and hotwater flows, using semantically-confirmed keys | Heating flow boiler-panel branch; hotwater flow stage 0 |
 | Handler is not misled by a stale boiler panel reading | Item 5 staleness guard: lastActivityTime check with visible muted warning when reading exceeds BOILER_PANEL_STALE_THRESHOLD_MINUTES (derived from Spencer's confirmed push cadence) | Heating and hotwater flows, boiler panel section |
 | Handler is not misled by a mis-keyed or out-of-range value | Item 5 sanity checks: hwTempC range [0, 95] (confirmed with Spencer), boilerOnOff recognisable boolean; out-of-range/unrecognised renders as an explicit error not a value | Heating and hotwater flows, boiler panel section |
@@ -445,6 +513,6 @@ Neither track introduces any background component, daemon, polling job, schedule
 
 **Q2 (to James): Hot water scope label for pure-heating sites.** A site with an iT700 and no DHW device shows hot water as 'none' today. If "none" is the right label, no change is needed. If James wants a distinct label for "hot water exists at the site but is not on Lighthouse" versus "no DHW device at all on this Lighthouse estate", the scope level logic needs a fourth state (which has UI implications). James to confirm before build.
 
-**Q3 (to James / IoT): WRITES_DISABLED current state — confirm before fleet reconnection.** Before the iT500 heating fleet reconnects (see item 3 critical timing note), James or the IoT team must confirm the current runtime value of WRITES_DISABLED and record the date checked. Item 3 makes setpoint commands available to handlers the moment the fleet reconnects; there is no separate activation gate. This design does not read or change WRITES_DISABLED. Record: _[value and date to be filled by James/IoT — must be completed before fleet reconnection event]_.
+**Q3 (to James / IoT): WRITES_DISABLED confirmation before SALUS_IT500_CTL_ENABLED flag flip.** Item 3 ships in Track 1 with SALUS_IT500_CTL_ENABLED=false. Fleet reconnection does not activate setpoint control — the flag is the gate. Before James or the IoT team sets SALUS_IT500_CTL_ENABLED=true and redeploys, the current runtime value of WRITES_DISABLED must be confirmed and the date recorded. This is a pre-flag-flip requirement, not a pre-ship requirement. The Track 1 patch can ship at any time. Record: _[value and date to be filled by James/IoT — required before flag flip]_.
 
 **Q4 (to Spencer): boilerControl healthy push cadence.** What is the expected interval between telemetry pushes from a healthy boilerControl device under normal operating conditions — is it on-change only, a fixed interval, or a combination? This value determines the BOILER_PANEL_STALE_THRESHOLD_MINUTES configuration constant. A threshold anchored to the dashboard's 30-second refresh cycle risks warning fatigue if healthy panels push slowly (e.g. every 15 minutes) or false reassurance if they push frequently and the threshold is too loose. The threshold must not ship as a fixed constant until Spencer's answer is recorded, and the constant must be parameterised in config so it can be updated without a code change if the cadence changes. Ask Spencer for this alongside the key names and semantic meaning (Q1).
