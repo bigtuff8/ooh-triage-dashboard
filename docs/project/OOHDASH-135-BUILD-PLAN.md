@@ -123,7 +123,11 @@ When `SALUS_IT500_CTL_ENABLED=true` (after activation): salus-it500 devices that
 
 Level A (UI affordance) -- `routes/api.js`: when building the per-device `d.controllable` field for salus-it500 devices, apply `CONTROL_CONTRACT.controllable AND SALUS_IT500_CTL_ENABLED`. If the flag is false, `d.controllable` is false in the browser payload even though the CONTROL_CONTRACT says true. The setpoint button does not appear.
 
+**CT2-verified (gate-committee response).** The effective controllable value for salus-it500 devices in the workspace payload is `CONTROL_CONTRACT.controllable AND SALUS_IT500_CTL_ENABLED`. This is NOT raw `CONTROL_CONTRACT.controllable`. The single evaluation locus is routes/api.js: the per-device payload build inside `workspacePayload`. The SCOPE_GROUPS heating step 1 then consumes `d.controllable` from that payload; the flag gate therefore flows through to the scope-level evaluation. For all other device types, effective controllable is `CONTROL_CONTRACT.controllable` unchanged. The flag check applies to salus-it500 only.
+
 Level B (dispatch enforcement) -- `services/control.js`: in `validateCommand`, add a check for salus-it500 device type. If `SALUS_IT500_CTL_ENABLED` is false, return error "iT500 control not yet enabled" immediately before any ThingsBoard write. This server-side gate prevents direct-API bypass of the browser. WRITES_DISABLED remains the master kill-switch and operates independently of this flag.
+
+**I3-verified (gate-committee response).** WRITES_DISABLED is checked BEFORE the new SALUS_IT500_CTL_ENABLED check. In services/control.js, the kill-switch check (F016, `writesBlocked`) is at dispatch step 2 (lines 68-70), before `validateCommand` at dispatch step 4 (line 87) where the Level B salus-it500 flag check resides. Confirmed order: (1) confirmation gate, (2) WRITES_DISABLED kill-switch, (3) device resolution and registration, (4) validateCommand including Level B SALUS_IT500_CTL_ENABLED check. WRITES_DISABLED remains the master kill-switch and is not bypassed by any flag-level check.
 
 **Files changed.**
 
@@ -165,6 +169,8 @@ Step 3: no heating device -- result is `'none'`.
 
 The `boilerControl.heatingControllable` branch is removed. It was the only route to an incorrect `'ctl'` label for boiler-panel sites.
 
+**CT1-verified (gate-committee response).** At routes/api.js line 169, `s.boilerControl?.heatingControllable` is the current gate for the heating `'ctl'` outcome. The `heatingControllable` field defaults to false (routes/api.js line 202, defaultBc). In production, OOH has no write path for boilerControl panel heating and the corresponding TB attribute is not populated for current C&B sites; `heatingControllable` evaluates to false. The current path for boilerControl sites is therefore: heatingControllable false -- falls to device-presence check -- boilerControl-profile devices are already classified as `kind: 'heating'` by the existing classifier paths (the profile-based early-return that W5-A adds does not change the `kind`; W5-A adds the explicit `deviceType: 'boiler-panel'` label and sets `controllable: false` definitively, but the `kind: 'heating'` classification already exists) -- result is `'mon'`. Item 4's removal of the `heatingControllable` branch is behaviour-preserving: both the pre-Item-4 path and the Item-4 path yield `'mon'` for boilerControl sites today. The removal is also a correction: it eliminates the latent risk of a false `'ctl'` label if the TB attribute were populated without an actual OOH write path. W5-A (Track 2) is NOT a prerequisite for the `'mon'` outcome: boilerControl devices already appear in `s.devices` as `kind: 'heating'` via the existing classifier. Track 1 sets the correct interim `'mon'` state for the site scope row regardless of whether W5-A has shipped.
+
 **Scenario verification against the evaluation order.**
 
 - iT700 site, device online: step 1 fires -- `'ctl'`. Correct.
@@ -204,6 +210,8 @@ Step 3: site has at least one classified heating device (`s.devices.some(d => d.
 Step 4: no heating device and no DHW device -- result is `'none'` (no hot water signal at all).
 
 The step 3 check must be specific: heating device present AND no boilerControl device AND no salus-it500-dhw device. The presence of a heating device signals that the site has a heating system (and therefore hot water); the absence of boilerControl and iT500-dhw confirms neither is on Lighthouse.
+
+**CT3 -- accepted inference (gate-committee response).** The step 3 inference that "heating device present implies hot water exists but is not on Lighthouse" is an accepted direction for Track 1. A site that is electric-only or genuinely has no DHW system would also satisfy step 3 (heating device present, no boilerControl, no iT500-dhw), producing a `'not-lighthouse'` label that is technically a false positive -- the correct label for such a site would be `'none'`. This false-positive direction is accepted: the operator sees "Not on Lighthouse here" for a site with no DHW system rather than silence. This is preferable to the false-negative (showing `'none'` for a site where DHW exists but is unmonitored). Track 2's W5-A classification will enable a more precise discrimination once boilerControl devices carry the explicit `'boiler-panel'` deviceType.
 
 **UI label.** The `'not-lighthouse'` level renders as "Not on Lighthouse here" -- James's exact wording from the Q2 decision.
 
@@ -261,6 +269,8 @@ Note: the registry.js already has `'boiler-panel': { label: 'Pub boiler panel', 
 
 Map `DHW.override` to `boilerDhwOverrideUntil` (number, epoch ms). Map `output1OutputMask` to `boilerOutputMask` (number). Both nil-safe: null if key absent or value is not a finite number. These are raw extractions; the boolean interpretation (active/inactive) happens in W5-C.
 
+**I2 (integration advisory).** ThingsBoard telemetry is a flat key-value map. The key literal is `'DHW.override'` with a literal dot embedded in the name. Use bracket notation ONLY: `telemetry['DHW.override']`. Do not use dot notation (`telemetry.DHW?.override`) which silently returns undefined on a flat map and makes `boilerDhwOverrideUntil` always null. This is a mandatory implementation constraint for W5-B.
+
 **Can start now.** Key names confirmed by Rosetta Stone. Semantic interpretation awaits Spencer's confirmation before the computed booleans ship.
 
 ---
@@ -268,6 +278,10 @@ Map `DHW.override` to `boilerDhwOverrideUntil` (number, epoch ms). Map `output1O
 ### Work Unit W5-C: Workspace Computation (routes/api.js)
 
 Compute `boilerDhwOverrideActive` for V2 panels: `boilerDhwOverrideUntil != null AND Date.now() < boilerDhwOverrideUntil`. Compute `boilerOutputMaskDhwBit` for V1 panels: bit 3 of `boilerOutputMask` is set. Add `boilerPanelStaleMinutes` to the boilerControl section of the site workspace (null if fresh, integer if stale). The `lastActivityTime` field is already retrieved per device from the ThingsBoard device list; this work unit consumes it against `BOILER_PANEL_STALE_THRESHOLD_MINUTES`.
+
+**I1 (integration advisory) -- V1/V2 discrimination rule.** A device is treated as V2 if `telemetry['DHW.override']` is present (non-null) after telemetry fetch. A device is treated as V1 if `telemetry['output1OutputMask']` is present. If both are absent: classify as unknown and emit no `boilerDhwOverrideActive` or `boilerOutputMaskDhwBit` fields. If both are present (unexpected): prefer V2. This rule governs which computed boolean to emit for each boilerControl device in the workspace payload.
+
+**CT4 -- boilerDhwOverrideActive staleness constraint (gate-committee response).** `boilerDhwOverrideActive` is computed at payload-build time using `Date.now()` at the moment routes/api.js builds the workspace response. A cached workspace response will show a stale `'Active'` state after the override expires between fetches. Refresh cadence is the existing workspace freshness window (PRODUCTION: 45 minutes). The staleness bound is: a displayed "DHW override: Active" state can remain on screen for up to 45 minutes after the override expires. Two options for Track 2 implementation: (1) accept this staleness bound -- the `boilerPanelStaleMinutes` warning already covers data-age visibility; or (2) recompute `boilerDhwOverrideActive` client-side using the raw `boilerDhwOverrideUntil` epoch value and `Date.now()` at render time -- this eliminates the staleness gap entirely and is the recommended approach since the raw epoch is already in the payload. This is a MUST-STATE constraint for the W5-D implementation decision.
 
 **Blocked on Spencer semantic confirmation before shipping.** W5-C can be stubbed (coded but feature-flagged or excluded from Track 2 PR) while awaiting Spencer's confirmation.
 
@@ -321,6 +335,14 @@ W5-A and W5-B are unblocked. W5-C, W5-D, and W5-E are blocked until Spencer's co
 | 5 W5-C | T2 | routes/api.js | Compute boilerDhwOverrideActive and boilerOutputMaskDhwBit; add boilerPanelStaleMinutes to workspace payload. |
 | 5 W5-D | T2 | public/js/flows.js | Update boiler-panel heating and hotwater flow branches; add override state display with staleness rendering. |
 | 5 W5-E | T2 | config (new constant) | BOILER_PANEL_STALE_THRESHOLD_MINUTES = 5 (provisional; replace with Spencer confirmed cadence before Track 2 ships). |
+
+---
+
+## Cost and Background Posture
+
+**CT5 (gate-committee response).** Track 1 introduces no new polling, no new background running, no new daemon or timer. The heating scope-level evaluation and the hot water `'not-lighthouse'` classification are computed on the existing request path from data already present in the workspace payload (device kind, controllable, and online fields). No new ThingsBoard queries are added for any Track 1 item. Cost is neutral relative to the current baseline.
+
+Track 2 (Item 5) likewise adds no new polling or background timers. The `boilerPanelStaleMinutes` value is computed from `lastActivityTime` already present in the ThingsBoard device list response on the same request path. `boilerDhwOverrideActive` is computed from telemetry already fetched per device. No new endpoints, no new timers, and no new daemon processes are introduced in either track.
 
 ---
 
