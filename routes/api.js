@@ -163,10 +163,14 @@ const switchControllable = (s, kind) => s.devices.some(d =>
     d.kind === kind && (registry.capabilitiesFor(d.deviceType)?.commands || []).includes('switch'));
 
 export const SCOPE_GROUPS = [
-    // OOHDASH-114-F1: heating is controllable when the site has a boilerControl device present.
-    // The old 'boiler-panel' exclusion was unreachable in production (that deviceType is never
-    // emitted by the live classifier). Falls back to device-presence for non-boilerControl sites.
-    { key: 'heating', label: 'Heating', level: s => s.boilerControl?.heatingControllable ? 'ctl' : s.devices.some(d => d.kind === 'heating') ? 'mon' : 'none' },
+    // OOHDASH-135 Item 4: heating scope is now DEVICE-driven (d.controllable on the effective
+    // device list built by workspacePayload's Level-A gate). boilerControl.heatingControllable
+    // is no longer the deciding factor — that was evaluated before the effective-controllable
+    // was computed, producing a stale result for dark fleets and flag-gated device classes.
+    // Step 1: any heating device with effective controllable=true → 'ctl'
+    // Step 2: any heating device present → 'mon'
+    // Step 3: no heating devices → 'none'
+    { key: 'heating', label: 'Heating', level: s => s.devices.some(d => d.kind === 'heating' && d.controllable) ? 'ctl' : s.devices.some(d => d.kind === 'heating') ? 'mon' : 'none' },
     { key: 'hotwater', label: 'Hot water', level: s => hasControllableDhw(s) ? 'ctl' : hasHotWaterSignal(s) ? 'mon' : 'none' },
     { key: 'kitchen', label: 'Kitchen equipment', level: s => switchControllable(s, 'kitchen') ? 'ctl' : s.devices.some(d => d.kind === 'kitchen') ? 'mon' : 'none' },
     { key: 'lighting', label: 'External lighting', level: s => switchControllable(s, 'lighting') ? 'ctl' : s.devices.some(d => d.kind === 'lighting') ? 'mon' : 'none' },

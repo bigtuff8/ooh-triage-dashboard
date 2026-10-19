@@ -55,15 +55,25 @@ test('BC-3: site with no boilerControl and no combi signal → hotwater scope le
     assert.equal(g.level(site), 'none');
 });
 
-/* ---- BC-4: boilerControl present → heating scope level is 'ctl' ---- */
-test('BC-4: site with boilerControl present → heating scope level is ctl', () => {
-    const site = makeSite(V2_BC);
+/* ---- BC-4: OOHDASH-135 Item 4 — heating scope is now device-driven, not boilerControl-driven ---- */
+// BC-4a: boilerControl alone (no heating devices) no longer drives 'ctl' — returns 'none'.
+test('BC-4a: site with boilerControl but no heating devices → heating scope level is none (device-driven after OOHDASH-135)', () => {
+    const site = makeSite(V2_BC);  // devices: []
+    const g = SCOPE_GROUPS.find(g => g.key === 'heating');
+    assert.equal(g.level(site), 'none');
+});
+
+// BC-4b: a heating device with effective controllable=true → 'ctl'.
+test('BC-4b: site with a controllable=true heating device → heating scope level is ctl', () => {
+    const site = makeSite(V2_BC, [
+        { deviceId: 'it700-1', deviceType: 'salus-it700', kind: 'heating', online: true, controllable: true, telemetry: {} }
+    ]);
     const g = SCOPE_GROUPS.find(g => g.key === 'heating');
     assert.equal(g.level(site), 'ctl');
 });
 
-/* ---- BC-5: no boilerControl + heating devices → heating scope level is 'mon' ---- */
-test('BC-5: site without boilerControl but with salus-it500 heating devices → heating scope level is mon', () => {
+/* ---- BC-5: no boilerControl + heating devices (controllable=false) → heating scope level is 'mon' ---- */
+test('BC-5: site without boilerControl but with salus-it500 heating devices (not controllable) → heating scope level is mon', () => {
     const site = makeSite(NO_BC, [
         { deviceId: 'it500-1', deviceType: 'salus-it500', kind: 'heating', online: true, telemetry: {} }
     ]);
