@@ -108,7 +108,14 @@ const CONTROL_CONTRACT = {
         requestedKey: 'setpointRequested', scope: 'SERVER_SCOPE',
         statusKey: 'setpointSyncStatus', errorKey: 'setpointLastError',
         confirmKeys: ['setPoint'], valueType: 'number', compareRule: 'numeric-0.25',
-        controllable: false, dark: true, timingClass: 'salus-it500'       // D-DARK-FLEETS: dark today
+        // OOHDASH-135 Item 3: controllable: true now that the IoT Command Gate (Rosetta Stone,
+        // OOHDASH-123) is verified to handle iT500 setpointRequested. The `dark` flag is removed;
+        // the dark-fleet state was temporary and is no longer the product design.
+        // ACTIVATION GATE: SALUS_IT500_CTL_ENABLED=false (default) keeps the UI and dispatch
+        // locked until the operator explicitly flips the flag (see config.js and the pre-activation
+        // checklist). Level A: routes/api.js overrides d.controllable to false when flag is off.
+        // Level B: services/control.js rejects iT500 commands when flag is off.
+        controllable: true, timingClass: 'salus-it500'
     },
     salus: {
         requestedKey: 'setpointRequested', scope: 'SERVER_SCOPE',

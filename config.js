@@ -89,6 +89,16 @@ export const config = {
     // cannot masquerade as anything but "not exactly false". Enable is a deliberate, auditable act.
     writesDisabled: (process.env.WRITES_DISABLED ?? '').trim().toLowerCase() !== 'false',
 
+    // OOHDASH-135 Item 3: salus-it500 setpoint control flag gate (defence-in-depth Level A + B).
+    // Default FALSE — iT500 setpoint control does NOT go live on fleet reconnection or on Track 1
+    // ship. Activation requires a deliberate two-step operator action:
+    //   1. Re-confirm WRITES_DISABLED=false on the live AKS pod (see pre-activation checklist).
+    //   2. Set SALUS_IT500_CTL_ENABLED=true in the pod environment and redeploy.
+    // The flag gates BOTH the Level A UI affordance (routes/api.js — d.controllable override) AND
+    // the Level B server-side dispatch check (services/control.js — rejects iT500 commands when false).
+    // Same fail-OPEN convention as writesDisabled: only exactly "true" (trim + lower-case) enables.
+    salusIt500CtlEnabled: (process.env.SALUS_IT500_CTL_ENABLED ?? '').trim().toLowerCase() === 'true',
+
     // Durable store: Cosmos DB in live mode, local JSON files in fixture/dev mode
     cosmos: {
         endpoint: env('COSMOS_ENDPOINT'),

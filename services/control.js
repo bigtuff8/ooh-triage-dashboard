@@ -83,6 +83,18 @@ export async function dispatch({ operator, confirmToken, siteNo, deviceId, comma
         throw Object.assign(new Error('Device has not registered with the platform yet (no state published) — it cannot accept remote commands. Capture and escalate.'), { status: 409, registration: true });
     }
 
+    // OOHDASH-135 Item 3 Level B: salus-it500 flag gate (defence-in-depth, server-side).
+    // Even if the Level A UI gate (routes/api.js) is bypassed or the client sends a direct
+    // request, this check refuses iT500 commands when SALUS_IT500_CTL_ENABLED=false.
+    // The error is 422 (guardrail) so the operator sees a clear "not yet enabled" message
+    // rather than a generic server error.
+    if (device.deviceType === 'salus-it500' && !config.salusIt500CtlEnabled) {
+        throw Object.assign(
+            new Error('iT500 setpoint control is not yet enabled — the fleet is reconnecting and will be activated once confirmed (SALUS_IT500_CTL_ENABLED)'),
+            { status: 422, guardrail: true }
+        );
+    }
+
     // 4. F009 guardrails
     const check = registry.validateCommand(device, command, value);
     if (!check.ok) throw Object.assign(new Error(check.reason), { status: 422, guardrail: true });

@@ -217,9 +217,14 @@ async function workspacePayload(site) {
     // OOHDASH-114-F1: safe default for boilerControl when field is absent (legacy fixture sites, bridge path).
     const defaultBc = { present: false, isV1: false, isV2: false, heatingControllable: false, dhwControllable: false, deviceId: null };
 
-    return {
-        site: { siteNo: site.siteNo, siteName: site.siteName, nameUnverified: site.nameUnverified, accountId: site.accountId, brand: site.brand, address: site.address, callsLast30Days: site.callsLast30Days },
-        devices: site.devices.map(d => ({
+    // OOHDASH-135 Item 3 Level A: compute effective controllable per device.
+    // For salus-it500, the SALUS_IT500_CTL_ENABLED flag gate overrides d.controllable to false
+    // when the flag is off — preventing a fleet reconnection from silently enabling iT500 setpoint
+    // control before the operator activates it deliberately. All other device types pass through
+    // d.controllable unchanged. The siteWithEffective object passes the effective device list to
+    // SCOPE_GROUPS so the heating scope reflects the flag state (Item 4 depends on this).
+    const effectiveDevices = site.devices.map(d => {
+        const base = {
             ...stripDemo(d),
             capabilities: registry.capabilitiesFor(d.deviceType)?.commands || [],
             // D9: registration is derived — fixture devices are registered unless flagged
@@ -228,8 +233,17 @@ async function workspacePayload(site) {
             // authoritative re-assert.
             registered: d._demo !== 'unregistered',
             setpointWindow: typeof d.telemetry?.heatingSetpoint === 'number' ? registry.setpointWindow(d.deviceType, d.telemetry.heatingSetpoint) : null
-        })),
-        scope: scopeGroups.map(g => ({ key: g.key, label: g.label, level: g.level(site) })),
+        };
+        if (d.deviceType === 'salus-it500' && !config.salusIt500CtlEnabled) {
+            return { ...base, controllable: false };
+        }
+        return base;
+    });
+    const siteWithEffective = { ...site, devices: effectiveDevices };
+    return {
+        site: { siteNo: site.siteNo, siteName: site.siteName, nameUnverified: site.nameUnverified, accountId: site.accountId, brand: site.brand, address: site.address, callsLast30Days: site.callsLast30Days },
+        devices: effectiveDevices,
+        scope: scopeGroups.map(g => ({ key: g.key, label: g.label, level: g.level(siteWithEffective) })),
         anyOffline: site.devices.some(d => !d.online),
         tickets,
         activeP1Tickets,

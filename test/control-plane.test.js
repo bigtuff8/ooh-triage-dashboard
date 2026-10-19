@@ -17,6 +17,11 @@ import { join } from 'path';
 process.env.DATA_MODE = 'fixture';
 process.env.OOH_STORE_DIR = mkdtempSync(join(tmpdir(), 'ooh-cplane-'));
 process.env.WRITES_DISABLED = 'false';
+// OOHDASH-135 Item 3: Level B gate — control-plane tests dispatch against IT500-BAR-6832
+// (salus-it500). Set the flag before any import so config.salusIt500CtlEnabled is true
+// when control.js and config.js modules are first loaded. Tests for the DISABLED path
+// are in oohdash-135.test.js (T1-4e) which uses a cache-busting import.
+process.env.SALUS_IT500_CTL_ENABLED = 'true';
 // OOHDASH-123: compress the per-class confirm timings + fixture trajectory so the real watcher settles
 // quickly in the test (production defaults are seconds–minutes).
 process.env.SYNC_POLL_INTERVAL_MS = '10';
