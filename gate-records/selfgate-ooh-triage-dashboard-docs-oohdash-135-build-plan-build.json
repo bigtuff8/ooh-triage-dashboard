@@ -1,0 +1,21 @@
+{
+  "run": "selfgate-ooh-triage-dashboard-docs-oohdash-135-build-plan",
+  "phase": "build",
+  "pr": 112,
+  "approvedBy": [
+    "bigtuff8"
+  ],
+  "reviewComments": [
+    "bigtuff8: - Track 1 — five changes shipping together: Approve this part\n\n(submitted via the interactive gate review)\n\n<!-- gate:selected [{\"question\":\"Track 1 — five changes shipping together\",\"answer\":\"Approve this part\"}] -->"
+  ],
+  "mergeCommit": "5ed291c23e3df34f98e3d624fa05464fd4c436e0",
+  "phaseBranch": "docs/oohdash-135-build-plan",
+  "releaseBranch": "main",
+  "stamp": 1792446035506,
+  "selectedOptions": [
+    {
+      "question": "Track 1 — five changes shipping together",
+      "answer": "Approve this part"
+    }
+  ]
+}
