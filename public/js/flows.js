@@ -723,30 +723,47 @@ const FLOWR = {
         // OOHDASH-114-F1: DHW controllability is now determined by the boilerControl workspace field
         // (Sam Day spec - V1/V2 shared-attribute check). The old devices.find was testing for a device
         // type that live inventory never emits. ws.boilerControl is always present (defaulted server-side).
+        // OOHDASH-135 Item 6: ‘not-lighthouse’ scope path — pure-heating site, hot water not on Lighthouse.
+        const hwLevel = ws.scope?.find(s => s.key === ‘hotwater’)?.level;
         if (f.stage === 0) {
-            doneLine('Hot water - boiler-side, not controllable from here; captured for the IoT team');
-            return `<div class="alert info">Hot water here runs on the boiler panel, which this dashboard monitors but can't control - there's no remote boost. We'll capture the details with the site boiler guidance and escalate to the IoT team, so you still have a next step for the caller.</div>
+            if (hwLevel === ‘not-lighthouse’) {
+                doneLine(‘Hot water - not on Lighthouse at this site’);
+                return `<div class="alert info" data-testid="hw-not-lighthouse">Hot water at this site isn’t on Lighthouse — it runs on the site’s own boiler or system and isn’t connected here. We can log the details and escalate to the IoT team.</div>
+   <div class="chips"><button class="chip" data-testid="hw-nlh-capture" onclick="flowStep({nlh:1})">Log and escalate to IoT team</button></div>`;
+            }
+            doneLine(‘Hot water - boiler-side, not controllable from here; captured for the IoT team’);
+            return `<div class="alert info">Hot water here runs on the boiler panel, which this dashboard monitors but can’t control - there’s no remote boost. We’ll capture the details with the site boiler guidance and escalate to the IoT team, so you still have a next step for the caller.</div>
    <div class="chips"><button class="chip" data-testid="hw-capture" onclick="flowStep({cap:1})">Log and escalate to IoT team</button><button class="chip" data-testid="hw-scope" onclick="flowStep({sc:1})">Scope guidance (boiler fault?)</button></div>`;
         }
         if (f.stage === 1) {
+            // OOHDASH-135 Item 6: not-lighthouse capture — must come before the !f.data.sc check.
+            if (f.data.nlh) {
+                doneLine(‘Outcome: captured (not on Lighthouse)’);
+                return outcomeCaptured(f, ‘nlh’, {
+                    subject: ‘Hot water issue — not on Lighthouse’,
+                    detail: ‘Caller reports hot-water problems. Hot water at this site is not connected to Lighthouse — no remote monitoring or control available. Logged for IoT team follow-up.’,
+                    script: "I’ve logged this for the IoT team. Hot water at this site isn’t on Lighthouse so there’s no remote view of it — the team will follow up to investigate.",
+                    OohCaptureClass: ‘hot-water’
+                });
+            }
             if (!f.data.sc) {
-                doneLine('Outcome: captured');
-                return outcomeCaptured(f, 'cap', {
-                    subject: 'Hot water issue - not resolvable remotely tonight',
-                    detail: 'Caller reports hot-water problems. Hot water is boiler-side (monitor-only on Lighthouse) - there is no remote boost. Needs IoT/boiler-side investigation.',
-                    script: "I've logged this for the IoT team as a priority for the morning. If it's urgent overnight the boiler's own override panel may help - and if a boiler engineer attends, remember a visit can be chargeable if the fault isn't Lighthouse equipment.",
-                    OohCaptureClass: 'hot-water'
+                doneLine(‘Outcome: captured’);
+                return outcomeCaptured(f, ‘cap’, {
+                    subject: ‘Hot water issue - not resolvable remotely tonight’,
+                    detail: ‘Caller reports hot-water problems. Hot water is boiler-side (monitor-only on Lighthouse) - there is no remote boost. Needs IoT/boiler-side investigation.’,
+                    script: "I’ve logged this for the IoT team as a priority for the morning. If it’s urgent overnight the boiler’s own override panel may help - and if a boiler engineer attends, remember a visit can be chargeable if the fault isn’t Lighthouse equipment.",
+                    OohCaptureClass: ‘hot-water’
                 });
             }
             if (f.data.sc) {
-                return outcomeScope(f, 'sc', {
-                    subject: 'Hot water — likely boiler fault',
-                    evidence: 'Lighthouse monitors demand here; the boiler itself (pressure, PCB, pilot) is not Lighthouse equipment.',
-                    script: 'From what you’re describing this looks like the boiler itself rather than the Lighthouse controls — that’s one for your boiler company. I’ll note tonight’s call so there’s a record.'
+                return outcomeScope(f, ‘sc’, {
+                    subject: ‘Hot water — likely boiler fault’,
+                    evidence: ‘Lighthouse monitors demand here; the boiler itself (pressure, PCB, pilot) is not Lighthouse equipment.’,
+                    script: ‘From what you’re describing this looks like the boiler itself rather than the Lighthouse controls — that’s one for your boiler company. I’ll note tonight’s call so there’s a record.’
                 });
             }
         }
-        return '';
+        return ‘’;
     },
 
     kitchen(ws, f) {

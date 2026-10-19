@@ -171,7 +171,19 @@ export const SCOPE_GROUPS = [
     // Step 2: any heating device present → 'mon'
     // Step 3: no heating devices → 'none'
     { key: 'heating', label: 'Heating', level: s => s.devices.some(d => d.kind === 'heating' && d.controllable) ? 'ctl' : s.devices.some(d => d.kind === 'heating') ? 'mon' : 'none' },
-    { key: 'hotwater', label: 'Hot water', level: s => hasControllableDhw(s) ? 'ctl' : hasHotWaterSignal(s) ? 'mon' : 'none' },
+    // OOHDASH-135 Item 6: four-step hotwater scope evaluation.
+    // Step 1: DHW controllable via boilerControl or iT500-dhw → 'ctl'.
+    // Step 2: hot-water signal device present → 'mon'.
+    // Step 3: pure-heating site (heating device present, no boilerControl, no DHW device) → 'not-lighthouse'.
+    //   Hot water exists at the site but is not on Lighthouse. CT3 (accepted inference): electric-only
+    //   or genuinely no-DHW sites also land here and show 'not-lighthouse' (false-positive accepted over
+    //   false-negative silence; Track 2 W5-A classifier enables finer discrimination).
+    // Step 4: no heating or DHW device at all → 'none'.
+    { key: 'hotwater', label: 'Hot water', level: s =>
+        hasControllableDhw(s) ? 'ctl' :
+        hasHotWaterSignal(s) ? 'mon' :
+        (s.devices.some(d => d.kind === 'heating') && !s.boilerControl?.present && !s.devices.some(d => d.deviceType === 'salus-it500-dhw')) ? 'not-lighthouse' :
+        'none' },
     { key: 'kitchen', label: 'Kitchen equipment', level: s => switchControllable(s, 'kitchen') ? 'ctl' : s.devices.some(d => d.kind === 'kitchen') ? 'mon' : 'none' },
     { key: 'lighting', label: 'External lighting', level: s => switchControllable(s, 'lighting') ? 'ctl' : s.devices.some(d => d.kind === 'lighting') ? 'mon' : 'none' },
     { key: 'fan', label: 'Extractor fans', level: s => switchControllable(s, 'fan') ? 'ctl' : s.devices.some(d => d.kind === 'fan') ? 'mon' : 'none' },
