@@ -1,0 +1,25 @@
+{
+  "run": "selfgate-ooh-triage-dashboard-oohdash-135-sd446-mapping",
+  "phase": "design",
+  "pr": 111,
+  "approvedBy": [
+    "bigtuff8"
+  ],
+  "reviewComments": [
+    "bigtuff8: - Q1 — Boiler panel feature (item 5): wait for full confirmation from Spencer, or ship hot-water temperature first and add panel on/off state later: (no option selected) — note: Are we absolutely sure we don’t have that information already from what Spencer has sent, from as docs or from a look up to thingsboard cross referenced back to any of the previously mentioned items?\n- Q2 — Hot water scope label for pure-heating sites (iT700 present, no hot-water device): use \"not available\" as today, or use a distinct label that separates \"no data at all\" from \"hot water exists but is not Lighthouse-controlled\": Introduce a distinct label (for example \"not on Lighthouse here\")\n- Q3 — WRITES_DISABLED master kill-switch: before James or the IoT team sets SALUS_IT500_CTL_ENABLED=true to activate iT500 setpoint control, someone must confirm where WRITES_DISABLED lives and that it is currently false (writes enabled): Confirm who owns the record of its current value and establish a process for checking it before any flag flip\n\n(submitted via the interactive gate review)\n\n<!-- gate:selected [{\"question\":\"Q1 — Boiler panel feature (item 5): wait for full confirmation from Spencer, or ship hot-water temperature first and add panel on/off state later\",\"answer\":\"(no option selected)\",\"comment\":\"Are we absolutely sure we don’t have that information already from what Spencer has sent, from as docs or from a look up to thingsboard cross referenced back to any of the previously mentioned items?\"},{\"question\":\"Q2 — Hot water scope label for pure-heating sites (iT700 present, no hot-water device): use \\\"not available\\\" as today, or use a distinct label that separates \\\"no data at all\\\" from \\\"hot water exists but is not Lighthouse-controlled\\\"\",\"answer\":\"Introduce a distinct label (for example \\\"not on Lighthouse here\\\")\"},{\"question\":\"Q3 — WRITES_DISABLED master kill-switch: before James or the IoT team sets SALUS_IT500_CTL_ENABLED=true to activate iT500 setpoint control, someone must confirm where WRITES_DISABLED lives and that it is currently false (writes enabled)\",\"answer\":\"Confirm who owns the record of its current value and establish a process for checking it before any flag flip\"}] -->"
+  ],
+  "mergeCommit": "8464cfd55aad62d286e47e2455f14a1c1edc9400",
+  "phaseBranch": "design/oohdash-135-sd446-mapping",
+  "releaseBranch": "main",
+  "stamp": 1792439977969,
+  "selectedOptions": [
+    {
+      "question": "Q2 — Hot water scope label for pure-heating sites (iT700 present, no hot-water device): use \"not available\" as today, or use a distinct label that separates \"no data at all\" from \"hot water exists but is not Lighthouse-controlled\"",
+      "answer": "Introduce a distinct label (for example \"not on Lighthouse here\")"
+    },
+    {
+      "question": "Q3 — WRITES_DISABLED master kill-switch: before James or the IoT team sets SALUS_IT500_CTL_ENABLED=true to activate iT500 setpoint control, someone must confirm where WRITES_DISABLED lives and that it is currently false (writes enabled)",
+      "answer": "Confirm who owns the record of its current value and establish a process for checking it before any flag flip"
+    }
+  ]
+}
