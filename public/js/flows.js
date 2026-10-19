@@ -788,18 +788,23 @@ const FLOWR = {
     },
 
     lighting(ws, f) {
-        const lg = ws.devices.find(d => d.kind === 'lighting');
+        // OOHDASH-135 Item 1: filter() so multi-circuit sites surface every lighting device.
+        const lgs = ws.devices.filter(d => d.kind === ‘lighting’);
         if (f.stage === 0) {
-            doneLine('Live read: external lighting ' + (lg ? (lg.online ? 'device online' : 'device NOT responding') : 'not on Lighthouse here'));
-            if (!lg) return '<div class="alert info">External lighting at this site isn’t on Lighthouse.</div>' + otherShortcut();
-            const lgSwitch = canSwitch(lg)
-                ? `<div class="zoneread"><span style="font-size:20px">💡</span><div><div><b>${esc(lg.zone)}</b> — ${lg.telemetry?.switch_1 ? 'currently ON' : 'currently OFF'}</div><div class="small">${esc(lg.deviceId)}</div></div>${switchButtons(lg, 'lighting-switch')}<span class="tag ${lg.telemetry?.switch_1 ? 'green' : 'grey'}">${lg.telemetry?.switch_1 ? 'on' : 'off'}</span></div>`
-                : '';
-            return lgSwitch + `<div class="alert info">${canSwitch(lg) ? 'This lighting circuit can be switched on/off directly above — the change only counts once the device confirms.' : `External lighting can’t be switched remotely from here yet (on the priority list with our platform team).${lg.online ? '' : ' The lighting controller is also <b>not responding</b>, which often means a tripped fuse board.'}`}</div>
-   <div class="script">“${lg.online
-   ? 'The outside lights have a sensor that brings them on automatically at dusk — so they should usually look after themselves. If tonight’s an exception, flip the Lighthouse lighting switch to override and they’ll come on. That only affects tonight; the sensor picks everything back up automatically from tomorrow, so there’s nothing to reset.'
-   : 'The outside lights have a sensor that brings them on automatically at dusk, so they should usually look after themselves. The lighting controller isn’t responding at the moment — it’s worth checking your fuse board first, as a tripped breaker is the usual cause. If everything looks clear, flip the Lighthouse lighting switch to override — that only covers tonight, and the sensor picks everything back up automatically from tomorrow.'}”</div>
-   <div class="chips"><button class="chip" onclick="flowStep({r:'ok'})">Caller sorted it with the override</button><button class="chip" onclick="flowStep({r:'cap'})">Still not working — capture &amp; escalate</button></div>`;
+            const anyOnline = lgs.some(d => d.online);
+            doneLine(‘Live read: external lighting ‘ + (lgs.length ? (anyOnline ? ‘device online’ : ‘device(s) NOT responding’) : ‘not on Lighthouse here’));
+            if (!lgs.length) return ‘<div class=”alert info”>External lighting at this site isn’t on Lighthouse.</div>’ + otherShortcut();
+            const lgSwitches = lgs.map(lg =>
+                canSwitch(lg)
+                    ? `<div class=”zoneread”><span style=”font-size:20px”>💡</span><div><div><b>${esc(lg.zone)}</b> — ${lg.telemetry?.switch_1 ? ‘currently ON’ : ‘currently OFF’}</div><div class=”small”>${esc(lg.deviceId)}</div></div>${switchButtons(lg, ‘lighting-switch’)}<span class=”tag ${lg.telemetry?.switch_1 ? ‘green’ : ‘grey’}”>${lg.telemetry?.switch_1 ? ‘on’ : ‘off’}</span></div>`
+                    : ‘’
+            ).join(‘’);
+            const anySwitchable = lgs.some(canSwitch);
+            return lgSwitches + `<div class=”alert info”>${anySwitchable ? ‘This lighting circuit can be switched on/off directly above — the change only counts once the device confirms.’ : `External lighting can’t be switched remotely from here yet (on the priority list with our platform team).${anyOnline ? ‘’ : ‘ The lighting controller is also <b>not responding</b>, which often means a tripped fuse board.’}`}</div>
+   <div class=”script”>”${anyOnline
+   ? ‘The outside lights have a sensor that brings them on automatically at dusk — so they should usually look after themselves. If tonight’s an exception, flip the Lighthouse lighting switch to override and they’ll come on. That only affects tonight; the sensor picks everything back up automatically from tomorrow, so there’s nothing to reset.’
+   : ‘The outside lights have a sensor that brings them on automatically at dusk, so they should usually look after themselves. The lighting controller isn’t responding at the moment — it’s worth checking your fuse board first, as a tripped breaker is the usual cause. If everything looks clear, flip the Lighthouse lighting switch to override — that only covers tonight, and the sensor picks everything back up automatically from tomorrow.’}”</div>
+   <div class=”chips”><button class=”chip” onclick=”flowStep({r:’ok’})”>Caller sorted it with the override</button><button class=”chip” onclick=”flowStep({r:’cap’})”>Still not working — capture &amp; escalate</button></div>`;
         }
         if (f.stage === 1) {
             if (f.data.r === 'ok') {
@@ -823,19 +828,24 @@ const FLOWR = {
     },
 
     fan(ws, f) {
-        const fan = ws.devices.find(d => d.kind === 'fan');
+        // OOHDASH-135 Item 1: filter() so multi-circuit sites surface every fan device.
+        const fans = ws.devices.filter(d => d.kind === ‘fan’);
         if (f.stage === 0) {
-            doneLine('Live read: extractor fans ' + (fan ? (fan.online ? 'controller online' : 'controller NOT responding') : 'not on Lighthouse here'));
-            if (!fan) return '<div class="alert info">Extractor fans at this site aren’t on Lighthouse.</div>' + otherShortcut();
-            const fanSwitch = canSwitch(fan)
-                ? `<div class="zoneread"><span style="font-size:20px">🌀</span><div><div><b>${esc(fan.zone)}</b> — ${fan.telemetry?.switch_1 ? 'currently ON' : 'currently OFF'}</div><div class="small">${esc(fan.deviceId)}</div></div>${switchButtons(fan, 'fan-switch')}<span class="tag ${fan.telemetry?.switch_1 ? 'green' : 'grey'}">${fan.telemetry?.switch_1 ? 'on' : 'off'}</span></div>`
-                : '';
-            if (canSwitch(fan)) return fanSwitch + `<div class="alert info">This fan circuit can be switched on/off directly above — the change only counts once the device confirms. If the caller needs a schedule change instead, capture it below.</div>
+            const anyOnline = fans.some(d => d.online);
+            doneLine(‘Live read: extractor fans ‘ + (fans.length ? (anyOnline ? ‘controller online’ : ‘controller(s) NOT responding’) : ‘not on Lighthouse here’));
+            if (!fans.length) return ‘<div class="alert info">Extractor fans at this site aren’t on Lighthouse.</div>’ + otherShortcut();
+            const anySwitchable = fans.some(canSwitch);
+            const fanSwitches = fans.map(fan =>
+                canSwitch(fan)
+                    ? `<div class="zoneread"><span style="font-size:20px">🌀</span><div><div><b>${esc(fan.zone)}</b> — ${fan.telemetry?.switch_1 ? ‘currently ON’ : ‘currently OFF’}</div><div class="small">${esc(fan.deviceId)}</div></div>${switchButtons(fan, ‘fan-switch’)}<span class="tag ${fan.telemetry?.switch_1 ? ‘green’ : ‘grey’}">${fan.telemetry?.switch_1 ? ‘on’ : ‘off’}</span></div>`
+                    : ‘’
+            ).join(‘’);
+            if (anySwitchable) return fanSwitches + `<div class="alert info">This fan circuit can be switched on/off directly above — the change only counts once the device confirms. If the caller needs a schedule change instead, capture it below.</div>
    <div class="formrow"><label>Capture a schedule/time request (optional)</label><input id="fannote" data-testid="fan-note" placeholder="e.g. fans on until 1am for deep clean"></div>
-   <div class="chips"><button class="chip" onclick="flowStep({note:document.getElementById('fannote').value||'(not specified)'})">Capture &amp; escalate</button></div>`;
+   <div class="chips"><button class="chip" onclick="flowStep({note:document.getElementById(‘fannote’).value||’(not specified)’})">Capture &amp; escalate</button></div>`;
             return `<div class="alert info">Fan control isn’t available remotely yet (on the priority list with our platform team). Capture the request — include the times the caller needs.</div>
    <div class="formrow"><label>What does the caller need? (times, which fans)</label><input id="fannote" data-testid="fan-note" placeholder="e.g. fans on until 1am for deep clean"></div>
-   <div class="chips"><button class="chip" onclick="flowStep({note:document.getElementById('fannote').value||'(not specified)'})">Capture &amp; escalate</button></div>`;
+   <div class="chips"><button class="chip" onclick="flowStep({note:document.getElementById(‘fannote’).value||’(not specified)’})">Capture &amp; escalate</button></div>`;
         }
         if (f.stage === 1) {
             doneLine('Captured: ' + esc(f.data.note));
