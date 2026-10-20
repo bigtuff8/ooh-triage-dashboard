@@ -32,9 +32,9 @@ test.describe('OOHDASH-114-F1 boilerControl controllability', () => {
         await expect(page.locator('[data-testid="scope-list"] li:has-text("Hot water")')).toContainText('Not controllable here');
     });
 
-    test('BC-E4: V2 site (9001) — heating scope row shows Controllable from here', async ({ page }) => {
+    test('BC-E4: V2 site (9001) — heating scope row shows Monitored only (boilerControl heating hard-coded to mon, OOHDASH-135 Item 4)', async ({ page }) => {
         await confirmSite(page, '9001', 'Test BoilerControl V2 (DHW)');
-        await expect(page.locator('[data-testid="scope-list"] li:has-text("Heating")')).toContainText('Controllable from here');
+        await expect(page.locator('[data-testid="scope-list"] li:has-text("Heating")')).toContainText('Monitored only');
     });
 
     test('BC-E5: V2 site (9001) — OOHDASH-123 boost removed: hotwater flow shows capture-and-escalate, NO boost chip', async ({ page }) => {

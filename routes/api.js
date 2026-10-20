@@ -163,11 +163,27 @@ const switchControllable = (s, kind) => s.devices.some(d =>
     d.kind === kind && (registry.capabilitiesFor(d.deviceType)?.commands || []).includes('switch'));
 
 export const SCOPE_GROUPS = [
-    // OOHDASH-114-F1: heating is controllable when the site has a boilerControl device present.
-    // The old 'boiler-panel' exclusion was unreachable in production (that deviceType is never
-    // emitted by the live classifier). Falls back to device-presence for non-boilerControl sites.
-    { key: 'heating', label: 'Heating', level: s => s.boilerControl?.heatingControllable ? 'ctl' : s.devices.some(d => d.kind === 'heating') ? 'mon' : 'none' },
-    { key: 'hotwater', label: 'Hot water', level: s => hasControllableDhw(s) ? 'ctl' : hasHotWaterSignal(s) ? 'mon' : 'none' },
+    // OOHDASH-135 Item 4: heating scope is now DEVICE-driven (d.controllable on the effective
+    // device list built by workspacePayload's Level-A gate). boilerControl.heatingControllable
+    // is no longer the deciding factor — that was evaluated before the effective-controllable
+    // was computed, producing a stale result for dark fleets and flag-gated device classes.
+    // Step 1: any heating device with effective controllable=true → 'ctl'
+    // Step 2: any heating device present → 'mon'
+    // Step 3: no heating devices → 'none'
+    { key: 'heating', label: 'Heating', level: s => s.devices.some(d => d.kind === 'heating' && d.controllable) ? 'ctl' : s.devices.some(d => d.kind === 'heating') ? 'mon' : 'none' },
+    // OOHDASH-135 Item 6: four-step hotwater scope evaluation.
+    // Step 1: DHW controllable via boilerControl or iT500-dhw → 'ctl'.
+    // Step 2: hot-water signal device present → 'mon'.
+    // Step 3: pure-heating site (heating device present, no boilerControl, no DHW device) → 'not-lighthouse'.
+    //   Hot water exists at the site but is not on Lighthouse. CT3 (accepted inference): electric-only
+    //   or genuinely no-DHW sites also land here and show 'not-lighthouse' (false-positive accepted over
+    //   false-negative silence; Track 2 W5-A classifier enables finer discrimination).
+    // Step 4: no heating or DHW device at all → 'none'.
+    { key: 'hotwater', label: 'Hot water', level: s =>
+        hasControllableDhw(s) ? 'ctl' :
+        hasHotWaterSignal(s) ? 'mon' :
+        (s.devices.some(d => d.kind === 'heating') && !s.boilerControl?.present && !s.devices.some(d => d.deviceType === 'salus-it500-dhw')) ? 'not-lighthouse' :
+        'none' },
     { key: 'kitchen', label: 'Kitchen equipment', level: s => switchControllable(s, 'kitchen') ? 'ctl' : s.devices.some(d => d.kind === 'kitchen') ? 'mon' : 'none' },
     { key: 'lighting', label: 'External lighting', level: s => switchControllable(s, 'lighting') ? 'ctl' : s.devices.some(d => d.kind === 'lighting') ? 'mon' : 'none' },
     { key: 'fan', label: 'Extractor fans', level: s => switchControllable(s, 'fan') ? 'ctl' : s.devices.some(d => d.kind === 'fan') ? 'mon' : 'none' },
@@ -201,9 +217,14 @@ async function workspacePayload(site) {
     // OOHDASH-114-F1: safe default for boilerControl when field is absent (legacy fixture sites, bridge path).
     const defaultBc = { present: false, isV1: false, isV2: false, heatingControllable: false, dhwControllable: false, deviceId: null };
 
-    return {
-        site: { siteNo: site.siteNo, siteName: site.siteName, nameUnverified: site.nameUnverified, accountId: site.accountId, brand: site.brand, address: site.address, callsLast30Days: site.callsLast30Days },
-        devices: site.devices.map(d => ({
+    // OOHDASH-135 Item 3 Level A: compute effective controllable per device.
+    // For salus-it500, the SALUS_IT500_CTL_ENABLED flag gate overrides d.controllable to false
+    // when the flag is off — preventing a fleet reconnection from silently enabling iT500 setpoint
+    // control before the operator activates it deliberately. All other device types pass through
+    // d.controllable unchanged. The siteWithEffective object passes the effective device list to
+    // SCOPE_GROUPS so the heating scope reflects the flag state (Item 4 depends on this).
+    const effectiveDevices = site.devices.map(d => {
+        const base = {
             ...stripDemo(d),
             capabilities: registry.capabilitiesFor(d.deviceType)?.commands || [],
             // D9: registration is derived — fixture devices are registered unless flagged
@@ -212,8 +233,17 @@ async function workspacePayload(site) {
             // authoritative re-assert.
             registered: d._demo !== 'unregistered',
             setpointWindow: typeof d.telemetry?.heatingSetpoint === 'number' ? registry.setpointWindow(d.deviceType, d.telemetry.heatingSetpoint) : null
-        })),
-        scope: scopeGroups.map(g => ({ key: g.key, label: g.label, level: g.level(site) })),
+        };
+        if (d.deviceType === 'salus-it500' && !config.salusIt500CtlEnabled) {
+            return { ...base, controllable: false };
+        }
+        return base;
+    });
+    const siteWithEffective = { ...site, devices: effectiveDevices };
+    return {
+        site: { siteNo: site.siteNo, siteName: site.siteName, nameUnverified: site.nameUnverified, accountId: site.accountId, brand: site.brand, address: site.address, callsLast30Days: site.callsLast30Days },
+        devices: effectiveDevices,
+        scope: scopeGroups.map(g => ({ key: g.key, label: g.label, level: g.level(siteWithEffective) })),
         anyOffline: site.devices.some(d => !d.online),
         tickets,
         activeP1Tickets,

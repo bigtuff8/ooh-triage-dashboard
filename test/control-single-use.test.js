@@ -25,6 +25,9 @@ process.env.OOH_STORE_DIR = mkdtempSync(join(tmpdir(), 'ooh-c2-'));
 // (unset WRITES_DISABLED => writes disabled), so an unset flag would 423 every dispatch.
 // The single-use property under test is independent of the deploy-time write lock.
 process.env.WRITES_DISABLED = 'false';
+// OOHDASH-135 Item 3: Level B gate — this file dispatches against IT500-BAR-6832 (salus-it500).
+// Set the flag so the Level B guardrail does not fire before the token single-use logic under test.
+process.env.SALUS_IT500_CTL_ENABLED = 'true';
 
 // Replace the device-write with a counting stub BEFORE control.js imports tb-client, so
 // control.dispatch() calls our stub. Fixture-mode readCommandState/tbStatus are preserved so

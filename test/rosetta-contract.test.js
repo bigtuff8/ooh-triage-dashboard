@@ -33,8 +33,10 @@ test('contract: IT700 confirms on heatingSetpoint ONLY; Tuya on switch_1 then ba
     assert.equal(IT700.scope, 'SERVER_SCOPE');
     assert.deepEqual(TUYA.confirmKeys, ['switch_1', 'switch']);
     assert.equal(TUYA.requestedKey, 'switchRequested');
-    // dark fleets are non-controllable
-    assert.equal(registry.capabilitiesContractFor('salus-it500').controllable, false);
+    // OOHDASH-135 Item 3: salus-it500 CONTROL_CONTRACT is now controllable: true (flag gate in
+    // routes/api.js + services/control.js keeps it locked until SALUS_IT500_CTL_ENABLED=true).
+    // The bare-salus (dark) type remains non-controllable — separate entry, not touched by Item 3.
+    assert.equal(registry.capabilitiesContractFor('salus-it500').controllable, true);
     assert.equal(registry.capabilitiesContractFor('salus').controllable, false);
 });
 
