@@ -46,6 +46,10 @@ export default defineConfig({
             OOH_CONFIRM_LIMIT_MS_IT500: '60000',
             OOH_LATE_WATCH_MS_IT500: '120000',
             WRITES_DISABLED: 'false', // OOHDASH-12 default is now fail-closed; fixture e2e exercises the dispatch flow, so enable writes here
+            // OOHDASH-135 Item 3: enable iT500 control in the e2e fixture environment so F005/F009
+            // tests can exercise the full Salus dispatch path and registry guardrails (Level B check
+            // would otherwise intercept before validateCommand reaches the expected error messages).
+            SALUS_IT500_CTL_ENABLED: 'true',
             RATE_LIMIT_MAX: '100000' // whole suite shares one IP
 
         }
