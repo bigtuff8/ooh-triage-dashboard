@@ -1,0 +1,114 @@
+[
+  {
+    "_desc": "SKIP-site-mismatch: site field says 6261 but TRG says 7639",
+    "id": 60001,
+    "subject": "[OOH] General issue captured",
+    "status": "open",
+    "tags": ["ooh"],
+    "custom_fields": [
+      { "id": 11405878329244, "value": "gk_6261" }
+    ],
+    "comments": [
+      {
+        "public": false,
+        "body": "[TRG] Call taken by OOH\nSite selected: Black Bull (Corbridge) (7639)\nOperator: Test Handler"
+      }
+    ]
+  },
+  {
+    "_desc": "SKIP-no-site: no site field value and no TRG site line",
+    "id": 60002,
+    "subject": "[OOH] General issue captured",
+    "status": "open",
+    "tags": ["ooh"],
+    "custom_fields": [
+      { "id": 11405878329244, "value": null }
+    ],
+    "comments": [
+      {
+        "public": false,
+        "body": "[TRG] Call taken by OOH\nOperator: Test Handler"
+      }
+    ]
+  },
+  {
+    "_desc": "SKIP-requester-updated: tagged updated_by_requester",
+    "id": 60003,
+    "subject": "[OOH] General issue captured",
+    "status": "open",
+    "tags": ["ooh", "updated_by_requester"],
+    "custom_fields": [
+      { "id": 11405878329244, "value": "gk_6261" }
+    ],
+    "comments": [
+      {
+        "public": false,
+        "body": "[TRG] Call taken by OOH\nSite selected: Wheatstone Inn (Gloucester) (6261)\nOperator: Test Handler"
+      }
+    ]
+  },
+  {
+    "_desc": "SKIP-monitoring-word: subject contains Monitoring",
+    "id": 60004,
+    "subject": "[OOH] Monitoring alert - temperature sensor offline",
+    "status": "open",
+    "tags": ["ooh"],
+    "custom_fields": [
+      { "id": 11405878329244, "value": "gk_6261" }
+    ],
+    "comments": [
+      {
+        "public": false,
+        "body": "[TRG] Call taken by OOH\nSite selected: Wheatstone Inn (Gloucester) (6261)\nOperator: Test Handler"
+      }
+    ]
+  },
+  {
+    "_desc": "TRG pattern absent from first comment — log line emitted, site from field only",
+    "id": 60005,
+    "subject": "[OOH] General issue captured",
+    "status": "open",
+    "tags": ["ooh"],
+    "custom_fields": [
+      { "id": 11405878329244, "value": "gk_6261" }
+    ],
+    "comments": [
+      {
+        "public": false,
+        "body": "[TRG] Call taken by OOH\nOperator: Test Handler (no Site selected line)"
+      }
+    ]
+  },
+  {
+    "_desc": "Stand-in siteName (gk-5209) resolves to number-only title when resolveName returns null",
+    "id": 60006,
+    "subject": "[OOH] General issue captured",
+    "status": "open",
+    "tags": ["ooh"],
+    "custom_fields": [
+      { "id": 11405878329244, "value": "gk_5209" }
+    ],
+    "comments": [
+      {
+        "public": false,
+        "body": "[TRG] Call taken by OOH\nSite selected: gk-5209 (5209)\nOperator: Test Handler"
+      }
+    ]
+  },
+  {
+    "_desc": "Changed-since-plan: ticket for apply-path testing (current subject changes between plan and apply)",
+    "id": 60007,
+    "subject": "[OOH] General issue captured",
+    "status": "open",
+    "tags": ["ooh"],
+    "custom_fields": [
+      { "id": 11405878329244, "value": "gk_6261" }
+    ],
+    "comments": [
+      {
+        "public": false,
+        "body": "[TRG] Call taken by OOH\nSite selected: Wheatstone Inn (Gloucester) (6261)\nOperator: Test Handler"
+      }
+    ]
+  }
+]

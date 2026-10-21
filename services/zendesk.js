@@ -12,6 +12,7 @@
 
 import axios from 'axios';
 import { config } from '../config.js';
+import { buildOohTitle, normaliseSiteNo } from './ticket-title.js';
 
 const live = () => config.dataMode === 'live';
 const baseUrl = () => `https://${config.zendesk.subdomain}.zendesk.com/api/v2`;
@@ -328,16 +329,21 @@ export async function createOutcomeTicket({ operator, siteNo, siteName, subject,
     // F002 — Ticket Category is set on every OOH outcome ticket (Explore reporting only).
     const categoryField = { id: config.zendesk.categoryFieldId, value: config.zendesk.categoryValue };
 
+    // OOHDASH-137: build the titled subject from site number, pub name and outcome wording.
+    // Test-mode tickets keep the raw subject unchanged (existing tests read it);
+    // live-mode tickets send the built title to Zendesk.
+    const title = buildOohTitle({ siteNo, siteName, outcome: subject });
+
     if (!live()) {
         const t = {
-            id: fixtureSeq++, siteNo, subject, status: 'new', custom_status_id: 11404223315612,
+            id: fixtureSeq++, siteNo, subject, title, status: 'new', custom_status_id: 11404223315612,
             priority, created_at: new Date().toISOString(), updated_at: new Date().toISOString(),
             tags: [config.zendesk.oohTag, ...extraTags], visit: false,
             custom_fields: [categoryField],
             comments: [{ public: false, body: buildBody(null), created_at: new Date().toISOString() }]
         };
         fixtureTickets.unshift(t);
-        return { id: t.id, url: `#fixture-ticket-${t.id}` };
+        return { id: t.id, url: `#fixture-ticket-${t.id}`, title };
     }
 
     const siteTag = await resolveSiteTag(siteNo);
@@ -347,7 +353,7 @@ export async function createOutcomeTicket({ operator, siteNo, siteName, subject,
         : `(Site field could not be resolved for house ID ${siteNo} — flagged for data-quality review)`;
     const payload = {
         ticket: {
-            subject: `[OOH] ${subject}`,
+            subject: title,
             comment: { body: buildBody(dataQualityNote), public: false },
             priority,
             tags: [config.zendesk.oohTag, ...extraTags],
@@ -355,7 +361,7 @@ export async function createOutcomeTicket({ operator, siteNo, siteName, subject,
         }
     };
     const data = await zd('POST', '/tickets.json', payload);
-    return { id: data.ticket.id, url: `https://${config.zendesk.subdomain}.zendesk.com/agent/tickets/${data.ticket.id}` };
+    return { id: data.ticket.id, url: `https://${config.zendesk.subdomain}.zendesk.com/agent/tickets/${data.ticket.id}`, title };
 }
 
 /**
@@ -605,15 +611,41 @@ export async function ticketsForSite(siteNo) {
 }
 
 /**
+ * Module-level resolver reference for raiseQuery. In production this is always the
+ * real resolveSiteName. Tests may call _setQueryResolver to inject a stub for R9/R10
+ * coverage (throw path and 2-second timeout path). The leading underscore signals this
+ * is a test-only escape hatch, not part of the public API.
+ */
+let _resolveForQuery = resolveSiteName;
+export function _setQueryResolver(fn) { _resolveForQuery = fn; }
+
+/**
  * "Raise a query" from the Tonight view — lands on a ticket for the IoT team.
+ * OOHDASH-137: looks up the pub name (via the 1-hour site-name cache) and passes it
+ * to createOutcomeTicket so the title gets the site number and name. A 2-second timeout
+ * guards against a cold-cache Zendesk read; on timeout or throw the title is number-only.
  */
 export async function raiseQuery(operator, siteNo, text, additionalNotes) {
-    const subject = `OOH query${siteNo ? ` — site ${siteNo}` : ''}`;
+    const norm = normaliseSiteNo(siteNo);
+    const digits = (norm && typeof norm === 'string') ? norm : null;
+    let resolvedName = null;
+    if (digits) {
+        const RESOLVE_TIMEOUT_MS = 2000;
+        const timeoutP = new Promise(res => setTimeout(() => res(null), RESOLVE_TIMEOUT_MS));
+        try {
+            resolvedName = await Promise.race([_resolveForQuery(digits), timeoutP]);
+        } catch (_) {
+            resolvedName = null;
+        }
+    }
+    // summary keeps the original first-line text so the [TRG] note is unchanged.
+    const summary = `OOH query${siteNo ? ` — site ${siteNo}` : ''}`;
     return createOutcomeTicket({
         operator,
         siteNo: siteNo || 'unknown',
-        subject,
-        summary: subject,
+        siteName: resolvedName,
+        subject: 'OOH query',
+        summary,
         transcript: [{ time: hhmm(new Date().toISOString()), text: `Query raised: ${text}` }],
         outcomeType: 'query',
         extraTags: ['ooh_query'],
