@@ -2,7 +2,7 @@
 
 ## v1.4.4 -- OOHDASH-137 Site number and pub name in OOH Zendesk ticket titles
 
-**Date:** TBD (release doer cuts with npm run release) · **Bump type:** patch · **Branch:** build/oohdash-137
+**Date:** 2026-10-21 · **Release commit:** d5bf838 · **Git tag:** v1.4.4 · **Image:** apitechhub.azurecr.io/ooh-dashboard:d5bf838 · **Bump type:** patch · **Branch:** build/oohdash-137
 
 ### What changed
 
