@@ -1,0 +1,373 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Hot Water Override States</title>
+<style>
+/* ===== OOH Dashboard stylesheet, copied from public/css/styles.css (main 6c3c459) ===== */
+/* OOH Dashboard - design-spec -1 (Airedale IoT family palette, Ant Design patterns) */
+:root{
+  --primary:#594AE2;--primary-dark:#4338CA;--primary-light:#EEF2FF;
+  --success:#10B981;--success-light:#D1FAE5;
+  --warning:#F59E0B;--warning-light:#FEF3C7;
+  --danger:#EF4444;--danger-light:#FEE2E2;
+  --info:#3B82F6;--info-light:#DBEAFE;
+  --surface:#FFFFFF;--surface-variant:#F8FAFC;--background:#F1F5F9;
+  --sidebar-bg:#1E293B;--sidebar-text:#94A3B8;--sidebar-active:#334155;
+  --text-primary:#1E293B;--text-secondary:#64748B;--text-disabled:#94A3B8;
+  --border:#E2E8F0;
+  --urgency-critical:#DC2626;--urgency-critical-bg:#FEF2F2;
+  --radius-sm:6px;--radius-md:8px;--radius-lg:12px;
+  --shadow-sm:0 1px 2px rgba(0,0,0,.05);--shadow-md:0 4px 6px -1px rgba(0,0,0,.1);--shadow-lg:0 10px 15px -3px rgba(0,0,0,.1);
+  --mono:ui-monospace,Consolas,'Cascadia Mono',monospace;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:Inter,system-ui,-apple-system,'Segoe UI',sans-serif;font-size:14px;line-height:22px;color:var(--text-primary);background:var(--background)}
+button{font:inherit;cursor:pointer}
+input,select,textarea{font:inherit}
+.mono{font-family:var(--mono);font-size:12.5px;font-weight:500}
+#app{display:flex;min-height:100vh}
+.sidebar{width:240px;background:var(--sidebar-bg);color:var(--sidebar-text);display:flex;flex-direction:column;position:fixed;top:0;bottom:0;left:0;z-index:20}
+.sidebar .brand{padding:20px 20px 16px;color:#fff;font-weight:700;font-size:16px;letter-spacing:.2px;border-bottom:1px solid #33415555}
+.sidebar .brand small{display:block;font-weight:400;font-size:11.5px;color:var(--sidebar-text);margin-top:2px}
+.nav{padding:12px 8px;flex:1}
+.nav button{display:flex;align-items:center;gap:10px;width:100%;text-align:left;background:none;border:0;color:var(--sidebar-text);padding:10px 12px;border-radius:var(--radius-md);font-size:14px;margin-bottom:2px}
+.nav button:hover{background:var(--sidebar-active);color:#fff}
+.nav button.active{background:var(--sidebar-active);color:#fff;font-weight:600}
+.sidebar .foot{padding:14px 16px;border-top:1px solid #33415555;font-size:12.5px}
+.opchip{display:flex;align-items:center;gap:10px;margin-bottom:10px}
+.opchip .avatar{width:32px;height:32px;border-radius:50%;background:var(--primary);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:600;font-size:13px}
+.opchip .nm{color:#fff;font-weight:600;line-height:16px}
+.opchip .rl{font-size:11.5px;line-height:14px}
+.main{margin-left:240px;flex:1;display:flex;flex-direction:column;min-width:0}
+.topbar{height:52px;background:var(--surface);border-bottom:1px solid var(--border);display:flex;align-items:center;gap:16px;padding:0 24px;position:sticky;top:0;z-index:10}
+.topbar .ctx{font-weight:600}
+.topbar .ver{margin-left:auto;color:var(--text-disabled);font-size:12px}
+.banner{padding:8px 24px;font-size:13.5px;font-weight:500;display:flex;align-items:center;gap:10px}
+.banner.kill{background:var(--danger-light);color:#991B1B;border-bottom:1px solid #FECACA}
+/* R8/S10: control-is-live signal - an ENABLED state (green), deliberately distinct from the red .kill block. */
+.banner.live{background:var(--success-light);color:#065F46;border-bottom:1px solid #A7F3D0}
+.banner.notice{background:var(--info-light);color:#1E40AF;border-bottom:1px solid #BFDBFE}
+.content{padding:18px 24px;max-width:1240px;width:100%;margin:0 auto}
+.content.narrow{max-width:760px}
+.card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-md);box-shadow:var(--shadow-sm);padding:18px;margin-bottom:12px}
+.card.tight{padding:12px 14px;margin-bottom:10px}
+.card h2{font-size:18px;line-height:26px;font-weight:600;margin-bottom:4px}
+.card h3{font-size:14.5px;line-height:20px;font-weight:600;margin-bottom:6px}
+.sub{color:var(--text-secondary);font-size:13px}
+.small{font-size:12.5px;line-height:17px;color:var(--text-secondary)}
+.btn{border:1px solid var(--border);background:var(--surface);color:var(--text-primary);border-radius:var(--radius-md);padding:8px 16px;font-weight:500;font-size:14px}
+.btn:hover{border-color:var(--primary);color:var(--primary)}
+.btn.primary{background:var(--primary);border-color:var(--primary);color:#fff}
+.btn.primary:hover{background:var(--primary-dark);color:#fff}
+.btn.big{padding:12px 22px;font-size:15px}
+.btn.link{border:none;background:none;color:var(--primary);padding:4px 6px}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+.tag{display:inline-flex;align-items:center;gap:5px;font-size:11.5px;font-weight:600;border-radius:var(--radius-sm);padding:1px 7px;line-height:17px;white-space:nowrap}
+.tag.green{background:var(--success-light);color:#065F46}
+.tag.amber{background:var(--warning-light);color:#92400E}
+.tag.red{background:var(--danger-light);color:#991B1B}
+.tag.blue{background:var(--info-light);color:#1E40AF}
+.tag.grey{background:#F1F5F9;color:var(--text-secondary)}
+.tag.violet{background:var(--primary-light);color:var(--primary-dark)}
+.dot{width:7px;height:7px;border-radius:50%;display:inline-block}
+.alert{border-radius:var(--radius-md);padding:11px 14px;font-size:13.5px;margin:10px 0;line-height:20px}
+.alert.warn{background:var(--warning-light);color:#92400E}
+.alert.err{background:var(--danger-light);color:#991B1B}
+.alert.info{background:var(--info-light);color:#1E40AF}
+.alert.ok{background:var(--success-light);color:#065F46}
+table.tbl{width:100%;border-collapse:collapse;font-size:13px}
+table.tbl th{text-align:left;color:var(--text-secondary);font-size:11px;text-transform:uppercase;letter-spacing:.4px;font-weight:600;padding:5px 8px;border-bottom:1px solid var(--border)}
+table.tbl td{padding:6px 8px;border-bottom:1px solid var(--surface-variant);vertical-align:middle}
+table.tbl tr:last-child td{border-bottom:none}
+table.tbl tr.rowoff td{background:var(--danger-light)}
+.searchwrap{position:relative}
+.searchwrap input{width:100%;height:46px;border:1.5px solid var(--border);border-radius:var(--radius-md);padding:0 16px;font-size:15px;outline:none}
+.searchwrap input:focus{border-color:var(--primary);box-shadow:0 0 0 3px var(--primary-light)}
+.sresults{position:absolute;top:50px;left:0;right:0;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-md);box-shadow:var(--shadow-lg);z-index:15;overflow:hidden}
+.sresults .ri{display:flex;align-items:center;gap:12px;padding:10px 14px;cursor:pointer;border-bottom:1px solid var(--surface-variant)}
+.sresults .ri:hover,.sresults .ri.sel{background:var(--primary-light)}
+.sresults .empty{padding:14px;color:var(--text-secondary);font-size:13.5px}
+.tiles{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}
+.tile{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-md);padding:10px 12px;cursor:pointer;transition:all .15s ease-out}
+.tile:hover{border-color:var(--primary);box-shadow:var(--shadow-md)}
+.tile .tt{font-weight:600;font-size:13.5px;line-height:18px}
+.tile .td{font-size:11.5px;color:var(--text-secondary);line-height:15px;margin-top:2px}
+.issueinput{width:100%;height:44px;border:1.5px solid var(--border);border-radius:var(--radius-md);padding:0 14px;font-size:14.5px;outline:none;margin-bottom:10px}
+.issueinput:focus{border-color:var(--primary);box-shadow:0 0 0 3px var(--primary-light)}
+.sugg{margin:-2px 0 10px;display:flex;gap:8px;flex-wrap:wrap;align-items:center;font-size:13px;color:var(--text-secondary)}
+.wsgrid{display:grid;grid-template-columns:minmax(0,7fr) minmax(0,5fr);gap:12px;align-items:start}
+@media(max-width:1100px){.wsgrid{grid-template-columns:minmax(0,1fr)}.tiles{grid-template-columns:repeat(2,1fr)}}
+.flowpanel{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);box-shadow:var(--shadow-md);overflow:hidden}
+.flowhead{padding:12px 18px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px;background:var(--surface-variant)}
+.flowbody{padding:18px}
+.flowfoot{padding:8px 18px;border-top:1px solid var(--border);display:flex;align-items:center;gap:12px;font-size:12px;color:var(--text-secondary)}
+.stepdone{display:flex;gap:8px;align-items:center;color:var(--text-secondary);font-size:13px;padding:5px 0;border-bottom:1px dashed var(--surface-variant)}
+.stepdone .tick{color:var(--success);font-weight:700}
+.stepq{font-size:15px;font-weight:600;margin:14px 0 10px}
+.chips{display:flex;flex-wrap:wrap;gap:8px}
+.chip{border:1.5px solid var(--border);background:var(--surface);border-radius:var(--radius-md);padding:9px 16px;font-size:14px;font-weight:500;cursor:pointer;min-height:40px}
+.chip:hover{border-color:var(--primary);color:var(--primary)}
+.chip.sel{border-color:var(--primary);background:var(--primary-light);color:var(--primary-dark);font-weight:600}
+.chip.p1{border-color:var(--danger);color:#991B1B;background:var(--surface);font-weight:600}
+.chip.p1:hover{background:var(--danger-light);border-color:var(--danger);color:#991B1B}
+.chip:disabled,.chip:disabled:hover{opacity:.5;cursor:not-allowed;border-color:var(--border);color:inherit;background:var(--surface)}
+.p1-explainer{font-size:13px;line-height:19px;color:var(--text-secondary);border-left:3px solid var(--danger);padding:6px 12px;margin:12px 0 4px}
+.p1-explainer p{margin:0 0 4px}
+.p1-blocked-note{color:#991B1B;margin:4px 0 8px}
+.zoneread{border:1px solid var(--border);border-radius:var(--radius-md);padding:10px 14px;margin:8px 0;display:flex;align-items:center;gap:14px;flex-wrap:wrap}
+.zoneread .t{font-size:20px;font-weight:700}
+.script{background:var(--surface-variant);border-left:3px solid var(--primary);border-radius:0 var(--radius-md) var(--radius-md) 0;padding:11px 14px;font-size:14px;font-style:italic;margin:10px 0;line-height:21px}
+.reco{border:1.5px solid var(--border);border-radius:var(--radius-lg);padding:16px;margin:12px 0;background:var(--surface-variant)}
+.reco b.hd{display:block;font-size:15px;margin-bottom:6px}
+.outcome{border-radius:var(--radius-lg);padding:16px;margin-top:14px}
+.outcome.applied{background:var(--success-light)}
+.outcome.captured{background:var(--info-light)}
+.outcome.p1{background:var(--urgency-critical-bg);border:1px solid #FECACA}
+.outcome.scope{background:#F1F5F9}
+.outcome.noaction{background:#F1F5F9;border:1px dashed var(--border)}
+.outcome h3{margin-bottom:6px;font-size:15px}
+.outbtns{display:flex;gap:10px;margin-top:12px;flex-wrap:wrap}
+.callsofar{background:var(--surface-variant);border-radius:var(--radius-md);padding:8px 12px;margin-bottom:10px;font-size:13px}
+.overlay{position:fixed;inset:0;background:rgba(15,23,42,.45);z-index:40;display:flex;align-items:center;justify-content:center;padding:20px}
+.modal{background:var(--surface);border-radius:var(--radius-lg);box-shadow:var(--shadow-lg);width:520px;max-width:100%;max-height:92vh;overflow:auto}
+.modal .mh{padding:16px 20px;border-bottom:1px solid var(--border);font-weight:600;font-size:16px;display:flex;justify-content:space-between;align-items:center}
+.modal .mb{padding:20px}
+.modal .mf{padding:14px 20px;border-top:1px solid var(--border);display:flex;justify-content:flex-end;gap:10px}
+.target{background:var(--surface-variant);border:1px solid var(--border);border-radius:var(--radius-md);padding:10px 14px;margin-bottom:16px;font-size:13.5px}
+/* B0/R0 - C9 - site identity is the most prominent element of the confirm target */
+.target-identity .target-name,.target .target-name{font-size:22px;font-weight:700;line-height:1.2;display:block}
+.target-tech{font-size:12.5px;color:var(--text-disabled);margin-top:4px}
+.target-identity.unverified .target-name{font-size:15px;font-weight:600}
+.muted{color:var(--text-disabled)}
+.stepper{display:flex;align-items:center;gap:14px;justify-content:center;margin:14px 0 6px}
+.stepper button{width:48px;height:48px;border-radius:var(--radius-md);border:1.5px solid var(--border);background:var(--surface);font-size:22px;font-weight:700;color:var(--primary)}
+.stepper button:hover{border-color:var(--primary)}
+.stepper button:disabled{color:var(--text-disabled)}
+.stepper .val{font-size:34px;font-weight:700;min-width:110px;text-align:center}
+.guard{text-align:center;font-size:12.5px;color:var(--text-secondary)}
+.syncsteps{display:flex;align-items:center;gap:8px;margin:16px 0}
+.ss{flex:1;text-align:center;padding:10px 6px;border-radius:var(--radius-md);background:var(--surface-variant);font-size:12.5px;font-weight:600;color:var(--text-disabled)}
+.ss.on{background:var(--primary-light);color:var(--primary-dark)}
+.ss.ok{background:var(--success-light);color:#065F46}
+.ss.bad{background:var(--danger-light);color:#991B1B}
+.ss.wait{animation:pulse 1.2s ease-in-out infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.55}}
+.drawer{position:fixed;top:0;right:0;bottom:0;width:480px;max-width:95vw;background:var(--surface);box-shadow:var(--shadow-lg);z-index:45;display:flex;flex-direction:column}
+.drawer .dh{padding:16px 20px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;font-weight:600}
+.drawer .db{padding:20px;overflow:auto;flex:1}
+.timeline{border-left:2px solid var(--border);margin-left:6px;padding-left:16px}
+.tlitem{position:relative;padding-bottom:14px}
+.tlitem:before{content:'';position:absolute;left:-21px;top:5px;width:8px;height:8px;border-radius:50%;background:var(--primary)}
+.tlitem .tw{font-size:11.5px;color:var(--text-disabled)}
+#toasts{position:fixed;top:16px;right:16px;z-index:60;display:flex;flex-direction:column;gap:8px}
+.toast{background:var(--surface);border:1px solid var(--border);border-left:4px solid var(--success);border-radius:var(--radius-md);box-shadow:var(--shadow-lg);padding:12px 16px;font-size:13.5px;min-width:280px;animation:slidein .2s ease-out}
+@keyframes slidein{from{transform:translateX(30px);opacity:0}to{transform:none;opacity:1}}
+.tabs{display:flex;gap:4px;border-bottom:1px solid var(--border);margin-bottom:14px}
+.tabs button{border:none;background:none;padding:9px 14px;font-size:14px;font-weight:500;color:var(--text-secondary);border-bottom:2px solid transparent}
+.tabs button.on{color:var(--primary);border-bottom-color:var(--primary);font-weight:600}
+.tabs .cnt{background:var(--surface-variant);border-radius:9px;padding:0 6px;font-size:11.5px;margin-left:5px}
+.sw{position:relative;width:40px;height:22px;border-radius:11px;background:#CBD5E1;border:none;transition:background .15s}
+.sw.on{background:var(--success)}
+.sw.off{background:var(--danger)}
+.sw:after{content:'';position:absolute;top:2px;left:2px;width:18px;height:18px;border-radius:50%;background:#fff;transition:left .15s}
+.sw.on:after{left:20px}
+.formrow{margin-bottom:12px}
+.formrow label{display:block;font-size:12.5px;font-weight:600;margin-bottom:4px;color:var(--text-secondary)}
+.formrow input,.formrow textarea,.formrow select{width:100%;border:1.5px solid var(--border);border-radius:var(--radius-sm);padding:8px 10px;outline:none}
+.formrow input:focus,.formrow textarea:focus{border-color:var(--primary)}
+.scopelist li{list-style:none;display:flex;justify-content:space-between;align-items:center;padding:4px 0;border-bottom:1px solid var(--surface-variant);font-size:13px}
+@media(max-width:900px){
+  .sidebar{width:100%;height:56px;bottom:0;top:auto;flex-direction:row;align-items:center}
+  .sidebar .brand,.sidebar .foot{display:none}
+  .nav{display:flex;padding:6px;flex:1}
+  .main{margin-left:0;padding-bottom:64px}
+  .wsgrid{grid-template-columns:minmax(0,1fr)}
+  .modal{width:100%;max-height:100vh;border-radius:0}
+}
+
+/* ===== Mockup-only chrome (not part of the product) ===== */
+body{background:var(--background)}
+.mk-wrap{max-width:1180px;margin:0 auto;padding:18px 16px 40px}
+.mk-intro{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);padding:16px 18px;margin-bottom:14px}
+.mk-intro h1{font-size:19px;line-height:26px;margin-bottom:4px}
+.mk-grid{display:grid;grid-template-columns:260px minmax(0,1fr);gap:14px;align-items:start}
+.mk-picker{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);padding:10px}
+.mk-picker h4{font-size:11px;text-transform:uppercase;letter-spacing:.4px;color:var(--text-secondary);margin:8px 6px 6px}
+.mk-picker button{display:block;width:100%;text-align:left;border:1.5px solid transparent;background:none;border-radius:var(--radius-md);padding:8px 10px;font-size:13.5px;margin-bottom:2px}
+.mk-picker button:hover{background:var(--surface-variant)}
+.mk-picker button.on{border-color:var(--primary);background:var(--primary-light);color:var(--primary-dark);font-weight:600}
+.mk-picker .why{display:block;font-size:11.5px;line-height:15px;color:var(--text-secondary);font-weight:400}
+.mk-app{background:var(--background);border:1px solid var(--border);border-radius:var(--radius-lg);overflow:hidden}
+.mk-top{min-height:48px;background:var(--surface);border-bottom:1px solid var(--border);display:flex;align-items:center;gap:12px;padding:0 16px;flex-wrap:wrap}
+.mk-top .ver{margin-left:auto;color:var(--text-disabled);font-size:12px}
+.mk-body{padding:14px 16px}
+.mk-note{border-left:3px solid var(--primary);background:var(--surface);padding:8px 12px;margin:10px 0 0;font-size:12.5px;color:var(--text-secondary);border-radius:0 var(--radius-md) var(--radius-md) 0}
+.mk-hidden{border:1.5px dashed var(--border);border-radius:var(--radius-md);padding:10px 12px;margin:10px 0;font-size:12.5px;color:var(--text-secondary);background:var(--surface)}
+.mk-ref{margin-top:14px;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);padding:14px 16px;overflow-x:auto}
+.mk-ref h3{font-size:14.5px;margin-bottom:8px}
+.ovr-head{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:6px}
+.ovr-head b.hd{margin-bottom:0}
+.ovr-say{font-size:12px;font-weight:600;color:var(--text-secondary);margin-top:10px;text-transform:uppercase;letter-spacing:.3px}
+@media(max-width:860px){.mk-grid{grid-template-columns:minmax(0,1fr)}}
+</style>
+</head>
+<body>
+<div class="mk-wrap">
+  <div class="mk-intro">
+    <h1>Hot water override states (OOHDASH-136)</h1>
+    <p class="sub">What the operator sees on the first step of the Hot water flow at a boiler-panel site. Display only: nothing here switches anything. The clock is fixed at <b>19:40 on Wed 21 Oct 2026</b> (UK time). Pick a state; the chips work, and the ON state has a button to move the clock to 22:00.</p>
+  </div>
+  <div class="mk-grid">
+    <nav class="mk-picker" id="picker" aria-label="States"></nav>
+    <div>
+      <div class="mk-app">
+        <div class="mk-top"><b id="siteTitle"></b><span class="tag violet">C&amp;B</span><span class="ver">OOH Dashboard (mockup)</span></div>
+        <div class="mk-body">
+          <div id="flow"></div>
+          <div class="mk-note" id="why"></div>
+        </div>
+      </div>
+      <div class="mk-ref">
+        <h3>All states at a glance (clock 19:40)</h3>
+        <table class="tbl" id="reftbl"><thead><tr><th>State</th><th>Panel</th><th>Tag</th><th>Headline</th></tr></thead><tbody></tbody></table>
+      </div>
+    </div>
+  </div>
+</div>
+<script>
+(function(){
+  var MIN = 60000;
+  var NOW0 = Date.UTC(2026,9,21,18,40,0);           // 19:40 UK (BST)
+  var now = NOW0;
+  var STALE_MIN = 60, V1_CONFIRM_MIN = 35;
+
+  // Each fixture is a boilerControl.dhwOverride payload object, as the design specifies.
+  var STATES = [
+    {id:'auto', label:'Auto (on schedule)', why:'V2 panel, reading 0.', site:'9361 The Plough Inn',
+     d:{visible:true,panelVersion:'V2',mode:'auto',untilMs:null,confirmedAtMs:null,unreadableReason:null,panelLastSeenMs:NOW0-3*MIN}},
+    {id:'ended', label:'Auto, override just ended', why:'V2, end time 18:00 has passed but the panel has not cleared it yet.', site:'9364 The White Hart',
+     d:{visible:true,panelVersion:'V2',mode:'on',untilMs:Date.UTC(2026,9,21,17,0,0),confirmedAtMs:null,unreadableReason:null,panelLastSeenMs:NOW0-2*MIN}},
+    {id:'on', label:'Override ON until 22:00', why:'V2, positive reading, end time later today.', site:'9362 The Golden Lion', jump:true, liveSeen:true,
+     d:{visible:true,panelVersion:'V2',mode:'on',untilMs:Date.UTC(2026,9,21,21,0,0),confirmedAtMs:null,unreadableReason:null,panelLastSeenMs:NOW0-4*MIN}},
+    {id:'off', label:'Override OFF until 06:00 tomorrow', why:'V2, negative reading (decision D1).', site:'9363 The Kings Arms',
+     d:{visible:true,panelVersion:'V2',mode:'off',untilMs:Date.UTC(2026,9,22,5,0,0),confirmedAtMs:null,unreadableReason:null,panelLastSeenMs:NOW0-1*MIN}},
+    {id:'v1on', label:'V1 Override ON', why:'V1, valid positive row 4 minutes ago; no end time (decision D2).', site:'9366 The Fox and Hounds',
+     d:{visible:true,panelVersion:'V1',mode:'on',untilMs:null,confirmedAtMs:NOW0-4*MIN,unreadableReason:null,panelLastSeenMs:NOW0-4*MIN}},
+    {id:'v1off', label:'V1 Override OFF', why:'V1, valid negative row 6 minutes ago; no time (decision D2).', site:'9367 The Royal Oak',
+     d:{visible:true,panelVersion:'V1',mode:'off',untilMs:null,confirmedAtMs:NOW0-6*MIN,unreadableReason:null,panelLastSeenMs:NOW0-6*MIN}},
+    {id:'stale', label:"Can't confirm: stale", why:'Panel last reported 3 hours 15 minutes ago (over the 60 minute limit).', site:'9365 The Red Lion',
+     d:{visible:true,panelVersion:'V2',mode:'auto',untilMs:null,confirmedAtMs:null,unreadableReason:null,panelLastSeenMs:NOW0-195*MIN}},
+    {id:'bad', label:"Can't confirm: reading odd", why:'V2 reading is not a usable time (for example the literal 1 or -1).', site:'9370 The George',
+     d:{visible:true,panelVersion:'V2',mode:'unreadable',untilMs:null,confirmedAtMs:null,unreadableReason:'implausible',panelLastSeenMs:NOW0-2*MIN}},
+    {id:'v1lapsed', label:"Can't confirm: V1 not re-confirmed", why:'V1 positive, but the newest valid row is 50 minutes old (limit 35).', site:'9371 The Crown',
+     d:{visible:true,panelVersion:'V1',mode:'on',untilMs:null,confirmedAtMs:NOW0-50*MIN,unreadableReason:null,panelLastSeenMs:NOW0-3*MIN}},
+    {id:'hid1', label:'Hidden: separate hot water', why:'V2 with separate_dhw = 1 (decision D3).', site:'9368 The Bell',
+     d:{visible:false,hiddenReason:'separate-dhw'}},
+    {id:'hid2', label:'Hidden: output 4 not hot water', why:'V1 with output 4 not wired to hot water (decision D4).', site:'9369 The Swan',
+     d:{visible:false,hiddenReason:'dhw-not-wired'}}
+  ];
+
+  // ---------- reference behaviour for dhwOverrideOutcome (the browser twin) ----------
+  var MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  function ukParts(ms){
+    var f = new Intl.DateTimeFormat('en-GB',{timeZone:'Europe/London',weekday:'short',day:'numeric',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit',hourCycle:'h23'});
+    var o = {}; f.formatToParts(new Date(ms)).forEach(function(p){ o[p.type] = p.value; });
+    return o;
+  }
+  function ukDay(ms){ var o = ukParts(ms); return Date.UTC(+o.year, MONTHS.indexOf(o.month), +o.day) / 86400000; }
+  function hm(ms){ var o = ukParts(ms); return o.hour + ':' + o.minute; }
+  function fmtUntil(ms, nowMs){
+    var o = ukParts(ms), t = o.hour + ':' + o.minute, dd = ukDay(ms) - ukDay(nowMs);
+    if (dd === 1 && t === '00:00') return 'midnight';
+    if (dd === 0) return t;
+    if (dd === 1) return t + ' tomorrow';
+    return 'on ' + o.weekday + ' ' + o.day + ' ' + o.month + ' at ' + t;
+  }
+  function fmtAgo(ms, nowMs){
+    var m = Math.floor((nowMs - ms) / MIN);
+    if (m < 120) return m + ' minutes ago';
+    if (m < 48 * 60) return Math.floor(m / 60) + ' hours ago';
+    var o = ukParts(ms); return 'on ' + o.weekday + ' ' + o.day + ' ' + o.month + ' at ' + o.hour + ':' + o.minute;
+  }
+  var CANT_SAY = "I can't see the current hot water setting from here right now, so I'll log it for the team to check.";
+  var CANT_TAIL = " Don't tell the caller it is on or off; log it and escalate as normal.";
+  function cant(body, reason){ return {tag:'grey', tagText:"Can't confirm", hd:"Hot water override: can't confirm", body:body + CANT_TAIL, say:CANT_SAY, ticket:'could not be confirmed (' + reason + ')'}; }
+  function dhwOverrideOutcome(d, nowMs){
+    if (!d || !d.visible) return null;
+    if (d.panelLastSeenMs == null) return cant("The boiler panel isn't reporting, so we can't tell whether the hot water is overridden.", 'panel not reporting');
+    if (nowMs - d.panelLastSeenMs > STALE_MIN * MIN) { var ago = fmtAgo(d.panelLastSeenMs, nowMs); return cant('The boiler panel last reported ' + ago + ", so we can't tell whether the hot water is overridden.", 'panel last reported ' + ago); }
+    if (d.mode === 'unreadable') return cant("The boiler panel's hot water override reading doesn't make sense right now, so we can't tell whether it is overridden.", 'reading did not make sense');
+    var autoHd = 'Hot water override: Auto (on schedule)';
+    if (d.mode === 'auto') return {tag:'green', tagText:'Auto', hd:autoHd, body:'Nobody has overridden the hot water on the boiler panel. It is following its normal timetable, so an override is not the reason for the problem.', say:"The hot water controls haven't been overridden - they're running on the normal timetable.", ticket:'Auto (on schedule)'};
+    if (d.panelVersion === 'V2') {
+      if (d.untilMs <= nowMs) { var e = hm(d.untilMs); return {tag:'green', tagText:'Auto', hd:autoHd, body:'An override ended at ' + e + ' and the panel has gone back to its normal timetable, so an override is not the reason for the problem now.', say:'The hot water controls are back on the normal timetable.', ticket:'Auto (on schedule), an override ended at ' + e}; }
+      var t = fmtUntil(d.untilMs, nowMs);
+      if (d.mode === 'on') return {tag:'blue', tagText:'Override ON', hd:'Hot water override: Override ON until ' + t, body:'Hot water has already been set to run from the boiler panel and stays on until ' + t + '. The controls are asking for hot water, so if there is still none, the likely cause is the boiler or the cylinder.', say:'The hot water has already been switched on from the controls and will stay on until ' + t + ". If it's still not coming through, it's likely the boiler itself, so I'll log it for the team.", ticket:'Override ON until ' + t};
+      return {tag:'amber', tagText:'Override OFF', hd:'Hot water override: Override OFF until ' + t, body:'Hot water has been deliberately switched off from the boiler panel until ' + t + '. That is the likely reason there is no hot water. It goes back to its normal timetable at ' + t + ". We can't change it from here, so escalate if the caller needs it sooner.", say:'The hot water has been switched off on purpose at the controls until ' + t + ", then it goes back to normal. I'll log that you need it back sooner so the team can look at it.", ticket:'Override OFF until ' + t};
+    }
+    if (d.confirmedAtMs == null || nowMs - d.confirmedAtMs > V1_CONFIRM_MIN * MIN) return cant("The boiler panel hasn't re-confirmed its hot water override recently, so we can't tell whether it is still in place.", 'panel had not re-confirmed it recently');
+    if (d.mode === 'on') return {tag:'blue', tagText:'Override ON', hd:'Hot water override: Override ON', body:"Hot water has been set to run from the boiler panel. This type of panel doesn't give an end time. The controls are asking for hot water, so if there is still none, the likely cause is the boiler or the cylinder.", say:"The hot water has been switched on from the controls. If it's still not coming through, it's likely the boiler itself, so I'll log it for the team.", ticket:'Override ON'};
+    return {tag:'amber', tagText:'Override OFF', hd:'Hot water override: Override OFF', body:"Hot water has been deliberately switched off on the boiler panel. That is the likely reason there is no hot water. This type of panel doesn't say when it ends, and we can't change it from here, so escalate it.", say:"The hot water has been switched off on purpose at the controls. I'll log it so the team can switch it back on for you.", ticket:'Override OFF'};
+  }
+
+  // ---------- rendering (mirrors FLOWR.hotwater stage 0 and its two outcomes) ----------
+  var cur = STATES[0], stage = 0, ticketNo = 48213;
+  function esc(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+  function card(o){
+    return '<div class="reco" data-testid="hw-dhw-override"><div class="ovr-head"><b class="hd">' + esc(o.hd) + '</b><span class="tag ' + o.tag + '" data-testid="hw-dhw-override-tag">' + esc(o.tagText) + '</span></div>' + esc(o.body) +
+      '<div class="ovr-say">You can tell the caller</div><div class="script">&ldquo;' + esc(o.say) + '&rdquo;</div></div>';
+  }
+  function render(){
+    document.getElementById('siteTitle').textContent = cur.site;
+    if (cur.liveSeen) cur.d.panelLastSeenMs = now - 4 * MIN;   // the panel keeps reporting while the clock moves
+    var o = dhwOverrideOutcome(cur.d, now), clock = hm(now);
+    var html = '<div class="flowpanel"><div class="flowhead"><span style="font-size:18px">&#128703;</span><b>Hot water</b><span class="small" style="margin-left:6px">guided flow</span><span class="small" style="margin-left:auto">clock ' + clock + '</span></div><div class="flowbody">' +
+      '<div class="stepdone"><span>&#128172;</span>Caller\'s words: "no hot water in the bar toilets or the kitchen"</div>' +
+      '<div class="stepdone"><span class="tick">&#10003;</span>Hot water - boiler-side, not controllable from here; captured for the IoT team</div>';
+    if (stage === 0) {
+      if (o) html += card(o);
+      else html += '<div class="mk-hidden" data-testid="hidden-note">Mockup note: no override card on this site (' + esc(cur.d.hiddenReason) + '). The operator sees today\'s step, unchanged.</div>';
+      html += '<div class="alert info">Hot water here runs on the boiler panel, which this dashboard monitors but can\'t control - there\'s no remote boost. We\'ll capture the details with the site boiler guidance and escalate to the IoT team, so you still have a next step for the caller.</div>' +
+        '<div class="chips"><button class="chip" data-act="cap">Log and escalate to IoT team</button><button class="chip" data-act="sc">Scope guidance (boiler fault?)</button>' +
+        (cur.jump && now === NOW0 ? '<button class="chip" data-act="jump" style="border-style:dashed">Mockup only: move clock to 22:00</button>' : '') +
+        (now !== NOW0 ? '<button class="chip" data-act="reset" style="border-style:dashed">Mockup only: reset clock to 19:40</button>' : '') + '</div>';
+    } else {
+      var sentence = o ? ' Hot water override at time of call: ' + o.ticket + '.' : '';
+      if (stage === 'cap') {
+        html += '<div class="outcome captured"><h3>&#128229; Captured for the IoT team</h3><p>Caller reports hot-water problems. Hot water is boiler-side (monitor-only on Lighthouse) - there is no remote boost. Needs IoT/boiler-side investigation.<b>' + esc(sentence) + '</b></p>' +
+          '<p style="margin-top:4px">This will be actioned on the <b>next working day</b> - it is logged, not lost.</p><div class="script">&ldquo;I\'ve logged this for the IoT team as a priority for the morning. If it\'s urgent overnight the boiler\'s own override panel may help - and if a boiler engineer attends, remember a visit can be chargeable if the fault isn\'t Lighthouse equipment.&rdquo;</div><p class="small">Ticket <b>#' + ticketNo + '</b>' + (o ? ' &middot; the bold sentence is the only addition to today\'s ticket text' : '') + '</p></div>';
+      } else {
+        html += '<div class="outcome scope"><h3>&#128295; Likely boiler fault - not Lighthouse equipment</h3><p>Lighthouse monitors demand here; the boiler itself (pressure, PCB, pilot) is not Lighthouse equipment.<b>' + esc(sentence) + '</b></p><div class="script">&ldquo;From what you\'re describing this looks like the boiler itself rather than the Lighthouse controls - that\'s one for your boiler company. I\'ll note tonight\'s call so there\'s a record.&rdquo;</div></div>';
+      }
+      html += '<div class="outbtns"><button class="btn" data-act="back">Back to the hot water step (mockup)</button><button class="btn primary" data-act="back">End call</button></div>';
+    }
+    html += '</div><div class="flowfoot"><span>Operator: <b>Kelly Phillips</b></span><span style="margin-left:auto">Everything here is recorded to the Zendesk ticket automatically</span></div></div>';
+    document.getElementById('flow').innerHTML = html;
+    document.getElementById('why').innerHTML = '<b>Why this state:</b> ' + esc(cur.why) + (now !== NOW0 ? ' Clock moved to ' + clock + ': the card re-evaluated in the browser with no new data fetch.' : '');
+    var p = '<h4>Card shown</h4>';
+    STATES.forEach(function(s, i){ if (s.id === 'hid1') p += '<h4>Card hidden</h4>'; p += '<button data-i="' + i + '" class="' + (s === cur ? 'on' : '') + '">' + esc(s.label) + '<span class="why">' + esc(s.site) + '</span></button>'; });
+    document.getElementById('picker').innerHTML = p;
+  }
+  function refTable(){
+    var rows = '';
+    STATES.forEach(function(s){ var o = dhwOverrideOutcome(s.d, NOW0);
+      rows += '<tr><td>' + esc(s.label) + '</td><td>' + (s.d.panelVersion || '-') + '</td><td>' + (o ? '<span class="tag ' + o.tag + '">' + esc(o.tagText) + '</span>' : '<span class="tag grey">no card</span>') + '</td><td>' + (o ? esc(o.hd) : 'Hidden - today\'s step unchanged') + '</td></tr>'; });
+    document.querySelector('#reftbl tbody').innerHTML = rows;
+  }
+  document.addEventListener('click', function(ev){
+    var b = ev.target.closest('button'); if (!b) return;
+    if (b.dataset.i != null) { cur = STATES[+b.dataset.i]; stage = 0; now = NOW0; render(); return; }
+    var a = b.dataset.act;
+    if (a === 'cap' || a === 'sc') { stage = a; ticketNo++; }
+    else if (a === 'back') stage = 0;
+    else if (a === 'jump') now = Date.UTC(2026,9,21,21,0,30);
+    else if (a === 'reset') now = NOW0;
+    render();
+  });
+  render(); refTable();
+})();
+</script>
+</body>
+</html>
