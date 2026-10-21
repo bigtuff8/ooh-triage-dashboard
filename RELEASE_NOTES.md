@@ -1,5 +1,55 @@
 # Release Notes — OOH Dashboard
 
+## v1.4.4 -- OOHDASH-137 Site number and pub name in OOH Zendesk ticket titles
+
+**Date:** TBD (release doer cuts with npm run release) · **Bump type:** patch · **Branch:** build/oohdash-137
+
+### What changed
+
+**OOHDASH-137 (improvement):** Every Zendesk ticket the OOH dashboard creates now
+carries the site number and pub name at the start of its subject. A title that
+previously read "[OOH] General issue captured" now reads "[OOH] 6186 George Inn
+(Bathampton) - General issue captured". When the dashboard has no trusted pub name
+the fallback is "[OOH] 6186 - General issue captured". When there is no site at all
+(a general query with no site typed) the subject is "[OOH] OOH query", unchanged.
+
+This affects all five ticket-creation routes: flow outcomes, control outcomes, late
+device confirmations, the raise-a-query path and the ambiguous-house-number capture.
+
+**No screen change.** The change is entirely server-side.
+
+New file services/ticket-title.js: a pure module that normalises the site number,
+cleans the pub name, and assembles the title in a single pipeline capped at 150
+characters. Two edits to services/zendesk.js: createOutcomeTicket now calls
+buildOohTitle; raiseQuery now resolves the pub name with a 2-second timeout.
+
+**Back-fill:** the one-off script scripts/backfill-ooh-titles.mjs renamed the open
+OOH tickets that still had generic subjects on release day. Each rename was recorded
+in a rollback file. P1 tickets were not renamed.
+
+**Tests:** 37 new unit tests (T1-T20, R1-R10, B1-B6 plus edge-case supplement).
+Full suite: 472 unit, 163 Playwright e2e, all green.
+
+### Accepted known behaviours
+
+- Pub name includes the town in brackets where known (e.g. "Wheatstone Inn (Gloucester)")
+  because multiple pubs share the same name and the IoT team already use the town form
+  when renaming tickets by hand. Decision D1 from design gate.
+- Open P1 tickets on release day were not renamed (decision D2) to avoid any risk of
+  a stale auto-escalation replay on the IoT Support dashboard.
+- Pub names longer than 60 characters are truncated with "..." in the title.
+- A ticket whose wording already began with the site number does not get the site prefix
+  added again (no-double rule).
+
+### Rollback
+
+Code: redeploy v1.4.3 image (apitechhub.azurecr.io/ooh-dashboard:a075b5e). New tickets
+revert to generic "[OOH] <outcome>" titles. Already-renamed back-fill tickets keep their
+new titles; use the back-fill rollback file to restore those independently if needed.
+
+Back-fill: node scripts/backfill-ooh-titles.mjs --rollback backfill-rollback-{timestamp}.json
+(file copied to C:\harness-runs\iot-ooh-dash at release time; keep for 30 days).
+
 ## v1.4.2 — OOHDASH-134 P1 Escalation in the Something else flow
 
 **Date:** 2026-10-16 (release doer cuts with `npm run release`) · **Bump type:** patch · **Branch:** `feat/oohdash-134-other-p1`
