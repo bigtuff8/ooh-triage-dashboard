@@ -1,0 +1,29 @@
+{
+  "run": "selfgate-ooh-triage-dashboard-oohdash-137",
+  "phase": "design",
+  "pr": 117,
+  "approvedBy": [
+    "bigtuff8"
+  ],
+  "reviewComments": [
+    "bigtuff8: - Pub name in the title (D1): Keep the town in brackets, e.g. \"6261 Wheatstone Inn (Gloucester)\"\n- P1 tickets in the one-off rename (D2): Leave the 2 open P1 tickets out\n- Release number (D3): Patch release v1.4.4\n\n(submitted via the interactive gate review)\n\n<!-- gate:selected [{\"question\":\"Pub name in the title (D1)\",\"answer\":\"Keep the town in brackets, e.g. \\\"6261 Wheatstone Inn (Gloucester)\\\"\"},{\"question\":\"P1 tickets in the one-off rename (D2)\",\"answer\":\"Leave the 2 open P1 tickets out\"},{\"question\":\"Release number (D3)\",\"answer\":\"Patch release v1.4.4\"}] -->"
+  ],
+  "mergeCommit": "27913512460a6f4acf818d27911b13e38fd71231",
+  "phaseBranch": "design/oohdash-137",
+  "releaseBranch": "main",
+  "stamp": 1792580997513,
+  "selectedOptions": [
+    {
+      "question": "Pub name in the title (D1)",
+      "answer": "Keep the town in brackets, e.g. \"6261 Wheatstone Inn (Gloucester)\""
+    },
+    {
+      "question": "P1 tickets in the one-off rename (D2)",
+      "answer": "Leave the 2 open P1 tickets out"
+    },
+    {
+      "question": "Release number (D3)",
+      "answer": "Patch release v1.4.4"
+    }
+  ]
+}
