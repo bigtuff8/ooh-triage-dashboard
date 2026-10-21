@@ -8,3 +8,5 @@ screenshots/
 *.log
 data/store/
 backups/
+backfill-plan-*.json
+backfill-rollback-*.json
