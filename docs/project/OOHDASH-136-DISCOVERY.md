@@ -2,11 +2,10 @@
 TICKET: OOHDASH-136
 PHASE: discovery
 QUESTIONS:
-Q-A: Spencer - V1 output4Override negative values: two panels (gk-4631 and gk-220) produced a single negative value following the same row_ts + 900s pattern as their positive values. What does a negative output4Override mean - is it a forced-off override distinct from 0, or a firmware variant / encoding artifact? (low-priority; only 2 occurrences across all V1 panels sampled)
 Q-B: Spencer - V2 separate_dhw=1 sites: the boilerControl panel at these sites has DHW.override telemetry and the field changes (gk-6263 had an active override). Does a DHW override on a panel where separate_dhw=1 actually control the hot water, or is it a separate output that does not affect the hot-water cylinder? This determines whether the dashboard should show DHW override state for those panels.
 DECISIONS:
 D1: V2 OFF-until display | show "Override OFF until [HH:MM]" (time is proven reliable - same seconds encoding as ON) | show "Override OFF" with no time (simpler) | show "Override OFF until [HH:MM]" with fallback to "Override OFF" if time implausible
-D2: V1 display label | "DHW zone: Active/Inactive" (neutral - avoids calling demand-driven signal an override) | "DHW demand: Active/Inactive" (precise but may confuse operators) | "DHW output: ON/OFF" (raw output terminology)
+D2: V1 display label | "Override ON / Override OFF / Auto (on schedule)" (recommended - matches V2 wording; Spencer confirmed output4Override IS the override key) | "DHW zone: Active/Inactive" (neutral but mismatches V2 framing) | "DHW output ON/OFF" (raw output terminology)
 D3: V2 separate_dhw=1 gate | hide DHW override row entirely for separate_dhw=1 sites (DEDUCED: panel output may not be the DHW cylinder) | show with note "DHW on separate system" | show without qualification (may mislead)
 D4: V1 output1OutputMask gate | hide DHW zone row when mask bit 3 = false (output 4 is not wired to DHW) | show with note "DHW output not configured" | always show output4Override state regardless of mask
 SECTIONS:
@@ -29,7 +28,7 @@ SECTIONS:
 
 ## What This Discovery Is For
 
-This ticket is the second track of OOHDASH-135. Track 1 (v1.4.3, shipped 20 October) added boilerControl panel recognition and the heating scope row for C&B sites. Track 2 adds one piece of read-only information: does the panel currently have a domestic hot water override active, and if so, what does it say? No control command is added. The operator sees this as a status row in the heating or hot water flow — it tells them whether the IoT team has already set an override and what it says, so they can advise the caller or escalate appropriately.
+This ticket is the second track of OOHDASH-135. Track 1 (v1.4.3, shipped 20 October) added boilerControl panel recognition and the heating scope row for C&B sites. Track 2 adds one piece of read-only information: does the panel currently have a domestic hot water override active, and if so, what does it say? No control command is added. The operator sees this as a status row in the heating or hot water flow  -  it tells them whether the IoT team has already set an override and what it says, so they can advise the caller or escalate appropriately.
 
 This discovery is unblocked because Spencer Thompson answered the two outstanding questions (Q1 and Q3 from the OOHDASH-136 Jira ticket, comment 41445, 2026-10-21). This document adds live TB evidence on top of Spencer's answers and corrects several assumptions in the OOHDASH-135 Build Plan spec.
 
@@ -39,7 +38,7 @@ v1.4.3 is live. It added the boiler-panel deviceType label in classifyDevice, th
 
 ## Cost and Background-Running Posture
 
-**Token and cost efficiency.** The DHW override state is decoded from ThingsBoard telemetry on the same per-panel on-demand GET request that fires when an operator opens a panel card. The two additional telemetry keys — DHW.override for V2 panels; output4Override for V1 panels — are appended to the existing keys list in the same HTTP request body. The V1 wiring gate attribute (output1OutputMask) is already present in the SHARED_SCOPE attributes call Track 1 established; reading index 3 adds no new request. The V2 version attribute (heating_scenario) is likewise already fetched from CLIENT_SCOPE for existing heating-scenario display purposes. Net additional ThingsBoard API calls per panel card load: zero. No LLM inference is involved; DHW state is a deterministic decode of a numeric field. Recurring cost introduced by Track 2: none.
+**Token and cost efficiency.** The DHW override state is decoded from ThingsBoard telemetry on the same per-panel on-demand GET request that fires when an operator opens a panel card. The two additional telemetry keys  -  DHW.override for V2 panels; output4Override for V1 panels  -  are appended to the existing keys list in the same HTTP request body. The V1 wiring gate attribute (output1OutputMask) is already present in the SHARED_SCOPE attributes call Track 1 established; reading index 3 adds no new request. The V2 version attribute (heating_scenario) is likewise already fetched from CLIENT_SCOPE for existing heating-scenario display purposes. Net additional ThingsBoard API calls per panel card load: zero. No LLM inference is involved; DHW state is a deterministic decode of a numeric field. Recurring cost introduced by Track 2: none.
 
 **Silent background running.** No new polling loop, daemon, timer, WebSocket subscription, scheduled task, or watcher of any kind is added. DHW state is fetched strictly on demand when the operator views a panel card. The panel card already has a manual refresh action; no automatic background re-poll is proposed. When no operator is viewing a panel, zero tokens, zero API calls, and zero machine resource are consumed. This satisfies the silent-running criterion in full: the feature is invisible across the entire computer while idle, and spends nothing when it has no work to do.
 
@@ -49,7 +48,7 @@ v1.4.3 is live. It added the boiler-panel deviceType label in classifyDevice, th
 
 The V2 DHW.override encoding is now fully proven from live data. The field in ThingsBoard telemetry is a string containing an integer. The integer has three possible forms.
 
-Zero means "Auto — running on schedule". The panel is not in any override state.
+Zero means "Auto  -  running on schedule". The panel is not in any override state.
 
 A positive integer is an epoch timestamp in SECONDS representing when the override expires. The override is ON (the IoT team has commanded hot water to run) until that time. The panel self-clears to zero when the time passes. Across 8 sites and 50+ data rows, every positive value decoded to a sensible near-future time (22:00, midnight, next-day boundary), confirming the "until" framing. The units are seconds, not milliseconds.
 
@@ -59,23 +58,19 @@ Spencer's simplified description of "0=AUTO, 1=ON, -1=OFF" is confirmed by the d
 
 ## Key Findings: V1 output4Override Encoding
 
-V1 panels use output4Override differently from how the spec assumed. This is a significant correction.
+Spencer confirmed (Jira comment 41445, 2026-10-21): output4Override IS the correct key to display for V1 panels. 0 = Auto. Positive = Override ON. Negative = Override OFF (the device was overridden off). The encoding is: sign = state; magnitude = Spencer's best guess of "MS to EPOCH or just EPOCH timestamp from when the override was switched off."
 
-The field is a continuous demand heartbeat, not an operator-set override. When DHW demand is active, the panel writes a new value every 15 minutes. The value is a millisecond epoch timestamp equal to the row timestamp plus exactly 900,000 milliseconds (15 minutes). In plain language: "DHW demand is ON, and this reading is valid for the next 15 minutes." When demand ends or the panel goes offline, the field reverts to zero.
+The live data confirms the units are MILLISECONDS (every valid value is 13 digits and decodes to a current-era date in ms, not seconds). The magnitude tension: Spencer describes the magnitude as the "when switched off" timestamp, but the live data shows every positive value is exactly row_ts_ms + 900,000ms (15 minutes ahead of the data point timestamp). The panel re-sends the positive value every 15 minutes while the override is held ON. This means: (a) there is no reliable "override ends at [time]" to display for V1 - the 15-min re-send value is implementation overhead, not the operator-intended end time; (b) the negative magnitude has the same +900s pattern, so the "when switched off" time is also unreliable for display. The display for both ON and OFF states omits the time: "Override ON" and "Override OFF".
 
-Spencer's best-guess in his answer was that the magnitude is "the timestamp when it was switched off (ms or s)". The live data shows it is ms and the value is always row_ts plus 900 seconds — it is a rolling "valid until" timestamp, not a one-time write timestamp. The units are confirmed as MILLISECONDS (not seconds; every value is 13 digits and decodes to a realistic current date as ms).
+Staleness implication for V1: a positive output4Override value whose last row is older than approximately 20 minutes (15-min re-send cadence plus a small fetch margin) should NOT be treated as an active override. The override may have ended and the panel stopped re-confirming it. Use lastActivityTime from the TB device list to separate "override ended" from "device offline".
 
-Negative values were observed on two V1 panels (gk-4631 and gk-220), each occurring once. Both negative values followed the same row_ts + 900s pattern as positive values, just negative. The meaning is not confirmed from data alone (see Q-A for Spencer). For the display spec these are treated as "DHW output inactive" since they are extremely rare (2 out of hundreds of rows across all V1 panels).
-
-Corrupted values: some V1 panels produce occasional values with more than 20 digits (e.g. 3206869449881746000000000). These appear to be floating-point encoding artifacts in the bridge telemetry pipeline and cannot be decoded as dates. The digit-count pre-check catches these obvious cases. Shorter corrupted values (13–14 digits that still parse as a number) are caught by the plausibility window in the display spec below — see the Revised State Display Spec for the combined guard.
-
-The important implication: V1 output4Override is not an "override" in the operator sense. It is a real-time demand signal. The display should not say "Override ON" for a V1 panel; it should say "DHW zone: Active" or "DHW zone: Inactive".
+Corrupted values: some V1 panels produce occasional values with more than 20 digits (e.g. 3206869449881746000000000). These appear to be floating-point encoding artifacts in the bridge telemetry pipeline and cannot be decoded as dates. The digit-count pre-check catches these obvious cases. Shorter corrupted values (13-14 digits that still parse as a number) are caught by the plausibility window in the display spec below.
 
 ## Key Findings: Version Discrimination
 
-**The prior Build-Plan discrimination rule — checking DHW.override telemetry recency — has a critical silent failure mode and must not be used. The correct approach is durable attribute presence.**
+**The prior Build-Plan discrimination rule  -  checking DHW.override telemetry recency  -  has a critical silent failure mode and must not be used. The correct approach is durable attribute presence.**
 
-The prior spec proposed: "check DHW.override has a non-null value within the last 24 hours; if yes, V2." DHW.override is event-driven — it writes on set, cancel, or expiry only. A healthy V2 panel running on schedule with no recent override will not write to DHW.override for weeks or months. Applying the 24-hour window to such a panel returns no recent row. The panel gets classified as unknown or offline. Its DHW row is hidden. The operator sees nothing — no stale-data warning, no visible failure — because the panel is live, just idle. This is the silent single point of failure the prior spec accepted without examination.
+The prior spec proposed: "check DHW.override has a non-null value within the last 24 hours; if yes, V2." DHW.override is event-driven  -  it writes on set, cancel, or expiry only. A healthy V2 panel running on schedule with no recent override will not write to DHW.override for weeks or months. Applying the 24-hour window to such a panel returns no recent row. The panel gets classified as unknown or offline. Its DHW row is hidden. The operator sees nothing  -  no stale-data warning, no visible failure  -  because the panel is live, just idle. This is the silent single point of failure the prior spec accepted without examination.
 
 **The correct discrimination uses durable static attributes, which are already fetched.**
 
@@ -83,7 +78,7 @@ V2 panels have heating_scenario in CLIENT_SCOPE attributes. This field is writte
 
 V1 panels have output1OutputMask in SHARED_SCOPE attributes. This field is a static JSON array written at wiring configuration. It is already fetched by the existing SHARED_SCOPE attributes call. If output1OutputMask is present in SHARED_SCOPE and heating_scenario is absent from CLIENT_SCOPE: the panel is V1. Read output4Override telemetry for state.
 
-If neither attribute is present: the panel version cannot be confirmed. Classification is "unknown / offline" and no DHW row is shown. This is the legitimate unknown state — not a misclassification of a healthy idle panel.
+If neither attribute is present: the panel version cannot be confirmed. Classification is "unknown / offline" and no DHW row is shown. This is the legitimate unknown state  -  not a misclassification of a healthy idle panel.
 
 | Condition | Classification | DHW data source |
 |---|---|---|
@@ -99,7 +94,7 @@ Not every boilerControl panel has DHW wired. The display should only show DHW st
 
 For V2 panels: heating_scenario.separate_dhw = 0 means DHW is on this panel. separate_dhw = 1 means DHW is on a separate system (for example a gas cylinder) and the panel does not control it. The dashboard already reads heating_scenario for other purposes (the field is in CLIENT_SCOPE). Whether to show DHW.override state when separate_dhw = 1 is DECISION D3 for James.
 
-For V1 panels: output1OutputMask is a JSON array [boiler, CH1, CH2, DHW]. Index 3 (DHW) = true means the fourth output is wired as a DHW zone. output4Override tracks the state of output 4 regardless of what it is wired to. If index 3 = false, output4Override should NOT be shown as a DHW state (it is some other output). This is DECISION D4 for James — the recommendation is to gate on index 3 = true.
+For V1 panels: output1OutputMask is a JSON array [boiler, CH1, CH2, DHW]. Index 3 (DHW) = true means the fourth output is wired as a DHW zone. output4Override tracks the state of output 4 regardless of what it is wired to. If index 3 = false, output4Override should NOT be shown as a DHW state (it is some other output). This is DECISION D4 for James  -  the recommendation is to gate on index 3 = true.
 
 Panels sampled (V1 wiring): gk-220 has DHW wired (index 3 = true), gk-4331 has DHW wired, gk-1736 has DHW wired, gk-1597 has DHW wired. gk-2933, gk-4631, gk-4741, gk-6769 do NOT have DHW wired (index 3 = false) even though they have output4Override data.
 
@@ -109,7 +104,7 @@ The BUILD-PLAN provisional 5-minute staleness threshold must be changed to 60 mi
 
 For V2 panels: DHW.override is event-driven only (writes on set, cancel, or expiry). A healthy V2 panel will not write DHW.override every few minutes. Staleness cannot be detected from the DHW.override key alone. Use lastActivityTime from the TB device list (already fetched) or another regularly-updating telemetry key.
 
-For V1 panels: The 15-minute heartbeat means output4Override is re-written every 15 minutes while DHW is active. If the latest row for output4Override is older than 20–25 minutes and the value was non-zero, either the demand ended (value would have gone to zero) or the device is offline. lastActivityTime is the reliable signal for offline detection.
+For V1 panels: The 15-minute heartbeat means output4Override is re-written every 15 minutes while DHW is active. If the latest row for output4Override is older than 20-25 minutes and the value was non-zero, either the demand ended (value would have gone to zero) or the device is offline. lastActivityTime is the reliable signal for offline detection.
 
 The 60-minute threshold is conservative and may include up to 1 false-positive stale reading (a device that reported 59 minutes ago). The 3-hour threshold that cleanly separates live from dead in the estate sweep is too generous for a display context where stale data could mislead the operator. 60 minutes is the recommended value for BOILER_PANEL_STALE_THRESHOLD_MINUTES.
 
@@ -126,67 +121,67 @@ The revised state list for the DHW override row, per panel version. All decoded 
 | DHW.override value | Decoded condition | Display |
 |---|---|---|
 | 0 | Auto mode | "Running on schedule" |
-| Positive integer | value × 1000 within plausibility window AND > Date.now() | "Override ON — hot water running until [HH:MM today/tomorrow]" |
-| Positive integer | value × 1000 within plausibility window AND ≤ Date.now() (expired, not yet cleared) | "Override just ended — running on schedule" |
-| Negative integer | |value| × 1000 within plausibility window AND > Date.now() | See DECISION D1 |
-| Any non-zero value | Decoded time outside plausibility window | "Cannot confirm DHW state — data implausible" |
-| Panel stale (60 min) | — | "Stale data — cannot confirm DHW state" |
+| Positive integer | value  x  1000 within plausibility window AND > Date.now() | "Override ON  -  hot water running until [HH:MM today/tomorrow]" |
+| Positive integer | value  x  1000 within plausibility window AND <= Date.now() (expired, not yet cleared) | "Override just ended  -  running on schedule" |
+| Negative integer | |value|  x  1000 within plausibility window AND > Date.now() | See DECISION D1 |
+| Any non-zero value | Decoded time outside plausibility window | "Cannot confirm DHW state  -  data implausible" |
+| Panel stale (60 min) |  -  | "Stale data  -  cannot confirm DHW state" |
 
-**V2 plausibility window.** After computing `untilMs = value * 1000`, the decoded time is plausible only if it falls within `[Date.now() − 6 h, Date.now() + 365 d]`. The lower bound (6 h in the past) catches the "Override just ended" case gracefully. The upper bound (365 d ahead) catches any version-misclassification artefact: a V1 millisecond value decoded as V2 seconds produces a year-58000+ epoch and is rejected immediately. Any value outside the window degrades to "Cannot confirm DHW state — data implausible" rather than displaying a confidently wrong override time. This is the defence-in-depth layer; the primary protection is the attribute-based version discrimination above, which prevents the misclassification from reaching this decoder in the first place.
+**V2 plausibility window.** After computing `untilMs = value * 1000`, the decoded time is plausible only if it falls within `[Date.now() - 6 h, Date.now() + 365 d]`. The lower bound (6 h in the past) catches the "Override just ended" case gracefully. The upper bound (365 d ahead) catches any version-misclassification artefact: a V1 millisecond value decoded as V2 seconds produces a year-58000+ epoch and is rejected immediately. Any value outside the window degrades to "Cannot confirm DHW state  -  data implausible" rather than displaying a confidently wrong override time. This is the defence-in-depth layer; the primary protection is the attribute-based version discrimination above, which prevents the misclassification from reaching this decoder in the first place.
 
 **V1 output4Override states** (shown only when output1OutputMask index 3 = true, per DECISION D4):
 
 | output4Override value | Decoded condition | Display |
 |---|---|---|
-| 0 | Inactive | See DECISION D2 ("DHW zone: Inactive") |
-| Positive integer | Digit count > 20 | Corrupted — treat as inactive |
-| Positive integer | value within plausibility window AND > Date.now() | See DECISION D2 ("DHW zone: Active") |
-| Positive integer | value outside plausibility window | Implausible — treat as inactive |
-| Positive integer | value ≤ Date.now() | Expired — treat as inactive |
-| Negative integer | Any | Treat as inactive (see Q-A) |
-| Panel stale (60 min) | — | "Stale data — cannot confirm DHW state" |
+| 0 | Auto mode | See DECISION D2 ("Auto (on schedule)") |
+| Positive integer | Digit count > 20 | Corrupted  -  treat as inactive |
+| Positive integer | value within plausibility window AND > Date.now() | See DECISION D2 ("Override ON") |
+| Positive integer | value outside plausibility window | Implausible  -  treat as inactive |
+| Positive integer | value <= Date.now() | Expired  -  treat as inactive |
+| Negative integer | Spencer confirmed: Override OFF state | "Override OFF" (no time - magnitude unreliable per data) |
+| Panel stale (60 min) |  -  | "Stale data  -  cannot confirm DHW state" |
 
-**V1 plausibility window.** After parsing `valueMs = output4Override` (positive, ≤ 20 digits), the value is plausible only if it falls within `[Date.now() − 20 min, Date.now() + 25 min]`. Valid heartbeats are `row_ts_ms + 900,000` — at fetch time they are at most 15 min + fetch-lag ahead of the current clock, never multiple hours or days forward. This window catches corrupted 13-or-14-digit values that the digit-count pre-check misses: a 14-digit value decoding to a date one month from now (for example) fails the +25-min bound and is treated as inactive rather than active. The dual guard — digit-count pre-check for obviously out-of-range values, plausibility window for the residual — ensures that any encoding artifact degrades to the safe default ("inactive") not to a false "Active" reading.
+**V1 plausibility window.** After parsing `valueMs = output4Override` (positive, <= 20 digits), the value is plausible only if it falls within `[Date.now() - 20 min, Date.now() + 25 min]`. Valid heartbeats are `row_ts_ms + 900,000`  -  at fetch time they are at most 15 min + fetch-lag ahead of the current clock, never multiple hours or days forward. This window catches corrupted 13-or-14-digit values that the digit-count pre-check misses: a 14-digit value decoding to a date one month from now (for example) fails the +25-min bound and is treated as inactive rather than active. The dual guard  -  digit-count pre-check for obviously out-of-range values, plausibility window for the residual  -  ensures that any encoding artifact degrades to the safe default ("inactive") not to a false "Active" reading.
 
 ## Build Plan Corrections Required
 
 Eight items in the OOHDASH-135 BUILD-PLAN need correcting before Track 2 code is written.
 
-**Correction 1 — units bug (line ~249).** The spec reads "boilerDhwOverrideActive = Date.now() less than boilerDhwOverrideUntil". This is wrong: Date.now() is milliseconds, DHW.override is epoch seconds. The correct logic is: multiply DHW.override by 1000 before comparison with Date.now(). boilerDhwOverrideUntil must be stored in MILLISECONDS in the workspace payload.
+**Correction 1  -  units bug (line ~249).** The spec reads "boilerDhwOverrideActive = Date.now() less than boilerDhwOverrideUntil". This is wrong: Date.now() is milliseconds, DHW.override is epoch seconds. The correct logic is: multiply DHW.override by 1000 before comparison with Date.now(). boilerDhwOverrideUntil must be stored in MILLISECONDS in the workspace payload.
 
-**Correction 2 — missing OFF state for V2.** The spec only handles positive DHW.override values (ON state). It does not handle negative values (OFF state). The workspace payload needs a second boolean field: boilerDhwOverrideOff (true when DHW.override is negative and |value × 1000| is in the future and within the plausibility window) and boilerDhwOverrideOffUntilMs for the UI to format the time.
+**Correction 2  -  missing OFF state for V2.** The spec only handles positive DHW.override values (ON state). It does not handle negative values (OFF state). The workspace payload needs a second boolean field: boilerDhwOverrideOff (true when DHW.override is negative and |value  x  1000| is in the future and within the plausibility window) and boilerDhwOverrideOffUntilMs for the UI to format the time.
 
-**Correction 3 — T2-6 test rewrite.** The test fixture uses "output1OutputMask: 8 (bit 3 set)" to show "Output 1 DHW: ON". This conflates the wiring capability attribute with live telemetry state. The correct V1 live key is output4Override. T2-6 must be rewritten: fixture should set output4Override to a positive ms value within the plausibility window (i.e. Date.now() + 600,000), and the expected result is "DHW zone: Active". A second fixture should set output4Override = 0 and expect "DHW zone: Inactive". A third fixture should set output4Override to a value > Date.now() + 25 min and expect "inactive" (plausibility rejection). The output1OutputMask wiring gate (index 3 = true/false) should be a separate fixture testing the hide-when-unwired case.
+**Correction 3  -  T2-6 test rewrite.** The test fixture uses "output1OutputMask: 8 (bit 3 set)" to show "Output 1 DHW: ON". This conflates the wiring capability attribute with live telemetry state. The correct V1 live key is output4Override. T2-6 must be rewritten: fixture should set output4Override to a positive ms value within the plausibility window (i.e. Date.now() + 600,000), and the expected result is "Override ON" (per DECISION D2, recommended option). A second fixture should set output4Override = 0 and expect "Auto (on schedule)". A third fixture should set output4Override to a negative value and expect "Override OFF". A third fixture should set output4Override to a value > Date.now() + 25 min and expect "inactive" (plausibility rejection). The output1OutputMask wiring gate (index 3 = true/false) should be a separate fixture testing the hide-when-unwired case.
 
-**Correction 4 — BOILER_PANEL_STALE_THRESHOLD_MINUTES.** Change from 5 to 60.
+**Correction 4  -  BOILER_PANEL_STALE_THRESHOLD_MINUTES.** Change from 5 to 60.
 
-**Correction 5 — V1 encoding in W5-B (mapTelemetry).** The field boilerOutputMaskDhwBit is no longer the right thing to compute from output1OutputMask. Instead compute: boilerDhwZoneActive = (output4Override is a positive integer within the plausibility window AND output4Override > Date.now()), AND boilerDhwOutputWired = (output1OutputMask[3] === true). The raw boilerOutputMask field can remain for debugging but is not the display value. The corruption and plausibility checks (digit count and window) must be applied before evaluating boilerDhwZoneActive.
+**Correction 5  -  V1 encoding in W5-B (mapTelemetry).** The field boilerOutputMaskDhwBit is no longer the right thing to compute from output1OutputMask. Instead compute: boilerDhwZoneActive = (output4Override is a positive integer within the plausibility window AND output4Override > Date.now()), AND boilerDhwOutputWired = (output1OutputMask[3] === true). The raw boilerOutputMask field can remain for debugging but is not the display value. The corruption and plausibility checks (digit count and window) must be applied before evaluating boilerDhwZoneActive.
 
-**Correction 6 — discrimination rule in W5-B/W5-C (MAJOR).** The prior spec proposed checking DHW.override telemetry recency (non-null within 24 h) to identify V2 panels. This is wrong: DHW.override is event-driven and a healthy idle V2 panel will have no recent write, causing it to be silently misclassified as unknown. The discrimination must use static attributes: (a) if heating_scenario is present in CLIENT_SCOPE → V2; (b) if output1OutputMask is present in SHARED_SCOPE and heating_scenario is absent → V1; (c) if neither → unknown / no DHW row. Both attribute calls are already in-flight for Track 1 features. No additional API call is needed.
+**Correction 6  -  discrimination rule in W5-B/W5-C (MAJOR).** The prior spec proposed checking DHW.override telemetry recency (non-null within 24 h) to identify V2 panels. This is wrong: DHW.override is event-driven and a healthy idle V2 panel will have no recent write, causing it to be silently misclassified as unknown. The discrimination must use static attributes: (a) if heating_scenario is present in CLIENT_SCOPE -> V2; (b) if output1OutputMask is present in SHARED_SCOPE and heating_scenario is absent -> V1; (c) if neither -> unknown / no DHW row. Both attribute calls are already in-flight for Track 1 features. No additional API call is needed.
 
-**Correction 7 — staleness signal in W5-C.** boilerPanelStaleMinutes computed from lastActivityTime. This approach remains correct; the threshold constant must be 60, not 5.
+**Correction 7  -  staleness signal in W5-C.** boilerPanelStaleMinutes computed from lastActivityTime. This approach remains correct; the threshold constant must be 60, not 5.
 
-**Correction 8 — plausibility guards on both decoders (NEW).** The V2 decoder must apply the `[Date.now() − 6 h, Date.now() + 365 d]` window to `value * 1000` before any display formatting. The V1 decoder must apply the `[Date.now() − 20 min, Date.now() + 25 min]` window to the parsed integer before classifying as active. Values outside the window in either decoder must produce the degraded state ("Cannot confirm" for V2; "Inactive" for V1), never a formatted time or an "Active" label. These guards are the defence-in-depth layer against version misclassification; they are not a substitute for correction 6.
+**Correction 8  -  plausibility guards on both decoders (NEW).** The V2 decoder must apply the `[Date.now() - 6 h, Date.now() + 365 d]` window to `value * 1000` before any display formatting. The V1 decoder must apply the `[Date.now() - 20 min, Date.now() + 25 min]` window to the parsed integer before classifying as active. Values outside the window in either decoder must produce the degraded state ("Cannot confirm" for V2; "Inactive" for V1), never a formatted time or an "Active" label. These guards are the defence-in-depth layer against version misclassification; they are not a substitute for correction 6.
 
 ## Residual Third-Party Questions
 
-Two questions remain for Spencer Thompson. Both are low-priority and do not block the display for the most common states.
+One question remains for Spencer Thompson. It does not block the display for the most common states.
 
-Q-A concerns V1 negative output4Override values. Only two occurrences were observed across the whole V1 sample. The current spec treats negative as inactive (same as zero). If Spencer confirms negative means "a specific forced-off state distinct from zero", the display may need a third V1 state label. Otherwise the current treatment is safe.
+Q-A is now answered. Spencer confirmed (Jira comment 41445, 2026-10-21) that negative output4Override = Override OFF. This is PROVEN by owner statement. The display shows "Override OFF" for negative values. The magnitude is not used (see Key Findings: V1 output4Override Encoding for the tension between Spencer's description and the live data).
 
 Q-B concerns V2 separate_dhw=1 sites. The boilerControl panels at these sites do have DHW.override telemetry and it does change. If Spencer confirms that the panel's fourth output controls something real on these sites, the display should show it. If not, the display should hide it. The code path already has the heating_scenario field available; implementing either answer is a one-line gate.
 
-Neither question blocks the first implementation. The build should implement with a safe default (hide for separate_dhw=1; treat V1 negative as inactive) and update the gate constant if Spencer changes the answer.
+Q-B does not block the first implementation. The build should implement with a safe default (hide for separate_dhw=1) and update if Spencer's answer changes it.
 
 ## Evidence Confidence
 
 All V2 findings are PROVEN from live ThingsBoard data (read-only GET requests, 2026-10-21). Eight V2 sites sampled, 8 panels, 80+ data rows across 30 days. The positive encoding (seconds, ON-until), the zero state (AUTO), and the negative encoding (OFF-until, same magnitude) are all confirmed by multiple independent panels. contractor_override co-occurrence is observed but its meaning is DEDUCED. V2 separate_dhw gating is DEDUCED from the heating_scenario field semantics.
 
-V1 findings are PROVEN from live ThingsBoard data (2026-10-21). Eight V1 panels sampled, 200+ rows across 180 days. The 15-minute ms heartbeat pattern is proven with mean diff = exactly 900 seconds across 197 analysed rows. The negative-value meaning is UNVERIFIED (Q-A). The output1OutputMask wiring gate is PROVEN from the attribute data.
+V1 findings are PROVEN from live ThingsBoard data (2026-10-21). Eight V1 panels sampled, 200+ rows across 180 days. The 15-minute ms heartbeat pattern is proven with mean diff = exactly 900 seconds across 197 analysed rows. The negative-value meaning is PROVEN by owner statement: Spencer confirmed negative = Override OFF (Q-A answered). The magnitude is DEDUCED unreliable for display (data shows row_ts + 900s, not a "since" timestamp as Spencer described). The output1OutputMask wiring gate is PROVEN from the attribute data.
 
 Version discrimination via attributes: heating_scenario in CLIENT_SCOPE is PROVEN present for all 8 V2 panels sampled. output1OutputMask in SHARED_SCOPE is PROVEN present for all 8 V1 panels sampled. No panel had both attributes simultaneously. The attribute-based discrimination rule is empirically supported across the full sample.
 
-Plausibility windows: DEDUCED from the proven encoding properties (V1 heartbeat = row_ts + 900 s; V2 overrides are near-term future epochs). The specific bounds (V1 ±20–25 min; V2 −6 h to +365 d) are conservative estimates chosen to pass all observed valid data while rejecting all observed corrupted or cross-version values.
+Plausibility windows: DEDUCED from the proven encoding properties (V1 heartbeat = row_ts + 900 s; V2 overrides are near-term future epochs). The specific bounds (V1 +/-20-25 min; V2 -6 h to +365 d) are conservative estimates chosen to pass all observed valid data while rejecting all observed corrupted or cross-version values.
 
 Staleness: 60-minute threshold is PROVEN from the estate sweep (OOHDASH-135 prior investigation). V1 heartbeat frequency is PROVEN as 15-minute.
 
