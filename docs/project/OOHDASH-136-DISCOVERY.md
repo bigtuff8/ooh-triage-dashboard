@@ -28,19 +28,16 @@ SECTIONS:
 
 ## What This Discovery Is For
 
-SECTION: What This Discovery Is For
 This ticket is the second track of OOHDASH-135. Track 1 (v1.4.3, shipped 20 October) added boilerControl panel recognition and the heating scope row for C&B sites. Track 2 adds one piece of read-only information: does the panel currently have a domestic hot water override active, and if so, what does it say? No control command is added. The operator sees this as a status row in the heating or hot water flow - it tells them whether the IoT team has already set an override and what it says, so they can advise the caller or escalate appropriately.
 
 This discovery is unblocked because Spencer Thompson answered the two outstanding questions (Q1 and Q3 from the OOHDASH-136 Jira ticket, comment 41445, 2026-10-21). This document adds live TB evidence on top of Spencer's answers and corrects several assumptions in the OOHDASH-135 Build Plan spec.
 
 ## What Track 1 Already Shipped
 
-SECTION: What Track 1 Already Shipped
 v1.4.3 is live. It added the boiler-panel deviceType label in classifyDevice, the 'mon' scope entry for boilerControl sites, and the read-only branch in flows.js that shows "The IoT team controls this panel directly from ThingsBoard" with an escalate button. The DHW override row was intentionally left blank pending this discovery. Track 2 fills that blank. Nothing from Track 1 needs to be changed.
 
 ## Key Findings: V2 DHW.override Encoding
 
-SECTION: Key Findings - V2 DHW.override
 The V2 DHW.override encoding is now fully proven from live data. The field in ThingsBoard telemetry is a string containing an integer. The integer has three possible forms:
 
 Zero means "Auto - running on schedule". The panel is not in any override state.
@@ -55,7 +52,6 @@ The raw "1" or "-1" values described in Spencer's answer were shorthand for the 
 
 ## Key Findings: V1 output4Override Encoding
 
-SECTION: Key Findings - V1 output4Override
 V1 panels use output4Override differently from how the spec assumed. This is a significant correction.
 
 The field is a continuous demand heartbeat, not an operator-set override. When DHW demand is active, the panel writes a new value every 15 minutes. The value is a millisecond epoch timestamp equal to the row timestamp plus exactly 900,000 milliseconds (15 minutes). In plain language: "DHW demand is ON, and this reading is valid for the next 15 minutes." When demand ends or the panel goes offline, the field reverts to zero.
@@ -70,7 +66,6 @@ The important implication: V1 output4Override is not an "override" in the operat
 
 ## Key Findings: Version Discrimination
 
-SECTION: Key Findings - Version Discrimination
 V1 and V2 are distinguishable from their TB data profile:
 
 V2 panels have DHW.override in telemetry (present and non-null when device is active) and heating_scenario in CLIENT_SCOPE attributes. They do NOT have output1OutputMask in attributes, and output4Override is absent from their telemetry.
@@ -81,7 +76,6 @@ The BUILD-PLAN discrimination rule (V2 if DHW.override present non-null; V1 if o
 
 ## Key Findings: DHW Wiring Gates
 
-SECTION: Key Findings - DHW Wiring Gates
 Not every boilerControl panel has DHW wired. The display should only show DHW state where DHW is actually connected.
 
 For V2 panels: heating_scenario.separate_dhw = 0 means DHW is on this panel. separate_dhw = 1 means DHW is on a separate system (for example a gas cylinder) and the panel does not control it. The dashboard already reads heating_scenario for other purposes (the field is in CLIENT_SCOPE). Whether to show DHW.override state when separate_dhw = 1 is DECISION D3 for James.
@@ -92,7 +86,6 @@ Panels sampled (V1 wiring): gk-220 has DHW wired (index 3 = true), gk-4331 has D
 
 ## Key Findings: Staleness
 
-SECTION: Key Findings - Staleness
 The BUILD-PLAN provisional 5-minute staleness threshold must be changed to 60 minutes. The 5-minute figure was acknowledged as a placeholder pending Spencer confirmation.
 
 For V2 panels: DHW.override is event-driven only (writes on set, cancel, or expiry). A healthy V2 panel will not write DHW.override every few minutes. Staleness cannot be detected from the DHW.override key alone. Use lastActivityTime from the TB device list (already fetched) or another regularly-updating telemetry key.
@@ -103,12 +96,10 @@ The 60-minute threshold is conservative and may include up to 1 false-positive s
 
 ## Key Findings: contractor_override
 
-SECTION: Key Findings - contractor_override
 contractor_override was observed at gk-6261 with value "1" at the same timestamp as a DHW.override change (2026-10-11). It then reverted to 0. The value appears to be a "contractor on site" flag written alongside the DHW override to identify who made the change. It does not alter the DHW state and does not need to appear in the display. The dashboard can safely ignore it.
 
 ## Revised State Display Spec
 
-SECTION: Revised State Display Spec
 The revised state list for the DHW override row, per panel version:
 
 V2 DHW.override states:
@@ -129,7 +120,6 @@ The time formatting for V2 ON/OFF-until should be UK local time, HH:MM, with "to
 
 ## Build Plan Corrections Required
 
-SECTION: Build Plan Corrections Required
 Seven items in the OOHDASH-135 BUILD-PLAN need correcting before Track 2 code is written.
 
 The first is the units bug at line ~249. The spec reads "boilerDhwOverrideActive = Date.now() less than boilerDhwOverrideUntil". This is wrong: Date.now() is milliseconds, DHW.override is epoch seconds. The correct logic is: multiply DHW.override by 1000 before comparison with Date.now(). boilerDhwOverrideUntil should be stored in MILLISECONDS in the workspace payload.
@@ -148,7 +138,6 @@ The seventh is the staleness signal: W5-C computes boilerPanelStaleMinutes from 
 
 ## Residual Third-Party Questions
 
-SECTION: Residual Third-Party Questions
 Two questions remain for Spencer Thompson. Both are low-priority and do not block the display for the most common states.
 
 Q-A concerns V1 negative output4Override values. Only two occurrences were observed across the whole V1 sample. The current spec treats negative as inactive (same as zero). If Spencer confirms negative means "a specific forced-off state distinct from zero", the display may need a third V1 state label. Otherwise the current treatment is safe.
@@ -159,7 +148,6 @@ Neither question blocks the first implementation. The build should implement wit
 
 ## Evidence Confidence
 
-SECTION: Evidence Confidence
 All V2 findings are PROVEN from live ThingsBoard data (read-only GET requests, 2026-10-21). Eight V2 sites sampled, 8 panels, 80+ data rows across 30 days. The positive encoding (seconds, ON-until), the zero state (AUTO), and the negative encoding (OFF-until, same magnitude) are all confirmed by multiple independent panels. contractor_override co-occurrence is observed but its meaning is DEDUCED. V2 separate_dhw gating is DEDUCED from the heating_scenario field semantics.
 
 V1 findings are PROVEN from live ThingsBoard data (2026-10-21). Eight V1 panels sampled, 200+ rows across 180 days. The 15-minute ms heartbeat pattern is proven with mean diff = exactly 900 seconds across 197 analysed rows. The negative-value meaning is UNRESOLVED (Q-A). The output1OutputMask wiring gate is PROVEN from the attribute data.
