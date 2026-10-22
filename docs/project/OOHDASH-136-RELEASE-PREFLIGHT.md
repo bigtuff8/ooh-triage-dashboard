@@ -51,7 +51,11 @@ This tags v1.4.5, bumps package.json, pushes tag to origin, and triggers the dep
 
 1. GET /healthz — expect {"status":"healthy"} with all subsystems green
 2. GET /api/version — expect {"version":"1.4.5"}
-3. Manual smoke: navigate to a boilerControl V2 site (e.g. 6250) -> Hot water flow -> stage 0 -> confirm DHW override card renders with correct state
+3. Manual smoke — V2 path: navigate to a site that has heating_scenario in its CLIENT attributes but NOT output1OutputMask in SHARED attributes (a pure V2 panel, not a dual-marker site). At Hot water stage 0, confirm the DHW override card renders showing one of: Auto (on-schedule), Override ON until, Override OFF until, or Can't confirm.
+4. Manual smoke — V1 path: navigate to a site that has output1OutputMask in its SHARED attributes but NOT heating_scenario in CLIENT attributes (a pure V1 panel). At Hot water stage 0, confirm the DHW override card renders showing one of: Override ON (V1), Override OFF (V1), or Can't confirm.
+5. Manual smoke — no panel: navigate to a site with no boilerControl panel. Confirm no DHW override card appears at Hot water stage 0.
+
+Note: the 7 known dual-marker sites (gk-6250, gk-6195, gk-6220, gk-6239, gk-6186, gk-4019, gk-6135) will render the card via the V2 path (heating_scenario-first rule). These are valid for checking the card appears but are not ideal primary smoke targets due to the dual-marker visual disagrement with the existing heating controllability row (tracked separately in Open Flag 1).
 
 ## Rollback
 
