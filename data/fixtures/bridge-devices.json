@@ -1306,6 +1306,339 @@
           "telemetry": {}
         }
       ]
+    },
+    {
+      "siteNo": "9361",
+      "siteName": "The Plough Inn",
+      "brand": "Catering & Bars",
+      "address": "Test Address, Test Town",
+      "callsLast30Days": 0,
+      "devices": [
+        {
+          "deviceId": "gk-9361-boilercontrol-1",
+          "zone": "Plant room",
+          "deviceType": "boilerControl",
+          "kind": "heating",
+          "area": null,
+          "online": true,
+          "telemetry": {}
+        }
+      ],
+      "boilerControl": {
+        "present": true,
+        "isV1": false,
+        "isV2": true,
+        "heatingControllable": true,
+        "dhwControllable": true,
+        "deviceId": "gk-9361-boilercontrol-1",
+        "dhwOverride": {
+          "visible": true,
+          "hiddenReason": null,
+          "panelVersion": "V2",
+          "panelLastSeenMs": 1792607820000,
+          "mode": "auto",
+          "untilMs": null,
+          "confirmedAtMs": null,
+          "decodedAtMs": 1792608000000,
+          "unreadableReason": null
+        }
+      }
+    },
+    {
+      "siteNo": "9362",
+      "siteName": "The Golden Lion",
+      "brand": "Catering & Bars",
+      "address": "Test Address, Test Town",
+      "callsLast30Days": 0,
+      "devices": [
+        {
+          "deviceId": "gk-9362-boilercontrol-1",
+          "zone": "Plant room",
+          "deviceType": "boilerControl",
+          "kind": "heating",
+          "area": null,
+          "online": true,
+          "telemetry": {}
+        }
+      ],
+      "boilerControl": {
+        "present": true,
+        "isV1": false,
+        "isV2": true,
+        "heatingControllable": true,
+        "dhwControllable": true,
+        "deviceId": "gk-9362-boilercontrol-1",
+        "dhwOverride": {
+          "visible": true,
+          "hiddenReason": null,
+          "panelVersion": "V2",
+          "panelLastSeenMs": 1792607820000,
+          "mode": "on-until",
+          "untilMs": 1792610400000,
+          "confirmedAtMs": null,
+          "decodedAtMs": 1792608000000,
+          "unreadableReason": null
+        }
+      }
+    },
+    {
+      "siteNo": "9363",
+      "siteName": "The Kings Arms",
+      "brand": "Catering & Bars",
+      "address": "Test Address, Test Town",
+      "callsLast30Days": 0,
+      "devices": [
+        {
+          "deviceId": "gk-9363-boilercontrol-1",
+          "zone": "Plant room",
+          "deviceType": "boilerControl",
+          "kind": "heating",
+          "area": null,
+          "online": true,
+          "telemetry": {}
+        }
+      ],
+      "boilerControl": {
+        "present": true,
+        "isV1": false,
+        "isV2": true,
+        "heatingControllable": true,
+        "dhwControllable": true,
+        "deviceId": "gk-9363-boilercontrol-1",
+        "dhwOverride": {
+          "visible": true,
+          "hiddenReason": null,
+          "panelVersion": "V2",
+          "panelLastSeenMs": 1792607820000,
+          "mode": "off-until",
+          "untilMs": 1792645200000,
+          "confirmedAtMs": null,
+          "decodedAtMs": 1792608000000,
+          "unreadableReason": null
+        }
+      }
+    },
+    {
+      "siteNo": "9364",
+      "siteName": "The White Hart",
+      "brand": "Catering & Bars",
+      "address": "Test Address, Test Town",
+      "callsLast30Days": 0,
+      "devices": [
+        {
+          "deviceId": "gk-9364-boilercontrol-1",
+          "zone": "Plant room",
+          "deviceType": "boilerControl",
+          "kind": "heating",
+          "area": null,
+          "online": true,
+          "telemetry": {}
+        }
+      ],
+      "boilerControl": {
+        "present": true,
+        "isV1": false,
+        "isV2": true,
+        "heatingControllable": true,
+        "dhwControllable": true,
+        "deviceId": "gk-9364-boilercontrol-1",
+        "dhwOverride": {
+          "visible": true,
+          "hiddenReason": null,
+          "panelVersion": "V2",
+          "panelLastSeenMs": 1792607820000,
+          "mode": "cant-confirm",
+          "untilMs": null,
+          "confirmedAtMs": null,
+          "decodedAtMs": 1792608000000,
+          "unreadableReason": "not-a-number"
+        }
+      }
+    },
+    {
+      "siteNo": "9365",
+      "siteName": "The Red Lion",
+      "brand": "Catering & Bars",
+      "address": "Test Address, Test Town",
+      "callsLast30Days": 0,
+      "devices": [
+        {
+          "deviceId": "gk-9365-boilercontrol-1",
+          "zone": "Plant room",
+          "deviceType": "boilerControl",
+          "kind": "heating",
+          "area": null,
+          "online": true,
+          "telemetry": {}
+        }
+      ],
+      "boilerControl": {
+        "present": true,
+        "isV1": false,
+        "isV2": true,
+        "heatingControllable": true,
+        "dhwControllable": true,
+        "deviceId": "gk-9365-boilercontrol-1",
+        "dhwOverride": {
+          "visible": true,
+          "hiddenReason": null,
+          "panelVersion": "V2",
+          "panelLastSeenMs": 1792596300000,
+          "mode": "auto",
+          "untilMs": null,
+          "confirmedAtMs": null,
+          "decodedAtMs": 1792608000000,
+          "unreadableReason": null
+        }
+      }
+    },
+    {
+      "siteNo": "9366",
+      "siteName": "The Fox and Hounds",
+      "brand": "Catering & Bars",
+      "address": "Test Address, Test Town",
+      "callsLast30Days": 0,
+      "devices": [
+        {
+          "deviceId": "gk-9366-boilercontrol-1",
+          "zone": "Plant room",
+          "deviceType": "boilerControl",
+          "kind": "heating",
+          "area": null,
+          "online": true,
+          "telemetry": {}
+        }
+      ],
+      "boilerControl": {
+        "present": true,
+        "isV1": true,
+        "isV2": false,
+        "heatingControllable": true,
+        "dhwControllable": true,
+        "deviceId": "gk-9366-boilercontrol-1",
+        "dhwOverride": {
+          "visible": true,
+          "hiddenReason": null,
+          "panelVersion": "V1",
+          "panelLastSeenMs": 1792607820000,
+          "mode": "on-v1",
+          "untilMs": null,
+          "confirmedAtMs": 1792607760000,
+          "decodedAtMs": 1792608000000,
+          "unreadableReason": null
+        }
+      }
+    },
+    {
+      "siteNo": "9367",
+      "siteName": "The Royal Oak",
+      "brand": "Catering & Bars",
+      "address": "Test Address, Test Town",
+      "callsLast30Days": 0,
+      "devices": [
+        {
+          "deviceId": "gk-9367-boilercontrol-1",
+          "zone": "Plant room",
+          "deviceType": "boilerControl",
+          "kind": "heating",
+          "area": null,
+          "online": true,
+          "telemetry": {}
+        }
+      ],
+      "boilerControl": {
+        "present": true,
+        "isV1": true,
+        "isV2": false,
+        "heatingControllable": true,
+        "dhwControllable": true,
+        "deviceId": "gk-9367-boilercontrol-1",
+        "dhwOverride": {
+          "visible": true,
+          "hiddenReason": null,
+          "panelVersion": "V1",
+          "panelLastSeenMs": 1792607820000,
+          "mode": "off-v1",
+          "untilMs": null,
+          "confirmedAtMs": 1792607640000,
+          "decodedAtMs": 1792608000000,
+          "unreadableReason": null
+        }
+      }
+    },
+    {
+      "siteNo": "9368",
+      "siteName": "The Bell",
+      "brand": "Catering & Bars",
+      "address": "Test Address, Test Town",
+      "callsLast30Days": 0,
+      "devices": [
+        {
+          "deviceId": "gk-9368-boilercontrol-1",
+          "zone": "Plant room",
+          "deviceType": "boilerControl",
+          "kind": "heating",
+          "area": null,
+          "online": true,
+          "telemetry": {}
+        }
+      ],
+      "boilerControl": {
+        "present": true,
+        "isV1": false,
+        "isV2": true,
+        "heatingControllable": true,
+        "dhwControllable": false,
+        "deviceId": "gk-9368-boilercontrol-1",
+        "dhwOverride": {
+          "visible": false,
+          "hiddenReason": "separate-dhw",
+          "panelVersion": "V2",
+          "panelLastSeenMs": 1792607820000,
+          "mode": null,
+          "untilMs": null,
+          "confirmedAtMs": null,
+          "decodedAtMs": 1792608000000,
+          "unreadableReason": null
+        }
+      }
+    },
+    {
+      "siteNo": "9369",
+      "siteName": "The Swan",
+      "brand": "Catering & Bars",
+      "address": "Test Address, Test Town",
+      "callsLast30Days": 0,
+      "devices": [
+        {
+          "deviceId": "gk-9369-boilercontrol-1",
+          "zone": "Plant room",
+          "deviceType": "boilerControl",
+          "kind": "heating",
+          "area": null,
+          "online": true,
+          "telemetry": {}
+        }
+      ],
+      "boilerControl": {
+        "present": true,
+        "isV1": true,
+        "isV2": false,
+        "heatingControllable": true,
+        "dhwControllable": false,
+        "deviceId": "gk-9369-boilercontrol-1",
+        "dhwOverride": {
+          "visible": false,
+          "hiddenReason": "dhw-not-wired",
+          "panelVersion": "V1",
+          "panelLastSeenMs": 1792607820000,
+          "mode": null,
+          "untilMs": null,
+          "confirmedAtMs": null,
+          "decodedAtMs": 1792608000000,
+          "unreadableReason": null
+        }
+      }
     }
   ]
 }

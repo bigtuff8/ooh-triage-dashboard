@@ -510,6 +510,169 @@ function equipmentGroupLabel(device) {
     return GROUP_LABELS[segs[i - 1]] || 'the equipment group';
 }
 
+/* -------- OOHDASH-136: DHW override outcome helpers (browser twin of tb-device.js) -------- */
+// NOTE: keep this algorithm in lock-step with services/tb-device.js dhwOverrideOutcome.
+// U20 enforces behavioral parity. A change to one must touch the other.
+// Constants must match config.js defaults (60 min stale, 35 min V1 confirm).
+const _BOILER_STALE_MS = 60 * 60 * 1000;
+const _BOILER_V1_CONFIRM_MS = 35 * 60 * 1000;
+
+function _dhwFmtTime(ms, nowMs) {
+    var tz = 'Europe/London';
+    var d = new Date(ms);
+    var timeStr = new Intl.DateTimeFormat('en-GB', { timeZone: tz, hour: '2-digit', minute: '2-digit', hour12: false }).format(d);
+    var timeDisp = timeStr === '00:00' ? 'midnight' : timeStr;
+    var fmtDate = function(dt) { return new Intl.DateTimeFormat('en-GB', { timeZone: tz, year: 'numeric', month: '2-digit', day: '2-digit' }).format(dt); };
+    var todayStr = fmtDate(new Date(nowMs));
+    var tomorrowStr = fmtDate(new Date(nowMs + 86400000));
+    var targetStr = fmtDate(d);
+    if (targetStr === todayStr) return timeDisp;
+    if (targetStr === tomorrowStr) return timeDisp === 'midnight' ? 'midnight' : timeDisp + ' tomorrow';
+    var dayName = new Intl.DateTimeFormat('en-GB', { timeZone: tz, weekday: 'short' }).format(d);
+    var dayNum = new Intl.DateTimeFormat('en-GB', { timeZone: tz, day: 'numeric' }).format(d);
+    var monthName = new Intl.DateTimeFormat('en-GB', { timeZone: tz, month: 'short' }).format(d);
+    return 'on ' + dayName + ' ' + dayNum + ' ' + monthName + ' at ' + timeDisp;
+}
+
+function _dhwFmtAgo(panelLastSeenMs, nowMs) {
+    if (panelLastSeenMs == null) return null;
+    var ageMs = nowMs - panelLastSeenMs;
+    var ageMins = Math.round(ageMs / 60000);
+    if (ageMins < 120) return ageMins + ' minute' + (ageMins !== 1 ? 's' : '') + ' ago';
+    var ageHrs = Math.round(ageMs / 3600000);
+    if (ageHrs < 48) return ageHrs + ' hour' + (ageHrs !== 1 ? 's' : '') + ' ago';
+    var tz = 'Europe/London';
+    var d = new Date(panelLastSeenMs);
+    var dayName = new Intl.DateTimeFormat('en-GB', { timeZone: tz, weekday: 'short' }).format(d);
+    var dayNum = new Intl.DateTimeFormat('en-GB', { timeZone: tz, day: 'numeric' }).format(d);
+    var monthName = new Intl.DateTimeFormat('en-GB', { timeZone: tz, month: 'short' }).format(d);
+    var timeStr = new Intl.DateTimeFormat('en-GB', { timeZone: tz, hour: '2-digit', minute: '2-digit', hour12: false }).format(d);
+    return 'on ' + dayName + ' ' + dayNum + ' ' + monthName + ' at ' + timeStr;
+}
+
+/**
+ * dhwOverrideOutcome(dhwOverride, nowMs) -> {state, headline, explanation, script, ticketSentence} | null
+ *
+ * Browser twin of services/tb-device.js dhwOverrideOutcome (same algorithm; keep both in lock-step).
+ * Re-applies time-based checks at nowMs. Called at Hot water stage 0 render; no network call.
+ */
+function dhwOverrideOutcome(dhwOverride, nowMs) {
+    if (!dhwOverride || !dhwOverride.visible) return null;
+    var mode = dhwOverride.mode;
+    var panelLastSeenMs = dhwOverride.panelLastSeenMs;
+    var untilMs = dhwOverride.untilMs;
+    var confirmedAtMs = dhwOverride.confirmedAtMs;
+    var unreadableReason = dhwOverride.unreadableReason;
+
+    // Re-apply staleness
+    if (panelLastSeenMs == null || (nowMs - panelLastSeenMs) > _BOILER_STALE_MS) {
+        var ago = _dhwFmtAgo(panelLastSeenMs, nowMs);
+        var reason = ago ? 'last reported ' + ago : "isn't reporting";
+        return {
+            state: 'cant-confirm',
+            headline: "Hot water override: can't confirm",
+            explanation: ago
+                ? "The boiler panel last reported " + ago + ", so we can't tell whether the hot water is overridden. Don't tell the caller it is on or off; log it and escalate as normal."
+                : "The boiler panel isn't reporting, so we can't tell whether the hot water is overridden. Don't tell the caller it is on or off; log it and escalate as normal.",
+            script: "I can't see the current hot water setting from here right now, so I'll log it for the team to check.",
+            ticketSentence: 'Hot water override at time of call: could not be confirmed (' + reason + ').'
+        };
+    }
+
+    // V2 end-time transition
+    var effectiveMode = mode;
+    var effectiveReason = unreadableReason;
+    if ((mode === 'on-until' || mode === 'off-until') && untilMs != null && untilMs <= nowMs) {
+        effectiveMode = 'auto-ended';
+    }
+    // V1 confirmation expiry
+    if ((mode === 'on-v1' || mode === 'off-v1') && (confirmedAtMs == null || (nowMs - confirmedAtMs) > _BOILER_V1_CONFIRM_MS)) {
+        effectiveMode = 'cant-confirm';
+        effectiveReason = 'not-reconfirmed';
+    }
+
+    if (effectiveMode === 'auto') {
+        return {
+            state: 'auto',
+            headline: 'Hot water override: Auto (on schedule)',
+            explanation: 'Nobody has overridden the hot water on the boiler panel. It is following its normal timetable, so an override is not the reason for the problem.',
+            script: "The hot water controls haven't been overridden - they're running on the normal timetable.",
+            ticketSentence: 'Hot water override at time of call: Auto (on schedule).'
+        };
+    }
+    if (effectiveMode === 'auto-ended') {
+        var endedAt = untilMs != null ? _dhwFmtTime(untilMs, nowMs) : '';
+        return {
+            state: 'auto-ended',
+            headline: 'Hot water override: Auto (on schedule)',
+            explanation: 'An override ended at ' + endedAt + ' and the panel has gone back to its normal timetable, so an override is not the reason for the problem now.',
+            script: 'The hot water controls are back on the normal timetable.',
+            ticketSentence: 'Hot water override at time of call: Auto (on schedule, override ended at ' + endedAt + ').'
+        };
+    }
+    if (effectiveMode === 'on-until') {
+        var timeStr = _dhwFmtTime(untilMs, nowMs);
+        return {
+            state: 'on-until',
+            headline: 'Hot water override: Override ON until ' + timeStr,
+            explanation: 'Hot water has already been set to run from the boiler panel and stays on until ' + timeStr + '. The controls are asking for hot water, so if there is still none, the likely cause is the boiler or the cylinder.',
+            script: "The hot water has already been switched on from the controls and will stay on until " + timeStr + ". If it's still not coming through, it's likely the boiler itself, so I'll log it for the team.",
+            ticketSentence: 'Hot water override at time of call: Override ON until ' + timeStr + '.'
+        };
+    }
+    if (effectiveMode === 'off-until') {
+        var timeStr2 = _dhwFmtTime(untilMs, nowMs);
+        return {
+            state: 'off-until',
+            headline: 'Hot water override: Override OFF until ' + timeStr2,
+            explanation: "Hot water has been deliberately switched off from the boiler panel until " + timeStr2 + ". That is the likely reason there is no hot water. It goes back to its normal timetable at " + timeStr2 + ". We can't change it from here, so escalate if the caller needs it sooner.",
+            script: "The hot water has been switched off on purpose at the controls until " + timeStr2 + ", then it goes back to normal. I'll log that you need it back sooner so the team can look at it.",
+            ticketSentence: 'Hot water override at time of call: Override OFF until ' + timeStr2 + '.'
+        };
+    }
+    if (effectiveMode === 'on-v1') {
+        return {
+            state: 'on-v1',
+            headline: 'Hot water override: Override ON',
+            explanation: "Hot water has been set to run from the boiler panel. This type of panel doesn't give an end time. The controls are asking for hot water, so if there is still none, the likely cause is the boiler or the cylinder.",
+            script: "The hot water has been switched on from the controls. If it's still not coming through, it's likely the boiler itself, so I'll log it for the team.",
+            ticketSentence: 'Hot water override at time of call: Override ON.'
+        };
+    }
+    if (effectiveMode === 'off-v1') {
+        return {
+            state: 'off-v1',
+            headline: 'Hot water override: Override OFF',
+            explanation: "Hot water has been deliberately switched off on the boiler panel. That is the likely reason there is no hot water. This type of panel doesn't say when it ends, and we can't change it from here, so escalate it.",
+            script: "The hot water has been switched off on purpose at the controls. I'll log it so the team can switch it back on for you.",
+            ticketSentence: 'Hot water override at time of call: Override OFF.'
+        };
+    }
+    // cant-confirm: stale, implausible, not-reconfirmed, decode-error, or unknown
+    var ccExplanation, ccTicket;
+    if (effectiveReason === 'stale') {
+        var ago2 = _dhwFmtAgo(panelLastSeenMs, nowMs);
+        var reason2 = ago2 ? 'last reported ' + ago2 : "isn't reporting";
+        ccExplanation = ago2
+            ? "The boiler panel last reported " + ago2 + ", so we can't tell whether the hot water is overridden. Don't tell the caller it is on or off; log it and escalate as normal."
+            : "The boiler panel isn't reporting, so we can't tell whether the hot water is overridden. Don't tell the caller it is on or off; log it and escalate as normal.";
+        ccTicket = 'Hot water override at time of call: could not be confirmed (' + reason2 + ').';
+    } else if (effectiveReason === 'not-reconfirmed') {
+        ccExplanation = "The boiler panel hasn't re-confirmed its hot water override recently, so we can't tell whether it is still in place. Don't tell the caller it is on or off; log it and escalate as normal.";
+        ccTicket = "Hot water override at time of call: could not be confirmed (panel hasn't re-confirmed recently).";
+    } else {
+        ccExplanation = "The boiler panel's hot water override reading doesn't make sense right now, so we can't tell whether it is overridden. Don't tell the caller it is on or off; log it and escalate as normal.";
+        ccTicket = "Hot water override at time of call: could not be confirmed (reading doesn't make sense).";
+    }
+    return {
+        state: 'cant-confirm',
+        headline: "Hot water override: can't confirm",
+        explanation: ccExplanation,
+        script: "I can't see the current hot water setting from here right now, so I'll log it for the team to check.",
+        ticketSentence: ccTicket
+    };
+}
+
 const NUM_WORDS = ['zero', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'ten'];
 
 /** Grammatical join: "A" · "A and B" · "A, B and C". */
@@ -732,7 +895,22 @@ const FLOWR = {
    <div class="chips"><button class="chip" data-testid="hw-nlh-capture" onclick="flowStep({nlh:1})">Log and escalate to IoT team</button></div>`;
             }
             doneLine('Hot water - boiler-side, not controllable from here; captured for the IoT team');
-            return `<div class="alert info">Hot water here runs on the boiler panel, which this dashboard monitors but can't control - there's no remote boost. We'll capture the details with the site boiler guidance and escalate to the IoT team, so you still have a next step for the caller.</div>
+            // OOHDASH-136: DHW override card — shown before the blue note when visible.
+            var _hwDhwOv = ws.boilerControl && ws.boilerControl.dhwOverride;
+            var _hwDhwCard = '';
+            if (_hwDhwOv && _hwDhwOv.visible === true) {
+                var _hwDhwOc = dhwOverrideOutcome(_hwDhwOv, Date.now());
+                if (_hwDhwOc) {
+                    var _hwTagColor = {auto:'green','auto-ended':'green','on-until':'blue','on-v1':'blue','off-until':'amber','off-v1':'amber','cant-confirm':'grey'}[_hwDhwOc.state] || 'grey';
+                    var _hwTagText = {auto:'Auto','auto-ended':'Auto','on-until':'Override ON','on-v1':'Override ON','off-until':'Override OFF','off-v1':'Override OFF','cant-confirm':"Can't confirm"}[_hwDhwOc.state] || "Can't confirm";
+                    _hwDhwCard = '<div class="reco" data-testid="hw-dhw-override">' +
+                        '<b class="hd">' + _hwDhwOc.headline + ' <span class="tag ' + _hwTagColor + '" data-testid="hw-dhw-override-tag">' + _hwTagText + '</span></b>' +
+                        '<p>' + _hwDhwOc.explanation + '</p>' +
+                        '<div class="script">"' + _hwDhwOc.script + '"</div>' +
+                        '</div>';
+                }
+            }
+            return _hwDhwCard + `<div class="alert info">Hot water here runs on the boiler panel, which this dashboard monitors but can't control - there's no remote boost. We'll capture the details with the site boiler guidance and escalate to the IoT team, so you still have a next step for the caller.</div>
    <div class="chips"><button class="chip" data-testid="hw-capture" onclick="flowStep({cap:1})">Log and escalate to IoT team</button><button class="chip" data-testid="hw-scope" onclick="flowStep({sc:1})">Scope guidance (boiler fault?)</button></div>`;
         }
         if (f.stage === 1) {
@@ -748,17 +926,31 @@ const FLOWR = {
             }
             if (!f.data.sc) {
                 doneLine('Outcome: captured');
+                // OOHDASH-136: append DHW override ticket sentence when the card was shown.
+                var _hwDhwOv1 = ws.boilerControl && ws.boilerControl.dhwOverride;
+                var _hwDhwTs1 = '';
+                if (_hwDhwOv1 && _hwDhwOv1.visible === true) {
+                    var _hwOc1 = dhwOverrideOutcome(_hwDhwOv1, Date.now());
+                    if (_hwOc1) _hwDhwTs1 = ' ' + _hwOc1.ticketSentence;
+                }
                 return outcomeCaptured(f, 'cap', {
                     subject: 'Hot water issue - not resolvable remotely tonight',
-                    detail: 'Caller reports hot-water problems. Hot water is boiler-side (monitor-only on Lighthouse) - there is no remote boost. Needs IoT/boiler-side investigation.',
+                    detail: 'Caller reports hot-water problems. Hot water is boiler-side (monitor-only on Lighthouse) - there is no remote boost. Needs IoT/boiler-side investigation.' + _hwDhwTs1,
                     script: "I've logged this for the IoT team as a priority for the morning. If it's urgent overnight the boiler's own override panel may help - and if a boiler engineer attends, remember a visit can be chargeable if the fault isn't Lighthouse equipment.",
                     OohCaptureClass: 'hot-water'
                 });
             }
             if (f.data.sc) {
+                // OOHDASH-136: append DHW override ticket sentence when the card was shown.
+                var _hwDhwOv2 = ws.boilerControl && ws.boilerControl.dhwOverride;
+                var _hwDhwTs2 = '';
+                if (_hwDhwOv2 && _hwDhwOv2.visible === true) {
+                    var _hwOc2 = dhwOverrideOutcome(_hwDhwOv2, Date.now());
+                    if (_hwOc2) _hwDhwTs2 = ' ' + _hwOc2.ticketSentence;
+                }
                 return outcomeScope(f, 'sc', {
                     subject: 'Hot water — likely boiler fault',
-                    evidence: 'Lighthouse monitors demand here; the boiler itself (pressure, PCB, pilot) is not Lighthouse equipment.',
+                    evidence: 'Lighthouse monitors demand here; the boiler itself (pressure, PCB, pilot) is not Lighthouse equipment.' + _hwDhwTs2,
                     script: 'From what you’re describing this looks like the boiler itself rather than the Lighthouse controls — that’s one for your boiler company. I’ll note tonight’s call so there’s a record.'
                 });
             }

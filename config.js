@@ -189,6 +189,17 @@ export const config = {
         maxChars: 1000
     },
 
+    // OOHDASH-136: DHW override state display constants.
+    // boilerPanelStaleThresholdMinutes: panel last-report age limit; over 60 min → "can't confirm".
+    // boilerV1OverrideConfirmMinutes: V1 output4Override must be re-confirmed within 35 min.
+    // boilerV2OverridePastWindowHours: V2 override end time may be at most 6 h in the past and still
+    //   count as "just ended" (auto-ended state); older = implausible.
+    // boilerV2OverrideFutureWindowDays: furthest future V2 end time accepted as real (365 days).
+    boilerPanelStaleThresholdMinutes: parseInt(env('BOILER_PANEL_STALE_THRESHOLD_MINUTES', '60'), 10),
+    boilerV1OverrideConfirmMinutes: parseInt(env('BOILER_V1_OVERRIDE_CONFIRM_MINUTES', '35'), 10),
+    boilerV2OverridePastWindowHours: parseInt(env('BOILER_V2_OVERRIDE_PAST_WINDOW_HOURS', '6'), 10),
+    boilerV2OverrideFutureWindowDays: parseInt(env('BOILER_V2_OVERRIDE_FUTURE_WINDOW_DAYS', '365'), 10),
+
     // Call-ticket reconciliation (F003). Thresholds are the numbers James tunes at the Design Gate
     // (locked: auto-merge ≥0.80 / link-only 0.50–0.79); env-overridable so they can be retuned
     // without a code change. operatorAgentMap maps operator email → Zendesk agent id for the
