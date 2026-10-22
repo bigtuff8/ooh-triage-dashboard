@@ -85,6 +85,15 @@ attribute `output1OutputMask` for V1. When neither is present the card is hidden
 `hiddenReason: 'version-unknown'`. When both are present, `heating_scenario` takes precedence
 and the panel is treated as V2 -- this correctly handles the 7 known dual-marker sites.
 
+### Browser recompute trigger
+
+dhwOverrideOutcome is called once on each render of Hot water stage 0 using the flow's existing
+render cycle. There is no standalone setInterval or background timer. The card reflects state at
+the moment the user navigates to Hot water stage 0; if the user leaves the card open past an
+untilMs boundary, the displayed state does not self-update until next navigation. U17/E10
+simulate time passage with page.clock.tick() then trigger a flow re-navigation to force
+re-render. Idle cost is zero; no teardown is needed.
+
 ---
 
 ## Files Changed
@@ -115,6 +124,9 @@ The 4 constants are:
 - `boilerV2OverrideFutureWindowDays`: furthest future V2 end time accepted as real. Value: 365.
 
 **2. `services/tb-device.js`**
+
+Note: dhwOverrideOutcome must be kept textually identical in both files; U20 enforces this. A
+change to one must touch the other.
 
 Four changes within this file:
 
@@ -156,6 +168,10 @@ Four changes within this file:
      (`mode: 'off-v1'`). If no valid row remains or none is recent enough, return
      `{ visible: true, mode: 'cant-confirm', unreadableReason: <confirmation expired> }`.
 
+     V1 output4Override values are epoch milliseconds (not epoch seconds). This differs from V2
+     DHW.override which is epoch seconds. The V1 corruption check detects 25-digit values by
+     comparing abs(value) against a plausible upper bound in milliseconds.
+
   c. V1 history read: when the function is processing a V1 panel and the latest
      `output4Override` reading is non-zero, make one extra ThingsBoard read of
      `output4Override` for the last 35 minutes (at most 20 rows, newest first). Failure of this
@@ -177,6 +193,9 @@ This ensures the payload is always structurally complete; `flows.js` need not gu
 missing `dhwOverride` key on any site.
 
 **4. `public/js/flows.js`**
+
+Note: dhwOverrideOutcome must be kept textually identical in both files; U20 enforces this. A
+change to one must touch the other.
 
 Two changes:
 
@@ -264,6 +283,9 @@ inside the `config` export object in `config.js`, following the same pattern as 
   human-readable strings
 - U19: V1 history read failure -- ThingsBoard call throws, panel degrades to unreadable,
   site-level result is still returned
+- U20: parity -- import the tb-device.js twin and execute dhwOverrideOutcome for every input
+  combination in the U1-U19 fixture table; assert each output matches the equivalent flows.js
+  test case. Any divergence fails. This enforces that the two copies cannot silently drift.
 
 ### E2e tests (Playwright) -- E1 through E12
 
@@ -374,6 +396,12 @@ controls this panel directly from ThingsBoard" never landed because Track 2 was 
 OOHDASH-136. This design explicitly does not touch the Heating flow. The current wording is
 noted here for James's decision: should a separate ticket be raised to update the Heating
 branch wording? No action is taken in this build.
+
+**AR-1 -- Client clock skew (accepted risk)**
+
+Browser recompute uses client Date.now(). A skewed device clock will display incorrect DHW
+override state. No guard is added; this is an accepted risk (same exposure as every other
+time-based display in the dashboard).
 
 **Flag 3 -- mockup reviewer-aid label**
 
