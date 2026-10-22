@@ -2,9 +2,9 @@
 TICKET: OOHDASH-138
 PHASE: discovery
 QUESTIONS:
-- Q1: loops bit order (Mon=pos0 DEDUCED -- needs Spencer confirmation)
+- Q1: loops bit order (Mon=pos0 DEDUCED -- multiple orderings fit observed data; confirmation is load-bearing)
 - Q2: schedule time zone (UK local or UTC -- UNRESOLVED)
-- Q3: on/off setpoint threshold (>=40 ON, <30 OFF DEDUCED -- needs Spencer confirmation)
+- Q3: on/off setpoint -- relative approach DEDUCED (within a channel, higher value = active/ON, lower = setback/OFF); absolute threshold (>=40°C) fails for heating zones where on=21°C and off=15°C are both below 40°C; reworded question puts heating 21-vs-15 case explicitly to Spencer
 - Q4: TB authority (bridge writes TO panel, or panel reports to TB -- UNRESOLVED)
 - Q5: recirc_pump value 1000/-1000 on all V3 sites -- is this V3 firmware behaviour or per-site misconfiguration?
 - Q6: site 122 LoRaWAN gateway -- is deployment planned?
@@ -13,7 +13,7 @@ QUESTIONS:
 DECISIONS:
 - D1: Scope for v1 of schedule display | BoilerControl only (V1+V2+V3) | All device types including Salus IT500 and Tuya
 - D2: Salus IT500 schedule | Defer until Spencer provides encoding spec | Display scheduleEnable status only | Skip IT500 entirely
-- D3: Triage phrasing style for schedule | Single sentence "Hot water on schedule: HH:MM to HH:MM today" | Time range per zone | Full timetable table
+- D3: Triage phrasing style for schedule | Single sentence "Hot water on schedule: HH:MM to HH:MM today/tomorrow" | Time range per zone | Full timetable table
 SECTIONS:
 - Background and Scope
 - Cost and Operational Posture
@@ -31,7 +31,7 @@ SECTIONS:
 **Date:** 2026-10-22
 **Ticket:** OOHDASH-138
 **Input:** TB read-only sweep across 8 sites (agents A-D), plus OOHDASH-136 schedule spike 2026-10-22
-**Phase:** Discovery gate
+**Phase:** Discovery gate (round 2 — re-authored to resolve committee blocks)
 **Author:** Discovery pipeline (agents A, B, C, D) + writer synthesis
 
 ---
@@ -121,30 +121,43 @@ Each schedule key holds a JSON object with a single "schedule" array. Each array
 Example from site 6261 DHW (PROVEN):
 {"schedule":[{"value":57,"time":"06:00","timer_id":"65184321","loops":"1111111"},{"value":15,"time":"01:00","timer_id":"65184321","loops":"1111111"}]}
 
-This decodes as: DHW heats to 57 degrees C from 06:00 every day, drops to 15 degrees C setback from 01:00 every day, producing a midnight-spanning on-period of 06:00 to 01:00 (next day).
+This decodes as: DHW heats to 57 degrees C from 06:00 every day, drops to 15 degrees C setback from 01:00 every day. Because 01:00 is earlier in the clock than 06:00, this is a midnight-spanning on-period: hot water is on from 06:00 until 01:00 the following morning. See Triage Conclusion Phrasing below for how this is presented to the operator ("06:00 to 01:00 tomorrow").
 
-### Day mask bit order — DEDUCED
+### Day mask bit order — DEDUCED (Q1, evidence weaker than first stated)
 
-The loops field is read left-to-right with position 0 at the left. Position 0 = Monday, position 6 = Sunday. This was deduced from data patterns: "1000011" appears alongside "0111100" at multiple sites to cover all 7 days with different times, consistent only with Monday-Saturday-Sunday versus Tuesday-Friday groupings. DEDUCED confidence. Spencer confirmation required before shipping (Q1).
+The loops field is read left-to-right with position 0 at the left. Position 0 = Monday, position 6 = Sunday — **DEDUCED, not confirmed.** This was inferred from data patterns at multiple sites where "1000011" appears alongside "0111100", the two masks together covering all 7 days with different scheduled times. If position 0 is Monday, the first mask covers Monday + Saturday + Sunday and the second covers Tuesday through Friday — a plausible but unusual hospitality pattern grouping Monday with the weekend.
 
-Thursday = position 3. To decode today (Thursday 2026-10-22): select all entries where loops[3] == "1", sort by time ascending, apply the setpoint from each entry until the next entry overrides it.
+**Evidence is weaker than a clean deduction.** The observed masks are also consistent with other bit orderings (for example, if position 0 is Sunday the same two masks would group Sunday + Friday + Saturday versus Monday through Thursday). Multiple orderings fit the available data; the business rationale for any particular grouping cannot be inferred from schedule data alone. Spencer confirmation is load-bearing: using the wrong bit order displays the wrong day's schedule to every operator who calls on an affected day. Q1 must be answered before design proceeds.
 
-### Setpoint threshold: ON vs OFF — DEDUCED
+Today is Thursday 2026-10-22. If Mon=pos0 is confirmed, position 3 is Thursday. The decoding step would select all entries where loops[3] == "1". This index value is stated here for reference only; it is contingent on Q1 confirmation.
 
-High setpoint = zone actively heating. Low setpoint = setback (zone effectively off, frost-protection only). Observed values:
+### Setpoint threshold: ON vs OFF — DEDUCED; absolute constant is INVALID for heating zones
+
+High setpoint = zone actively heating. Low setpoint = setback (zone effectively off, frost-protection only). Observed values across sampled sites:
 
 - DHW on-setpoint: 57 degrees C (V3 sites), 50-60 degrees C (V1 sites)
-- DHW off-setpoint: 15-20 degrees C
-- Heating zone on-setpoint: 21 degrees C (all sampled sites)
-- Heating zone off-setpoint: 15 degrees C (all sampled sites)
+- DHW off-setpoint (setback): 15-20 degrees C
+- Heating zone on-setpoint (CHZ1/CHZ2, output2/output3): 21 degrees C at all sampled sites
+- Heating zone off-setpoint (setback): 15 degrees C at all sampled sites
 
-DEDUCED threshold: value >= 40 degrees C = zone ON; value < 30 degrees C = zone OFF. No explicit flag exists in the data. The 30-40 range was not observed in any sampled schedule. Spencer confirmation required (Q3).
+**A single absolute threshold (e.g. value >= 40°C = ON) is NOT correct.** It works for DHW (57°C on, 15°C off — 57 is above 40, 15 is below). It fails completely for heating zones: both the on-setpoint (21°C) and the off-setpoint (15°C) are below 40°C, so every heating schedule entry would be classified as OFF and the output "Heating zone on schedule" could never be emitted.
+
+**DEDUCED approach: relative comparison within the channel.** Within a given channel's schedule array, the entry (or entries) with the higher setpoint value represent the active/ON state; the entry (or entries) with the lower setpoint value represent the setback/OFF state. This relative approach is channel-agnostic and handles both cases correctly:
+
+- DHW: higher value = 57°C (heating), lower value = 15°C (setback). The higher value is the ON state.
+- Heating zones: higher value = 21°C (active heating), lower value = 15°C (setback). The higher value is the ON state.
+
+No explicit on/off flag exists in the data. The relative approach is DEDUCED; Spencer confirmation is required (Q3). The Q3 question has been reworded to put the heating 21-vs-15 case explicitly — see Residual Questions for Spencer below.
+
+**Edge case: channels with more than two distinct setpoint values.** If a channel's schedule contains three or more distinct values (e.g. 21°C, 18°C, 15°C for a graduated heating schedule), the relative approach provides no single ON/OFF boundary without further guidance. No such case was observed in the sample, but it cannot be ruled out across the full 223-panel estate. If encountered, the decoder must surface "schedule format unrecognised" rather than silently misclassify. Q3 asks Spencer to confirm whether multi-value schedules exist and how to handle them.
+
+**No 30–40°C values were observed in any sampled schedule.** The previous draft mentioned a 30–40°C unresolved range; this range is withdrawn because it was derived from the now-invalid absolute threshold model. Under the relative approach, no intermediate range concept is needed: the decoder compares values within the channel array, not against a fixed constant.
 
 ### recirc_pump.schedule anomaly — PROVEN/UNRESOLVED
 
 At all four V3 sites sampled (6261, 6097, 122, 6164), the recirc_pump.schedule uses value 1000 (pump ON) and value -1000 (pump OFF) rather than a temperature setpoint. The pump follows the same day-of-week and time logic as the DHW schedule at each site. This is a non-temperature signal encoded in the same JSON structure.
 
-The standard setpoint threshold (>= 40 = ON) must NOT be applied to recirc_pump entries. The dashboard must detect the recirc_pump channel name and apply a separate binary decode (1000 = ON, -1000 = OFF). Whether this is intended V3 firmware behaviour or a quirk is UNRESOLVED (Q5). V1 has no recirc_pump schedule channel.
+The relative setpoint approach must NOT be applied to recirc_pump entries. The dashboard must detect the recirc_pump channel name and apply a separate binary decode (1000 = ON, -1000 = OFF). Whether this is intended V3 firmware behaviour or a quirk is UNRESOLVED (Q5). V1 has no recirc_pump schedule channel.
 
 ### Coverage and freshness — PROVEN
 
@@ -188,7 +201,7 @@ The following table summarises every non-boilerControl device type encountered a
 
 **Salus IT700TX note.** The IT700TX thermostat controls accommodation zones at several sites (6261, 6097, 6164, 122, 6769, 6770). The scheduleEnable flag can tell the operator whether the thermostat is running in schedule mode (1) or on hold/manual override (2 or 0). It cannot say what the schedule is. Both IT700TX gateway devices sampled at sites 6261 and 6097 were offline (active=false); the thermostats themselves remained active. Whether the thermostat continues to run its on-device schedule while the gateway is offline is UNRESOLVED.
 
-**Salus IT500 note.** All 6 IT500 devices at site 5208 were offline at time of sweep (active=false, last activity June-September 2026). The schedule attribute exists in SERVER_SCOPE for all of them. The format uses 7 day-keys (A00-A06, DEDUCED Mon-Sun) each holding a 24-character ASCII-offset nibble-encoded string. A decoding attempt was made in Agent C but the result did not yield readable HH:MM times, confirming the encoding is proprietary. UNRESOLVED.
+**Salus IT500 note.** All 6 IT500 devices at site 5208 were offline at time of sweep (active=false, last activity June-September 2026). The schedule attribute exists in SERVER_SCOPE for all of them. The format uses 7 day-keys (A00-A06, DEDUCED Mon-Sun) each holding a 24-character ASCII-offset encoded string. A decoding attempt was made in Agent C but the result did not yield readable HH:MM times, confirming the encoding is proprietary. UNRESOLVED.
 
 **Tuya note.** The Tuya schedule is an internal device-side timer (preheat/warm-up phases for kitchen appliances), not a heating or hot water schedule. Even if the action byte semantics were resolved, this schedule is not relevant to the Hot water or Heating triage flows.
 
@@ -200,21 +213,27 @@ The following table summarises every non-boilerControl device type encountered a
 
 The governing design principle requires that the operator reads a conclusion, not a raw timetable. The schedule data must be decoded into a single sentence per zone that answers "when does this run today?"
 
-### Proposed primary phrasing (simple case)
+### Proposed primary phrasing
 
-When DHW has one on-period today and the schedule is the same every day:
+**Simple case — non-midnight-spanning, uniform across the week:**
 
-"Hot water on schedule: 06:00 to 01:00 today."
+"Hot water on schedule: 08:00 to 22:00 today."
 
-When DHW has a weekday/weekend split and the operator is on a weekday:
+**Same-time-every-day but midnight-spanning (site 6261 DHW: 06:00 ON, 01:00 OFF):**
+
+"Hot water on schedule: 06:00 to 01:00 tomorrow."
+
+The off-time (01:00) falls on the following calendar day, so it is labelled "tomorrow" — not "today." The algorithm in the Implementation Notes section below determines whether any given on-period end crosses midnight and applies this label consistently.
+
+**Weekday/weekend split (operator is on a weekday):**
 
 "Hot water on schedule: 11:00 to 22:00 today (Tue-Fri pattern)."
 
-When DHW has different times for individual days (as at site 122 on Monday):
+**Day-varying schedule (different times on individual days):**
 
 "Hot water on schedule: 09:00 to 22:00 today."
 
-The day-group qualifier ("Tue-Fri pattern") is shown only when the today schedule differs from other days — it gives the operator a cue to tell a caller whether the situation will change at the weekend without requiring a second question.
+The day-group qualifier ("Tue-Fri pattern") is shown only when today's schedule differs from other days — it gives the operator a cue to tell a caller whether the situation will change at the weekend without requiring a second question.
 
 ### Heating zones
 
@@ -226,12 +245,12 @@ The same phrasing pattern applies to CHZ1 and CHZ2 in the Heating flow:
 
 The following cases must be handled by the decoder before the phrasing can be applied:
 
-- No rule applies today: the loops mask has "0" at today's position for every high-setpoint entry. Phrase: "Hot water not scheduled today." (Operator should escalate regardless.)
+- No rule applies today: the loops mask has "0" at today's position for every active-setpoint entry. Phrase: "Hot water not scheduled today." (Operator should escalate regardless.)
 - Empty schedule array: no entries at all. Phrase: show nothing — this is the same as the hidden condition in OOHDASH-136 (no schedule configured).
 - Multi-session day: two or more on-periods separated by a setback. Phrase: "Hot water on schedule: 11:00 to 12:00 and 17:00 to 18:30 today." (Two on-periods joined with "and".)
-- Midnight-spanning window: on at 06:00, off at 01:00 next day. The off time is past midnight so the phrase reads "06:00 to 01:00 tomorrow" rather than "06:00 to 01:00 today." This is the 6261 DHW case.
+- Midnight-spanning window: the OFF entry's clock time falls earlier in the day than the ON entry's clock time (as at site 6261: 06:00 ON, 01:00 OFF). Label the end time "tomorrow": "06:00 to 01:00 tomorrow." Never label a midnight-spanning end as "today."
 - recirc_pump: not shown to the operator as a named zone. The pump schedule is implementation detail, not a conclusion the operator needs.
-- V3 recirc_pump 1000/-1000: decoder must branch on channel name before applying the setpoint threshold.
+- V3 recirc_pump 1000/-1000: decoder must branch on channel name before applying the relative setpoint comparison; recirc_pump uses binary decode only.
 
 ### Version discrimination
 
@@ -241,7 +260,7 @@ V1 sites use output-numbered keys; the dashboard must translate these to zone la
 
 ## Where It Appears in the Flow
 
-OOHDASH-136 placed an override card at the top of the Hot water triage step. When no override is active the card reads "Hot water running on schedule." OOHDASH-138 adds the schedule sentence to that same card — no new card is created. The result reads, for example: "Hot water running on schedule — 06:00 to 01:00 today."
+OOHDASH-136 placed an override card at the top of the Hot water triage step. When no override is active the card reads "Hot water running on schedule." OOHDASH-138 adds the schedule sentence to that same card — no new card is created. The result reads, for example: "Hot water running on schedule — 06:00 to 01:00 tomorrow."
 
 The hide conditions from OOHDASH-136 still apply and are unchanged. The schedule sentence is shown only on sites where the override card is already shown:
 
@@ -290,12 +309,13 @@ V2/V3 zone-to-key mapping:
 ### Decoding algorithm (outline)
 
 1. Parse the schedule JSON and extract the array.
-2. Find today's day-of-week as an integer 0-6 (where 0 = Monday, 6 = Sunday). DEDUCED from bit order — Q1.
+2. Find today's day-of-week as an integer 0-6 (where 0 = Monday, 6 = Sunday). **DEDUCED from bit order — Q1. Confirm before shipping.**
 3. Filter entries to those where loops[dayOfWeek] == "1" to get today's active rules.
-4. For recirc_pump channel: skip setpoint threshold; treat value 1000 as ON, -1000 as OFF.
-5. For all other channels: apply threshold (DEDUCED: value >= 40 = ON, value < 30 = OFF). Entries with values in the 30-39 range are UNRESOLVED — treat as OFF until Spencer confirms (Q3).
-6. Sort today's active entries ascending by time.
-7. **Identify on-period boundaries, including midnight carry-forward.**
+4. **Channel-specific ON/OFF classification:**
+   - For recirc_pump channel: apply binary decode. value == 1000 → ON; value == -1000 → OFF. Do not apply any setpoint comparison.
+   - For all other channels (DHW, CHZ1, CHZ2, output2, output3, output4): classify using the relative approach (DEDUCED, Q3). Inspect all setpoint values in the full schedule array for this channel (not just today's filtered entries). Identify the maximum value (= active/ON state) and the minimum value (= setback/OFF state). Classify each entry accordingly. If more than two distinct values exist, surface "schedule format unrecognised" and do not attempt further decoding until Q3 is answered.
+5. Sort today's active entries ascending by time.
+6. **Identify on-period boundaries, including midnight carry-forward.**
 
    **Standard case** (all ON and OFF transitions land within today's active entries): pair each ON transition with the next OFF transition that follows it in time. Each pair is one on-period.
 
@@ -313,7 +333,12 @@ V2/V3 zone-to-key mapping:
 
    **Practical impact — sites 122 and 6770.** Site 6770's split-day CH pattern (11:00 ON, 12:00 OFF, 17:00 ON, 18:30 OFF, all days uniform) has no midnight carry: the last active entry each day is 18:30 OFF, so every day begins in OFF state. The standard case applies. Site 6261 DHW (06:00 ON every day, 01:00 OFF every day) does carry across midnight: 06:00 is the last entry by time, so yesterday's last active entry is ON at 06:00 — today begins in ON state, and the 01:00 OFF is the end of the overnight period. Where site 122 has day-varying schedules, the cross-day rule above determines the inherited state from the specific prior day's mask, not from a global "all days" assumption.
 
-8. Format each on-period boundary pair as the phrasing described in the Triage Conclusion Phrasing section. Where an on-period end falls past midnight (i.e., the OFF entry's time is less than the ON entry's time within the same day grouping), label it "tomorrow": "06:00 to 01:00 tomorrow."
+7. **Format each on-period as a phrase.** For each on-period end time, determine whether it falls past midnight relative to the on-period start. Detect midnight-crossing: if the OFF entry's clock time (as an HH:MM integer) is numerically less than the ON entry's clock time within the same on-period, the period crosses midnight. Label the end time "tomorrow." Otherwise label it "today." Do not apply "tomorrow" to on-period end times that occur later the same calendar day.
+
+   Examples:
+   - ON at 06:00, OFF at 01:00 → "06:00 to 01:00 tomorrow" (01:00 < 06:00, midnight crossing confirmed)
+   - ON at 08:00, OFF at 22:00 → "08:00 to 22:00 today" (22:00 > 08:00, no midnight crossing)
+   - ON at 11:00, OFF at 12:00 → "11:00 to 12:00 today"; ON at 17:00, OFF at 18:30 → "17:00 to 18:30 today" (two periods, both same day)
 
 ### Time zone assumption
 
@@ -333,12 +358,12 @@ The following questions must be answered before design can be finalised. James m
 
 | Q# | Question | Confidence before answer | Design impact | Blocker? |
 |----|---------|--------------------------|--------------|---------|
-| Q1 | In the loops field, is position 0 (leftmost character) Monday? We deduced this from patterns such as "1000011" combined with "0111100" covering all 7 days, but need confirmation. | DEDUCED | If wrong, displayed day is off by an unknown offset — schedule phrasing will be wrong for some callers | YES — blocks design |
+| Q1 | In the loops field, is position 0 (leftmost character) Monday? We see masks such as "1000011" and "0111100" covering all 7 days at different times. If pos0=Monday these group Mon+Sat+Sun versus Tue-Fri. Other orderings fit the same evidence (e.g. pos0=Sunday groups Sun+Fri+Sat versus Mon-Thu). The data cannot distinguish between them. Please confirm the day order. | DEDUCED — multiple orderings fit; confidence is low | Wrong bit order means wrong day's schedule is displayed to every operator on an affected day | YES — blocks design |
 | Q2 | Are HH:MM times in the schedule stored as UK local time (Europe/London) or UTC? | UNRESOLVED | Displayed time wrong by 0-1 hours in summer without correct zone | YES — blocks design |
-| Q3 | For DHW and CH zones, what setpoint value distinguishes "zone is heating" from "zone is in setback"? We see 57 degrees C as the DHW on-setpoint and 15 degrees C as the off-setpoint across most sites. Is the threshold: (a) a fixed rule such as value >= 40 = heating on, or (b) a configurable per-site threshold? | DEDUCED (>=40 on, <30 off) | If threshold is configurable, the decoder needs to read an extra attribute | YES — blocks design |
+| Q3 | How does the decoder distinguish "zone is heating" from "zone is in setback" in the schedule? Two patterns exist in sampled data: (a) DHW zones — on-setpoint 57°C, setback 15°C; (b) CH heating zones — on-setpoint 21°C, setback 15°C. Both CH values (21°C on and 15°C off) are below any reasonable absolute threshold such as 40°C, so a fixed absolute constant would classify every heating zone entry as OFF and the output "Heating zone on schedule" could never be emitted. Our proposed approach is relative: within a given channel's schedule array, compare all setpoint values and treat the higher as the active state and the lower as the setback state. Please confirm: (1) Is the relative comparison the correct approach? (2) Are there ever more than two distinct setpoint values in a single channel's schedule (e.g. graduated heating profiles)? (3) For CH zones specifically, does 21°C represent a universal on-setpoint across the estate, or does it vary by site? | DEDUCED (relative: higher = ON, lower = setback); absolute threshold confirmed invalid for heating zones | If relative approach is wrong or multi-value schedules exist, decoder needs explicit per-channel threshold configuration | YES — blocks design |
 | Q4 | Is the schedule stored in ThingsBoard the authoritative schedule the panel actually runs? Specifically: if an on-site engineer reprograms the panel directly (not via the bridge or dashboard), does that change get written back to ThingsBoard, or would TB show a stale schedule? | UNVERIFIED | Determines freshness approach: if not authoritative, must surface lastUpdateTs age to operator | YES — blocks freshness design decision |
-| Q8 | V2 panels (appVersion 2.x, heating_scenario present) — do they store schedule data under the same key names as V3 (CHZ1.schedule, CHZ2.schedule, DHW.schedule) and in the same JSON format? Zero V2 examples existed in the sample; this assumption is untested. Alternatively: can Spencer share the attribute schema for any V2 panel, or name a site with appVersion 2.x we can read directly? | UNVERIFIED — zero V2 examples sampled | If key names differ, V2 panels silently decode to empty schedule. The V2 routing path is currently untested. James must decide whether to accept this risk or hold design pending this answer. | YES — blocks design unless James explicitly accepts the V2 risk |
-| Q5 | The recirc_pump.schedule at all V3 sites uses value 1000 (pump on) and -1000 (pump off) instead of a temperature setpoint in degrees C. Is this the intended encoding for the recirc_pump channel across all V3 panels, or is it specific to certain configurations? | UNRESOLVED | Decoder must branch on channel name; if behaviour varies the branching logic changes | Nice to have |
+| Q8 | V2 panels (appVersion 2.x, heating_scenario present) — do they store schedule data under the same key names as V3 (CHZ1.schedule, CHZ2.schedule, DHW.schedule) and in the same JSON format? Zero V2 examples existed in the sample; this assumption is untested. Alternatively: can Spencer share the attribute schema for any V2 panel, or name a site with appVersion 2.x we can read directly? | UNVERIFIED — zero V2 examples sampled | If key names differ, V2 panels silently decode to empty schedule. James must decide whether to accept this risk or hold design pending this answer. | YES — blocks design unless James explicitly accepts the V2 risk |
+| Q5 | The recirc_pump.schedule at all V3 sites uses value 1000 (pump on) and -1000 (pump off) instead of a temperature setpoint. Is this the intended encoding for the recirc_pump channel across all V3 panels, or is it specific to certain configurations? | UNRESOLVED | Decoder must branch on channel name; if behaviour varies by site the branching logic changes | Nice to have |
 | Q6 | Site 122 has two Watteco Clim'o LoRaWAN sensors registered in the LNS (CHZ1.lorawan_devices, both provisioned=true) but no lwgateway device deployed in ThingsBoard. Is a gateway deployment planned for site 122, and if so when? | UNRESOLVED | No impact on schedule display; relevant to CHZ1 optimum start stop accuracy | Nice to have |
 | Q7 | Salus IT500 devices store a schedule in SERVER_SCOPE.schedule as a JSON object with keys A00-A06 (one per day). Each value is a 24-character ASCII-offset encoded string. Can you share the encoding specification so the dashboard can decode and display these schedules in a future release? | UNRESOLVED | Required for any future IT500 schedule display; not needed for v1 if D2 defers IT500 | Nice to have (deferred to post-v1) |
 
