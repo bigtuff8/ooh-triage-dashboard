@@ -1,0 +1,21 @@
+{
+  "run": "selfgate-ooh-triage-dashboard-oohdash-136-dhw-override",
+  "phase": "build",
+  "pr": 124,
+  "approvedBy": [
+    "bigtuff8"
+  ],
+  "reviewComments": [
+    "bigtuff8: - Live prototype — click through the actual screen: Looks right\n\n(submitted via the interactive gate review)\n\n<!-- gate:selected [{\"question\":\"Live prototype — click through the actual screen\",\"answer\":\"Looks right\"}] -->"
+  ],
+  "mergeCommit": "4075c63184ce3eaa7330b6ea080f489ac8bfab84",
+  "phaseBranch": "build-plan/oohdash-136-dhw-override",
+  "releaseBranch": "main",
+  "stamp": 1792685110074,
+  "selectedOptions": [
+    {
+      "question": "Live prototype — click through the actual screen",
+      "answer": "Looks right"
+    }
+  ]
+}
