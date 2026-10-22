@@ -215,7 +215,8 @@ async function workspacePayload(site) {
         ? SCOPE_GROUPS.filter(g => CB_SCOPE_KEYS.includes(g.key))
         : SCOPE_GROUPS;
     // OOHDASH-114-F1: safe default for boilerControl when field is absent (legacy fixture sites, bridge path).
-    const defaultBc = { present: false, isV1: false, isV2: false, heatingControllable: false, dhwControllable: false, deviceId: null };
+    // OOHDASH-136: dhwOverride added with visible:false so flows.js never throws on a missing key.
+    const defaultBc = { present: false, isV1: false, isV2: false, heatingControllable: false, dhwControllable: false, deviceId: null, dhwOverride: { visible: false, hiddenReason: 'no-panel', panelVersion: null, panelLastSeenMs: null, mode: null, untilMs: null, confirmedAtMs: null, decodedAtMs: null, unreadableReason: null } };
 
     // OOHDASH-135 Item 3 Level A: compute effective controllable per device.
     // For salus-it500, the SALUS_IT500_CTL_ENABLED flag gate overrides d.controllable to false

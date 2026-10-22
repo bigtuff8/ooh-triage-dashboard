@@ -858,6 +858,317 @@ export function isPowerPauseDevice(d) {
     return name.includes('powerpause') || profile.includes('powerpause');
 }
 
+/* ------------------------------------------------------------------ */
+/* OOHDASH-136: DHW override decode + outcome helpers                   */
+/* ------------------------------------------------------------------ */
+// decodeDhwOverride lives here (server-side decode, pure, unit tested).
+// dhwOverrideOutcome lives here AND in public/js/flows.js (textually identical
+// behaviour). The twin pattern follows siteConnectivityAnchor above.
+
+/** Safe default for any decodeDhwOverride throw. */
+const _DHW_DECODE_ERROR = Object.freeze({
+    visible: false, hiddenReason: 'decode-error', panelVersion: null, panelLastSeenMs: null,
+    mode: 'cant-confirm', untilMs: null, confirmedAtMs: null, decodedAtMs: null, unreadableReason: 'decode-error'
+});
+
+/**
+ * Format a DHW override end time in UK local time for the operator.
+ *   Later today      → HH:MM (or 'midnight' if 00:00)
+ *   Tomorrow         → 'HH:MM tomorrow' (or 'midnight' if 00:00)
+ *   Any later day    → 'on Ddd D Mmm at HH:MM' (or 'at midnight' if 00:00)
+ *   Earlier today    → HH:MM (override-ended case, same calendar day)
+ */
+function _dhwFmtTime(ms, nowMs) {
+    const tz = 'Europe/London';
+    const d = new Date(ms);
+    const timeStr = new Intl.DateTimeFormat('en-GB', { timeZone: tz, hour: '2-digit', minute: '2-digit', hour12: false }).format(d);
+    const timeDisp = timeStr === '00:00' ? 'midnight' : timeStr;
+    const fmtDate = dt => new Intl.DateTimeFormat('en-GB', { timeZone: tz, year: 'numeric', month: '2-digit', day: '2-digit' }).format(dt);
+    const todayStr = fmtDate(new Date(nowMs));
+    const tomorrowStr = fmtDate(new Date(nowMs + 86400000));
+    const targetStr = fmtDate(d);
+    if (targetStr === todayStr) return timeDisp;
+    if (targetStr === tomorrowStr) return timeDisp === 'midnight' ? 'midnight' : `${timeDisp} tomorrow`;
+    const dayName = new Intl.DateTimeFormat('en-GB', { timeZone: tz, weekday: 'short' }).format(d);
+    const dayNum = new Intl.DateTimeFormat('en-GB', { timeZone: tz, day: 'numeric' }).format(d);
+    const monthName = new Intl.DateTimeFormat('en-GB', { timeZone: tz, month: 'short' }).format(d);
+    return `on ${dayName} ${dayNum} ${monthName} at ${timeDisp}`;
+}
+
+/** Format a staleness "last heard from X" string for the operator. */
+function _dhwFmtAgo(panelLastSeenMs, nowMs) {
+    if (panelLastSeenMs == null) return null;
+    const ageMs = nowMs - panelLastSeenMs;
+    const ageMins = Math.round(ageMs / 60000);
+    if (ageMins < 120) return `${ageMins} minute${ageMins !== 1 ? 's' : ''} ago`;
+    const ageHrs = Math.round(ageMs / 3600000);
+    if (ageHrs < 48) return `${ageHrs} hour${ageHrs !== 1 ? 's' : ''} ago`;
+    const tz = 'Europe/London';
+    const d = new Date(panelLastSeenMs);
+    const dayName = new Intl.DateTimeFormat('en-GB', { timeZone: tz, weekday: 'short' }).format(d);
+    const dayNum = new Intl.DateTimeFormat('en-GB', { timeZone: tz, day: 'numeric' }).format(d);
+    const monthName = new Intl.DateTimeFormat('en-GB', { timeZone: tz, month: 'short' }).format(d);
+    const timeStr = new Intl.DateTimeFormat('en-GB', { timeZone: tz, hour: '2-digit', minute: '2-digit', hour12: false }).format(d);
+    return `on ${dayName} ${dayNum} ${monthName} at ${timeStr}`;
+}
+
+/**
+ * decodeDhwOverride(sharedScope, clientScope, panelLastSeenMs, telemBag, historyRows, now)
+ *
+ * Pure function (no network). Returns the 9-field dhwOverride payload object.
+ * Wrapped in try/catch: any throw returns _DHW_DECODE_ERROR.
+ *
+ * @param {object|null} sharedScope     TB SHARED_SCOPE attrs (output1OutputMask for V1)
+ * @param {object|null} clientScope     TB CLIENT_SCOPE attrs (heating_scenario for V2)
+ * @param {number|null} panelLastSeenMs lastActivityTime in ms; null when absent
+ * @param {object}      telemBag        flat telemetry bag (DHW.override, output4Override)
+ * @param {Array|null}  historyRows     V1 history rows [{ts, value}], or null (read failed)
+ * @param {number}      now             current epoch ms (injectable for tests)
+ * @returns {{ visible, hiddenReason, panelVersion, panelLastSeenMs, mode, untilMs, confirmedAtMs, decodedAtMs, unreadableReason }}
+ */
+export function decodeDhwOverride(sharedScope, clientScope, panelLastSeenMs, telemBag, historyRows, now) {
+    try {
+        return _decodeDhwOverrideInner(sharedScope, clientScope, panelLastSeenMs, telemBag, historyRows, now);
+    } catch (_e) {
+        return { ..._DHW_DECODE_ERROR };
+    }
+}
+
+function _decodeDhwOverrideInner(sharedScope, clientScope, panelLastSeenMs, telemBag, historyRows, now) {
+    const sc = sharedScope || {};
+    const cc = clientScope || {};
+    const t = telemBag || {};
+    const decodedAtMs = now;
+    const lastSeenMs = panelLastSeenMs ?? null;
+
+    // Version discrimination: heating_scenario in CLIENT → V2 (wins even when output1OutputMask also
+    // present — the dual-marker rule that correctly handles the 7 known dual-marker estate sites).
+    const hasHeatScen = Object.prototype.hasOwnProperty.call(cc, 'heating_scenario');
+    const hasMask = Object.prototype.hasOwnProperty.call(sc, 'output1OutputMask');
+    if (!hasHeatScen && !hasMask) {
+        return { visible: false, hiddenReason: 'version-unknown', panelVersion: null, panelLastSeenMs: lastSeenMs, mode: null, untilMs: null, confirmedAtMs: null, decodedAtMs, unreadableReason: null };
+    }
+    const panelVersion = hasHeatScen ? 'V2' : 'V1';
+
+    // V2 hide (D3): heating_scenario.separate_dhw !== 0 → hidden (hot water on a separate system)
+    if (panelVersion === 'V2') {
+        let hs = cc['heating_scenario'];
+        if (typeof hs === 'string') { try { hs = JSON.parse(hs); } catch (_e2) { hs = null; } }
+        const sepDhw = (hs != null && typeof hs === 'object') ? hs.separate_dhw : undefined;
+        if (sepDhw !== 0) {
+            return { visible: false, hiddenReason: 'separate-dhw', panelVersion: 'V2', panelLastSeenMs: lastSeenMs, mode: null, untilMs: null, confirmedAtMs: null, decodedAtMs, unreadableReason: null };
+        }
+    }
+
+    // V1 hide (D4): output1OutputMask[3] !== true → hidden (output 4 not wired for hot water)
+    if (panelVersion === 'V1') {
+        let mask = sc.output1OutputMask;
+        if (typeof mask === 'string') { try { mask = JSON.parse(mask); } catch (_e2) { mask = null; } }
+        if (!Array.isArray(mask) || mask[3] !== true) {
+            return { visible: false, hiddenReason: 'dhw-not-wired', panelVersion: 'V1', panelLastSeenMs: lastSeenMs, mode: null, untilMs: null, confirmedAtMs: null, decodedAtMs, unreadableReason: null };
+        }
+    }
+
+    // No reading: key absent from telemetry → hidden (nothing to conclude)
+    if (panelVersion === 'V2' && !Object.prototype.hasOwnProperty.call(t, 'DHW.override')) {
+        return { visible: false, hiddenReason: 'no-reading', panelVersion: 'V2', panelLastSeenMs: lastSeenMs, mode: null, untilMs: null, confirmedAtMs: null, decodedAtMs, unreadableReason: null };
+    }
+    if (panelVersion === 'V1' && !Object.prototype.hasOwnProperty.call(t, 'output4Override')) {
+        return { visible: false, hiddenReason: 'no-reading', panelVersion: 'V1', panelLastSeenMs: lastSeenMs, mode: null, untilMs: null, confirmedAtMs: null, decodedAtMs, unreadableReason: null };
+    }
+
+    // Staleness: panel last report > 60 min ago (or absent) → can't confirm
+    const staleMs = config.boilerPanelStaleThresholdMinutes * 60 * 1000;
+    if (lastSeenMs === null || (now - lastSeenMs) > staleMs) {
+        return { visible: true, hiddenReason: null, panelVersion, panelLastSeenMs: lastSeenMs, mode: 'cant-confirm', untilMs: null, confirmedAtMs: null, decodedAtMs, unreadableReason: 'stale' };
+    }
+
+    // V2 decode (DHW.override is epoch SECONDS — multiply by 1000 for ms)
+    if (panelVersion === 'V2') {
+        const raw = t['DHW.override'];
+        const n = Number(raw);
+        if (raw === null || raw === undefined || String(raw).trim() === '' || !Number.isFinite(n) || !Number.isInteger(n)) {
+            return { visible: true, hiddenReason: null, panelVersion: 'V2', panelLastSeenMs: lastSeenMs, mode: 'cant-confirm', untilMs: null, confirmedAtMs: null, decodedAtMs, unreadableReason: 'not-a-number' };
+        }
+        if (n === 0) {
+            return { visible: true, hiddenReason: null, panelVersion: 'V2', panelLastSeenMs: lastSeenMs, mode: 'auto', untilMs: null, confirmedAtMs: null, decodedAtMs, unreadableReason: null };
+        }
+        // Plausibility: abs(n)*1000 ms must be within [now-6h, now+365d]. Catches sentinel values 1/-1.
+        const endMs = Math.abs(n) * 1000;
+        const pastWindowMs = config.boilerV2OverridePastWindowHours * 60 * 60 * 1000;
+        const futureWindowMs = config.boilerV2OverrideFutureWindowDays * 24 * 60 * 60 * 1000;
+        if (endMs < (now - pastWindowMs) || endMs > (now + futureWindowMs)) {
+            return { visible: true, hiddenReason: null, panelVersion: 'V2', panelLastSeenMs: lastSeenMs, mode: 'cant-confirm', untilMs: null, confirmedAtMs: null, decodedAtMs, unreadableReason: 'implausible' };
+        }
+        if (endMs <= now) {
+            // End time in the past but within 6 h → auto-ended (panel hasn't cleared it yet)
+            return { visible: true, hiddenReason: null, panelVersion: 'V2', panelLastSeenMs: lastSeenMs, mode: 'auto-ended', untilMs: endMs, confirmedAtMs: null, decodedAtMs, unreadableReason: null };
+        }
+        // End time in the future: on-until (positive) or off-until (negative)
+        return { visible: true, hiddenReason: null, panelVersion: 'V2', panelLastSeenMs: lastSeenMs, mode: n > 0 ? 'on-until' : 'off-until', untilMs: endMs, confirmedAtMs: null, decodedAtMs, unreadableReason: null };
+    }
+
+    // V1 decode (output4Override is epoch MILLISECONDS)
+    {
+        const raw = t['output4Override'];
+        const latestN = (raw !== null && raw !== undefined && String(raw).trim() !== '') ? Number(raw) : 0;
+        if (Number.isFinite(latestN) && latestN === 0) {
+            return { visible: true, hiddenReason: null, panelVersion: 'V1', panelLastSeenMs: lastSeenMs, mode: 'auto', untilMs: null, confirmedAtMs: null, decodedAtMs, unreadableReason: null };
+        }
+        // Non-zero (or corrupt): use history rows.
+        // Valid row: integer with abs in [1.0e12, 2.1e12] (approximately 2001–2036), or exactly 0.
+        // 25-digit corrupt copies (like 3213428566365480600000000) have abs > 2.1e12 → rejected.
+        const confirmWindowMs = config.boilerV1OverrideConfirmMinutes * 60 * 1000;
+        const rows = Array.isArray(historyRows) ? historyRows : [];
+        const validRows = rows.filter(row => {
+            const v = Number(row.value);
+            if (!Number.isFinite(v) || !Number.isInteger(v)) return false;
+            if (v === 0) return true;
+            return Math.abs(v) >= 1.0e12 && Math.abs(v) <= 2.1e12;
+        });
+        if (!validRows.length) {
+            return { visible: true, hiddenReason: null, panelVersion: 'V1', panelLastSeenMs: lastSeenMs, mode: 'cant-confirm', untilMs: null, confirmedAtMs: null, decodedAtMs, unreadableReason: 'not-reconfirmed' };
+        }
+        // Sort newest first (TB returns DESC but sort to be safe).
+        const sorted = [...validRows].sort((a, b) => Number(b.ts) - Number(a.ts));
+        const newest = sorted[0];
+        const newestTs = Number(newest.ts);
+        const newestVal = Number(newest.value);
+        if ((now - newestTs) > confirmWindowMs) {
+            return { visible: true, hiddenReason: null, panelVersion: 'V1', panelLastSeenMs: lastSeenMs, mode: 'cant-confirm', untilMs: null, confirmedAtMs: newestTs, decodedAtMs, unreadableReason: 'not-reconfirmed' };
+        }
+        if (newestVal === 0) {
+            return { visible: true, hiddenReason: null, panelVersion: 'V1', panelLastSeenMs: lastSeenMs, mode: 'auto', untilMs: null, confirmedAtMs: newestTs, decodedAtMs, unreadableReason: null };
+        }
+        return { visible: true, hiddenReason: null, panelVersion: 'V1', panelLastSeenMs: lastSeenMs, mode: newestVal > 0 ? 'on-v1' : 'off-v1', untilMs: null, confirmedAtMs: newestTs, decodedAtMs, unreadableReason: null };
+    }
+}
+
+/**
+ * dhwOverrideOutcome(dhwOverride, nowMs) -> {state, headline, explanation, script, ticketSentence} | null
+ *
+ * Server twin of the public/js/flows.js function (same algorithm; keep both in lock-step).
+ * Takes the dhwOverride payload object and re-applies time-based checks at the given nowMs.
+ * Handles: V2 on-until/off-until → auto-ended when untilMs passes; V1 on-v1/off-v1 → cant-confirm
+ * when confirmedAtMs expires; staleness re-check. Exposed here for unit testing U17, U18, U20.
+ * Returns null when dhwOverride is absent or visible is false.
+ */
+export function dhwOverrideOutcome(dhwOverride, nowMs) {
+    if (!dhwOverride || !dhwOverride.visible) return null;
+    const { mode, panelLastSeenMs, untilMs, confirmedAtMs, unreadableReason } = dhwOverride;
+    const staleMs = config.boilerPanelStaleThresholdMinutes * 60 * 1000;
+    const v1ConfirmMs = config.boilerV1OverrideConfirmMinutes * 60 * 1000;
+
+    // Re-apply staleness
+    if (panelLastSeenMs == null || (nowMs - panelLastSeenMs) > staleMs) {
+        const ago = _dhwFmtAgo(panelLastSeenMs, nowMs);
+        const reason = ago ? `last reported ${ago}` : "isn't reporting";
+        return {
+            state: 'cant-confirm',
+            headline: "Hot water override: can't confirm",
+            explanation: ago
+                ? `The boiler panel last reported ${ago}, so we can't tell whether the hot water is overridden. Don't tell the caller it is on or off; log it and escalate as normal.`
+                : "The boiler panel isn't reporting, so we can't tell whether the hot water is overridden. Don't tell the caller it is on or off; log it and escalate as normal.",
+            script: "I can't see the current hot water setting from here right now, so I'll log it for the team to check.",
+            ticketSentence: `Hot water override at time of call: could not be confirmed (${reason}).`
+        };
+    }
+
+    // V2 end-time transition: on-until / off-until → auto-ended when untilMs passes
+    let effectiveMode = mode;
+    let effectiveReason = unreadableReason;
+    if ((mode === 'on-until' || mode === 'off-until') && untilMs != null && untilMs <= nowMs) {
+        effectiveMode = 'auto-ended';
+    }
+    // V1 confirmation expiry: on-v1 / off-v1 → cant-confirm when confirmedAtMs is too old
+    if ((mode === 'on-v1' || mode === 'off-v1') && (confirmedAtMs == null || (nowMs - confirmedAtMs) > v1ConfirmMs)) {
+        effectiveMode = 'cant-confirm';
+        effectiveReason = 'not-reconfirmed';
+    }
+
+    if (effectiveMode === 'auto') {
+        return {
+            state: 'auto',
+            headline: 'Hot water override: Auto (on schedule)',
+            explanation: 'Nobody has overridden the hot water on the boiler panel. It is following its normal timetable, so an override is not the reason for the problem.',
+            script: "The hot water controls haven't been overridden - they're running on the normal timetable.",
+            ticketSentence: 'Hot water override at time of call: Auto (on schedule).'
+        };
+    }
+    if (effectiveMode === 'auto-ended') {
+        const endedAt = untilMs != null ? _dhwFmtTime(untilMs, nowMs) : '';
+        return {
+            state: 'auto-ended',
+            headline: 'Hot water override: Auto (on schedule)',
+            explanation: `An override ended at ${endedAt} and the panel has gone back to its normal timetable, so an override is not the reason for the problem now.`,
+            script: "The hot water controls are back on the normal timetable.",
+            ticketSentence: `Hot water override at time of call: Auto (on schedule, override ended at ${endedAt}).`
+        };
+    }
+    if (effectiveMode === 'on-until') {
+        const timeStr = _dhwFmtTime(untilMs, nowMs);
+        return {
+            state: 'on-until',
+            headline: `Hot water override: Override ON until ${timeStr}`,
+            explanation: `Hot water has already been set to run from the boiler panel and stays on until ${timeStr}. The controls are asking for hot water, so if there is still none, the likely cause is the boiler or the cylinder.`,
+            script: `The hot water has already been switched on from the controls and will stay on until ${timeStr}. If it's still not coming through, it's likely the boiler itself, so I'll log it for the team.`,
+            ticketSentence: `Hot water override at time of call: Override ON until ${timeStr}.`
+        };
+    }
+    if (effectiveMode === 'off-until') {
+        const timeStr = _dhwFmtTime(untilMs, nowMs);
+        return {
+            state: 'off-until',
+            headline: `Hot water override: Override OFF until ${timeStr}`,
+            explanation: `Hot water has been deliberately switched off from the boiler panel until ${timeStr}. That is the likely reason there is no hot water. It goes back to its normal timetable at ${timeStr}. We can't change it from here, so escalate if the caller needs it sooner.`,
+            script: `The hot water has been switched off on purpose at the controls until ${timeStr}, then it goes back to normal. I'll log that you need it back sooner so the team can look at it.`,
+            ticketSentence: `Hot water override at time of call: Override OFF until ${timeStr}.`
+        };
+    }
+    if (effectiveMode === 'on-v1') {
+        return {
+            state: 'on-v1',
+            headline: 'Hot water override: Override ON',
+            explanation: "Hot water has been set to run from the boiler panel. This type of panel doesn't give an end time. The controls are asking for hot water, so if there is still none, the likely cause is the boiler or the cylinder.",
+            script: "The hot water has been switched on from the controls. If it's still not coming through, it's likely the boiler itself, so I'll log it for the team.",
+            ticketSentence: 'Hot water override at time of call: Override ON.'
+        };
+    }
+    if (effectiveMode === 'off-v1') {
+        return {
+            state: 'off-v1',
+            headline: 'Hot water override: Override OFF',
+            explanation: "Hot water has been deliberately switched off on the boiler panel. That is the likely reason there is no hot water. This type of panel doesn't say when it ends, and we can't change it from here, so escalate it.",
+            script: "The hot water has been switched off on purpose at the controls. I'll log it so the team can switch it back on for you.",
+            ticketSentence: 'Hot water override at time of call: Override OFF.'
+        };
+    }
+    // cant-confirm: stale, implausible, not-reconfirmed, decode-error, or unknown
+    let explanation, ticketSentence;
+    if (effectiveReason === 'stale') {
+        const ago = _dhwFmtAgo(panelLastSeenMs, nowMs);
+        const reason = ago ? `last reported ${ago}` : "isn't reporting";
+        explanation = ago
+            ? `The boiler panel last reported ${ago}, so we can't tell whether the hot water is overridden. Don't tell the caller it is on or off; log it and escalate as normal.`
+            : "The boiler panel isn't reporting, so we can't tell whether the hot water is overridden. Don't tell the caller it is on or off; log it and escalate as normal.";
+        ticketSentence = `Hot water override at time of call: could not be confirmed (${reason}).`;
+    } else if (effectiveReason === 'not-reconfirmed') {
+        explanation = "The boiler panel hasn't re-confirmed its hot water override recently, so we can't tell whether it is still in place. Don't tell the caller it is on or off; log it and escalate as normal.";
+        ticketSentence = "Hot water override at time of call: could not be confirmed (panel hasn't re-confirmed recently).";
+    } else {
+        // not-a-number, implausible, decode-error, or unspecified
+        explanation = "The boiler panel's hot water override reading doesn't make sense right now, so we can't tell whether it is overridden. Don't tell the caller it is on or off; log it and escalate as normal.";
+        ticketSentence = "Hot water override at time of call: could not be confirmed (reading doesn't make sense).";
+    }
+    return {
+        state: 'cant-confirm',
+        headline: "Hot water override: can't confirm",
+        explanation,
+        script: "I can't see the current hot water setting from here right now, so I'll log it for the team to check.",
+        ticketSentence
+    };
+}
+
 /**
  * Bulk latest telemetry for a set of TB devices, PLUS the per-device online state (OOHDASH-80). Uses
  * per-device latest-timeseries reads over the read session AND a per-device SERVER_SCOPE `active`
@@ -887,7 +1198,8 @@ async function fetchTelemetry(devices) {
             readRequest('GET', `/api/plugins/telemetry/DEVICE/${uuid}/values/timeseries`),
             readServerScopeAttributes(uuid, 'active,lastActivityTime'),
             isBoilerControl
-                ? readClientScopeAttributes(uuid, 'site,salusLocation,DHW.use_boiler')
+                // OOHDASH-136: heating_scenario added to identify V2 panels for DHW override decode.
+                ? readClientScopeAttributes(uuid, 'site,salusLocation,DHW.use_boiler,heating_scenario')
                 : readClientScopeAttributes(uuid, 'site,salusLocation'),
             isBoilerControl
                 // OOHDASH-123 (WU13): also read the schedule attributes (V1 output1..4Schedule,
@@ -941,6 +1253,39 @@ async function fetchTelemetry(devices) {
             }
         } else {
             bag.__sharedScope = null;
+        }
+        // OOHDASH-136: conditional V1 output4Override history read.
+        // Fires only for V1 boilerControl panels (output1OutputMask in SHARED, no heating_scenario in
+        // CLIENT) whose latest output4Override is non-zero. One extra read, at most 35 min of rows,
+        // at most 20 rows, newest first. Failure degrades only this panel to cant-confirm (unreadableReason
+        // 'not-reconfirmed'); it never fails the site. __v1OverrideHistory=null → decodeDhwOverride
+        // returns cant-confirm, as decodeDhwOverride treats a missing/empty history as unconfirmed.
+        if (isBoilerControl) {
+            const ss = bag.__sharedScope ?? {};
+            const cs = bag.__clientScope ?? {};
+            const isV1panel = Object.prototype.hasOwnProperty.call(ss, 'output1OutputMask')
+                && !Object.prototype.hasOwnProperty.call(cs, 'heating_scenario');
+            if (isV1panel) {
+                const latestRaw = bag['output4Override'];
+                const latestN = (latestRaw !== undefined && latestRaw !== null && latestRaw !== '')
+                    ? Number(latestRaw) : 0;
+                if (Number.isFinite(latestN) && latestN !== 0) {
+                    const nowMs = Date.now();
+                    const v1ConfirmMs = config.boilerV1OverrideConfirmMinutes * 60 * 1000;
+                    const histPath = `/api/plugins/telemetry/DEVICE/${uuid}/values/timeseries` +
+                        `?keys=output4Override&startTs=${nowMs - v1ConfirmMs}&endTs=${nowMs}&limit=20&agg=NONE&orderBy=DESC`;
+                    try {
+                        const hist = await readRequest('GET', histPath);
+                        bag.__v1OverrideHistory = (hist && Array.isArray(hist['output4Override']))
+                            ? hist['output4Override'] : [];
+                    } catch (err) {
+                        console.warn(`[TB] V1 DHW override history read failed for ${uuid}: ${err.message}`);
+                        bag.__v1OverrideHistory = null;
+                    }
+                } else {
+                    bag.__v1OverrideHistory = [];
+                }
+            }
         }
         out.set(uuid, bag);
     }));
@@ -1036,6 +1381,7 @@ async function fetchLiveSitesByNumber(siteNo) {
         console.error(`[TB] Site name enrichment failed for ${key}: ${err.message}`);
     }
     // OOHDASH-114-F1: derive boilerControl field.
+    // OOHDASH-136: also decode the DHW override state and attach as boilerControl.dhwOverride.
     const boilerControlRaw = matched
         .filter(d => (d.type ?? d.profile) === 'boilerControl')
         .sort((a, b) => String(a.name || '').localeCompare(String(b.name || '')))[0] ?? null;
@@ -1050,6 +1396,15 @@ async function fetchLiveSitesByNumber(siteNo) {
         if (!boilerControlField.isV1 && !boilerControlField.isV2) {
             console.warn(`[TB] boilerControl at site ${key} has no V1/V2 discriminator — dhwControllable=false`);
         }
+        // OOHDASH-136: decode DHW override state and attach to the boilerControl object.
+        boilerControlField.dhwOverride = decodeDhwOverride(
+            bcBag.__sharedScope ?? null,
+            bcBag.__clientScope ?? null,
+            bcBag.__lastActivityTime ?? null,
+            bcBag,
+            bcBag.__v1OverrideHistory ?? null,
+            Date.now()
+        );
     } else {
         boilerControlField = { present: false, isV1: false, isV2: false, heatingControllable: false, dhwControllable: false, deviceId: null };
     }
