@@ -142,10 +142,15 @@ test.describe('OOHDASH-136 DHW override card', () => {
 
         await page.locator('[data-testid="hw-capture"]').click();
 
+        // finishOutcome shows a confirm step first — check the ticket sentence in the detail,
+        // then click "Record outcome" to fire the POST and reach outcome-captured.
+        const confirmStep = page.locator('[data-testid="confirm-step"]');
+        await expect(confirmStep).toBeVisible();
+        await expect(confirmStep).toContainText('Auto (on schedule)');
+        await page.locator('[data-testid="record-outcome"]').click();
+
         const outcome = page.locator('[data-testid="outcome-captured"]');
         await expect(outcome).toBeVisible();
-        // The ticket sentence for auto state: "Hot water override at time of call: Auto (on schedule)."
-        await expect(outcome).toContainText('Auto (on schedule)');
         await expect(outcome).toContainText(/Ticket #\d+/);
     });
 });
