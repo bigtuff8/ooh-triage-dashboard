@@ -85,6 +85,11 @@ attribute `output1OutputMask` for V1. When neither is present the card is hidden
 `hiddenReason: 'version-unknown'`. When both are present, `heating_scenario` takes precedence
 and the panel is treated as V2 -- this correctly handles the 7 known dual-marker sites.
 
+The heating_scenario-first rule is deterministic: any device that carries both
+heating_scenario (CLIENT attr) and output1OutputMask (SHARED attr) is treated as V2. The 7
+known dual-marker sites are confirmed V2 by estate sweep. Any new dual-marker site added after
+this build will be handled correctly by the same rule without code change.
+
 ### Browser recompute trigger
 
 dhwOverrideOutcome is called once on each render of Hot water stage 0 using the flow's existing
@@ -125,8 +130,9 @@ The 4 constants are:
 
 **2. `services/tb-device.js`**
 
-Note: dhwOverrideOutcome must be kept textually identical in both files; U20 enforces this. A
-change to one must touch the other.
+Note: dhwOverrideOutcome must be kept behaviorally identical for all test inputs in both files;
+U20 enforces behavioral parity; whitespace, comment, or helper-function drift between the two
+copies is not caught and is accepted as documented debt. A change to one must touch the other.
 
 Four changes within this file:
 
@@ -172,11 +178,29 @@ Four changes within this file:
      DHW.override which is epoch seconds. The V1 corruption check detects 25-digit values by
      comparing abs(value) against a plausible upper bound in milliseconds.
 
+     The valid range for output4Override is epoch ms in the window 1.0e12–2.1e12 (approximately
+     2001–2036). Values outside this range in either direction (too small as well as too large)
+     are treated as corrupt and skipped. Unit tests U10/U11 cover both implausible-low and
+     implausible-high values.
+
+     Error safety: decodeDhwOverride is wrapped in try/catch. On any throw (malformed attrs,
+     missing output1OutputMask, unexpected value type) it returns a safe default:
+     {visible:false, hiddenReason:'decode-error', panelVersion:null, panelLastSeenMs:null,
+     mode:null, untilMs:null, confirmedAtMs:null, decodedAtMs:null,
+     unreadableReason:'decode-error'}. In flows.js, dhwOverride properties are accessed via
+     optional chain (dhwOverride?.visible) so a missing key cannot throw on the client side
+     either.
+
   c. V1 history read: when the function is processing a V1 panel and the latest
      `output4Override` reading is non-zero, make one extra ThingsBoard read of
      `output4Override` for the last 35 minutes (at most 20 rows, newest first). Failure of this
      read degrades only that panel to `unreadable` via `unreadableReason`; it does not fail the
      site.
+
+     Call frequency: the workspace payload is rebuilt once per /api/site-status HTTP request
+     (no server-side cache). The V1 extra history read fires once per V1 panel at the requested
+     site, per request. At the dashboard's auto-refresh interval (~60 s) and current estate
+     scale, the aggregate additional TB read rate is negligible and within TB rate limits.
 
   d. Twin pure function `dhwOverrideOutcome(dhwOverride, nowMs)` -- same logic as the
      `flows.js` twin (see below), exposed here for unit testing the server-side decode path
@@ -194,8 +218,9 @@ missing `dhwOverride` key on any site.
 
 **4. `public/js/flows.js`**
 
-Note: dhwOverrideOutcome must be kept textually identical in both files; U20 enforces this. A
-change to one must touch the other.
+Note: dhwOverrideOutcome must be kept behaviorally identical for all test inputs in both files;
+U20 enforces behavioral parity; whitespace, comment, or helper-function drift between the two
+copies is not caught and is accepted as documented debt. A change to one must touch the other.
 
 Two changes:
 
@@ -285,7 +310,8 @@ inside the `config` export object in `config.js`, following the same pattern as 
   site-level result is still returned
 - U20: parity -- import the tb-device.js twin and execute dhwOverrideOutcome for every input
   combination in the U1-U19 fixture table; assert each output matches the equivalent flows.js
-  test case. Any divergence fails. This enforces that the two copies cannot silently drift.
+  test case. Any divergence fails. U20 enforces behavioral parity; whitespace, comment, or
+  helper-function drift between the two copies is not caught and is accepted as documented debt.
 
 ### E2e tests (Playwright) -- E1 through E12
 
