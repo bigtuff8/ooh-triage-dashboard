@@ -1,6 +1,6 @@
 <!-- gate:contract
 SECTION: What this ticket builds
-When a caller says a pub is too cold or too hot, the OOH agent applies a timed boost directly to the boiler-control panel — forcing heating on or off for a fixed period — without touching the schedule. Every boost opens a Zendesk ticket so the IoT team can find the underlying cause next morning. The boost reuses the existing durable-hold and revert-worker machinery and adds two new dispatch primitives: a one-way RPC for V2 panels and a shared-attribute write for V1 panels. The 01:00 and 07:00 Europe/London boundaries are enforced server-side and hold even if a revert is late.
+When a caller says a pub is too cold or too hot, the OOH agent applies a timed boost directly to the boiler-control panel — forcing heating on or off for a fixed period — without touching the schedule. Every boost opens a Zendesk ticket so the IoT team can find the underlying cause next morning. The boost reuses the existing durable-hold and revert-worker machinery and adds two new dispatch primitives: a one-way RPC for V2 panels and a shared-attribute write for V1 panels. The 01:00 and 07:00 Europe/London boundaries are enforced server-side at dispatch. V2 panels also self-revert at the next schedule edge as a secondary safety net. V1 panels have no natural expiry and depend solely on the revert worker; a late or failed V1 revert leaves the zone forced until manually zeroed — this risk is documented in the discovery and is a build requirement for V1 rollout.
 
 DECISION: Heat ON — duration menu | 30 min, 1 h, 2 h | Different options
 DETAIL: The 01:00 cutoff clamps any boost that would run past it. A 2-hour boost at 23:30 becomes 30 minutes. A boost requested between 01:00 and 07:00 is refused outright.
@@ -19,7 +19,7 @@ Tony, Sam or CJ sometimes set overrides directly from the TB dashboard. If OOH s
 DECISION: Existing human override | Warn operator and let them proceed | Block if a human override is already active
 
 SECTION: Overnight revert-failed coverage
-A failed V1 revert leaves a zone forced indefinitely. The planned Zendesk ticket update means the IoT team sees the failure first thing next morning — worst case is roughly six hours if the failure is at 01:00. An SMS or email notification on revert-failed would give an overnight owner but is not in scope for this ticket.
+A failed V1 revert leaves a zone forced indefinitely. A Heat ON revert failure leaves the pub overheating overnight; a Heat OFF revert failure leaves staff arriving to a cold pub at 07:00. The Zendesk ticket update means the IoT team sees the failure next morning — worst case is roughly six hours if the failure is at 01:00. An SMS or email notification on revert-failed would give an overnight owner for both scenarios but is not in scope for this ticket.
 
 DECISION: Overnight revert-failed — V1 risk | IoT morning ticket is acceptable for now | Require SMS notification before V1 sites go live
 -->
@@ -81,17 +81,31 @@ The `REGISTRY['boiler-panel'].commands` array changes from `[]` to `['boost-on',
 
 ### 2c. services/control.js — new boiler boost dispatch path
 
-A parallel entry point `dispatchBoilerBoost({ operator, confirmToken, siteNo, deviceId, zone, direction, hold })` is added alongside the existing `dispatch()`. The existing Salus/Tuya path stays unchanged. The new path: validates the F004 token and F016 kill-switch; resolves the device and checks online state; reads the current zone state via `tb.readBoilerState()` for the `previousDirection` audit field; applies the 01:00/07:00 clamp (§3) and refuses or truncates as needed; validates via `registry.validateCommand`; dispatches via `tb.dispatchBoilerRpc()` (V2) or `tb.writeSharedScopeAttribute()` (V1); polls `tb.readBoilerState()` for confirmation (up to 5 s for V2, 2 s for V1, checking the zone's `overrideUntilMs` changed and the `direction` sign matches); writes the audit row; calls `scheduleOverride()` with the version, zone, and attribute stored in the hold record; and creates the IoT team Zendesk ticket (§5).
+A parallel entry point `dispatchBoilerBoost({ operator, confirmToken, siteNo, deviceId, zone, direction, hold })` is added alongside the existing `dispatch()`. The existing Salus/Tuya path stays unchanged. The new path: validates the F004 token and F016 kill-switch; resolves the device and checks online state; reads the current zone state via `tb.readBoilerState()` for the `previousDirection` audit field; applies the 01:00/07:00 clamp (§3) and refuses or truncates as needed; validates via `registry.validateCommand`; dispatches via `tb.dispatchBoilerRpc()` (V2) or `tb.writeSharedScopeAttribute()` (V1); then polls `tb.readBoilerState()` for confirmation.
+
+**Confirm-timeout path (required):** The confirm poll window is 5 s for V2, 2 s for V1, checking that the zone's `overrideUntilMs` changed and the `direction` sign matches. Telemetry is treated as stale if the most recent reading pre-dates the dispatch timestamp; IN-FLIGHT if stale or still matching previous state; CONFIRMED on a fresh match; NON-DELIVERY if a contradicting fresh value is received. If the poll window expires with no CONFIRMED or NON-DELIVERY (i.e., telemetry never turned fresh), the outcome is classified as IN-FLIGHT-TIMEOUT. **In all non-CONFIRMED outcomes the hold must still be scheduled with the original `revertAt`.** Dispatching without a safety revert because confirmation was ambiguous is not acceptable — the zone may be forced and the only safeguard is the revert. Additionally: on IN-FLIGHT-TIMEOUT, an F021 alert is raised and the Zendesk ticket body flags the confirmation as unverified. After writes the audit row is committed and the IoT team Zendesk ticket is created (§5).
 
 ### 2d. services/overrides.js — boiler revert dispatch branch
 
-Inside the `revert()` inner function, after the kill-switch check, a new branch is added for `doc.deviceType === 'boiler-panel'`. It reads `doc.panelVersion` ('v1' or 'v2'), `doc.zone` (e.g. 'CHZ1'), and `doc.attribute` (e.g. 'output2Override') from the Cosmos record, then calls `tb.dispatchBoilerRpc(device, doc.zone, 0)` for V2 or `tb.writeSharedScopeAttribute(device, doc.attribute, 0)` for V1. Confirmation is via `tb.readBoilerState()` checking the zone's `overrideUntilMs` returned to near-zero. The Cosmos record written by `scheduleOverride()` must store `panelVersion`, `zone`, and `attribute` so the revert path can reconstruct these without re-reading the device.
+Inside the `revert()` inner function, after the kill-switch check, a new branch is added for `doc.deviceType === 'boiler-panel'`. It reads `doc.panelVersion` ('v1' or 'v2'), `doc.zone` (e.g. 'CHZ1'), `doc.attribute` (e.g. 'output2Override'), and `doc.dispatchFootprint` from the Cosmos record.
 
-### 2e. New helper: clampBoostWindow (inline in control.js or new module)
+**Revert identity check (required — prevents clobbering a later human override):** Before writing the zero, the revert worker calls `tb.readBoilerState()` and compares the live zone override footprint to `doc.dispatchFootprint`. For V2 the footprint is the `CHZn.override` epoch-second value written by OOH's dispatch; for V1 it is the signed `outputNOverride` epoch-ms value. If the live footprint differs from `doc.dispatchFootprint` — i.e., the zone has been overridden again since OOH dispatched — the revert is skipped (already-satisfied or superseded) and a note is added to the Zendesk ticket. This is analogous to the existing `preDispatchCheck()` already-satisfied guard. The `scheduleOverride()` call in `dispatchBoilerBoost` must store `dispatchFootprint` alongside `panelVersion`, `zone`, and `attribute` in the Cosmos record.
+
+After the identity check passes, the worker calls `tb.dispatchBoilerRpc(device, doc.zone, 0)` for V2 or `tb.writeSharedScopeAttribute(device, doc.attribute, 0)` for V1. Confirmation is via `tb.readBoilerState()` checking the zone's `overrideUntilMs` returned to near-zero. On revert-failed, `raiseAlert('revert-failed', ...)` is called and the Zendesk ticket is updated with a manual-check flag.
+
+### 2e. Confirm-poll telemetry freshness and slow-telemetry fallback
+
+The 2–5 s confirm window is the expected round-trip for boiler-panel telemetry. The freshness threshold is `now - dispatchTs < 10 s` for V2 (CHZn timestamps are epoch-second granularity) and `< 5 s` for V1 (outputNOverride is epoch-ms). If telemetry fails to turn fresh within the poll window, classify as IN-FLIGHT-TIMEOUT (§2c). The poll must not block indefinitely — cap at 5 s for V2 and 2 s for V1 regardless. The confirm poll is a best-effort check; the safety revert is always scheduled.
+
+### 2f. Revert worker posture
+
+The existing 30 s revert worker loop is already in production for Salus/Tuya holds and is bounded (one Cosmos lease claim per device per tick). Each boiler boost adds one Cosmos document and one polling cycle per revert attempt — no unbounded fan-out. The per-boost Zendesk ticket is a single API call at dispatch and a single note at revert — likewise bounded.
+
+### 2g. New helper: clampBoostWindow (inline in control.js or new module)
 
 A pure function `clampBoostWindow(now, durationMs, direction, timezone)` that enforces the 01:00/07:00 rule. See §3.
 
-### 2f. routes/api.js — new POST route
+### 2h. routes/api.js — new POST route
 
 A new `POST /api/boiler-boost` route calls `dispatchBoilerBoost()`. Guarded by the existing auth and site-confirmation middleware. Wired into the operator flow after 139's `boilerHeatingOutcome()` returns a boost-appropriate state (W5 switched-off / W6 off-on-timetable for the ON path; W8 on-but-hot for the OFF path).
 
@@ -113,7 +127,9 @@ When the request arrives between midnight and 01:00, the same clamp applies. A 2
 
 When the request arrives between 01:00 and 06:59, the boost is refused: *"Heating boosts cannot start between 01:00 and 07:00. If the pub is still cold, the IoT team will investigate next morning."*
 
-**Hard stop on late revert:** V2 zones have a natural cap at the next schedule edge (DEDUCED, strong — 60-day log shows every `CHZn.override` epoch matches the next schedule slot boundary). If the OOH revert fails, the V2 natural end fires regardless. V1 has no natural expiry; a failed V1 revert leaves the zone forced indefinitely. The supervised first test must verify V1 revert reliability before any V1 site goes live.
+**Hard stop on late revert — V2:** V2 zones expire at the next schedule edge (DEDUCED, strong — 60-day log shows every `CHZn.override` epoch matches the next schedule slot boundary). If the OOH revert fails, the V2 natural end fires regardless. D2 is preserved for V2.
+
+**Hard stop on late revert — V1 (open risk, build requirement):** V1 has no natural expiry. The `outputNOverride` attribute persists until explicitly zeroed. A failed or late V1 revert leaves the zone forced indefinitely — D2 cannot be guaranteed by dispatch-side clamping alone. Build requirement: V1 sites must not go live until the supervised test verifies revert reliability, and the revert-failed alert path (§Q5) must be agreed before V1 rollout. The `revertAt` clamp at dispatch ensures no boost *starts* past the window, but cannot guarantee it *ends* on time if the revert worker fails.
 
 ### Heat OFF boost — clamp (OPTIONS for James)
 
@@ -183,9 +199,19 @@ Forcing `CHZ1 1` opens the zone valve. If the boiler is not already calling for 
 
 Tony, Sam, or CJ sometimes set overrides directly from the TB dashboard. If a human has `CHZ1.override = epoch+2h` and OOH sends a 30-min boost, OOH's revert at 30 min sends `CHZ1 0` (auto), cancelling the human's 2-hour override. Two choices: pre-empt and warn the operator that an override is already active (read `readBoilerState()` before dispatching and surface the existing `overrideUntilMs`), or block the boost and ask the operator to call the engineer. The `contractor_override` field is unreliable (went stale at 6211 for 6 days — DEDUCED). The per-zone `CHZn.override` sign is the reliable source. James to decide the policy.
 
+Note: the post-dispatch window is separately addressed by the revert identity check in §2d — if a human override is placed after OOH's boost is active, the revert worker detects the footprint mismatch and skips the zero-write. Q4 is therefore only about what to do at dispatch time, not at revert time.
+
 ### Q5 — Overnight revert-failed owner (UNRESOLVED, operational)
 
-`raiseAlert('revert-failed', ...)` writes to the F026 admin queue. Who monitors it at 01:00? The planned Zendesk ticket update (§5) means the IoT team sees the failure first thing next morning — worst case is a zone held for ~6 hours if V1. An SMS/email notification on F021 revert-failed would provide an overnight owner; this is outside scope for 141. James to decide whether overnight notification is needed before V1 sites go live.
+`raiseAlert('revert-failed', ...)` writes to the F026 admin queue. Who monitors it at 01:00? The planned Zendesk ticket update (§5) means the IoT team sees the failure first thing next morning — worst case is a zone held for ~6 hours if V1.
+
+Two revert-failed scenarios need covering:
+
+**Heat ON revert-failed:** V1 zone stays forced on past `revertAt`. Pub overheating overnight. Already covered in the gate DECISION below.
+
+**Heat OFF revert-failed (symmetric risk):** V1 zone stays forced off past `revertAt`. Staff arrive to a cold pub at 07:00. This is the symmetric failure and should be subject to the same notification decision — an overnight owner is needed in both cases.
+
+An SMS/email notification on F021 revert-failed would provide overnight coverage for both; this is outside scope for 141. James to decide the notification threshold before any V1 site goes live (both ON and OFF paths).
 
 ---
 
