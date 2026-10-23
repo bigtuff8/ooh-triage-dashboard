@@ -56,11 +56,13 @@ test('BC-3: site with no boilerControl and no combi signal → hotwater scope le
 });
 
 /* ---- BC-4: OOHDASH-135 Item 4 — heating scope is now device-driven, not boilerControl-driven ---- */
-// BC-4a: boilerControl alone (no heating devices) no longer drives 'ctl' — returns 'none'.
-test('BC-4a: site with boilerControl but no heating devices → heating scope level is none (device-driven after OOHDASH-135)', () => {
-    const site = makeSite(V2_BC);  // devices: []
+// BC-4a: OOHDASH-139: boilerControl site with a boiler-panel device (controllable=false) → heating scope 'mon'.
+test('BC-4a: boilerControl site with a boiler-panel device (controllable=false) → heating scope level is mon (OOHDASH-139)', () => {
+    const site = makeSite(V2_BC, [
+        { deviceId: 'gk-9001-boilercontrol-1', deviceType: 'boiler-panel', kind: 'heating', online: true, controllable: false, telemetry: {} }
+    ]);
     const g = SCOPE_GROUPS.find(g => g.key === 'heating');
-    assert.equal(g.level(site), 'none');
+    assert.equal(g.level(site), 'mon');
 });
 
 // BC-4b: a heating device with effective controllable=true → 'ctl'.

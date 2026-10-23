@@ -682,6 +682,273 @@ function grammaticalList(items) {
     return items.slice(0, -1).join(', ') + ' and ' + items[items.length - 1];
 }
 
+/* ------------------------------------------------------------------ */
+/* OOHDASH-139: Pub boiler panel heating flow helpers                  */
+/* ------------------------------------------------------------------ */
+
+/**
+ * boilerHeatingOutcome(heating, need, nowMs) — pure state-first decision tree.
+ * Returns a W-code string ('W1'..'W9').
+ */
+function boilerHeatingOutcome(heating, need, nowMs) {
+    var staleMs = 60 * 60 * 1000;
+    var isStale = !heating || !heating.visible
+        || heating.panelLastSeenMs === null
+        || (nowMs - heating.panelLastSeenMs) > staleMs;
+    if (isStale) return 'W1';
+
+    var zones = (heating.zones || []);
+    var anyOn = zones.some(function(z) { return z.on; });
+    var allOn = zones.length > 0 && zones.every(function(z) { return z.on; });
+    var anyFallback = zones.some(function(z) { return z.fallback; });
+    var anyForcedOff = zones.some(function(z) { return !z.on && z.forced === 'off'; });
+    var someOnSomeOff = anyOn && !allOn;
+
+    if (need === 'cold') {
+        if (anyFallback) return 'W7';
+        if (heating.boilerCalling && allOn) return 'W2';
+        if (anyForcedOff) return 'W5';
+        if (someOnSomeOff) return 'W3';
+        if (heating.summerMode) return 'W4';
+        return 'W6';
+    }
+    if (need === 'hot') {
+        if (anyOn) return 'W8';
+        return 'W9';
+    }
+    return 'W1';
+}
+
+/**
+ * bpOutcomeCard(wcode, heating, nowMs) — returns all card fields for a W-code.
+ */
+function bpOutcomeCard(wcode, heating, nowMs) {
+    var zones = (heating && heating.zones) || [];
+    var version = heating && heating.version;
+
+    function panelAgo(ms) {
+        if (ms === null || ms === undefined) return 'never';
+        var diff = nowMs - ms;
+        if (diff < 2 * 60 * 1000) return 'just now';
+        if (diff < 60 * 60 * 1000) return Math.floor(diff / 60000) + ' min ago';
+        return Math.floor(diff / 3600000) + ' hours ago';
+    }
+
+    function forcedTimeStr(zone) {
+        if (version === 'V2' && zone.forcedUntilMs && zone.forcedUntilMs > nowMs) {
+            var d = new Date(zone.forcedUntilMs);
+            var hh = String(d.getHours()).padStart(2, '0');
+            var mm2 = String(d.getMinutes()).padStart(2, '0');
+            return 'until ' + hh + ':' + mm2;
+        }
+        if (zone.held) return 'and is being held';
+        return '';
+    }
+
+    // Forced-on add-on sentence
+    var forcedOnZone = zones.find(function(z) { return z.on === true && z.forced === 'on'; });
+    var forcedOnSentence = '';
+    if (forcedOnZone) {
+        var ts = forcedTimeStr(forcedOnZone);
+        forcedOnSentence = 'Pub zone ' + forcedOnZone.n + ' has been switched on at the panel' +
+            (ts ? ' (' + ts + ')' : '') + ", so it's running outside its normal timetable.";
+    }
+
+    var headline, operatorText, scriptText, ticketText, buttons;
+    var ago = panelAgo(heating && heating.panelLastSeenMs);
+
+    if (wcode === 'W1') {
+        headline = "Pub heating: can’t check right now";
+        operatorText = "The pub’s boiler panel last reported " + ago + ", so we can’t see what the heating is doing. Don’t tell the caller whether it is on or off. Log it for the IoT team.";
+        scriptText = "I can’t see the pub heating controls from here at the moment, so I’ve logged it for the team to check.";
+        ticketText = "Pub heating at time of call: could not be checked (boiler panel last reported " + ago + ").";
+        buttons = '<button class="btn primary" data-testid="bp-capture" onclick="flowStep({need:\'bp-esc\'})">Capture &amp; escalate for the IoT team</button>' +
+                  '<button class="btn" data-testid="bp-noact" onclick="flowStep({need:\'bp-noact\'})">End with no action</button>';
+    } else if (wcode === 'W2') {
+        headline = "Lighthouse is asking the boiler for heat";
+        operatorText = "The panel is calling for heat and every pub heating zone is switched on. The controls are doing their job, so the fault is most likely the boiler itself, the pipework, or the radiators and valves. The site needs their gas or heating engineer.";
+        scriptText = "Our controls are asking the boiler for heat right now, so the problem looks like it’s with the boiler or the radiators rather than the controls. Please call your heating engineer. I’ve logged tonight’s call.";
+        ticketText = "Pub heating at time of call: panel calling for heat, all pub zones on. Likely a boiler/heating-side fault; site advised to call their heating engineer.";
+        buttons = '<button class="btn primary" data-testid="bp-advice" onclick="flowStep({need:\'bp-advice\'})">Advise site &amp; log it (recommended)</button>' +
+                  '<button class="btn" data-testid="bp-capture" onclick="flowStep({need:\'bp-esc\'})">Capture &amp; escalate for the IoT team</button>';
+    } else if (wcode === 'W3') {
+        var onZonesW3 = zones.filter(function(z) { return z.on; }).map(function(z) { return 'pub zone ' + z.n; });
+        var offZonesW3 = zones.filter(function(z) { return !z.on; }).map(function(z) { return 'pub zone ' + z.n; });
+        var onListW3 = onZonesW3.join(', ') || 'pub zone 1';
+        var offListW3 = offZonesW3.join(', ') || 'pub zone 2';
+        var onListCapW3 = onListW3.charAt(0).toUpperCase() + onListW3.slice(1);
+        headline = "Part of the pub heating is off";
+        operatorText = esc(onListCapW3) + " is on, but " + esc(offListW3) + " is off right now. The panel doesn’t tell us why from here, and we can’t switch zones remotely. Log it for the IoT team. If the caller says the cold area is the part that’s heating, treat it as a boiler or radiator problem and advise their heating engineer.";
+        scriptText = "Part of the heating is on, but one area is switched off at the controls. I can’t change that from here, so I’ve logged it for the team.";
+        ticketText = "Pub heating at time of call: " + esc(onListW3) + " on, " + esc(offListW3) + " off. Captured for the IoT team.";
+        buttons = '<button class="btn primary" data-testid="bp-capture" onclick="flowStep({need:\'bp-esc\'})">Capture &amp; escalate for the IoT team</button>' +
+                  '<button class="btn" data-testid="bp-advice" onclick="flowStep({need:\'bp-advice\'})">Advise heating engineer &amp; log it</button>' +
+                  '<button class="btn" data-testid="bp-noact" onclick="flowStep({need:\'bp-noact\'})">End with no action</button>';
+    } else if (wcode === 'W4') {
+        headline = "Pub heating is in summer mode";
+        operatorText = "The panel has switched the pub heating off for the summer season. It isn’t a fault, but we can’t change it from here. If the site needs heating, log it for the IoT team.";
+        scriptText = "The heating controls are still set to summer mode, which is why the heating isn’t coming on. I can’t change that from here, but I’ve logged it so the team can switch it back for you.";
+        ticketText = "Pub heating at time of call: off, panel in summer mode. Site needs heating; captured for the IoT team.";
+        buttons = '<button class="btn primary" data-testid="bp-capture" onclick="flowStep({need:\'bp-esc\'})">Capture &amp; escalate for the IoT team</button>' +
+                  '<button class="btn" data-testid="bp-noact" onclick="flowStep({need:\'bp-noact\'})">End with no action</button>';
+    } else if (wcode === 'W5') {
+        var forcedOffZone = zones.find(function(z) { return !z.on && z.forced === 'off'; }) || zones[0] || { n: 1 };
+        var tsW5 = forcedTimeStr(forcedOffZone);
+        var tsPhraseW5 = tsW5 || (forcedOffZone.held ? 'and is being held off' : '');
+        headline = "Pub heating has been switched off on purpose";
+        operatorText = "Pub zone " + forcedOffZone.n + " has been deliberately switched off at the boiler panel" +
+            (tsPhraseW5 ? " (" + tsPhraseW5 + ")" : "") +
+            ". That’s the likely reason it’s cold. We can’t change it from here, so log it for the IoT team if the site needs the heating back on.";
+        scriptText = "That part of the heating has been switched off on purpose at the controls. I can’t change it from here, but I’ve logged that you need it back on so the team can sort it.";
+        ticketText = "Pub heating at time of call: pub zone " + forcedOffZone.n + " forced OFF at the panel" +
+            (tsPhraseW5 ? " (" + tsPhraseW5 + ")" : "") + ". Site needs heat; captured for the IoT team.";
+        buttons = '<button class="btn primary" data-testid="bp-capture" onclick="flowStep({need:\'bp-esc\'})">Capture &amp; escalate for the IoT team</button>' +
+                  '<button class="btn" data-testid="bp-noact" onclick="flowStep({need:\'bp-noact\'})">End with no action</button>';
+    } else if (wcode === 'W6') {
+        var nc = heating && heating.nextChange;
+        headline = "Pub heating is off at the controls right now";
+        operatorText = "The panel isn’t asking the boiler for heat. It isn’t in summer mode and nobody has switched it off on purpose, so it’s most likely outside its heating times." +
+            (nc ? " Based on the panel’s stored timetable, the next change is " + esc(nc) + "." : "") +
+            " We can’t switch it on from here.";
+        scriptText = "The heating is off on its timetable at the moment" +
+            (nc ? " and is due back on at " + esc(nc) : "") +
+            ". I can’t turn it on from here, so I’ve logged it for the team.";
+        ticketText = "Pub heating at time of call: off at the panel (no summer mode, not forced off" +
+            (nc ? "; next scheduled change " + esc(nc) : "") + "). Captured for the IoT team.";
+        buttons = '<button class="btn primary" data-testid="bp-capture" onclick="flowStep({need:\'bp-esc\'})">Capture &amp; escalate for the IoT team</button>' +
+                  '<button class="btn" data-testid="bp-noact" onclick="flowStep({need:\'bp-noact\'})">End with no action</button>';
+    } else if (wcode === 'W7') {
+        var fallbackZone = zones.find(function(z) { return z.fallback; }) || zones[0] || { n: 1 };
+        headline = "Heating is running on a back-up cycle";
+        operatorText = "The panel has lost the room temperature reading for pub zone " + fallbackZone.n + ", so it’s heating that zone on a timed on/off cycle instead. Rooms can feel cooler than normal. The IoT team needs to check the room sensor.";
+        scriptText = "The heating is running, but on a back-up setting because a temperature sensor isn’t reporting. I’ve logged it for the team to fix the sensor.";
+        ticketText = "Pub heating at time of call: pub zone " + fallbackZone.n + " on back-up (fallback) cycle, room sensor not reporting. Captured for the IoT team.";
+        buttons = '<button class="btn primary" data-testid="bp-capture" onclick="flowStep({need:\'bp-esc\'})">Capture &amp; escalate for the IoT team</button>' +
+                  '<button class="btn" data-testid="bp-noact" onclick="flowStep({need:\'bp-noact\'})">End with no action</button>';
+    } else if (wcode === 'W8') {
+        var onZonesW8 = zones.filter(function(z) { return z.on; }).map(function(z) { return 'pub zone ' + z.n; });
+        var onListW8 = onZonesW8.length > 0 ? onZonesW8.join(' and ') : 'pub zones';
+        headline = "Pub heating is on, and we can’t switch it off from here";
+        operatorText = "The panel is heating " + esc(onListW8) + ". Pub heating on this panel can’t be changed remotely. Log it for the IoT team. In the meantime the site can turn the radiator valves down.";
+        scriptText = "The heating is on at the controls and I can’t change it from here tonight. Turning the radiator valves down will help in the meantime. I’ve logged it for the team.";
+        ticketText = "Pub heating at time of call: on (" + esc(onListW8) + "). Caller wants it lower/off; not remotely adjustable. Captured for the IoT team.";
+        buttons = '<button class="btn primary" data-testid="bp-capture" onclick="flowStep({need:\'bp-esc\'})">Capture &amp; escalate for the IoT team</button>' +
+                  '<button class="btn" data-testid="bp-noact" onclick="flowStep({need:\'bp-noact\'})">End with no action</button>';
+    } else if (wcode === 'W9') {
+        headline = "Pub heating is already off";
+        operatorText = "The panel isn’t heating any pub zone right now, so the warmth isn’t coming from the pub heating controls. Ask whether another heater, or the accommodation heating, is on.";
+        scriptText = "Our controls show the pub heating is off right now, so the warmth is coming from somewhere else, perhaps a radiator on manual or another heater. I’ve noted the call.";
+        ticketText = "Pub heating at time of call: off at the panel. Caller reports too warm; heat source is not the pub heating controls.";
+        buttons = '<button class="btn" data-testid="bp-noact" onclick="flowStep({need:\'bp-noact\'})">Log it &amp; end</button>' +
+                  '<button class="btn primary" data-testid="bp-capture" onclick="flowStep({need:\'bp-esc\'})">Capture &amp; escalate for the IoT team</button>';
+    } else {
+        headline = "Pub heating: can’t check right now";
+        operatorText = "Could not determine the heating state. Log it for the IoT team.";
+        scriptText = "I can’t see the pub heating controls from here at the moment, so I’ve logged it for the team to check.";
+        ticketText = "Pub heating at time of call: could not be determined.";
+        buttons = '<button class="btn primary" data-testid="bp-capture" onclick="flowStep({need:\'bp-esc\'})">Capture &amp; escalate for the IoT team</button>' +
+                  '<button class="btn" data-testid="bp-noact" onclick="flowStep({need:\'bp-noact\'})">End with no action</button>';
+    }
+
+    return { headline: headline, operatorText: operatorText, scriptText: scriptText, ticketText: ticketText, buttons: buttons, forcedOnSentence: forcedOnSentence };
+}
+
+/**
+ * boilerPanelHeatingBranch(ws, f, panelDevice, site) — handles the entire boiler panel heating flow.
+ * Entered when the chosen area's device set has a boiler-panel device.
+ */
+function boilerPanelHeatingBranch(ws, f, panelDevice, site) {
+    var heating = ws.boilerControl && ws.boilerControl.heating ? ws.boilerControl.heating : null;
+    var nowMs = Date.now();
+
+    function panelAgo(ms) {
+        if (ms === null || ms === undefined) return 'never';
+        var diff = nowMs - ms;
+        if (diff < 2 * 60 * 1000) return 'just now';
+        if (diff < 60 * 60 * 1000) return Math.floor(diff / 60000) + ' min ago';
+        return Math.floor(diff / 3600000) + ' hours ago';
+    }
+
+    function fmtTemp(v) {
+        if (typeof v !== 'number' || !isFinite(v) || v < -30 || v > 110) return '—';
+        return v.toFixed(1) + '°C';
+    }
+
+    // Build readout line
+    function buildReadout() {
+        if (!heating || !heating.visible) {
+            return '<div class="zoneread"><span class="small">Pub boiler panel — no reading</span></div>';
+        }
+        var zones = heating.zones || [];
+        var zoneParts = zones.map(function(z) {
+            var stateHtml = z.on === true ? '<b class="ok">on</b>' : (z.on === false ? '<b class="warn">off</b>' : '—');
+            return 'Pub zone ' + z.n + ' ' + stateHtml;
+        }).join(' · ');
+        var temps = zones.map(function(z) { return fmtTemp(z.roomTemp); }).join(' / ');
+        var ago = panelAgo(heating.panelLastSeenMs);
+        var readoutText = (zoneParts || 'no zones') +
+            (temps && temps !== '—' ? ' · room ' + temps : '') +
+            ' · panel reported ' + ago;
+        return '<div class="zoneread"><span class="small">' + readoutText + '</span></div>';
+    }
+
+    var readout = buildReadout();
+
+    // Stage 1: ask what the caller needs (two chips only for boiler panel)
+    if (f.stage === 1) {
+        doneLine('Area: <b>Bar/Restaurant (pub boiler panel)</b>');
+        return readout +
+            '<div class="stepq">What does the caller need?</div>' +
+            '<div class="chips">' +
+            '<button class="chip" data-testid="need-cold" onclick="flowStep({need:\'cold\'})">Too cold / not working</button>' +
+            '<button class="chip" data-testid="need-hot" onclick="flowStep({need:\'hot\'})">Too hot / wants it off</button>' +
+            '</div>';
+    }
+
+    var need = f.data.need;
+
+    // Outcome button clicks
+    if (need === 'bp-esc') {
+        var wcode1 = f.data.bpWcode || 'W1';
+        var card1 = bpOutcomeCard(wcode1, heating, nowMs);
+        return outcomeCaptured(f, 'bp-esc', { subject: card1.headline, detail: card1.operatorText, script: card1.scriptText, OohCaptureClass: 'boiler-panel-heating' });
+    }
+    if (need === 'bp-advice') {
+        var wcode2 = f.data.bpWcode || 'W2';
+        var card2 = bpOutcomeCard(wcode2, heating, nowMs);
+        return outcomeCaptured(f, 'bp-advice', { subject: card2.headline, detail: card2.operatorText, script: card2.scriptText, OohCaptureClass: 'boiler-panel-advice' });
+    }
+    if (need === 'bp-noact') {
+        return outcomeNoAction(f, 'bp-noact', { subject: 'Pub heating query — no action', detail: '', script: '' });
+    }
+
+    // Stage 2: show outcome card
+    if (need === 'cold' || need === 'hot') {
+        var wcode = boilerHeatingOutcome(heating, need, nowMs);
+        f.data.bpWcode = wcode;
+        var card = bpOutcomeCard(wcode, heating, nowMs);
+        doneLine('Need: <b>' + (need === 'cold' ? 'Too cold / not working' : 'Too hot / wants it off') + '</b>');
+        doneLine('Outcome: <b>' + wcode + '</b>');
+        return readout +
+            '<div class="reco" data-testid="reco-boiler-panel">' +
+            '<b class="hd">' + esc(card.headline) + '</b>' +
+            '<div class="k">What to tell the operator</div>' +
+            '<p>' + card.operatorText + '</p>' +
+            (card.forcedOnSentence ? '<p>' + esc(card.forcedOnSentence) + '</p>' : '') +
+            '<div class="k">Say to caller</div>' +
+            '<p class="script">“' + card.scriptText + '”</p>' +
+            '<div class="k">Ticket sentence</div>' +
+            '<p class="tkt">' + card.ticketText + '</p>' +
+            '<div class="outbtns">' + card.buttons + '</div>' +
+            '</div>';
+    }
+
+    // Fallback: reset to stage 1
+    f.stage = 1;
+    f.data.need = null;
+    return boilerPanelHeatingBranch(ws, f, panelDevice, site);
+}
+
 /* ------------------------ flow renderers ------------------------ */
 const FLOWR = {
     heating(ws, f) {
@@ -729,6 +996,14 @@ const FLOWR = {
         const chosenArea = f.data.area === '__unmapped__' ? null : f.data.area;
         const areaLabel = f.data.area === '__unmapped__' ? 'Heating — area not identified' : f.data.area;
         const set = devicesForArea(chosenArea);
+
+        // OOHDASH-139: if the area has a boiler panel, route to the panel branch before
+        // areaRepresentative and the no-online-device connectivity diversion.
+        const panelDevice = set.find(d => d.deviceType === 'boiler-panel');
+        if (panelDevice) {
+            return boilerPanelHeatingBranch(ws, f, panelDevice, ws.site);
+        }
+
         const z = areaRepresentative(set);
         // No online device in the area → connectivity branch (design §7.3 rule 2), same as a single
         // offline device today. Uses any device in the set to name the area in the connectivity line.
@@ -793,10 +1068,6 @@ const FLOWR = {
             const notReportingNote = nOff > 0
                 ? '<p class="small" data-testid="area-not-reporting-note">' + (nOff === 1 ? '1 other heating unit' : nOff + ' other heating units') + ' in ' + esc(areaLabel) + ' ' + (nOff === 1 ? 'is' : 'are') + ' not reporting, so ' + (nOff === 1 ? 'it is' : 'they are') + ' not part of this reading. Nothing done on this call caused this.</p>'
                 : '';
-            if (z.deviceType === 'boiler-panel') {
-                doneLine(`Live read: ${temp != null ? temp + '°C' : 'no reading'} · pub boiler panel`);
-                return read + `<div class="reco" data-testid="reco-boiler-panel"><b class="hd">Pub heating here is monitored only.</b>We can read the temperature from the boiler panel, but there’s no remote adjustment path for heating on this site.<div class="outbtns"><button class="btn primary" onclick="flowStep({need:’bp’})">Capture &amp; escalate for the IoT team</button><button class="btn" onclick="flowStep({need:’noact’})">End with no action</button></div></div>`;
-            }
             return read + notReportingNote + `<div class="stepq">What does the caller need?</div><div class="chips">
     <button class="chip" data-testid="need-warm" onclick="flowStep({need:'warm'})">Warmer</button>
     <button class="chip" data-testid="need-cool" onclick="flowStep({need:'cool'})">Cooler</button>
@@ -805,21 +1076,6 @@ const FLOWR = {
         }
         if (f.stage === 2) {
             const need = f.data.need;
-            if (need === 'bp') {
-                return outcomeCaptured(f, 'bp', {
-                    subject: `Pub heating change requested (${z.zone})`,
-                    detail: `Caller asked for a pub heating adjustment; no remote control path exists for boiler-panel heating. Logged with the reading ${temp != null ? temp + '°C' : 'n/a'}. (SR-4① pressure recorded.)`,
-                    script: `This has been logged for our team. We can see the temperature reading, but there is no remote adjustment path for pub heating at this site.`,
-                    OohCaptureClass: 'boiler-panel-heating'
-                });
-            }
-            if (need === 'noact') {
-                return outcomeNoAction(f, 'noact', {
-                    subject: 'Pub heating query — no action possible',
-                    detail: 'Caller asked about pub boiler-panel heating; no remote control path exists and the caller declined a follow-up. Call recorded for the audit trail.',
-                    script: ''
-                });
-            }
             if (need === 'warm' && temp != null && sp != null && temp <= sp - 2) {
                 doneLine('Requested: warmer · system already calling for heat');
                 return `<div class="reco" data-testid="reco-building-heat"><b class="hd">Raising the setpoint won’t help here.</b>The zone is reading <b>${temp}°C against a ${sp}°C setpoint</b> with the device online — the system is already asking for more heat than the building is delivering. That usually means radiators/TRVs or the boiler.<div class="outbtns"><button class="btn primary" onclick="flowStep({buildheat:1})">Give building-heat guidance &amp; log it</button><button class="btn" onclick="flowStep({forceCtl:1})">Adjust the setpoint anyway</button></div></div>`;

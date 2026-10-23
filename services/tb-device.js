@@ -428,6 +428,12 @@ export function classifyDevice(name, profile, telemetry) {
         return { kind: 'fridge', deviceType: 'refrigeration', deviceTypeLabel: 'Refrigeration (monitor-only)', controllable: false, control: null };
     }
 
+    // OOHDASH-139: boilerControl profile → pub boiler panel (read-only heating device).
+    // Profile is authoritative; no ASSET_INTENT row added (avoids bare-name bleed — OOHDASH-108).
+    if (profile === 'boilerControl') {
+        return { kind: 'heating', deviceType: 'boiler-panel', deviceTypeLabel: 'Pub boiler panel', controllable: false, control: null };
+    }
+
     // 1) Capability from telemetry signals first (control-eligibility, never profile).
     let intent = null;
     if (hasSwitchSignal(telemetry)) {
@@ -564,7 +570,8 @@ export function parseSiteCodeLetter(siteCode) {
  *     name's trailing parenthetical (OOHDASH-108 DECISION 1, parenthetical fallback — the raw name
  *     is required because normaliseName strips parentheticals before tokenising). A present
  *     CLIENT_SCOPE letter ALWAYS wins over the parenthetical.
- *   - every other deviceType (intesis, gateway, tuya, refrigeration, boiler-panel, unknown) → null.
+ *   - boiler-panel → Bar/Restaurant.
+ *   - every other deviceType (intesis, gateway, tuya, refrigeration, unknown) → null.
  *
  * @param {string}      deviceType  a registry.js key from classifyDevice
  * @param {object|null} clientScope the CLIENT_SCOPE attribute map (carries `site`)
@@ -613,6 +620,8 @@ export function deriveArea(deviceType, clientScope, rawName) {
         if (letter === 'r' || letter === 'b') return 'Bar/Restaurant';
         return null;
     }
+    // OOHDASH-139: the boiler panel is the Bar/Restaurant device.
+    if (deviceType === 'boiler-panel') return 'Bar/Restaurant';
     return null;
 }
 
@@ -1169,6 +1178,146 @@ export function dhwOverrideOutcome(dhwOverride, nowMs) {
     };
 }
 
+/* ------------------------------------------------------------------ */
+/* OOHDASH-139: decodeBoilerHeating — pub zone heating state (V1/V2)   */
+/* ------------------------------------------------------------------ */
+
+const _BOILER_HEATING_DECODE_ERROR = { visible: false, version: null, panelLastSeenMs: null, stale: true, boilerCalling: null, zones: [], summerMode: null, nextChange: null };
+
+function _decodeBoilerHeatingInner(sharedScope, clientScope, panelLastSeenMs, telemBag, now) {
+    const sc = sharedScope || {};
+    const cc = clientScope || {};
+    const t = telemBag || {};
+
+    // Version discrimination: heating_scenario in CLIENT → V2; output1OutputMask in SHARED → V1.
+    // V2 wins if both present (dual-marker rule, same as _decodeDhwOverrideInner).
+    const hasHeatScen = Object.prototype.hasOwnProperty.call(cc, 'heating_scenario');
+    const hasMask = Object.prototype.hasOwnProperty.call(sc, 'output1OutputMask');
+    if (!hasHeatScen && !hasMask) {
+        return { visible: false, version: null, panelLastSeenMs: panelLastSeenMs ?? null, stale: true, boilerCalling: null, zones: [], summerMode: null, nextChange: null };
+    }
+    const version = hasHeatScen ? 'V2' : 'V1';
+
+    // Staleness: panel last report > boilerPanelStaleThresholdMinutes ago (or absent).
+    const staleMs = config.boilerPanelStaleThresholdMinutes * 60 * 1000;
+    const lastSeenMs = panelLastSeenMs ?? null;
+    const stale = lastSeenMs === null || (now - lastSeenMs) > staleMs;
+
+    // Helper: drop temperature sentinel values outside [-30, 110] → null.
+    function safeTemp(v) {
+        const n = Number(v);
+        if (!Number.isFinite(n) || n < -30 || n > 110) return null;
+        return n;
+    }
+
+    // Parse override for a zone: returns { forced, forcedUntilMs, held }
+    function parseOverride(rawOverride, zoneOn, ver, nowMs) {
+        if (rawOverride === null || rawOverride === undefined) return { forced: null, forcedUntilMs: null, held: false };
+        const n = Number(rawOverride);
+        if (!Number.isFinite(n) || n === 0) return { forced: null, forcedUntilMs: null, held: false };
+
+        if (ver === 'V1') {
+            // V1: negative = forced off, positive = forced on; rolling now+15min heartbeat (no real end time).
+            if (n < 0 && zoneOn === false) return { forced: 'off', forcedUntilMs: null, held: true };
+            if (n > 0 && zoneOn === true) return { forced: 'on', forcedUntilMs: null, held: true };
+            return { forced: null, forcedUntilMs: null, held: false };
+        } else {
+            // V2: epoch-seconds end time, signed. negative = forced off, positive = forced on.
+            const endMs = Math.abs(n) * 1000;
+            const inFuture = endMs > nowMs;
+            if (n < 0 && zoneOn === false) return { forced: 'off', forcedUntilMs: inFuture ? endMs : null, held: false };
+            if (n > 0 && zoneOn === true) return { forced: 'on', forcedUntilMs: inFuture ? endMs : null, held: false };
+            return { forced: null, forcedUntilMs: null, held: false };
+        }
+    }
+
+    // Decode a boolean-like TB attribute (true/1 → true, false/0 → false, else null).
+    function tbBool(v) {
+        if (v === true || v === 1) return true;
+        if (v === false || v === 0) return false;
+        return null;
+    }
+
+    let boilerCalling, zones, summerMode;
+
+    if (version === 'V1') {
+        boilerCalling = tbBool(t.output1State);
+        summerMode = tbBool(t.summerModeActive);
+
+        // Zone configured: output1OutputMask index 1 = z1, index 2 = z2.
+        let mask = sc.output1OutputMask;
+        if (typeof mask === 'string') { try { mask = JSON.parse(mask); } catch { mask = null; } }
+        const z1Configured = Array.isArray(mask) ? !!mask[1] : Object.prototype.hasOwnProperty.call(t, 'output2State');
+        const z2Configured = Array.isArray(mask) ? !!mask[2] : Object.prototype.hasOwnProperty.call(t, 'output3State');
+
+        zones = [];
+        if (z1Configured) {
+            const on = tbBool(t.output2State);
+            const fallback = tbBool(t.output2FallbackEnabled);
+            const { forced, forcedUntilMs, held } = parseOverride(t.output2Override ?? null, on, 'V1', now);
+            zones.push({ n: 1, on, fallback, forced, forcedUntilMs, held, roomTemp: safeTemp(t.roomSensor1Temp) });
+        }
+        if (z2Configured) {
+            const on = tbBool(t.output3State);
+            const fallback = tbBool(t.output3FallbackEnabled);
+            const { forced, forcedUntilMs, held } = parseOverride(t.output3Override ?? null, on, 'V1', now);
+            zones.push({ n: 2, on, fallback, forced, forcedUntilMs, held, roomTemp: safeTemp(t.roomSensor2Temp) });
+        }
+    } else {
+        // V2
+        boilerCalling = tbBool(t['boiler.enable_output_state']);
+        summerMode = tbBool(t['summer_mode']);
+
+        // Zone configured: clientScope CHZ1.enabled / CHZ2.enabled (bool or string 'true'/'false').
+        // Fallback: telemetry key presence.
+        function isZoneEnabled(ccKey, telemKey) {
+            const v = cc[ccKey];
+            if (v === true || v === 'true' || v === 1) return true;
+            if (v === false || v === 'false' || v === 0) return false;
+            return Object.prototype.hasOwnProperty.call(t, telemKey);
+        }
+        const z1Configured = isZoneEnabled('CHZ1.enabled', 'CHZ1.output_state');
+        const z2Configured = isZoneEnabled('CHZ2.enabled', 'CHZ2.output_state');
+
+        zones = [];
+        if (z1Configured) {
+            const on = tbBool(t['CHZ1.output_state']);
+            const fallback = tbBool(t['CHZ1.fallback_enabled']);
+            const { forced, forcedUntilMs, held } = parseOverride(t['CHZ1.override'] ?? null, on, 'V2', now);
+            zones.push({ n: 1, on, fallback, forced, forcedUntilMs, held, roomTemp: safeTemp(t['CHZ1.room_temp']) });
+        }
+        if (z2Configured) {
+            const on = tbBool(t['CHZ2.output_state']);
+            const fallback = tbBool(t['CHZ2.fallback_enabled']);
+            const { forced, forcedUntilMs, held } = parseOverride(t['CHZ2.override'] ?? null, on, 'V2', now);
+            zones.push({ n: 2, on, fallback, forced, forcedUntilMs, held, roomTemp: safeTemp(t['CHZ2.room_temp']) });
+        }
+    }
+
+    // nextChange: use decodeDeviceSchedule (internal function, same file).
+    // Pass a deviceType string so the function routes to the right schedule key family.
+    const nextChange = decodeDeviceSchedule('boiler-panel', sc, now) ?? null;
+
+    return {
+        visible: true,
+        version,
+        panelLastSeenMs: lastSeenMs,
+        stale,
+        boilerCalling,
+        zones,
+        summerMode,
+        nextChange,
+    };
+}
+
+export function decodeBoilerHeating(sharedScope, clientScope, panelLastSeenMs, telemBag, now) {
+    try {
+        return _decodeBoilerHeatingInner(sharedScope, clientScope, panelLastSeenMs, telemBag, now);
+    } catch (_e) {
+        return { ..._BOILER_HEATING_DECODE_ERROR };
+    }
+}
+
 /**
  * Bulk latest telemetry for a set of TB devices, PLUS the per-device online state (OOHDASH-80). Uses
  * per-device latest-timeseries reads over the read session AND a per-device SERVER_SCOPE `active`
@@ -1199,7 +1348,8 @@ async function fetchTelemetry(devices) {
             readServerScopeAttributes(uuid, 'active,lastActivityTime'),
             isBoilerControl
                 // OOHDASH-136: heating_scenario added to identify V2 panels for DHW override decode.
-                ? readClientScopeAttributes(uuid, 'site,salusLocation,DHW.use_boiler,heating_scenario')
+                // OOHDASH-139: CHZ1.enabled,CHZ2.enabled added for zone-configured decode in decodeBoilerHeating.
+                ? readClientScopeAttributes(uuid, 'site,salusLocation,DHW.use_boiler,heating_scenario,CHZ1.enabled,CHZ2.enabled')
                 : readClientScopeAttributes(uuid, 'site,salusLocation'),
             isBoilerControl
                 // OOHDASH-123 (WU13): also read the schedule attributes (V1 output1..4Schedule,
@@ -1405,8 +1555,16 @@ async function fetchLiveSitesByNumber(siteNo) {
             bcBag.__v1OverrideHistory ?? null,
             Date.now()
         );
+        // OOHDASH-139: decode live heating state and attach.
+        boilerControlField.heating = decodeBoilerHeating(
+            bcBag.__sharedScope ?? null,
+            bcBag.__clientScope ?? null,
+            bcBag.__lastActivityTime ?? null,
+            bcBag,
+            Date.now()
+        );
     } else {
-        boilerControlField = { present: false, isV1: false, isV2: false, heatingControllable: false, dhwControllable: false, deviceId: null };
+        boilerControlField = { present: false, isV1: false, isV2: false, heatingControllable: false, dhwControllable: false, deviceId: null, heating: null };
     }
     const accountId = `${brand}-${key}`;
     const site = {
@@ -1477,7 +1635,7 @@ export async function getSitesByNumber(siteNo) {
         } else {
             sites = loadFixture().sites.filter(s => s.siteNo === String(siteNo));
             // OOHDASH-114-F1: ensure every fixture site has the boilerControl field.
-            const defaultBc = { present: false, isV1: false, isV2: false, heatingControllable: false, dhwControllable: false, deviceId: null };
+            const defaultBc = { present: false, isV1: false, isV2: false, heatingControllable: false, dhwControllable: false, deviceId: null, heating: null };
             sites = sites.map(s => ({ ...s, boilerControl: s.boilerControl ?? defaultBc }));
         }
         lastReadOk = true;
