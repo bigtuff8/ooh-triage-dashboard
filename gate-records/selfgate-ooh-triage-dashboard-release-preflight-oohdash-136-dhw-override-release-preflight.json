@@ -1,0 +1,21 @@
+{
+  "run": "selfgate-ooh-triage-dashboard-release-preflight-oohdash-136-dhw-override",
+  "phase": "release-preflight",
+  "pr": 128,
+  "approvedBy": [
+    "bigtuff8"
+  ],
+  "reviewComments": [
+    "bigtuff8: - Known issues not blocking this release: Approve this part\n\n(submitted via the interactive gate review)\n\n<!-- gate:selected [{\"question\":\"Known issues not blocking this release\",\"answer\":\"Approve this part\"}] -->"
+  ],
+  "mergeCommit": "46264e209f9d5e54fd740db19f1b0d0652a97f35",
+  "phaseBranch": "release-preflight/oohdash-136-dhw-override",
+  "releaseBranch": "main",
+  "stamp": 1792736296926,
+  "selectedOptions": [
+    {
+      "question": "Known issues not blocking this release",
+      "answer": "Approve this part"
+    }
+  ]
+}
