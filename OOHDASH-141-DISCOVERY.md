@@ -71,13 +71,15 @@ For boiler panels this call is wrong: V2 needs a one-way RPC (method `override`,
 
 **`dispatchBoilerRpc(device, zone, direction)`** sends a one-way RPC to the panel. It POSTs to `/api/rpc/oneway/{uuid}` with body `{ method: 'override', params: '<ZONE> <N>' }` where ZONE is one of `CHZ1`, `CHZ2`, `DHW`, `boiler` and N is `1` (force on), `-1` (force off), or `0` (auto). Uses the write session. Returns `Date.now()` as `dispatchTs` since one-way RPC gives no server-assigned timestamp. Confirmation is not from the RPC reply — it comes from polling `readBoilerState()`.
 
-**`writeSharedScopeAttribute(device, attribute, value)`** POSTs `{ [attribute]: value }` to `/api/plugins/telemetry/DEVICE/{uuid}/attributes/SHARED_SCOPE` using the write session. Used for V1 panels only. Must be allow-listed against a new `BOILER_SHARED_KEYS` constant analogous to the existing `REQUESTED_KEYS` guard.
+**`writeSharedScopeAttribute(device, attribute, value)`** POSTs `{ [attribute]: value }` to `/api/plugins/telemetry/DEVICE/{uuid}/attributes/SHARED_SCOPE` using the write session. Used for V1 panels only. Must be allow-listed against a new `BOILER_SHARED_KEYS` constant analogous to the existing `REQUESTED_KEYS` guard. The `BOILER_SHARED_KEYS` guard is enforced inside `writeSharedScopeAttribute` itself (not only declared) — it is the sole guard against arbitrary V1 SHARED_SCOPE writes and must reject any key not in the set.
 
 **`readBoilerState(device, version, zones[])`** reads the confirming telemetry for each zone. For V2 it reads timeseries `CHZn.override` (epoch-seconds signed) and `CHZn.output_state`. For V1 it reads `outputNOverride` (epoch-ms signed) and `outputNState`. Returns an array of `{ n, overrideUntilMs, direction, outputState }`. Used by the dispatch confirm loop and by the revert confirm path.
 
 ### 2b. services/registry.js — boiler-panel commands and contract
 
 The `REGISTRY['boiler-panel'].commands` array changes from `[]` to `['boost-on', 'boost-off']`. A new `CONTROL_CONTRACT['boiler-panel']` entry is added with `requestedKey: null` (no Requested key — dispatch is direct), `statusKey: null`, `errorKey: null`, `confirmKeys: null` (confirmation is via `readBoilerState()`), `controllable: true`, and `timingClass: 'boiler-panel'`. A new timing class `'boiler-panel'` is added to `config.control.classes` with fast confirm limits (V2 ~3 s, V1 ~2 s). `validateCommand` gains two new cases — `'boost-on'` and `'boost-off'` — that validate the zone is one of `CHZ1` or `CHZ2` (pub zones only) and return `{ ok: true, dispatchMethod, zone, direction }`.
+
+**V1 zone→output mapping (build-verify requirement):** V1 panels use `output2Override` for zone 1 (Bar) and `output3Override` for zone 2 (Restaurant) in the standard Airedale wiring. This mapping is conventional, not confirmed per-device from TB telemetry. Build requirement: the supervised first-boost test must validate that the CHZ1→output2Override and CHZ2→output3Override mapping holds for the selected test site before any V1 site goes live. The registry entry should store the per-device mapping if it is confirmed to vary across sites. RPC params (`<ZONE> <N>`) and SHARED_SCOPE attribute names are derived solely from allow-listed, validateCommand-returned values — never from raw operator input.
 
 ### 2c. services/control.js — new boiler boost dispatch path
 
@@ -89,7 +91,9 @@ A parallel entry point `dispatchBoilerBoost({ operator, confirmToken, siteNo, de
 
 Inside the `revert()` inner function, after the kill-switch check, a new branch is added for `doc.deviceType === 'boiler-panel'`. It reads `doc.panelVersion` ('v1' or 'v2'), `doc.zone` (e.g. 'CHZ1'), `doc.attribute` (e.g. 'output2Override'), and `doc.dispatchFootprint` from the Cosmos record.
 
-**Revert identity check (required — prevents clobbering a later human override):** Before writing the zero, the revert worker calls `tb.readBoilerState()` and compares the live zone override footprint to `doc.dispatchFootprint`. For V2 the footprint is the `CHZn.override` epoch-second value written by OOH's dispatch; for V1 it is the signed `outputNOverride` epoch-ms value. If the live footprint differs from `doc.dispatchFootprint` — i.e., the zone has been overridden again since OOH dispatched — the revert is skipped (already-satisfied or superseded) and a note is added to the Zendesk ticket. This is analogous to the existing `preDispatchCheck()` already-satisfied guard. The `scheduleOverride()` call in `dispatchBoilerBoost` must store `dispatchFootprint` alongside `panelVersion`, `zone`, and `attribute` in the Cosmos record.
+**Revert identity check (required — prevents clobbering a later human override):** Before writing the zero, the revert worker calls `tb.readBoilerState()` and compares the live zone override footprint to `doc.dispatchFootprint`. For V2 the footprint is the `CHZn.override` epoch-second value written by OOH's dispatch; for V1 it is the signed `outputNOverride` epoch-ms value. If the live footprint differs from `doc.dispatchFootprint` and the footprint is not `null` — i.e., the zone has been overridden again since OOH dispatched — the revert is skipped (already-satisfied or superseded) and a note is added to the Zendesk ticket. This is analogous to the existing `preDispatchCheck()` already-satisfied guard. The `scheduleOverride()` call in `dispatchBoilerBoost` must store `dispatchFootprint` alongside `panelVersion`, `zone`, and `attribute` in the Cosmos record.
+
+**Footprint under IN-FLIGHT-TIMEOUT:** When dispatch classification is IN-FLIGHT-TIMEOUT, the post-dispatch telemetry never turned fresh, so the OOH-written footprint was never observed. In this case `doc.dispatchFootprint` is stored as `null`. When the revert worker finds `dispatchFootprint === null`, it skips the identity check and reverts unconditionally — this is the conservative safe path since we know a dispatch was sent and cannot verify it did not land. The unconditional zero is preferred over leaving the zone potentially forced.
 
 After the identity check passes, the worker calls `tb.dispatchBoilerRpc(device, doc.zone, 0)` for V2 or `tb.writeSharedScopeAttribute(device, doc.attribute, 0)` for V1. Confirmation is via `tb.readBoilerState()` checking the zone's `overrideUntilMs` returned to near-zero. On revert-failed, `raiseAlert('revert-failed', ...)` is called and the Zendesk ticket is updated with a manual-check flag.
 
@@ -119,7 +123,9 @@ Pub heating must never run past 01:00 and never start before 07:00 Europe/London
 
 ### Heat ON boost — clamp logic
 
-The `clampBoostWindow()` function converts `now` to Europe/London and applies these rules:
+The `clampBoostWindow()` function converts `now` to Europe/London using the `date-fns-tz` library already in the repo and applies these rules:
+
+**DST handling:** On spring-forward nights (late March), the 01:00 Europe/London hour does not exist (clocks jump 00:59 → 02:00 BST). On those nights the clamp ceiling is 02:00 BST (the next valid moment), which is more permissive but safe — heating cannot run into a non-existent hour. On fall-back nights (late October), 01:00 occurs twice: 01:00 BST and 01:00 GMT. The clamp must use the later occurrence (01:00 GMT / `1:00:00 +00:00`) — the more conservative choice. The implementation must use `date-fns-tz`'s `zonedTimeToUtc` with the `disambiguate: 'later'` option or equivalent to handle the fall-back duplicate. This must be verified with a unit test covering both DST transitions.
 
 When the request arrives between 07:00 and midnight, the boost is allowed. `revertAt` is set to `now + durationMs`. If `revertAt` falls after 01:00 of the same night (e.g. 23:30 + 2h = 01:30), it is clamped to 01:00 and the operator sees a message: *"2-hour boost clamped to 30 min — pub heating must stop at 01:00."*
 
@@ -171,6 +177,8 @@ V2 CHZ overrides expire at the next schedule transition. OOH schedules its own r
 
 Every boost creates a Zendesk ticket via the existing `createLateSyncTicket` / `addLateSyncNote` infrastructure in `services/zendesk.js`. For a boiler boost the ticket is opened **immediately on dispatch** (not deferred), so the IoT team receives it even if the revert succeeds cleanly.
 
+**Zendesk ticket creation failure handling:** The Zendesk call at dispatch is synchronous and blocking before `scheduleOverride()` is called. If it fails (network error, API error), the dispatch flow must still schedule the hold (the safety revert must not be skipped) but must raise a separate `raiseAlert('zendesk-failed', ...)` to the F026 admin queue so a record of the boost exists even without the ticket. The "IoT morning ticket is acceptable" risk acceptance requires the ticket to exist; the alert provides a fallback when it does not.
+
 **At dispatch the ticket body covers:** site name and number, zone (pub zone 1 or 2), direction (heating forced ON or OFF), operator name, caller's reported issue (from the conversation context), panel version (V1 or V2), boost label and `revertAt` time, whether the duration was clamped and by how much, and the confirmation read-back (zone `overrideUntilMs` and `outputState` at the moment CONFIRMED was classified).
 
 **At revert a ticket note is added:** revert outcome (CONFIRMED or revert-failed), the zone `overrideUntilMs` and `outputState` read-back after the revert, and if revert-failed, a plaintext flag that the zone may still be forced and a manual check is needed.
@@ -194,6 +202,8 @@ Does `"CHZ1 1 30"` (a third argument = minutes) tell the V2 panel to self-revert
 ### Q3 — Does a zone boost also need boiler.override? (UNRESOLVED, safety-critical)
 
 Forcing `CHZ1 1` opens the zone valve. If the boiler is not already calling for heat (`boiler.enable_output_state` or `output1State`), the zone runs but the boiler may not fire. For a "too cold" call, the pub does not warm up. The V2 panel may propagate a zone-on override to the boiler automatically (the normal case during active schedule), or it may not. The supervised test must record `boiler.enable_output_state` before and after the zone override. If it does not flip, OOH must also send `boiler 1` alongside the zone command and `boiler 0` on revert — a separate RPC call. For V1, the same question applies to `output1State` and `output2Override`.
+
+**Build requirement:** The ON path must not go live on any site — V1 or V2 — until the supervised test confirms or refutes Q3. This applies to the first site regardless of panel version.
 
 ### Q4 — Interaction with an existing human override (UNRESOLVED, policy)
 
@@ -220,6 +230,8 @@ An SMS/email notification on F021 revert-failed would provide overnight coverage
 In scope for OOHDASH-141: V2 one-way RPC dispatch and revert for CHZ1 and CHZ2 (pub zones), V1 SHARED_SCOPE write and revert for output2Override and output3Override, the 01:00/07:00 clamp enforced server-side at dispatch and at revert scheduling, the durable Cosmos hold record extended with `panelVersion`, `zone`, and `attribute`, the revert worker extended with the boiler branch, the IoT team Zendesk ticket opened at dispatch and updated at revert, and the supervised first-boost test on a Sam-selected site.
 
 Out of scope: DHW override (OOHDASH-136), accommodation zones, SMS/email notification on revert-failed (operational decision), schedule changes (invariant — never).
+
+**Concurrent overlapping boosts on the same zone:** If a second boost request arrives for the same zone while a first boost is active, `readBoilerState()` at dispatch time will return an existing non-zero `overrideUntilMs`. The Q4 policy (warn or block) applies — the same pre-dispatch check that guards against human overrides also guards against a second OOH boost. The footprint identity check at revert time additionally prevents the earlier boost's revert from zeroing a zone that has since been re-boosted. This behaviour is explicit, not emergent.
 
 **Dependency:** OOHDASH-141 builds on OOHDASH-139's `classifyDevice → boiler-panel`, `deriveArea → Bar/Restaurant`, and `decodeBoilerHeating`. The boost UI re-uses 139's zone-state facts. 141 cannot ship before 139 is merged.
 
