@@ -1,6 +1,6 @@
 <!-- gate:contract
 SECTION: What this ticket builds
-When a caller says a pub is too cold or too hot, the OOH agent applies a timed boost directly to the boiler-control panel — forcing heating on or off for a fixed period — without touching the schedule. Every boost opens a Zendesk ticket so the IoT team can find the underlying cause next morning. The boost reuses the existing durable-hold and revert-worker machinery and adds two new dispatch primitives: a one-way RPC for V2 panels and a shared-attribute write for V1 panels. The 01:00 and 07:00 Europe/London boundaries are enforced server-side at dispatch. V2 panels also self-revert at the next schedule edge as a secondary safety net. V1 panels have no natural expiry and depend solely on the revert worker; a late or failed V1 revert leaves the zone forced until manually zeroed — this risk is documented in the discovery and is a build requirement for V1 rollout.
+When a caller says a pub is too cold or too hot, the OOH agent applies a timed boost directly to the boiler-control panel — forcing heating on or off for a fixed period — without touching the schedule. Every boost opens a Zendesk ticket so the IoT team can find the underlying cause next morning. The boost reuses the existing durable-hold and revert-worker machinery and adds two new dispatch primitives: a one-way RPC for V2 panels and a shared-attribute write for V1 panels. The 01:00 and 07:00 Europe/London boundaries are enforced at dispatch. The OOH revert worker is the sole guarantor of the D2 boundary for both V1 and V2 — V2 panels self-revert at the next schedule edge but that edge can be after 01:00 for late-closing pubs. A failed revert on either panel type can leave heating running past 01:00; this risk and the overnight notification policy are open questions James must decide before any site goes live.
 
 DECISION: Heat ON — duration menu | 30 min, 1 h, 2 h | Different options
 DETAIL: The 01:00 cutoff clamps any boost that would run past it. A 2-hour boost at 23:30 becomes 30 minutes. A boost requested between 01:00 and 07:00 is refused outright.
@@ -107,6 +107,8 @@ The 2–5 s confirm window is the expected round-trip for boiler-panel telemetry
 
 **Freshness threshold:** Treat telemetry as fresh if its timestamp is `>= dispatchTs` (epoch-seconds comparison for V2, epoch-ms for V1). Stale if predating dispatch. If telemetry fails to turn fresh within the poll window, classify as IN-FLIGHT-TIMEOUT (§2c). The poll cap is 5 s for V2 and 2 s for V1. The confirm poll is best-effort; the safety revert is always scheduled regardless of outcome.
 
+**Confirm-window latency must be measured, not assumed:** The 2 s / 5 s windows are estimates based on the 60-day log analysis (not a dedicated latency benchmark). If exceeded routinely, dispatch silently degrades to null-footprint unconditional revert, disabling the human-override identity check at scale. Build requirement: the supervised first-boost test must record the actual telemetry round-trip latency distribution (not just binary "lands within N s") and report the P95. If P95 exceeds the confirm cap, the window must be widened before site rollout.
+
 ### 2f. Revert worker posture
 
 The existing 30 s revert worker loop is already in production for Salus/Tuya holds and is bounded (one Cosmos lease claim per device per tick). Each boiler boost adds one Cosmos document and one polling cycle per revert attempt — no unbounded fan-out. The per-boost Zendesk ticket is a single API call at dispatch and a single note at revert — likewise bounded.
@@ -139,9 +141,15 @@ When the request arrives between midnight and 01:00, the same clamp applies. A 2
 
 When the request arrives between 01:00 and 06:59, the boost is refused: *"Heating boosts cannot start between 01:00 and 07:00. If the pub is still cold, the IoT team will investigate next morning."*
 
-**Hard stop on late revert — V2:** V2 zones expire at the next schedule edge (DEDUCED, strong — 60-day log shows every `CHZn.override` epoch matches the next schedule slot boundary). If the OOH revert fails, the V2 natural end fires regardless. D2 is preserved for V2.
+**Hard stop on late revert — OOH revert worker is the sole D2 guarantor (both V1 and V2):**
 
-**Hard stop on late revert — V1 (open risk, build requirement):** V1 has no natural expiry. The `outputNOverride` attribute persists until explicitly zeroed. A failed or late V1 revert leaves the zone forced indefinitely — D2 cannot be guaranteed by dispatch-side clamping alone. Build requirement: V1 sites must not go live until the supervised test verifies revert reliability, and the revert-failed alert path (§Q5) must be agreed before V1 rollout. The `revertAt` clamp at dispatch ensures no boost *starts* past the window, but cannot guarantee it *ends* on time if the revert worker fails.
+V2 zones expire at the next schedule edge (60-day log confirmed). However, the next edge is the next configured schedule slot boundary — which for a late-closing or overnight-off pub can be at 02:00, 06:00, or later. A V2 boost running from 23:30 to "next edge" at 06:00 would hold the zone on past 01:00 if the OOH revert fails. V2 natural expiry is a safety net, not a D2 guarantee.
+
+V1 has no natural expiry at all.
+
+Therefore: for both V1 and V2, the OOH revert worker is the sole D2 guarantor. A failed revert on either panel type can leave heating running past 01:00. The `revertAt` clamp ensures no boost starts past the window, but cannot guarantee it ends on time if the revert worker fails. The risk differential between V1 and V2 is therefore one of urgency (V2 eventually self-reverts; V1 does not) rather than D2 compliance.
+
+Build requirement: revert reliability must be verified in the supervised first-boost test for both V1 and V2, and the overnight revert-failed notification decision (Q5) applies to both panel types before any site goes live.
 
 ### Heat OFF boost — clamp (OPTIONS for James)
 
@@ -210,6 +218,8 @@ Does `"CHZ1 1 30"` (a third argument = minutes) tell the V2 panel to self-revert
 Forcing `CHZ1 1` opens the zone valve. If the boiler is not already calling for heat (`boiler.enable_output_state` or `output1State`), the zone runs but the boiler may not fire. For a "too cold" call, the pub does not warm up. The V2 panel may propagate a zone-on override to the boiler automatically (the normal case during active schedule), or it may not. The supervised test must record `boiler.enable_output_state` before and after the zone override. If it does not flip, OOH must also send `boiler 1` alongside the zone command and `boiler 0` on revert — a separate RPC call. For V1, the same question applies to `output1State` and `output2Override`.
 
 **Build requirement:** The ON path must not go live on any site — V1 or V2 — until the supervised test confirms or refutes Q3. This applies to the first site regardless of panel version.
+
+**Multi-zone revert (conditional on Q3 outcome):** If Q3 resolves to requiring an explicit `boiler 1` alongside the zone command, the revert at boost end must also send `boiler 0`. However, sending `boiler 0` when a second zone is concurrently boosted or still being heated by an active schedule would starve that zone. The revert worker must check that no other zone is currently active (via `readBoilerState()` covering all pub zones) before sending `boiler 0`. If another zone is active, the `boiler 0` send is skipped and only the triggering zone's override is zeroed. This requirement is conditional on Q3's outcome and must be specced in the design gate if Q3 confirms the boiler override is needed.
 
 ### Q4 — Interaction with an existing human override (UNRESOLVED, policy)
 
