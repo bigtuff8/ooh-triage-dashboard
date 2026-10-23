@@ -386,7 +386,8 @@
         "isV2": false,
         "heatingControllable": false,
         "dhwControllable": false,
-        "deviceId": "IT500-DHW-6234"
+        "deviceId": "IT500-DHW-6234",
+        "heating": null
       }
     },
     {
@@ -975,10 +976,11 @@
         {
           "deviceId": "gk-9001-boilercontrol-1",
           "zone": "Plant room",
-          "deviceType": "boilerControl",
+          "deviceType": "boiler-panel",
           "kind": "heating",
-          "area": "Plant",
+          "area": "Bar/Restaurant",
           "online": true,
+          "controllable": false,
           "telemetry": {}
         }
       ],
@@ -988,7 +990,8 @@
         "isV2": true,
         "heatingControllable": true,
         "dhwControllable": true,
-        "deviceId": "gk-9001-boilercontrol-1"
+        "deviceId": "gk-9001-boilercontrol-1",
+        "heating": null
       }
     },
     {
@@ -1001,10 +1004,11 @@
         {
           "deviceId": "gk-9002-boilercontrol-1",
           "zone": "Plant room",
-          "deviceType": "boilerControl",
+          "deviceType": "boiler-panel",
           "kind": "heating",
-          "area": "Plant",
+          "area": "Bar/Restaurant",
           "online": true,
+          "controllable": false,
           "telemetry": {}
         }
       ],
@@ -1014,7 +1018,8 @@
         "isV2": false,
         "heatingControllable": true,
         "dhwControllable": true,
-        "deviceId": "gk-9002-boilercontrol-1"
+        "deviceId": "gk-9002-boilercontrol-1",
+        "heating": null
       }
     },
     {
@@ -1061,7 +1066,8 @@
         "isV2": true,
         "heatingControllable": true,
         "dhwControllable": true,
-        "deviceId": "gk-6999-boilercontrol-1"
+        "deviceId": "gk-6999-boilercontrol-1",
+        "heating": null
       }
     },
     {
@@ -1341,7 +1347,8 @@
           "confirmedAtMs": null,
           "decodedAtMs": 1792608000000,
           "unreadableReason": null
-        }
+        },
+        "heating": null
       }
     },
     {
@@ -1378,7 +1385,8 @@
           "confirmedAtMs": null,
           "decodedAtMs": 1792608000000,
           "unreadableReason": null
-        }
+        },
+        "heating": null
       }
     },
     {
@@ -1415,7 +1423,8 @@
           "confirmedAtMs": null,
           "decodedAtMs": 1792608000000,
           "unreadableReason": null
-        }
+        },
+        "heating": null
       }
     },
     {
@@ -1452,7 +1461,8 @@
           "confirmedAtMs": null,
           "decodedAtMs": 1792608000000,
           "unreadableReason": "not-a-number"
-        }
+        },
+        "heating": null
       }
     },
     {
@@ -1489,7 +1499,8 @@
           "confirmedAtMs": null,
           "decodedAtMs": 1792608000000,
           "unreadableReason": null
-        }
+        },
+        "heating": null
       }
     },
     {
@@ -1526,7 +1537,8 @@
           "confirmedAtMs": 1792607760000,
           "decodedAtMs": 1792608000000,
           "unreadableReason": null
-        }
+        },
+        "heating": null
       }
     },
     {
@@ -1563,7 +1575,8 @@
           "confirmedAtMs": 1792607640000,
           "decodedAtMs": 1792608000000,
           "unreadableReason": null
-        }
+        },
+        "heating": null
       }
     },
     {
@@ -1600,7 +1613,8 @@
           "confirmedAtMs": null,
           "decodedAtMs": 1792608000000,
           "unreadableReason": null
-        }
+        },
+        "heating": null
       }
     },
     {
@@ -1637,6 +1651,154 @@
           "confirmedAtMs": null,
           "decodedAtMs": 1792608000000,
           "unreadableReason": null
+        },
+        "heating": null
+      }
+    },
+    {
+      "siteNo": "9010",
+      "siteName": "Test Boiler Panel V2 (Heating)",
+      "brand": "Catering & Bars",
+      "address": "Test Address, Test Town",
+      "callsLast30Days": 0,
+      "devices": [
+        {
+          "deviceId": "gk-9010-boilercontrol-1",
+          "zone": "Plant room",
+          "deviceType": "boiler-panel",
+          "kind": "heating",
+          "area": "Bar/Restaurant",
+          "online": true,
+          "controllable": false,
+          "telemetry": {}
+        },
+        {
+          "deviceId": "gk-9010-salusit700-1",
+          "zone": "Accommodation",
+          "deviceType": "salus-it700",
+          "kind": "heating",
+          "area": "Accommodation",
+          "online": true,
+          "controllable": true,
+          "telemetry": {
+            "localTemperature": 20,
+            "heatingSetpoint": 21
+          }
+        }
+      ],
+      "boilerControl": {
+        "present": true,
+        "isV1": false,
+        "isV2": true,
+        "heatingControllable": true,
+        "dhwControllable": false,
+        "deviceId": "gk-9010-boilercontrol-1",
+        "dhwOverride": {
+          "visible": false,
+          "hiddenReason": "no-reading",
+          "panelVersion": "V2",
+          "panelLastSeenMs": null,
+          "mode": null,
+          "untilMs": null,
+          "confirmedAtMs": null,
+          "decodedAtMs": 0,
+          "unreadableReason": null
+        },
+        "heating": {
+          "visible": true,
+          "version": "V2",
+          "panelLastSeenMs": 9999999999999,
+          "stale": false,
+          "boilerCalling": true,
+          "zones": [
+            {
+              "n": 1,
+              "on": true,
+              "fallback": false,
+              "forced": null,
+              "forcedUntilMs": null,
+              "held": false,
+              "roomTemp": 18.7
+            },
+            {
+              "n": 2,
+              "on": true,
+              "fallback": false,
+              "forced": null,
+              "forcedUntilMs": null,
+              "held": false,
+              "roomTemp": 19.3
+            }
+          ],
+          "summerMode": false,
+          "nextChange": null
+        }
+      }
+    },
+    {
+      "siteNo": "9011",
+      "siteName": "Test Boiler Panel V1 (Heating)",
+      "brand": "Catering & Bars",
+      "address": "Test Address, Test Town",
+      "callsLast30Days": 0,
+      "devices": [
+        {
+          "deviceId": "gk-9011-boilercontrol-1",
+          "zone": "Plant room",
+          "deviceType": "boiler-panel",
+          "kind": "heating",
+          "area": "Bar/Restaurant",
+          "online": true,
+          "controllable": false,
+          "telemetry": {}
+        }
+      ],
+      "boilerControl": {
+        "present": true,
+        "isV1": true,
+        "isV2": false,
+        "heatingControllable": true,
+        "dhwControllable": false,
+        "deviceId": "gk-9011-boilercontrol-1",
+        "dhwOverride": {
+          "visible": false,
+          "hiddenReason": "dhw-not-wired",
+          "panelVersion": "V1",
+          "panelLastSeenMs": null,
+          "mode": null,
+          "untilMs": null,
+          "confirmedAtMs": null,
+          "decodedAtMs": 0,
+          "unreadableReason": null
+        },
+        "heating": {
+          "visible": true,
+          "version": "V1",
+          "panelLastSeenMs": 9999999999999,
+          "stale": false,
+          "boilerCalling": false,
+          "zones": [
+            {
+              "n": 1,
+              "on": true,
+              "fallback": false,
+              "forced": null,
+              "forcedUntilMs": null,
+              "held": false,
+              "roomTemp": 18.7
+            },
+            {
+              "n": 2,
+              "on": false,
+              "fallback": false,
+              "forced": null,
+              "forcedUntilMs": null,
+              "held": false,
+              "roomTemp": null
+            }
+          ],
+          "summerMode": false,
+          "nextChange": null
         }
       }
     }

@@ -66,8 +66,12 @@ test('deriveArea: iT500 with an unknown or missing site-code → null (fallback 
     assert.equal(deriveArea('salus-it500', undefined), null);
 });
 
-test('deriveArea: intesis, gateway, tuya, refrigeration, boiler-panel, unknown → null (never an area)', () => {
-    for (const dt of ['intesis', 'gateway', 'tuya', 'refrigeration', 'boiler-panel', 'unknown']) {
+test('deriveArea: intesis, gateway, tuya, refrigeration, unknown → null (never an area)', () => {
+    for (const dt of ['intesis', 'gateway', 'tuya', 'refrigeration', 'unknown']) {
         assert.equal(deriveArea(dt, { site: '6218-s-1' }), null, `${dt} must never be an area even with a site code`);
     }
+});
+
+test('deriveArea: boiler-panel → Bar/Restaurant', () => {
+    assert.equal(deriveArea('boiler-panel', null), 'Bar/Restaurant');
 });
