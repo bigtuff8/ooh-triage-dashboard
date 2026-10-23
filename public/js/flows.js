@@ -795,7 +795,7 @@ const FLOWR = {
                 : '';
             if (z.deviceType === 'boiler-panel') {
                 doneLine(`Live read: ${temp != null ? temp + '°C' : 'no reading'} · pub boiler panel`);
-                return read + `<div class="reco" data-testid="reco-boiler-panel"><b class="hd">This zone can’t be adjusted remotely yet.</b>It runs on the pub’s boiler control panel, which isn’t connected for remote changes (it’s on the priority list with our platform team).<div class="outbtns"><button class="btn primary" onclick="flowStep({need:'bp'})">Capture &amp; escalate for the IoT team</button><button class="btn" onclick="flowStep({need:'noact'})">End with no action</button></div></div>`;
+                return read + `<div class="reco" data-testid="reco-boiler-panel"><b class="hd">Pub heating here is monitored only.</b>We can read the temperature from the boiler panel, but there’s no remote adjustment path for heating on this site.<div class="outbtns"><button class="btn primary" onclick="flowStep({need:’bp’})">Capture &amp; escalate for the IoT team</button><button class="btn" onclick="flowStep({need:’noact’})">End with no action</button></div></div>`;
             }
             return read + notReportingNote + `<div class="stepq">What does the caller need?</div><div class="chips">
     <button class="chip" data-testid="need-warm" onclick="flowStep({need:'warm'})">Warmer</button>
@@ -808,15 +808,15 @@ const FLOWR = {
             if (need === 'bp') {
                 return outcomeCaptured(f, 'bp', {
                     subject: `Pub heating change requested (${z.zone})`,
-                    detail: `Caller asked for a pub heating adjustment; boiler-panel control isn’t available remotely yet. Logged with the reading ${temp != null ? temp + '°C' : 'n/a'}. (SR-4① pressure recorded.)`,
-                    script: 'I’ve logged this for the IoT team — pub heating on this site can’t be adjusted remotely yet, so they’ll pick this up as a priority.',
+                    detail: `Caller asked for a pub heating adjustment; no remote control path exists for boiler-panel heating. Logged with the reading ${temp != null ? temp + '°C' : 'n/a'}. (SR-4① pressure recorded.)`,
+                    script: `This has been logged for our team. We can see the temperature reading, but there is no remote adjustment path for pub heating at this site.`,
                     OohCaptureClass: 'boiler-panel-heating'
                 });
             }
             if (need === 'noact') {
                 return outcomeNoAction(f, 'noact', {
-                    subject: 'Pub heating query — no action possible tonight',
-                    detail: 'Caller asked about pub boiler-panel heating; no remote control path exists tonight and the caller declined a follow-up. Call recorded for the audit trail.',
+                    subject: 'Pub heating query — no action possible',
+                    detail: 'Caller asked about pub boiler-panel heating; no remote control path exists and the caller declined a follow-up. Call recorded for the audit trail.',
                     script: ''
                 });
             }
