@@ -1,0 +1,138 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>OOHDASH-139 Wording</title>
+<style>
+:root{--bg:#f7f7f5;--card:#fff;--ink:#1d1d1b;--mute:#666;--line:#ddd;--acc:#1f5fbf;--warn:#a35a00;--ok:#1d7a3a}
+@media (prefers-color-scheme:dark){:root{--bg:#161616;--card:#222;--ink:#eee;--mute:#aaa;--line:#3a3a3a;--acc:#7fb0ff;--warn:#f0a850;--ok:#6fd08f}}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.5 system-ui,-apple-system,Segoe UI,sans-serif}
+main{max-width:860px;margin:0 auto;padding:16px}
+h1{font-size:21px;margin:8px 0 4px}h2{font-size:17px;margin:26px 0 8px;border-bottom:1px solid var(--line);padding-bottom:4px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:12px 14px;margin:10px 0}
+.k{font-size:12px;text-transform:uppercase;letter-spacing:.04em;color:var(--mute);margin-top:8px}
+.hd{font-weight:700;font-size:16px}.when{color:var(--acc);font-size:13px;font-weight:600}
+.script{font-style:italic}.tkt{font-family:ui-monospace,Consolas,monospace;font-size:13px}
+.btns span{display:inline-block;border:1px solid var(--line);border-radius:6px;padding:2px 8px;margin:2px 4px 2px 0;font-size:13px}
+.warn{color:var(--warn)}.ok{color:var(--ok)}pre{white-space:pre-wrap;font-size:13px;overflow-x:auto}
+table{border-collapse:collapse;width:100%;font-size:13px}td,th{border:1px solid var(--line);padding:4px 6px;text-align:left;vertical-align:top}
+</style></head><body><main>
+<h1>OOHDASH-139: pub heating outcomes, wording for sign-off</h1>
+<p>What the operator sees when a caller rings about <b>pub (Bar/Restaurant) heating</b> at a site with a Lighthouse boiler panel (213 sites). The gate is held until you agree this wording.</p>
+
+<h2>Before you read: the live check changed three things</h2>
+<div class="card">
+<p><b>1. Valve alarms aren't live.</b> On 6863 the zone-valve alarm flags are "true" on <i>all</i> zones, but they were last updated about 262 days ago. Meanwhile those zones are actually running. They are stale, so the outcomes below <b>don't use valve alarms</b>.</p>
+<p><b>2. Panel alarms aren't being managed.</b> 6863 has 6 open alarms (the oldest from Nov 2025) and 4741 has 8 (the oldest from Sep 2025). None of them are acknowledged, so they can't be used to say what is wrong <i>tonight</i>. <span class="warn">The escalation email to Sam in the discovery doc says 6863 has a live zone-3 valve fault. The data doesn't support that, and the email needs redrafting before it goes.</span></p>
+<p><b>3. The "warm-weather" flag doesn't stop the heating.</b> We checked 178 panels over 21 days. The flag is on at most sites in cold weather, and the zones run regardless. Only the real summer-mode setting blocks heating, so the warm-weather outcome has been <b>removed</b>. The panel's <b>actual on/off state always comes first</b>.</p>
+<p><b>4. Overrides can force heating OFF, not only on.</b> This was proven across 27 V1 sites and several V2 sites. Some V1 zones have been forced off for 21+ days, so "forced off at the panel" is now its own outcome (W5). V2 overrides have a real end time. V1 overrides renew every 15 minutes, so for V1 we say "held" rather than giving a time.</p>
+<p class="small">Updated 2026-10-23 after a read-only sweep of the history on 135 V1 and 43 V2 panels. That answered four of the five open questions.</p>
+</div>
+
+<h2>How the flow runs</h2>
+<div class="card"><pre>Caller: pub heating  →  chip "Bar/Restaurant" (the panel)   [Accommodation stays on Salus]
+  Panel not reporting / unreadable ............ W1
+  "What does the caller need?"
+    Too cold / not working
+      zone on back-up cycle ................... W7
+      boiler asked for heat, all zones on ..... W2
+      a zone forced OFF at the panel .......... W5
+      some zones on, some off ................. W3
+      nothing on: summer mode ................. W4
+                  otherwise (timetable) ....... W6
+    Too hot / wants it off
+      any zone on ............................. W8
+      nothing on .............................. W9
+  Manual override on a zone → one extra sentence added to any outcome (see bottom)</pre>
+<p class="k">Readout shown above every outcome</p>
+<p>Pub zone 1 <b class="ok">on</b> · Pub zone 2 <b class="warn">off</b> · room 18.7°C / 19.3°C · panel reported 2 min ago</p>
+<p class="small">"Zone 1 / zone 2" is the most we can say, because the panel doesn't record which room each zone heats.</p></div>
+
+<h2>Outcomes</h2>
+
+<div class="card"><div class="when">W1 · panel not reporting (over 60 min) or reading doesn't make sense</div>
+<div class="hd">Pub heating: can't check right now</div>
+<div class="k">Operator sees</div>The pub's boiler panel last reported {3 hours ago}, so we can't see what the heating is doing. Don't tell the caller whether it is on or off. Log it for the IoT team.
+<div class="k">Say to caller</div><div class="script">"I can't see the pub heating controls from here at the moment, so I've logged it for the team to check."</div>
+<div class="k">Ticket</div><div class="tkt">Pub heating at time of call: could not be checked (boiler panel last reported 3 hours ago).</div>
+<div class="btns"><span>Capture &amp; escalate for the IoT team</span><span>End with no action</span></div></div>
+
+<div class="card"><div class="when">W2 · too cold · boiler asked for heat, every pub zone on</div>
+<div class="hd">Lighthouse is asking the boiler for heat</div>
+<div class="k">Operator sees</div>The panel is calling for heat and every pub heating zone is switched on. The controls are doing their job, so the fault is most likely the boiler itself, the pipework, or the radiators and valves. The site needs their gas or heating engineer.
+<div class="k">Say to caller</div><div class="script">"Our controls are asking the boiler for heat right now, so the problem looks like it's with the boiler or the radiators rather than the controls. Please call your heating engineer. I've logged tonight's call."</div>
+<div class="k">Ticket</div><div class="tkt">Pub heating at time of call: panel calling for heat, all pub zones on. Likely a boiler/heating-side fault; site advised to call their heating engineer.</div>
+<div class="btns"><span>Advise site &amp; log it (recommended)</span><span>Capture &amp; escalate for the IoT team</span></div></div>
+
+<div class="card"><div class="when">W3 · too cold · some zones on, some off &nbsp;(<b>this is 6863 right now</b>)</div>
+<div class="hd">Part of the pub heating is off</div>
+<div class="k">Operator sees</div>Pub zone 1 is on, but pub zone 2 is off right now. The panel doesn't tell us why from here, and we can't switch zones remotely. Log it for the IoT team. If the caller says the cold area is the part that's heating, treat it as a boiler or radiator problem and advise their heating engineer.
+<div class="k">Say to caller</div><div class="script">"Part of the heating is on, but one area is switched off at the controls. I can't change that from here, so I've logged it for the team."</div>
+<div class="k">Ticket</div><div class="tkt">Pub heating at time of call: pub zone 1 on, pub zone 2 off. Captured for the IoT team.</div>
+<div class="btns"><span>Capture &amp; escalate for the IoT team</span><span>Advise heating engineer &amp; log it</span><span>End with no action</span></div></div>
+
+<div class="card"><div class="when">W4 · too cold · nothing on · summer mode</div>
+<div class="hd">Pub heating is in summer mode</div>
+<div class="k">Operator sees</div>The panel has switched the pub heating off for the summer season. It isn't a fault, but we can't change it from here. If the site needs heating, log it for the IoT team.
+<div class="k">Say to caller</div><div class="script">"The heating controls are still set to summer mode, which is why the heating isn't coming on. I can't change that from here, but I've logged it so the team can switch it back for you."</div>
+<div class="k">Ticket</div><div class="tkt">Pub heating at time of call: off, panel in summer mode. Site needs heating; captured for the IoT team.</div>
+<div class="btns"><span>Capture &amp; escalate for the IoT team</span><span>End with no action</span></div></div>
+
+<div class="card"><div class="when">W5 · too cold · a zone has been forced OFF at the panel</div>
+<div class="hd">Pub heating has been switched off on purpose</div>
+<div class="k">Operator sees</div>Pub zone {2} has been deliberately switched off at the boiler panel {until 22:00 / and is being held off}. That's the likely reason it's cold. We can't change it from here, so log it for the IoT team if the site needs the heating back on.
+<div class="k">Say to caller</div><div class="script">"That part of the heating has been switched off on purpose at the controls. I can't change it from here, but I've logged that you need it back on so the team can sort it."</div>
+<div class="k">Ticket</div><div class="tkt">Pub heating at time of call: pub zone 2 forced OFF at the panel (until 22:00 / held). Site needs heat; captured for the IoT team.</div>
+<div class="btns"><span>Capture &amp; escalate for the IoT team</span><span>End with no action</span></div>
+<p class="small">The bracketed part depends on the panel: V2 panels give an end time, V1 panels only show "held off".</p></div>
+
+<div class="card"><div class="when">W6 · too cold · nothing on · no other reason (timetable)</div>
+<div class="hd">Pub heating is off at the controls right now</div>
+<div class="k">Operator sees</div>The panel isn't asking the boiler for heat. It isn't in summer mode and nobody has switched it off on purpose, so it's most likely outside its heating times. {Based on the panel's stored timetable, the next change is to 21°C at 11:00.} We can't switch it on from here.
+<div class="k">Say to caller</div><div class="script">"The heating is off on its timetable at the moment {and is due back on at 11:00}. I can't turn it on from here, so I've logged it for the team."</div>
+<div class="k">Ticket</div><div class="tkt">Pub heating at time of call: off at the panel (no summer mode, not forced off; next scheduled change 11:00). Captured for the IoT team.</div>
+<div class="btns"><span>Capture &amp; escalate for the IoT team</span><span>End with no action</span></div></div>
+
+<div class="card"><div class="when">W7 · too cold · a zone running on back-up (fallback)</div>
+<div class="hd">Heating is running on a back-up cycle</div>
+<div class="k">Operator sees</div>The panel has lost the room temperature reading for pub zone {1}, so it's heating that zone on a timed on/off cycle instead. Rooms can feel cooler than normal. The IoT team needs to check the room sensor.
+<div class="k">Say to caller</div><div class="script">"The heating is running, but on a back-up setting because a temperature sensor isn't reporting. I've logged it for the team to fix the sensor."</div>
+<div class="k">Ticket</div><div class="tkt">Pub heating at time of call: pub zone 1 on back-up (fallback) cycle, room sensor not reporting. Captured for the IoT team.</div>
+<div class="btns"><span>Capture &amp; escalate for the IoT team</span><span>End with no action</span></div></div>
+
+<div class="card"><div class="when">W8 · too hot / wants it off · a zone is on</div>
+<div class="hd">Pub heating is on, and we can't switch it off from here</div>
+<div class="k">Operator sees</div>The panel is heating pub zone {1 and 2}. Pub heating on this panel can't be changed remotely. Log it for the IoT team. In the meantime the site can turn the radiator valves down.
+<div class="k">Say to caller</div><div class="script">"The heating is on at the controls and I can't change it from here tonight. Turning the radiator valves down will help in the meantime. I've logged it for the team."</div>
+<div class="k">Ticket</div><div class="tkt">Pub heating at time of call: on (pub zones 1 and 2). Caller wants it lower/off; not remotely adjustable. Captured for the IoT team.</div>
+<div class="btns"><span>Capture &amp; escalate for the IoT team</span><span>End with no action</span></div></div>
+
+<div class="card"><div class="when">W9 · too hot / wants it off · nothing on</div>
+<div class="hd">Pub heating is already off</div>
+<div class="k">Operator sees</div>The panel isn't heating any pub zone right now, so the warmth isn't coming from the pub heating controls. Ask whether another heater, or the accommodation heating, is on.
+<div class="k">Say to caller</div><div class="script">"Our controls show the pub heating is off right now, so the warmth is coming from somewhere else, perhaps a radiator on manual or another heater. I've noted the call."</div>
+<div class="k">Ticket</div><div class="tkt">Pub heating at time of call: off at the panel. Caller reports too warm; heat source is not the pub heating controls.</div>
+<div class="btns"><span>Log it &amp; end</span><span>Capture &amp; escalate for the IoT team</span></div></div>
+
+<div class="card"><div class="when">Add-on · a zone has been forced ON at the panel</div>
+<div class="k">Extra sentence (operator)</div>Pub zone {1} has been switched on at the panel {until 22:00 / and is being held on}, so it's running outside its normal timetable.
+<div class="k">Extra on ticket</div><div class="tkt">Pub zone 1 forced ON at the panel (until 22:00 / held).</div>
+<p class="small">We only show this when the override and the live state agree (forced on and actually on). Some panels leave old override values behind after they've been cancelled, so the live state always wins.</p></div>
+
+<h2>Decisions (answered by James 2026-10-23: D1 approved · D2 no alarms · D3 yes · D4 dropped, not an action; alarm ownership is a separate workstream)</h2>
+<div class="card"><table>
+<tr><th>#</th><th>Decision</th><th>My recommendation</th></tr>
+<tr><td>D1</td><td>Approve W1–W9 + the forced-on add-on wording (or mark changes)</td><td>Approve</td></tr>
+<tr><td>D2</td><td>Should valve alarms and panel alarms be shown to the operator at all?</td><td><b>Not in v1.</b> They're stale and unmanaged. If you want, add one small footnote: "This panel has 6 older alarms open, the oldest from Nov 2025" with no cause attached</td></tr>
+<tr><td>D3</td><td>The boiler panel becomes the <b>Bar/Restaurant</b> chip, and Accommodation stays on Salus</td><td>Yes. TB links the panel's alarms "toRestaurant"</td></tr>
+<tr><td>D4</td><td>Redraft the Sam email (6863/4741) around "panel alarms aren't being managed" instead of "live valve fault"</td><td>Yes. I'll show you the draft first and won't send anything</td></tr>
+</table></div>
+
+<h2>Open questions: researched first, one left for a person</h2>
+<div class="card"><table>
+<tr><th>Question</th><th>Verdict</th></tr>
+<tr><td>Can an override force heating off?</td><td class="ok">PROVEN: yes. The sign of the value gives the direction (V1 and V2)</td></tr>
+<tr><td>Do V1 valve-alarm flags stay stuck on?</td><td class="ok">PROVEN: no, they cleared normally. V1 panels just stopped reporting them around Dec 2025–Feb 2026, so the "true" values are old data</td></tr>
+<tr><td>Does the warm-weather flag stop the heating?</td><td class="ok">PROVEN: no. Only real summer mode does, and an override can beat it</td></tr>
+<tr><td>What is V2 <code>contractor_override</code>?</td><td>DEDUCED: a whole-system boost (all zones forced on together). It can go stale, so it isn't used. The per-zone state covers it</td></tr>
+<tr><td>Who should clear or acknowledge boiler-panel alarms?</td><td class="warn">OPEN: an ownership question for Sam. It doesn't block the build. Held until after the gate, as you directed on PR 130</td></tr>
+</table></div>
+</main></body></html>
