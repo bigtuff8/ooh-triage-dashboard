@@ -23,6 +23,9 @@ import * as killswitch from './killswitch.js';
 import * as audit from './audit.js';
 import * as registry from './registry.js';
 import { recordControlEvent, raiseAlert } from './metrics.js';
+import { config } from '../config.js';
+// Lazy import to avoid static-binding issues under the test module-mocking framework.
+const _zendesk = () => import('./zendesk.js');
 
 const WORKER_INTERVAL_MS = 30 * 1000;
 // OOHDASH-123 (WU14): the revert confirm uses the per-class confirm limit, but a single worker pass must
@@ -46,7 +49,9 @@ export async function scheduleOverride(action) {
     const existing = (await col.query(o =>
         o.status === 'active' && o.deviceId === action.deviceId && o.attribute === action.attribute
     ))[0];
-    let revertValue = action.previousValue;
+    // OOHDASH-141: for boiler-panel, action.revertValue is always explicitly set to 0 (auto).
+    // For all other types, fall back to action.previousValue (the captured original).
+    let revertValue = action.revertValue !== undefined ? action.revertValue : action.previousValue;
     if (existing) {
         revertValue = existing.revertValue;
         existing.status = 'superseded';
@@ -73,7 +78,14 @@ export async function scheduleOverride(action) {
         ticketId: action.ticketId || null,
         status: 'active',
         leaseOwner: null,
-        leaseUntil: null
+        leaseUntil: null,
+        // OOHDASH-141: boiler-specific fields (undefined values are omitted cleanly).
+        ...(action.panelVersion !== undefined ? { panelVersion: action.panelVersion } : {}),
+        ...(action.boilerZone !== undefined ? { boilerZone: action.boilerZone } : {}),
+        ...(action.direction !== undefined ? { direction: action.direction } : {}),
+        ...(action.footprint !== undefined ? { footprint: action.footprint } : {}),
+        ...(action.d2CeilingAtMs !== undefined ? { d2CeilingAtMs: action.d2CeilingAtMs } : {}),
+        ...(action.clampedFromMin !== undefined ? { clampedFromMin: action.clampedFromMin } : {})
     });
     startWorker();
     return doc.id;
@@ -152,6 +164,12 @@ export async function runWorkerOnce() {
 }
 
 async function revert(col, doc) {
+    // OOHDASH-141: boiler-panel has its own revert path with kill-switch exemption and
+    // direction-based identity. Branch first before the standard kill-switch check.
+    if (doc.deviceType === 'boiler-panel') {
+        return await revertBoiler(col, doc);
+    }
+
     const blocked = await killswitch.writesBlocked(doc.siteNo);
     if (blocked) {
         // Do not silently drop the revert — back to active, retried each cycle, alert raised
@@ -248,5 +266,206 @@ async function revert(col, doc) {
         await col.upsert(doc);
         recordControlEvent('revert-failed');
         raiseAlert('revert-failed', `Hold revert for ${doc.deviceId} (${doc.siteName}) failed to dispatch: ${err.message}`);
+    }
+}
+
+/* ------------------------------------------------------------------ */
+/* OOHDASH-141 — boiler-panel revert path                              */
+/* ------------------------------------------------------------------ */
+
+/**
+ * Revert a boiler-panel hold. Branches from revert() before the standard kill-switch check.
+ * Implements design §6: direction-based identity, kill-switch exemption, bounded retry.
+ */
+async function revertBoiler(col, doc) {
+    const exempt = config.boilerBoost?.revertExempt === 'all';
+
+    // Kill-switch: when NOT exempt, check and bounce like the standard path.
+    if (!exempt) {
+        const blocked = await killswitch.writesBlocked(doc.siteNo);
+        if (blocked) {
+            doc.status = 'active';
+            doc.leaseOwner = null;
+            doc.leaseUntil = null;
+            await col.upsert(doc);
+            raiseAlert('revert-blocked', `Boiler hold revert for ${doc.deviceId} ${doc.boilerZone} blocked by kill-switch — will retry`);
+            return;
+        }
+    } else {
+        console.log(`[BOILER-REVERT-EXEMPT] processing revert for ${doc.deviceId} ${doc.boilerZone} (exempt from kill-switch + WRITES_DISABLED)`);
+    }
+
+    try {
+        const device = await bridge.getDevice(doc.siteNo, doc.deviceId) || {
+            deviceId: doc.deviceId, deviceType: doc.deviceType, telemetry: {}
+        };
+        const version = doc.panelVersion || 'v2';
+        const zone = doc.boilerZone;
+        const held = doc.heldValue; // ±1
+
+        // Read current state for identity check
+        const { zones: zoneStates } = await tb.readBoilerState(device, version, [zone]);
+        const zState = zoneStates[0];
+        const liveDir = zState?.dir ?? 0;
+
+        let revertOutcome = null;
+        let ticketNote = null;
+        let shouldWrite = false;
+
+        if (liveDir === 0) {
+            // Already on auto — timetable change or panel cleared it
+            revertOutcome = 'already-auto';
+            ticketNote = 'already-auto';
+        } else if (liveDir === -held) {
+            // Opposite direction — someone else forced it the other way
+            revertOutcome = 'superseded-by-other';
+            ticketNote = 'superseded';
+            raiseAlert('boost-superseded', `Boiler zone ${zone} on ${doc.deviceId} (${doc.siteName}) was superseded by an opposite override — not reverting`);
+        } else {
+            // liveDir === held: zone is still in our direction
+            if (version === 'v1') {
+                const attrTs = zState?.attrTs;
+                const docAttrTs = doc.footprint?.attrTs ?? null;
+                if (docAttrTs === null || attrTs === docAttrTs) {
+                    // Our write, or no footprint recorded (IN-FLIGHT-TIMEOUT) — revert
+                    shouldWrite = true;
+                } else if (attrTs !== docAttrTs) {
+                    // Attr ts changed — someone re-applied
+                    if (held === 1) {
+                        // ON: D2 wins — always revert to respect 01:00 rule
+                        shouldWrite = true;
+                    } else {
+                        // OFF: decision 2 (leave it, alert)
+                        revertOutcome = 'same-direction-skip';
+                        ticketNote = 'same-direction-skip';
+                        raiseAlert('boost-same-direction-re-override', `Boiler zone ${zone} OFF on ${doc.deviceId} — someone re-applied OFF; leaving as-is (D2 does not apply to OFF)`);
+                    }
+                }
+            } else {
+                // V2: cannot tell apart, always revert
+                shouldWrite = true;
+            }
+        }
+
+        if (!shouldWrite) {
+            // Non-write resolution
+            doc.status = revertOutcome === 'already-auto' ? 'reverted' : 'reverted';
+            if (revertOutcome === 'superseded-by-other') doc.status = 'superseded-by-other';
+            if (revertOutcome === 'same-direction-skip') doc.status = 'reverted'; // mark reverted, no write
+            doc.revertedAt = new Date().toISOString();
+            doc.leaseOwner = null;
+            doc.leaseUntil = null;
+            await col.upsert(doc);
+            await audit.logAction({ actionType: 'boiler-revert', operator: null, siteNo: doc.siteNo, siteName: doc.siteName, deviceId: doc.deviceId, zone: doc.zone, detail: `Boiler zone ${zone} revert: ${revertOutcome}`, outcome: doc.status, ticketId: doc.ticketId });
+            recordControlEvent('revert-ok');
+            if (doc.ticketId && ticketNote) {
+                try { await (await _zendesk()).addBoostRevertNote(doc.ticketId, doc, ticketNote); } catch (e) { console.error(`[OVERRIDES] boost ticket note failed: ${e.message}`); }
+            }
+            return;
+        }
+
+        // Write: revert to auto
+        const preRevert = zState;
+        await tb.revertBoilerZoneToAuto(device, version, zone);
+
+        // Confirm: poll up to 20s for override=0
+        const CONFIRM_MS = 20000;
+        const POLL_MS = 1000;
+        const deadline = Date.now() + CONFIRM_MS;
+        let confirmed = false;
+        while (Date.now() < deadline) {
+            await new Promise(r => setTimeout(r, POLL_MS));
+            const { zones: postZones } = await tb.readBoilerState(device, version, [zone]);
+            const postZ = postZones[0];
+            const postDir = postZ?.dir ?? 0;
+            if (postDir === 0) {
+                if (version === 'v2') {
+                    // V2: check overrideTs advanced (confirms new sample)
+                    const preTs = preRevert?.overrideTs ?? 0;
+                    if ((postZ?.overrideTs ?? 0) > preTs) { confirmed = true; break; }
+                    // If overrideTs is null or same but dir=0, accept it (panel may not echo ts)
+                    if (postZ?.overrideTs == null) { confirmed = true; break; }
+                } else {
+                    // V1: attrTs should have advanced from the revert write
+                    const preAttrTs = preRevert?.attrTs ?? 0;
+                    if ((postZ?.attrTs ?? 0) > preAttrTs) { confirmed = true; break; }
+                    if (postZ?.attrTs == null) { confirmed = true; break; }
+                }
+            }
+        }
+
+        if (confirmed) {
+            const confirmedAtMs = Date.now();
+            doc.status = 'reverted';
+            doc.revertedAt = new Date().toISOString();
+            doc.leaseOwner = null;
+            doc.leaseUntil = null;
+            await col.upsert(doc);
+            await audit.logAction({ actionType: 'boiler-revert', operator: null, siteNo: doc.siteNo, siteName: doc.siteName, deviceId: doc.deviceId, zone: doc.zone, detail: `Boiler zone ${zone} reverted to auto (confirmed)`, outcome: 'confirmed', ticketId: doc.ticketId });
+            recordControlEvent('revert-ok');
+            if (doc.ticketId) {
+                try { await (await _zendesk()).addBoostRevertNote(doc.ticketId, doc, 'reverted'); } catch (e) { console.error(`[OVERRIDES] boost ticket note failed: ${e.message}`); }
+            }
+            // §6.5 late-revert check for ON boosts
+            if (doc.direction === 'on' && doc.d2CeilingAtMs && confirmedAtMs > doc.d2CeilingAtMs + 2 * 60000) {
+                const lateMin = Math.round((confirmedAtMs - doc.d2CeilingAtMs) / 60000);
+                const note = `Heating ran past 01:00 by approximately ${lateMin} min (revert confirmed late). Manual check may be needed.`;
+                raiseAlert('d2-late-revert', `${doc.deviceId} ${zone}: ${note}`);
+                if (doc.ticketId) {
+                    try { await (await _zendesk()).addBoostRevertNote(doc.ticketId, doc, 'd2-late-revert'); } catch (e) { console.error(`[OVERRIDES] late-revert note failed: ${e.message}`); }
+                }
+            }
+        } else {
+            // Not confirmed — bounded retry (§6.4): retry every 5 min for up to 12h
+            const attempts = (doc.revertAttempts || 0) + 1;
+            const maxRetryMs = 12 * 60 * 60 * 1000;
+            const elapsedMs = Date.now() - new Date(doc.createdAt).getTime();
+            if (elapsedMs < maxRetryMs) {
+                doc.status = 'active';
+                doc.revertAttempts = attempts;
+                doc.lastRevertAttemptAt = new Date().toISOString();
+                doc.OohOverrideRevertAt = new Date(Date.now() + 5 * 60000).toISOString();
+                doc.leaseOwner = null;
+                doc.leaseUntil = null;
+                await col.upsert(doc);
+                raiseAlert('revert-failed', `Boiler zone ${zone} on ${doc.deviceId} revert NOT confirmed (attempt ${attempts}) — retrying in 5 min`);
+            } else {
+                doc.status = 'revert-failed';
+                doc.revertAttempts = attempts;
+                doc.lastRevertAttemptAt = new Date().toISOString();
+                doc.revertedAt = new Date().toISOString();
+                doc.leaseOwner = null;
+                doc.leaseUntil = null;
+                await col.upsert(doc);
+                await audit.logAction({ actionType: 'boiler-revert', operator: null, siteNo: doc.siteNo, siteName: doc.siteName, deviceId: doc.deviceId, zone: doc.zone, detail: `Boiler zone ${zone} revert FAILED after ${attempts} attempts`, outcome: 'revert-failed', ticketId: doc.ticketId });
+                recordControlEvent('revert-failed');
+                raiseAlert('revert-failed', `Boiler zone ${zone} on ${doc.deviceId} (${doc.siteName}) — may still be forced ON/OFF — manual check needed`);
+                if (doc.ticketId) {
+                    try { await (await _zendesk()).addBoostRevertNote(doc.ticketId, doc, 'revert-failed'); } catch (e) { console.error(`[OVERRIDES] boost ticket note failed: ${e.message}`); }
+                }
+            }
+        }
+    } catch (err) {
+        console.error(`[OVERRIDES] Boiler revert failed for ${doc.id}: ${err.message}`);
+        const attempts = (doc.revertAttempts || 0) + 1;
+        const maxRetryMs = 12 * 60 * 60 * 1000;
+        const elapsedMs = Date.now() - new Date(doc.createdAt).getTime();
+        if (elapsedMs < maxRetryMs) {
+            doc.status = 'active';
+            doc.revertAttempts = attempts;
+            doc.lastRevertAttemptAt = new Date().toISOString();
+            doc.OohOverrideRevertAt = new Date(Date.now() + 5 * 60000).toISOString();
+            doc.leaseOwner = null;
+            doc.leaseUntil = null;
+            await col.upsert(doc);
+        } else {
+            doc.status = 'revert-failed';
+            doc.revertAttempts = attempts;
+            doc.leaseOwner = null;
+            doc.leaseUntil = null;
+            await col.upsert(doc);
+            recordControlEvent('revert-failed');
+            raiseAlert('revert-failed', `Boiler zone ${doc.boilerZone} on ${doc.deviceId} (${doc.siteName}) failed to revert: ${err.message}`);
+        }
     }
 }

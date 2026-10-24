@@ -488,6 +488,103 @@ export async function setFollowUpDate(ticketId, date) {
 }
 
 /* ------------------------------------------------------------------ */
+/* OOHDASH-141 — pub heating boost tickets                             */
+/* ------------------------------------------------------------------ */
+
+/**
+ * Creates a Zendesk ticket for a pub heating boost dispatch. Returns { id, url }.
+ * Subject: "[OOH Boost] {siteNo} {siteName} — Pub zone {n} heating {ON|OFF} until {HH:MM}"
+ */
+export async function createBoostTicket({ operator, callerWords, siteNo, siteName, panelVersion, zones, direction, durationKey, requestedMin, effectiveMin, clamped, revertAtMs, previousStates, acknowledgedWarnings, outcomes }) {
+    const dirUpper = direction === 'on' ? 'ON' : 'OFF';
+    const revertTime = revertAtMs ? new Date(revertAtMs).toLocaleTimeString('en-GB', { timeZone: 'Europe/London', hour: '2-digit', minute: '2-digit' }) : '?';
+
+    // Zone label: "Pub zone 1" or "Pub zones 1+2"
+    const zoneNums = zones.map(z => z === 'CHZ1' ? '1' : '2');
+    const zoneLabel = zoneNums.length > 1 ? `Pub zones ${zoneNums.join('+')}` : `Pub zone ${zoneNums[0]}`;
+
+    const subject = `[OOH Boost] ${siteNo} ${siteName || ''} — ${zoneLabel} heating ${dirUpper} until ${revertTime}`.trim();
+    const extraTags = ['ooh_boost', direction === 'on' ? 'ooh_boost_on' : 'ooh_boost_off'];
+
+    const durationText = durationKey === 'until-0700'
+        ? 'until 07:00 (until-0700)'
+        : `${effectiveMin} min${clamped ? ` (cut from ${requestedMin} min — 01:00 ceiling)` : ''}`;
+
+    const lines = [
+        `[TRG] OOH Boost: ${zoneLabel} heating ${dirUpper} until ${revertTime}`,
+        `Operator: ${oneLine(operator?.name) || 'OOH'} (OOH)`
+    ];
+    if (callerWords) lines.push(`Caller's words: "${oneLine(callerWords)}"`);
+    lines.push(`Outcome: boiler-boost`);
+    lines.push('');
+    lines.push(`Panel version: ${panelVersion?.toUpperCase() || 'unknown'}`);
+    lines.push(`Zones: ${zones.join(', ')}`);
+    lines.push(`Direction: ${dirUpper}`);
+    lines.push(`Duration: ${durationText}`);
+    lines.push(`Revert at: ${revertTime} (Europe/London)`);
+
+    if (previousStates?.length) {
+        const stateLines = previousStates.map(z => {
+            const d = z.dir > 0 ? 'forced ON' : z.dir < 0 ? 'forced OFF' : 'auto';
+            return `  ${z.zone}: ${d}`;
+        });
+        lines.push(`Previous zone state:`, ...stateLines);
+    }
+    if (acknowledgedWarnings) {
+        lines.push('Note: operator acknowledged existing engineer override and proceeded.');
+    }
+
+    lines.push('');
+    lines.push('Per-zone outcomes:');
+    for (const { zone, outcome, dispatchError } of (outcomes || [])) {
+        lines.push(`  ${zone}: ${outcome}${dispatchError ? ` (${oneLine(dispatchError).slice(0, 200)})` : ''}`);
+    }
+
+    lines.push('');
+    lines.push('The IoT team should find out why this site needed a boost.');
+
+    const body = lines.join('\n');
+
+    return createOutcomeTicket({
+        operator,
+        siteNo: String(siteNo),
+        siteName,
+        subject,
+        summary: subject,
+        transcript: [{ time: hhmm(new Date().toISOString()), text: body }],
+        callerWords,
+        outcomeType: 'boiler-boost',
+        extraTags
+    });
+}
+
+/**
+ * Adds a revert-outcome internal note to a boost ticket.
+ * result: 'reverted' | 'already-auto' | 'superseded' | 'same-direction-skip' | 'revert-failed' | 'd2-late-revert'
+ */
+export async function addBoostRevertNote(ticketId, doc, result) {
+    const zone = doc.boilerZone || '';
+    const dir = doc.direction === 'on' ? 'ON' : 'OFF';
+    let body;
+    if (result === 'reverted') {
+        body = `[OOH Boost] Pub zone ${zone} is back on automatic. The panel's own thermostat now decides whether it heats${doc.panelVersion === 'v2' ? ' (V2: may stay on or off briefly while the room is close to temperature)' : ''}.`;
+    } else if (result === 'already-auto') {
+        body = `[OOH Boost] Pub zone ${zone} was already back on automatic (timetable change or panel cleared it) — no write needed.`;
+    } else if (result === 'superseded') {
+        body = `[OOH Boost] Pub zone ${zone} has been forced the OPPOSITE direction since OOH's boost — not reverting (leaving the engineer's override in place). Manual check needed.`;
+    } else if (result === 'same-direction-skip') {
+        body = `[OOH Boost] Pub zone ${zone} is still forced ${dir} but appears to have been re-applied by someone else. OFF boost: leaving it in place (possible engineer hold). Manual check recommended.`;
+    } else if (result === 'revert-failed') {
+        body = `[OOH Boost] REVERT FAILED for pub zone ${zone} — zone may still be forced ${dir}. Manual check at the panel is needed. Revert will be retried up to 12 hours from boost time.`;
+    } else if (result === 'd2-late-revert') {
+        body = `[OOH Boost] Pub zone ${zone} heating ran past 01:00 (late revert confirmed). Manual check needed.`;
+    } else {
+        body = `[OOH Boost] Pub zone ${zone} revert outcome: ${result}.`;
+    }
+    return addInternalComment(ticketId, body);
+}
+
+/* ------------------------------------------------------------------ */
 /* F013 — callback lookup (translation layer)                          */
 /* ------------------------------------------------------------------ */
 

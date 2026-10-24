@@ -33,7 +33,10 @@ import * as audit from './audit.js';
 import * as errors from './errors.js';
 import { scheduleOverride } from './overrides.js';
 import { addLateSyncNote, createLateSyncTicket } from './zendesk.js';
-import { recordControlEvent } from './metrics.js';
+// Lazy import for boost-only zendesk helpers (avoids static-binding issues in test module mocking).
+const _zendeskBoost = () => import('./zendesk.js');
+import { clampBoostWindow } from './boost-window.js';
+import { recordControlEvent, raiseAlert } from './metrics.js';
 import * as inflight from './inflight-store.js';
 
 /** Formats an ISO timestamp as e.g. "Sat 07:00" for audit detail strings. */
@@ -534,4 +537,257 @@ export function controlQueueStatus() {
     const counts = {};
     for (const a of actions.values()) counts[a.state] = (counts[a.state] || 0) + 1;
     return counts;
+}
+
+/* ------------------------------------------------------------------ */
+/* OOHDASH-141 — boiler-panel boost dispatch                           */
+/* ------------------------------------------------------------------ */
+
+/**
+ * Dispatches a pub heating boost (ON or OFF) to a boiler-panel device.
+ * Returns the action record, or { _warnings } for a 409 pre-read warning.
+ */
+export async function dispatchBoilerBoost({ operator, confirmToken, siteNo, deviceId, zones, direction, durationKey, acknowledgedWarnings, callerWords }) {
+    // F004 — validate confirmation token (non-consuming). We consume it just before the first
+    // write so that a warnings-only pre-read can be followed by a second acknowledged request
+    // without the token being spent on the read. The window between isConfirmed and
+    // consumeConfirmation is single-event-loop-tick risk only (Node.js), which is acceptable.
+    if (!resolution.isConfirmed(confirmToken, siteNo, operator.id)) {
+        throw Object.assign(new Error('Site has not been confirmed for this call — confirm the site before sending any change'), { status: 409 });
+    }
+
+    // F016 — kill-switch (standard; revert uses the exempt path)
+    const blocked = await killswitch.writesBlocked(siteNo);
+    if (blocked) throw Object.assign(new Error(blocked), { status: 423 });
+
+    // Feature flags
+    if (!config.boilerBoost.enabled || config.boilerBoost.sitesDeny.includes(String(siteNo))) {
+        throw Object.assign(new Error('Pub heating boost is not available for this site (flag or deny list)'), { status: 423 });
+    }
+    if (direction === 'on' && !config.boilerBoost.onEnabled) {
+        throw Object.assign(new Error('Pub heating boost ON is not currently enabled'), { status: 423 });
+    }
+
+    // Resolve site and device
+    const sites = await bridge.getSitesByNumber(siteNo);
+    if (sites.length !== 1) throw Object.assign(new Error('Site is no longer uniquely resolvable'), { status: 409 });
+    const site = sites[0];
+    const device = site.devices.find(d => d.deviceId === deviceId);
+    if (!device) throw Object.assign(new Error('Device not found at this site'), { status: 404 });
+    if (device.deviceType !== 'boiler-panel') {
+        throw Object.assign(new Error('Device is not a boiler-panel'), { status: 409 });
+    }
+    if (!device.online) throw Object.assign(new Error('Device is offline — no command can reach it'), { status: 409 });
+    if (!await tb.hasPublishedState(device)) {
+        throw Object.assign(new Error('Device has not registered with the platform yet'), { status: 409, registration: true });
+    }
+    if (device.heating?.stale === true) {
+        throw Object.assign(new Error('Boiler panel data is stale — confirmation would be unreliable. Try again when the panel reports.'), { status: 409 });
+    }
+
+    // Determine panel version from site-level boilerControl (populated by decodeBoilerHeating).
+    // device.deviceType is always 'boiler-panel' (mapped from the TB boilerControl profile),
+    // so V1/V2 discrimination comes from site.boilerControl.isV2 (set at site-read time).
+    const panelVersion = site.boilerControl?.isV2 ? 'v2' : 'v1';
+
+    // Clamp: 01:00/07:00 window check
+    const clampResult = clampBoostWindow(Date.now(), direction, durationKey);
+    if (!clampResult.ok) {
+        throw Object.assign(new Error(clampResult.message), { status: 422, code: clampResult.code });
+    }
+
+    // Validate each zone
+    const zoneValidations = [];
+    for (const zone of zones) {
+        const check = registry.validateCommand(device, direction === 'on' ? 'boost-on' : 'boost-off', { zone, durationKey, panelVersion });
+        if (!check.ok) throw Object.assign(new Error(check.reason), { status: 422, guardrail: true });
+        zoneValidations.push({ zone, n: check.n, attribute: check.attribute });
+    }
+
+    // Pre-read: check for existing engineer override
+    const { zones: preStates } = await tb.readBoilerState(device, panelVersion, zones);
+    const warnings = preStates.filter(z => z.dir !== 0 && !acknowledgedWarnings).map(z => ({
+        zone: z.zone,
+        currentDir: z.dir > 0 ? 'on' : 'off',
+        message: `Pub zone ${z.zone === 'CHZ1' ? '1' : '2'} is already forced ${z.dir > 0 ? 'ON' : 'OFF'} (set at the panel or by an engineer)`
+    }));
+    if (warnings.length) return { _warnings: warnings };
+
+    // F004 — consume the confirmation token exactly once, only when we are about to write.
+    // This allows the warnings-only path to leave the token intact for a subsequent acknowledged request.
+    if (!resolution.consumeConfirmation(confirmToken, siteNo, operator.id)) {
+        throw Object.assign(new Error('Confirmation token has expired or was already used — re-confirm the site'), { status: 409 });
+    }
+
+    const contract = config.control.classes['boiler-panel'];
+    const confirmLimitMs = panelVersion === 'v1' ? contract.confirmLimitMsV1 : contract.confirmLimitMs;
+    const confirmPollMs = contract.confirmPollMs;
+
+    // Dispatch each zone and confirm
+    const actionId = randomUUID();
+    const zoneOutcomes = [];
+    const overrideIds = [];
+
+    for (const { zone, n, attribute } of zoneValidations) {
+        const preState = preStates.find(z => z.zone === zone);
+        const baselineOverrideTs = preState?.overrideTs ?? 0;
+        const baselineAttrTs = preState?.attrTs ?? 0;
+
+        let sentAtMs, dispatchOk = false, dispatchError = null, deliveryTag = null;
+        try {
+            if (panelVersion === 'v2') {
+                ({ sentAtMs } = await tb.dispatchBoilerRpc(device, zone, n, clampResult.effectiveMin));
+            } else {
+                ({ attrTs: sentAtMs } = await tb.writeSharedScopeAttribute(device, attribute, n));
+            }
+            dispatchOk = true;
+        } catch (err) {
+            if (err.delivery === 'rejected') {
+                deliveryTag = 'NON-DELIVERY';
+                dispatchError = err.message;
+            } else {
+                deliveryTag = 'IN-FLIGHT-TIMEOUT';
+                dispatchError = err.message;
+            }
+        }
+
+        await audit.logAction({
+            actionType: `boiler-boost-${direction}`,
+            operator,
+            siteNo: site.siteNo,
+            siteName: site.siteName,
+            deviceId: device.deviceId,
+            zone: device.zone,
+            detail: `Boiler ${direction.toUpperCase()} on ${zone} (${panelVersion}, attr=${attribute || zone}) n=${n}, effectiveMin=${clampResult.effectiveMin}${clampResult.clamped ? ' [CLAMPED]' : ''}`,
+            outcome: dispatchOk ? 'in-flight' : (deliveryTag || 'non-delivery'),
+            controlActionId: actionId
+        });
+
+        let outcome = 'IN-FLIGHT-TIMEOUT';
+        let confirmed = false;
+
+        if (deliveryTag === 'NON-DELIVERY') {
+            outcome = 'NON-DELIVERY';
+            raiseAlert('boost-non-delivery', `Boiler boost ${direction} on ${device.deviceId} ${zone} was rejected: ${dispatchError}`);
+        } else if (dispatchOk) {
+            // Confirm poll
+            const deadline = Date.now() + confirmLimitMs;
+            while (Date.now() < deadline) {
+                await new Promise(r => setTimeout(r, confirmPollMs));
+                const { zones: pollZones } = await tb.readBoilerState(device, panelVersion, [zone]);
+                const pz = pollZones[0];
+                if (pz?.dir === n) {
+                    if (panelVersion === 'v2' && (pz.overrideTs ?? 0) > baselineOverrideTs) { confirmed = true; break; }
+                    if (panelVersion === 'v1' && (pz.overrideTs ?? 0) > baselineAttrTs) { confirmed = true; break; }
+                    if (config.dataMode === 'fixture') { confirmed = true; break; } // fixture sim
+                }
+            }
+            if (confirmed) {
+                outcome = 'CONFIRMED';
+            } else {
+                outcome = 'IN-FLIGHT-TIMEOUT';
+                raiseAlert('boost-unverified', `Boiler boost ${direction} on ${device.deviceId} ${zone} not confirmed within ${confirmLimitMs}ms — hold still scheduled`);
+            }
+        }
+
+        zoneOutcomes.push({ zone, outcome, dispatchError, panelVersion });
+
+        // Schedule hold on CONFIRMED or IN-FLIGHT-TIMEOUT (not NON-DELIVERY)
+        if (outcome !== 'NON-DELIVERY') {
+            const overrideAttr = panelVersion === 'v2' ? `${zone}.override` : attribute;
+            const holdAction = {
+                actionId,
+                operator,
+                siteNo: site.siteNo,
+                siteName: site.siteName,
+                deviceId: device.deviceId,
+                zone: device.zone,           // area zone (not boilerZone)
+                deviceType: 'boiler-panel',
+                attribute: overrideAttr,
+                value: n,
+                revertValue: 0,              // always auto
+                previousValue: 0,
+                ticketId: null,              // set after ticket creation
+                hold: {
+                    revertAt: new Date(clampResult.revertAtMs).toISOString(),
+                    label: `Boiler boost ${direction.toUpperCase()} ${zone} for ${clampResult.effectiveMin} min`
+                },
+                // Boiler-specific
+                panelVersion,
+                boilerZone: zone,
+                direction,
+                footprint: panelVersion === 'v1' ? { attrTs: baselineAttrTs, confirmed } : { confirmed },
+                d2CeilingAtMs: direction === 'on' ? clampResult.revertAtMs : undefined,
+                clampedFromMin: clampResult.clamped ? clampResult.requestedMin : undefined
+            };
+            try {
+                const oid = await scheduleOverride(holdAction);
+                overrideIds.push({ zone, overrideId: oid });
+            } catch (err) {
+                console.error(`[CONTROL] Boiler hold persist failed for ${zone}: ${err.message}`);
+                recordControlEvent('hold-persist-failed');
+            }
+        }
+    }
+
+    // Create Zendesk ticket (synchronous; failure raises alert but does not cancel hold)
+    let ticketId = null;
+    try {
+        const preStateMap = Object.fromEntries(preStates.map(z => [z.zone, z]));
+        const { createBoostTicket } = await _zendeskBoost();
+        const ticket = await createBoostTicket({
+            operator,
+            callerWords,
+            siteNo: site.siteNo,
+            siteName: site.siteName,
+            panelVersion,
+            zones,
+            direction,
+            durationKey,
+            requestedMin: clampResult.requestedMin,
+            effectiveMin: clampResult.effectiveMin,
+            clamped: clampResult.clamped,
+            revertAtMs: clampResult.revertAtMs,
+            previousStates: preStates,
+            acknowledgedWarnings: !!acknowledgedWarnings,
+            outcomes: zoneOutcomes
+        });
+        ticketId = ticket.id;
+        // Attach ticketId to all holds
+        const { collection } = await import('./store.js');
+        const col = await collection('OohOverrides');
+        for (const { zone, overrideId } of overrideIds) {
+            try {
+                const doc = await col.get(overrideId);
+                if (doc) { doc.ticketId = ticketId; await col.upsert(doc); }
+            } catch (e) { console.error(`[CONTROL] boost ticketId attach failed for ${zone}: ${e.message}`); }
+        }
+    } catch (err) {
+        console.error(`[CONTROL] Boost ticket creation failed: ${err.message}`);
+        raiseAlert('boost-ticket-failed', `Zendesk ticket creation failed for boiler boost on ${deviceId}: ${err.message}`);
+    }
+
+    recordControlEvent(`boiler-boost-${direction}`);
+
+    const action = {
+        actionId,
+        operator: { id: operator.id, name: operator.name, email: operator.email },
+        siteNo: site.siteNo,
+        siteName: site.siteName,
+        deviceId: device.deviceId,
+        deviceType: 'boiler-panel',
+        panelVersion,
+        zones: zoneOutcomes,
+        direction,
+        durationKey,
+        requestedMin: clampResult.requestedMin,
+        effectiveMin: clampResult.effectiveMin,
+        clamped: clampResult.clamped,
+        revertAtMs: clampResult.revertAtMs,
+        ticketId,
+        overrideIds,
+        dispatchedAt: new Date().toISOString()
+    };
+    actions.set(actionId, { ...action, _boilerBoost: true });
+    return action;
 }

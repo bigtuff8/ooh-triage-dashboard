@@ -367,6 +367,193 @@ export async function hasPublishedState(device) {
 /** TEST-ONLY seam — clears the fixture sim state so edge/settle tests don't leak across each other. */
 export function __resetSim() {
     cmdSim.clear();
+    boilerAttrSim.clear();
+}
+
+/**
+ * Test-only: directly write a value into boilerAttrSim for a given device+key.
+ * This is the only way to pre-seed V2 fixture state for zone overrides (V2 RPC dispatch
+ * is fire-and-forget and does not update boilerAttrSim). Only available in fixture mode.
+ */
+export function __setBoilerSim(deviceId, key, value, ts = Date.now()) {
+    boilerAttrSim.set(boilerSimKey(deviceId, key), { value, ts });
+}
+
+/* ------------------------------------------------------------------ */
+/* OOHDASH-141 — boiler-panel direct dispatch (V2 RPC + V1 SHARED)    */
+/* ------------------------------------------------------------------ */
+
+const BOILER_RPC_ZONES = Object.freeze(['CHZ1', 'CHZ2']);
+const BOILER_SHARED_KEYS = Object.freeze(['output2Override', 'output3Override']);
+
+// Fixture-mode attribute simulation store: deviceId+key → { value, ts }
+const boilerAttrSim = new Map();
+
+function boilerSimKey(deviceId, key) { return `${deviceId}::${key}`; }
+
+/**
+ * OOHDASH-141 — V2 boiler RPC dispatch. Sends `{ method: 'override', params: 'CHZn ±1' }` via
+ * one-way RPC. Only `BOILER_RPC_ZONES` and values `{1,-1}` are accepted (allow-list). Honours
+ * WRITES_DISABLED. Returns `{ sentAtMs }` on success; throws with `{ delivery }` tag on failure.
+ */
+export async function dispatchBoilerRpc(device, zone, n, durationMin = null) {
+    if (!BOILER_RPC_ZONES.includes(zone)) throw new Error(`Invalid boiler zone: ${zone}`);
+    if (n !== 1 && n !== -1) throw new Error(`Invalid boiler boost direction: ${n}`);
+    if (config.dataMode === 'fixture') {
+        // Write to boilerAttrSim so readBoilerState/confirm polling sees the dispatched state.
+        const now = Date.now();
+        boilerAttrSim.set(boilerSimKey(device.deviceId, `${zone}.override`), { value: n, ts: now });
+        return { sentAtMs: now };
+    }
+    if (config.writesDisabled) throw Object.assign(new Error('Device writes are disabled at deploy time (WRITES_DISABLED)'), { status: 423 });
+    const params = `${zone} ${n > 0 ? '1' : '-1'}${(durationMin != null && config.boilerBoost?.v2DurationToken) ? ` ${durationMin}` : ''}`;
+    const uuid = await tbDeviceUuid(device.deviceId);
+    try {
+        await writeSession.request('POST', `/api/rpc/oneway/${uuid}`, { method: 'override', params });
+    } catch (err) {
+        const status = err.response?.status;
+        if (status && status >= 400 && status < 500) {
+            throw Object.assign(new Error(`Boiler RPC rejected (${status}): ${err.response?.data?.message || err.message}`), { delivery: 'rejected', status });
+        }
+        throw Object.assign(new Error(`Boiler RPC failed: ${err.message}`), { delivery: 'unknown' });
+    }
+    return { sentAtMs: Date.now() };
+}
+
+/**
+ * OOHDASH-141 — V1 SHARED_SCOPE attribute write for boiler zone override.
+ * Only `BOILER_SHARED_KEYS` and values `{1,-1,0}` are accepted (allow-list). Honours WRITES_DISABLED.
+ * Returns `{ attrTs }` (server-assigned lastUpdateTs) on success.
+ */
+export async function writeSharedScopeAttribute(device, attribute, value) {
+    if (!BOILER_SHARED_KEYS.includes(attribute)) throw new Error(`Attribute ${attribute} is not a permitted boiler shared attribute`);
+    if (![1, -1, 0].includes(value)) throw new Error(`Value ${value} is not valid for a boiler shared attribute (must be 1, -1 or 0)`);
+    if (config.dataMode === 'fixture') {
+        const now = Date.now();
+        boilerAttrSim.set(boilerSimKey(device.deviceId, attribute), { value, ts: now });
+        return { attrTs: now };
+    }
+    if (config.writesDisabled) throw Object.assign(new Error('Device writes are disabled at deploy time (WRITES_DISABLED)'), { status: 423 });
+    const uuid = await tbDeviceUuid(device.deviceId);
+    await writeSession.request('POST', `/api/plugins/telemetry/DEVICE/${uuid}/attributes/SHARED_SCOPE`, { [attribute]: value });
+    // Read back the server-assigned lastUpdateTs so confirm can compare apples-to-apples.
+    try {
+        const attrs = await readSession.request('GET', `/api/plugins/telemetry/DEVICE/${uuid}/values/attributes/SHARED_SCOPE?keys=${encodeURIComponent(attribute)}`);
+        const row = (Array.isArray(attrs) ? attrs : []).find(a => a.key === attribute);
+        if (row && row.lastUpdateTs != null) return { attrTs: Number(row.lastUpdateTs) };
+    } catch (err) {
+        console.error(`[TB] boiler SHARED_SCOPE attrTs read-back failed for ${device.deviceId}: ${err.message}`);
+    }
+    return { attrTs: Date.now() };
+}
+
+/**
+ * OOHDASH-141 — revert a boiler zone to auto (override = 0). This is the ONLY path allowed
+ * under the BOILER_BOOST_REVERT_EXEMPT kill-switch exemption — it does NOT call the WRITES_DISABLED
+ * guard when the exemption is 'all'. Value is hard-coded 0. Zone must be CHZ1 or CHZ2.
+ */
+export async function revertBoilerZoneToAuto(device, version, zone) {
+    if (!BOILER_RPC_ZONES.includes(zone)) throw new Error(`Invalid boiler zone: ${zone}`);
+    const exempt = config.boilerBoost?.revertExempt === 'all';
+    if (config.dataMode === 'fixture') {
+        const key = version === 'v1'
+            ? (zone === 'CHZ1' ? 'output2Override' : 'output3Override')
+            : `${zone}.override`;
+        const now = Date.now();
+        boilerAttrSim.set(boilerSimKey(device.deviceId, key), { value: 0, ts: now });
+        console.log(`[BOILER-REVERT-EXEMPT] fixture: reverting ${device.deviceId} ${zone} to auto`);
+        return { attrTs: now };
+    }
+    console.log(`[BOILER-REVERT-EXEMPT] reverting ${device.deviceId} ${zone} to auto (exempt=${exempt}, version=${version})`);
+    // Bypass WRITES_DISABLED when exempt; use writeSession directly.
+    if (!exempt && config.writesDisabled) {
+        throw Object.assign(new Error('Device writes are disabled at deploy time (WRITES_DISABLED)'), { status: 423 });
+    }
+    const uuid = await tbDeviceUuid(device.deviceId);
+    if (version === 'v2') {
+        await writeSession.request('POST', `/api/rpc/oneway/${uuid}`, { method: 'override', params: `${zone} 0` });
+    } else {
+        const attribute = zone === 'CHZ1' ? 'output2Override' : 'output3Override';
+        await writeSession.request('POST', `/api/plugins/telemetry/DEVICE/${uuid}/attributes/SHARED_SCOPE`, { [attribute]: 0 });
+    }
+    return { attrTs: Date.now() };
+}
+
+/**
+ * OOHDASH-141 — reads the current boiler zone state(s). Returns one entry per zone plus
+ * `boiler: { enableState, ts }`.
+ *
+ * V2: reads timeseries keys CHZ1.override, CHZ2.override, boiler.enable_output_state,
+ *     CHZ1.output_state, CHZ2.output_state. `dir` is Math.sign of the latest override value
+ *     (string-tolerant per OOHDASH-143 fix).
+ * V1: reads timeseries keys output2State, output3State, output1State, and SHARED_SCOPE attrs
+ *     output2Override, output3Override for attrValue/attrTs.
+ */
+export async function readBoilerState(device, version, zones) {
+    function parseDir(raw) {
+        const n = parseInt(String(raw ?? '0'), 10);
+        return isNaN(n) ? 0 : Math.sign(n);
+    }
+
+    if (config.dataMode === 'fixture') {
+        const results = zones.map(zone => {
+            const simKey = version === 'v1'
+                ? (zone === 'CHZ1' ? 'output2Override' : 'output3Override')
+                : `${zone}.override`;
+            const sim = boilerAttrSim.get(boilerSimKey(device.deviceId, simKey));
+            const attrValue = sim?.value ?? 0;
+            const attrTs = sim?.ts ?? (Date.now() - 60000);
+            const dir = parseDir(attrValue);
+            return version === 'v1'
+                ? { zone, dir, overrideRaw: attrValue, overrideTs: attrTs, outputState: dir !== 0, outputStateTs: attrTs - 1000, attrValue, attrTs }
+                : { zone, dir, overrideRaw: attrValue, overrideTs: attrTs, outputState: dir !== 0, outputStateTs: attrTs - 1000, forcedUntilMs: null };
+        });
+        return { zones: results, boiler: { enableState: results.some(z => z.dir !== 0), ts: Date.now() - 5000 } };
+    }
+
+    const uuid = await tbDeviceUuid(device.deviceId);
+    if (version === 'v2') {
+        const keys = [
+            ...zones.flatMap(z => [`${z}.override`, `${z}.output_state`]),
+            'boiler.enable_output_state'
+        ];
+        const ts = await readSession.request('GET', `/api/plugins/telemetry/DEVICE/${uuid}/values/timeseries?keys=${encodeURIComponent(keys.join(','))}`);
+        const latest = (k) => { const s = ts?.[k]; return (Array.isArray(s) && s.length) ? s[0] : null; };
+        const zoneResults = zones.map(zone => {
+            const ov = latest(`${zone}.override`);
+            const st = latest(`${zone}.output_state`);
+            const dir = parseDir(ov?.value);
+            const fSeconds = typeof ov?.value === 'string' ? null : null; // V2 panel may embed seconds; not available from simple latest read
+            return { zone, dir, overrideRaw: ov?.value ?? null, overrideTs: ov?.ts ? Number(ov.ts) : null, outputState: st?.value, outputStateTs: st?.ts ? Number(st.ts) : null, forcedUntilMs: null };
+        });
+        const bv = latest('boiler.enable_output_state');
+        return { zones: zoneResults, boiler: { enableState: bv?.value, ts: bv?.ts ? Number(bv.ts) : null } };
+    } else {
+        // V1: timeseries for output2State, output3State, output1State
+        const tsKeys = ['output2State', 'output3State', 'output1State'];
+        const attrKeys = ['output2Override', 'output3Override'];
+        const [tsData, attrData] = await Promise.all([
+            readSession.request('GET', `/api/plugins/telemetry/DEVICE/${uuid}/values/timeseries?keys=${encodeURIComponent(tsKeys.join(','))}`),
+            readSession.request('GET', `/api/plugins/telemetry/DEVICE/${uuid}/values/attributes/SHARED_SCOPE?keys=${encodeURIComponent(attrKeys.join(','))}`)
+        ]);
+        const latestTs = (k) => { const s = tsData?.[k]; return (Array.isArray(s) && s.length) ? s[0] : null; };
+        const attrMap = {};
+        for (const row of (Array.isArray(attrData) ? attrData : [])) {
+            if (row?.key) attrMap[row.key] = row;
+        }
+        const zoneResults = zones.map(zone => {
+            const tsKey = zone === 'CHZ1' ? 'output2State' : 'output3State';
+            const attrKey = zone === 'CHZ1' ? 'output2Override' : 'output3Override';
+            const st = latestTs(tsKey);
+            const attr = attrMap[attrKey];
+            const attrValue = attr?.value ?? null;
+            const attrTs = attr?.lastUpdateTs != null ? Number(attr.lastUpdateTs) : null;
+            const dir = parseDir(attrValue);
+            return { zone, dir, overrideRaw: attrValue, overrideTs: attrTs, outputState: st?.value, outputStateTs: st?.ts ? Number(st.ts) : null, attrValue, attrTs };
+        });
+        const boilerSt = latestTs('output1State');
+        return { zones: zoneResults, boiler: { enableState: boilerSt?.value, ts: boilerSt?.ts ? Number(boilerSt.ts) : null } };
+    }
 }
 
 /**
