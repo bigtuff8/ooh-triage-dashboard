@@ -27,6 +27,8 @@ DETAIL: W3 is "part of the pub heating is off". A Heat ON boost on just the off 
 
 # OOHDASH-141 Design: pub heating boost (timed ON/OFF at the boiler panel)
 
+> **Amended 2026-10-24 after the supervised live test (§3a).** Q3 is resolved (the boiler follows the zone), the V2 confirm limit is now 15 s, revert is confirmed on the override only, and rollout is enabled for all sites under James's "Launch it". The gate-contract questions above are historical.
+
 **Date:** 2026-10-24 · **Phase:** design · **Discovery:** PR #137 (merged 166bd23) · **Depends on:** OOHDASH-139 (built and released, v1.4.7) and OOHDASH-143 (string decode, design merged)
 
 ## 1. Summary
@@ -37,7 +39,7 @@ The agent gets a **Heat ON** or **Heat OFF** action on the pub boiler panel's Ba
 - **V1 panels** (tag `boilercontrol`): SHARED_SCOPE write `output2Override` (zone 1) or `output3Override` (zone 2), with value `1`, `-1` or `0`.
 - The **01:00 / 07:00 Europe/London** rule (D2) is enforced on the server at dispatch, and the OOH revert worker is the guarantor of the end time.
 - Every boost opens a **Zendesk ticket** (tag `ooh_boost`). Revert outcomes are added to it as notes.
-- The feature ships **dark** behind flags and is turned on site by site after the supervised test (§10).
+- Rollout (revised after the 2026-10-24 live test, §3a): the boost ships **enabled for all boiler-panel sites, ON and OFF**. Flags remain as off-switches and there is a per-site deny list (§10).
 
 ## 2. Decisions already made
 
@@ -65,6 +67,19 @@ The agent gets a **Heat ON** or **Heat OFF** action on the pub boiler panel's Ba
 | E7 | Expected volume | DEDUCED | Zendesk `tags:ooh` heating-related tickets 2026-09-24 → 10-24: 39 in total, a handful at boiler panels (e.g. 6811 "Pub heating is off at the controls", 6856 "Heating boost") | A few boosts a week. One ticket per boost stays meaningful |
 | E8 | 139 dependency | **PROVEN** | `decodeBoilerHeating` (`tb-device.js:1313`), `boilerHeatingOutcome` (`flows.js:693`), tag `v1.4.7` | D3 is met. 143's string-bool fix must be in the same or an earlier release than 141 (§11) |
 
+### 3a. Supervised live test (2026-10-24, 15:27–15:36 BST, James's go)
+
+Four pub zone 1 tests ran in parallel: V1 6720 ON→OFF, V1 6790 OFF→ON, V2 6214 ON→OFF, V2 6302 OFF→ON. Each was held for 3 minutes and then sent back to auto. All four applied and all four reverted, with no retries. The full record is in `C:\harness-runs\gate141\livetest\RESULTS.md`.
+
+| # | Finding | Verdict | Design consequence |
+|---|---|---|---|
+| E9 | Dispatch works as designed: V2 one-way RPC `{method:'override', params:'CHZ1 ±1\|0'}`; V1 single-key SHARED_SCOPE `output2Override` | **PROVEN** | §4A unchanged |
+| E10 | Panel echo latency: V1 under 1 s (same second); V2 **7–9 s** on the panel clock | **PROVEN** | The V2 confirm limit is raised from 5 s to **15 s** (§4B/§4C). V1 stays at 2 s |
+| E11 | **Q3 RESOLVED:** the boiler follows a zone ON. At 6790 (V1) and 6302 (V2) the boiler was idle and was firing by the first 30 s check | **PROVEN** | No boiler command is needed. §8 is closed and the force-boiler flag is removed. The ON path is no longer gated on Q3 |
+| E12 | V2 pub zones are **thermostatic**. The timetable sets 21 °C by day and 15 °C at night, with a 0.5 °C deadband and a 10 min recheck (`CHZ1.enable_interval_mins`). After "CHZ1 0" the override cleared in about 8 s, but `output_state` stays where the boost left it until the room crosses the deadband | **PROVEN** | Revert confirmation is **override = 0 only**, never output_state (§6.3). Operator and ticket wording say "the panel's thermostat takes over". A V2 Heat ON opens the valve whatever the room temperature |
+| E13 | V2 "CHZ1 ±1" end time = the next timetable edge (22:00Z, which is 23:00 BST, at both sites) | **PROVEN** | V2 natural expiry is as discovery said (§9) |
+| E14 | V1 panel output (`output2State`) followed the command at both sites | **PROVEN** (panel level) | Physical valve wiring cannot be seen remotely. Under James's "launch it" this is accepted as a residual risk, and the per-site map override stays available (§10) |
+
 ## 4. Code changes
 
 ### A. `services/tb-client.js`: four functions
@@ -72,7 +87,7 @@ The agent gets a **Heat ON** or **Heat OFF** action on the pub boiler panel's Ba
 | Function | Behaviour |
 |---|---|
 | `dispatchBoilerRpc(device, zone, n, durationMin = null)` | `zone` must be in `BOILER_RPC_ZONES = ['CHZ1','CHZ2']`, else it throws. `n` must be in `{1,-1}`, else it throws. Builds `params` from those allow-listed values only. Appends ` <durationMin>` only when `config.boilerBoost.v2DurationToken` is true (set only after the supervised test proves Q2). Honours `WRITES_DISABLED` (423 before any POST). Fixture mode simulates it. An HTTP error is thrown with `{ delivery: 'rejected' }` for a 4xx, or `{ delivery: 'unknown' }` for a timeout or 5xx. Returns `{ sentAtMs: Date.now() }`, which is only used for audit. Freshness uses the server-domain sample ts (§C). |
-| `writeSharedScopeAttribute(device, attribute, value)` | Rejects any `attribute` not in `BOILER_SHARED_KEYS = ['output2Override','output3Override']` (plus `output1Override` only if Q3 needs it, §8). Rejects any `value` not in `{1,-1,0}`. Both checks run **inside** the function. Honours `WRITES_DISABLED`. After the POST, reads back the attribute's `lastUpdateTs` (server clock), like `writeServerScopeAttribute`, and returns `{ attrTs }`. |
+| `writeSharedScopeAttribute(device, attribute, value)` | Rejects any `attribute` not in `BOILER_SHARED_KEYS = ['output2Override','output3Override']`. Rejects any `value` not in `{1,-1,0}`. Both checks run **inside** the function. Honours `WRITES_DISABLED`. After the POST, reads back the attribute's `lastUpdateTs` (server clock), like `writeServerScopeAttribute`, and returns `{ attrTs }`. |
 | `revertBoilerZoneToAuto(device, version, zone)` | The **only** write that may run under the kill-switch exemption (decision 1). Value is hard-coded `0`. `zone` must be `CHZ1` or `CHZ2`. V2 sends `CHZn 0`. V1 writes the mapped `outputNOverride = 0`. It does not call the `WRITES_DISABLED` guard when `config.boilerBoost.revertExempt` covers it (decision 1 picks the setting). Every call is logged `[BOILER-REVERT-EXEMPT]`. |
 | `readBoilerState(device, version, zones)` | One timeseries GET (latest values plus sample ts) and, for V1, one SHARED_SCOPE GET. Returns one entry per zone: `{ zone, dir: 1\|-1\|0, overrideRaw, overrideTs, outputState, outputStateTs, forcedUntilMs, attrValue, attrTs }`. `dir` is the override sign, parsed with the 143 string-tolerant rules (`'-1792…'` gives -1). `forcedUntilMs` is V2 only (seconds ×1000). `attrValue`/`attrTs` are V1 only. Also returns `boiler: { enableState, ts }` (V2 `boiler.enable_output_state`, V1 `output1State`). |
 
@@ -86,19 +101,19 @@ The agent gets a **Heat ON** or **Heat OFF** action on the pub boiler panel's Ba
   - `durationKey` must be in the menu for that direction.
   - Returns `{ ok, zone, n: ±1, durationKey, panelVersion, attribute }`. For V1, `attribute` comes from `v1ZoneMap(device)`; for V2 it is `null`.
 - `v1ZoneMap(device)`: the default is `{ CHZ1: 'output2Override', CHZ2: 'output3Override' }`. A per-site override comes from `config.boilerBoost.v1ZoneMap[siteNo]`, filled in only after the supervised test proves the wiring.
-- `config.control.classes['boiler-panel']`: `{ confirmLimitMs: 5000 (V2) / 2000 (V1) via confirmLimitMsV1, confirmPollMs: 500, lateWatchMs: 180000, copyMinutes: null, offlineHours: 48 }`. All values are env-tunable. The validator rule `copyMinutes*60000 <= confirmLimitMs` passes with `null`.
+- `config.control.classes['boiler-panel']`: `{ confirmLimitMs: 15000 (V2, E10) / 2000 (V1) via confirmLimitMsV1, confirmPollMs: 1000, lateWatchMs: 180000, copyMinutes: null, offlineHours: 48 }`. All values are env-tunable. The validator rule `copyMinutes*60000 <= confirmLimitMs` passes with `null`.
 
 ### C. `services/control.js`: `dispatchBoilerBoost()`
 
 `dispatchBoilerBoost({ operator, confirmToken, siteNo, deviceId, zones, direction, durationKey, acknowledgedWarnings, callerWords })`. `zones` holds one or two values.
 
-1. **F004** consume the token. **F016** `killswitch.writesBlocked(siteNo)`. **Flags:** `boilerBoost.enabled`, `siteNo` in `boilerBoost.sites`, and for ON also `boilerBoost.onEnabled`. Otherwise 423 with a plain reason.
+1. **F004** consume the token. **F016** `killswitch.writesBlocked(siteNo)`. **Flags:** `boilerBoost.enabled`, `siteNo` not in `boilerBoost.sitesDeny`, and for ON also `boilerBoost.onEnabled`. Otherwise 423 with a plain reason.
 2. Resolve the site and device. It must be `boiler-panel`, online, have `hasPublishedState`, and its 139 `heating` must not be stale.
 3. **Clamp** `clampBoostWindow(now, direction, durationKey)` (§5). A refusal returns 422 with the operator text.
 4. **F009** `validateCommand` for each zone.
 5. **Pre-read** `readBoilerState`. This gives the baseline `overrideTs` and `attrTs` per zone, and `previousDir` for the audit. If any zone has `dir !== 0` and `!acknowledgedWarnings`, return **409 `{ warnings: [...] }`** with no write. The UI shows the warning and resends with `acknowledgedWarnings: true` (James-4).
 6. **Dispatch** each zone in turn: V2 with `dispatchBoilerRpc`, V1 with `writeSharedScopeAttribute`. Record the audit row (`actionType: 'boiler-boost-on'|'boiler-boost-off'`).
-7. **Confirm poll.** Poll every 500 ms up to the limit (V2 5 s, V1 2 s). All timestamps are **server-domain** TB sample timestamps, compared against the **pre-read baseline**, never against the local clock.
+7. **Confirm poll.** Poll every 1 s up to the limit (V2 15 s, V1 2 s; E10). All timestamps are **server-domain** TB sample timestamps, compared against the **pre-read baseline**, never against the local clock.
    - V2 CONFIRMED: a new `CHZn.override` sample (`overrideTs > baseline.overrideTs`) with `dir === n`, and the latest `outputState` agrees (on for +1, off for −1).
    - V1 CONFIRMED: an `outputNOverride` sample with `overrideTs > attrTs` (our write) and `dir === n`, and the latest `outputState` agrees.
    - `outputState` is checked on its latest value, not for freshness, because state keys report on change only (139 E-table).
@@ -154,6 +169,7 @@ Because `revertValue` is always `0`, the existing "inherit the original" superse
     - Unverified: "Sent, but the panel hasn't confirmed yet. It will be put back to automatic at 22:30 either way."
     - Clamped: "Cut to 30 min: pub heating must stop at 01:00."
     - Refused: the §5 text.
+    - Revert note (ticket), V2: "Pub zone 1 is back on automatic. The panel's own thermostat (21 °C day / 15 °C night) now decides whether it heats, so it may stay on or off for a while if the room is close to temperature." (E12)
 - New copy follows the 139 tone. The build shows it to James in the test-gate mockup.
 
 ## 5. The 01:00 / 07:00 clamp
@@ -201,7 +217,7 @@ The rules, with `now` converted to local time:
 | `dir === held`, **V1**, `attrTs` changed and `attrValue === held` | Someone re-applied the same value. **ON: revert** (D2 wins). **OFF:** decision 2, recommended skip plus alert plus note |
 | `dir === held`, **V2** | **Revert.** V2 cannot tell a same-direction re-issue apart, and the ticket note says so |
 
-3. **Write:** `revertBoilerZoneToAuto`. **Confirm** with a fresh override sample showing `dir === 0` (V2 `overrideTs > pre-revert overrideTs`, V1 `> new attrTs`), polled up to 15 s. If it is not confirmed, the doc stays `active` and is re-checked on the next 30 s cycle without re-firing (same pattern as `revertDispatchedTs`). The horizon is the class `lateWatchMs` (3 min).
+3. **Write:** `revertBoilerZoneToAuto`. **Confirm** with a fresh override sample showing `dir === 0` (V2 `overrideTs > pre-revert overrideTs`, V1 `> new attrTs`), polled up to 20 s. **Never check `output_state` for a revert.** On V2 the zone's thermostat takes over and may keep the boosted state while the room is inside its deadband (E12). That is correct auto behaviour, not a failed revert. If it is not confirmed, the doc stays `active` and is re-checked on the next 30 s cycle without re-firing (same pattern as `revertDispatchedTs`). The horizon is the class `lateWatchMs` (3 min).
 4. **Bounded retry.** If the revert is still not confirmed after the horizon, it becomes `revert-failed`. A note goes on the ticket: "zone may still be forced ON/OFF — manual check needed". Alert `revert-failed`. Unlike Salus/Tuya holds, **boiler `revert-failed` docs are retried every 5 min** (`revertAttempts`, up to 12 h). Each retry re-runs steps 2–3, so a zone that is already on auto stops the retries. Sending "auto" again is idempotent. That is why this does not break the DD-RESEND-UX "no resend" rule, which is about operator commands.
 5. **Late-revert note.** If `doc.direction === 'on'` and the confirmed revert time is later than `d2CeilingAtMs` plus 2 min, add the ticket note "heating ran past 01:00 by N min (cause: …)" and raise alert `d2-late-revert`.
 6. **Admin cancel** (`cancelOverride`) uses the same path.
@@ -219,14 +235,11 @@ The rules, with `now` converted to local time:
 
 ## 8. Q3: does a zone ON also need the boiler forced on?
 
-This is still UNRESOLVED and safety-critical. The design handles both answers, so the build does not wait on it, but the **ON path stays off** (`boilerBoost.onEnabled = false`) until the supervised test answers it.
+**RESOLVED by the live test (E11): no.** Forcing a zone ON makes the panel fire the boiler by itself, on both V1 and V2. The conditional force-boiler step from the first version of this design is **removed**:
 
-- **If the zone ON is enough**, nothing more is needed.
-- **If the boiler must also be forced**, `config.boilerBoost.forceBoilerOnBoost = true` switches on an extra step.
-  - The dispatch also sends V2 `boiler 1` or V1 `output1Override = 1`. `BOILER_RPC_ZONES` and `BOILER_SHARED_KEYS` gain `boiler` and `output1Override` **only** under this flag.
-  - It is recorded on the same hold doc (`boilerForced: true`).
-  - At revert, the zone goes back to auto first. Then the boiler goes back to auto (`0`) **unless** another active OOH ON hold on the same panel has `boilerForced`, in which case it is skipped and handed to that hold.
-  - Boiler "auto" lets the panel decide, so zones still on their timetable keep heat. The discovery worry about starving another zone only applies to another OOH boost, and that case is covered.
+- no `BOILER_BOOST_FORCE_BOILER` flag;
+- `BOILER_RPC_ZONES` stays `CHZ1`/`CHZ2`, and `BOILER_SHARED_KEYS` stays `output2Override`/`output3Override`. `boiler` and `output1Override` are never writable;
+- there is no boiler revert step.
 
 ## 9. Outage and stale data (critical-thinking finding 2)
 
@@ -242,22 +255,24 @@ This is still UNRESOLVED and safety-critical. The design handles both answers, s
 
 | Flag (env) | Default | Purpose |
 |---|---|---|
-| `BOILER_BOOST_ENABLED` | `false` | Master switch for the route, the buttons and dispatch |
-| `BOILER_BOOST_ON_ENABLED` | `false` | Heat ON path. Off until Q3 is answered |
-| `BOILER_BOOST_SITES` | empty | Comma list of sites verified at the supervised test (V1 wiring per site) |
+**Rollout (James, PR #140: "Launch it"; revised after the live test).** The boost ships **ON for every boiler-panel site, both directions**. The flags stay as off-switches, so it can be pulled without a release.
+
+| Flag (env) | Default | Purpose |
+|---|---|---|
+| `BOILER_BOOST_ENABLED` | `true` | Master switch for the route, the buttons and dispatch. Set it to `false` to pull the feature |
+| `BOILER_BOOST_ON_ENABLED` | `true` | Heat ON path (Q3 resolved, E11). An independent off-switch |
+| `BOILER_BOOST_SITES_DENY` | empty | Comma list of sites to **exclude** (e.g. a site found wired differently). Replaces the earlier allow-list |
 | `BOILER_BOOST_V1_ZONE_MAP` | empty | JSON per-site override of CHZ→output, used only if a site differs |
-| `BOILER_BOOST_FORCE_BOILER` | `false` | §8 extra step |
-| `BOILER_BOOST_V2_DURATION_TOKEN` | `false` | §9 V2 backstop |
-| `BOILER_BOOST_REVERT_EXEMPT` | per decision 1 | `all` / `runtime` / `none` |
+| `BOILER_BOOST_V2_DURATION_TOKEN` | `false` | §9 V2 backstop (Q2 still untested) |
+| `BOILER_BOOST_REVERT_EXEMPT` | `all` | Decision 1 (James): revert-to-auto runs under both the runtime kill-switch and `WRITES_DISABLED` |
 
-**Supervised first-boost test.** This is the first action of the build's live phase. It needs James's explicit go, on a site Sam picks, one V1 and one V2:
+Device writes still depend on the existing `WRITES_DISABLED=false` in production, which is already live since v1.3.0. The release itself (tag and deploy) still needs James's explicit go.
 
-1. Record the telemetry round trip over at least 5 dispatches and report P95. If P95 is over the cap, widen `confirmLimitMs` before rollout.
-2. V2: check that `CHZn.override` and `output_state` change, and that the OOH revert returns the override to 0.
-3. V1: check that **zone→output wiring** is correct at **each** V1 site before it joins `BOILER_BOOST_SITES`.
-4. Record `boiler.enable_output_state` / `output1State` before and after a zone ON (Q3).
-5. Optionally try `CHZ1 1 30` (Q2).
-6. Test revert under the kill-switch exemption with the runtime switch engaged.
+**Supervised first-boost test: DONE 2026-10-24 (§3a).** Items that remain for the build's own verification:
+
+1. An end-to-end test through the dashboard path. After deploy, one operator-driven boost and its revert on a single site, with James's go.
+2. A revert under the kill-switch exemption, in unit/sim tests. No live kill-switch test is needed.
+3. Optionally, `CHZ1 1 30` (Q2) on one V2 site, with James's go.
 
 ## 11. Tests the build must add
 
