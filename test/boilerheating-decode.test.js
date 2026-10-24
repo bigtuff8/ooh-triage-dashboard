@@ -13,7 +13,7 @@ process.env.TB_URL = 'https://tb.test';
 process.env.TB_USERNAME = 'svc-read';
 process.env.TB_PASSWORD = 'x';
 
-const { decodeBoilerHeating } = await import('../services/tb-device.js');
+const { decodeBoilerHeating, _extractMaxTelemTs } = await import('../services/tb-device.js');
 
 const NOW = 1700000000000; // fixed epoch ms for deterministic tests
 
@@ -300,4 +300,30 @@ test('BH-22: fetchTelemetry fallback path — both null (no telemetry ts) → st
     const r = decodeBoilerHeating(ss, {}, panelLastSeenMs, t, NOW);
     assert.equal(r.stale, true, 'should be stale when both timestamps absent');
     assert.equal(r.visible, true, 'device is still visible (version detected)');
+});
+
+test('BH-23: _extractMaxTelemTs — multi-key TB response → max valid ts returned, future ts rejected', () => {
+    const future = NOW + 600_000;  // 10 min ahead — beyond 5-min upper bound
+    const tsData = {
+        output1State:  [{ ts: NOW - 30_000, value: 'true' }],
+        output2State:  [{ ts: NOW - 60_000, value: 'false' }],
+        badFuture:     [{ ts: future, value: '1' }],        // should be rejected
+        noTs:          [{ value: 'x' }],                    // no ts field — ignored
+        negativeTs:    [{ ts: -1, value: '0' }],            // negative — ignored
+    };
+    const result = _extractMaxTelemTs(tsData, NOW);
+    assert.equal(result, NOW - 30_000, 'should be the most-recent valid ts (future rejected)');
+});
+
+test('BH-24: _extractMaxTelemTs — empty / all-invalid-ts response → null (safe degradation)', () => {
+    assert.equal(_extractMaxTelemTs({}, NOW), null, 'empty object → null');
+    assert.equal(_extractMaxTelemTs(null, NOW), null, 'null input → null');
+    assert.equal(
+        _extractMaxTelemTs({ k: [{ value: 'x' }] }, NOW), null,
+        'entry with no ts → null'
+    );
+    assert.equal(
+        _extractMaxTelemTs({ k: [{ ts: NOW + 600_000, value: '1' }] }, NOW), null,
+        'all ts in future (bad clock) → null, not pinned fresh'
+    );
 });
