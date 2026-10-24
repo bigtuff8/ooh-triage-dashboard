@@ -10,7 +10,7 @@ Q4: James -- today's classifier puts Tuya devices named dhw, supplyfan and barfa
 SECTION: What we are building
 When a caller says kitchen equipment is not working, the kitchen flow will read each circuit's live state from Tuya (ON or OFF, plus power draw on Tongou) and its real schedule. It then tells the agent which of the five agreed outcomes applies (A to E). It is read-only. Nothing is ever sent to a device, and Tuya control stays out of scope.
 SECTION: How the live data is read
-The OOH server calls the Tuya EU OpenAPI directly (Option A, your discovery decision). A live check on 2026-10-24 found that one call per site (the site's device list) already returns every circuit's switch state, power and online flag in about half a second. Schedules need one extra call per kitchen circuit, and those are cached for 5 minutes. All Tuya reads run alongside the ThingsBoard reads. They have a hard 3-second budget, so they can never slow the page down by more than that. OOH is capped at 5 Tuya requests per second, and it backs off for 60 seconds at the first rate-limit signal, so it cannot use up the quota the Tuya Scheduler shares. Tuya gives every caller the same project token (checked live), so OOH cannot break the Scheduler's login.
+The OOH server calls the Tuya EU OpenAPI directly (Option A, your discovery decision). A live check on 2026-10-24 found that one call per site (the site's device list) already returns every circuit's switch state, power and online flag in about half a second. Schedules need one extra call per kitchen circuit, and those are cached for 5 minutes. All Tuya reads run alongside the ThingsBoard reads. They have a hard 3-second budget, so they can never slow the page down by more than that. OOH is capped at 5 Tuya requests per second per process. Tuya gives every caller the same project token (checked live on two samples 3 s apart), so OOH calling a token endpoint can't invalidate the Tuya Scheduler's existing token. Note: whether OOH's share of Tuya traffic can push the Scheduler into a 429 on a schedule-write is not yet proven — it is a residual risk (R6, below) for you to accept or reject.
 SECTION: If Tuya fails
 Your discovery condition was that a Tuya failure must never break the app. In this design it can't. A failure, timeout, missing credentials or unmatched device marks that circuit's live data "unavailable". The kitchen flow then falls back to exactly today's behaviour, with one line saying live circuit state could not be read. After 3 failures in a row the server stops calling Tuya for 60 seconds. The feature ships switched off behind a flag. While it is off the dashboard behaves exactly as it does today.
 SECTION: What changes for the agent
@@ -56,11 +56,12 @@ The backend turns those facts into one of the five outcomes James agreed in disc
 | The same listing also returns each device's `local_key` (the device's local encryption key) | PROVEN | Dropped at parse; never stored, logged or sent to the browser (section 9) |
 | `GET /v2.0/cloud/thing/{id}/shadow/properties?codes=schedule` filters to the schedule property (93 ms) | PROVEN | OWON schedule read is one small call |
 | `GET /v2.0/cloud/timer/device/{id}` returns a plain array; entry keys `time, loops, functions, enable, timezone_id, timer_id, category, date` (86 ms) | PROVEN | Tongou schedule read is one call; `timezone_id` is used when present |
-| Two `grant_type=1` token requests 3 s apart returned the **identical** access token (same hash) with `expire_time` counting down (1690 s, then 1687 s). An earlier request had returned 2611 s, not a fresh 7200 | PROVEN | Tuya hands every caller the project's one current token, so OOH taking a token cannot invalidate the Tuya Scheduler's. OOH never calls the refresh-token endpoint, which is the only call that could rotate it |
+| Two `grant_type=1` token requests 3 s apart returned the **identical** access token (same hash) with `expire_time` counting down (1690 s, then 1687 s). An earlier request had returned 2611 s, not a fresh 7200 | PROVEN (2 samples, 3 s apart — see R4 for the evidence gap) | Tuya hands every caller the project's one current token. OOH never calls the refresh-token endpoint, which is the only call that could rotate it. This specific risk is not yet proven at production scale and across a Scheduler token-refresh cycle; see R4. |
 | Tongou product name at gk-6863 is "Din Rail Wi-Fi Switch with metering" | PROVEN | The relay key is `switch_1`. The Scheduler's `switch` key applies only to the "wifi din rail switch" / "breaker" product names. The read takes `switch_1` and falls back to `switch` |
 | `k8s/deployment.yaml` pins `replicas: 1` (session affinity) | PROVEN | Per-process token cache, rate limiter and breaker are the whole-app limits today. If replicas ever go above 1, the limits multiply by the replica count (section 9) |
 | `classifyDevice` puts glasswasher, merrychef, coffeemachine, hcupboard, heatedgantry, supplyfan, barfan **and dhw** into `kitchen` once TB reports a switch key. Fridge, freezer and cellar go to refrigeration; extractfan goes to fan; externallighting goes to lighting | PROVEN (unit run of the live classifier) | Kitchen circuit set = existing `kind === 'kitchen'`. The dhw problem is decision Q4 |
 | Existing `services/schedule.js` already handles `loops` strings with `dayOrder: 'sun-first'` and Europe/London DST-safe time maths | PROVEN (code) | Reuse its time helpers; no second time library |
+| The actual Tuya project rate-limit ceiling and the Tuya Scheduler's steady-state request volume are **not known from design evidence** | **GAP** | The claim that OOH's 5 req/s cap cannot exhaust the shared quota is therefore unsubstantiated. This is an accepted residual risk; see R6 |
 
 ## 4. Architecture
 
@@ -102,8 +103,8 @@ In fixture mode the Tuya client is **never called**. Fixture kitchen devices may
   - `^/v2\.0/cloud/timer/device/[A-Za-z0-9]+(\?last_row_key=[^&]+)?$`
   - `^/v2\.0/cloud/thing/[A-Za-z0-9]+/shadow/properties\?codes=schedule$`
 - Per-request timeout of 2500 ms (AbortController). HTTP 429 or body code 1009 are treated as rate-limited. A non-2xx response, or `success !== true`, is a failure (Scheduler rule A05: a failed read is never treated as "empty").
-- **Global limiter (per process):** at most 4 Tuya requests in flight and at most 5 requests per second (token bucket). Requests over the limit wait inside the 3-second budget and otherwise fail with `rate-limited`. This caps OOH's load at 5 req/s **however many sites are open at once**.
-- Circuit breaker: 3 consecutive failures, or **any** 429/1009 rate-limit response, open the breaker for 60 s. While it is open, calls fail immediately with reason `circuit-open`. OOH backs off first, so the Tuya Scheduler keeps the shared quota.
+- **Global limiter (per process):** at most 4 Tuya requests in flight and at most 5 requests per second (token bucket). Requests over the limit wait inside the 3-second budget and otherwise fail with `rate-limited`. This caps OOH's contribution at 5 req/s however many sites are open at once, but does not guarantee that combined OOH + Scheduler traffic stays below Tuya's project ceiling — see R6.
+- Circuit breaker: 3 consecutive failures, or **any** 429/1009 rate-limit response, open the breaker for 60 s. While it is open, calls fail immediately with reason `circuit-open`, which protects OOH from sustained 429 storms. The breaker is a reactive protection for OOH; it does not guarantee Scheduler writes are unaffected by OOH traffic that preceded a 429 — see R6.
 - Token errors (Tuya codes 1010 / 1011, token invalid or expired): drop the cached token, re-grant once, then fail. If the token changes before the cached expiry, a warning `tuya_token_changed_early` is logged, which would reveal unexpected rotation.
 - Counters for calls, failures, rate-limit responses and breaker openings are added to the existing `services/metrics.js`.
 - Logging: method, redacted path, status, duration. The token, signature, client id, secret and `local_key` are never logged.
@@ -239,9 +240,9 @@ No Tuya failure can turn a workspace request into an error response, and none ch
 - **The key pair can write schedules on every linked device** (CIR `TUYA_OPENAPI_ACCESS.md`, blast radius). Mitigation: section 5.1. The module has no write methods and a GET path allowlist. The unit test asserts that the module source contains no `'POST'|'PUT'|'PATCH'|'DELETE'` method strings and that a non-allowlisted path throws.
 - `local_key` is removed at listing parse. A test asserts it is absent from `device.tuya` and from the workspace JSON.
 - **Secrets.** `kv-airedale-prod` is in tenant `238e24db`, and the OOH pod's workload identity is in `002bfc30`, so a direct Key Vault read is not available. Recommended (Q3): Spencer adds `TUYA_CLIENT_ID` / `TUYA_CLIENT_SECRET` to the existing `ooh-dashboard-secrets` secret. Nothing goes in code, docs, logs or the manifest. A message to Spencer will be drafted for James to approve first; nothing will be sent without that.
-- **Shared quota with the Tuya Scheduler.** Typical load is about 2 listing calls per minute per open site, plus at most one schedule call per kitchen circuit every 5 minutes. Incident storm: 20 sites open at once with 12 kitchen circuits each comes to about 40 listing calls per minute plus 240 schedule calls per 5 minutes, roughly 1.5 req/s. That is below the hard 5 req/s cap. The cap holds at any number of open sites, because extra requests are queued or dropped to the fallback, never sent. Any rate-limit response opens the breaker for 60 s (section 5.1).
-- **Token.** Shared by Tuya's design and verified (section 3). OOH only ever uses `grant_type=1`, never the refresh endpoint, so it cannot rotate the token the Scheduler holds.
-- **Replicas.** The deployment is pinned to 1 replica. If that ever changes, the per-process limiter becomes N × 5 req/s, and the build must then lower the per-process cap to keep the total at or below 5 req/s.
+- **Shared quota with the Tuya Scheduler.** This is a residual risk (R6). What is known: OOH is capped at 5 req/s per process, and the storm case in section 13.1 gives about 1.5 req/s. What is not known: the Tuya project's actual rate-limit ceiling, and the Scheduler's steady-state volume. Without those figures, the claim that OOH cannot exhaust the shared quota cannot be made. The circuit breaker opens on OOH's first 429 and stops OOH calls for 60 s — but that is reactive: a Scheduler schedule-WRITE that arrived in the same 429 window is not retried by OOH. Whether the Scheduler retries on 429 is also not known to design. R6 below is the explicit residual for James.
+- **Token.** Shared by Tuya's design and supported by two samples 3 s apart (section 3). OOH only ever uses `grant_type=1`, never the refresh endpoint, so it cannot rotate the Scheduler's token. Whether the token can change unexpectedly between samples (e.g. during a Scheduler token-refresh cycle) is not yet proven from wider evidence; see R4.
+- **Replicas.** The deployment is pinned to 1 replica. If that ever changes, the per-process limiter becomes N × 5 req/s, and the build must then lower the per-process cap to keep OOH's contribution at or below 5 req/s.
 
 ## 10. Out of scope
 
@@ -271,14 +272,14 @@ No Tuya failure can turn a workspace request into an error response, and none ch
 - **Risk: snapshot drift.** `data/tuya-sites.json` can fall behind the Scheduler. A missing site degrades to the fallback, never to a wrong answer. The refresh procedure goes in the runbook.
 - **F2 wording and override latching.** The Tongou button holds until the next scheduled timer event (discovery SA2, confirmed). OWON is only assumed to behave the same. F2 therefore states the next scheduled change as a fact and makes no claim about when the override ends.
 - **Risk: write-capable key in the OOH pod.** Mitigated by the GET-only client (section 9). A read-only Tuya project key would be better, but none exists today.
-- **Rollout:** ships dark behind `TUYA_READ_ENABLED=false` in a minor release (v1.5.0). Production enable needs the secret (Q3) **and** James's explicit go. Rollback is setting the flag to false, with no redeploy of code.
+- **Rollout:** ships dark behind `TUYA_READ_ENABLED=false` in a minor release (v1.5.0). Production enable needs the secret (Q3) **and** James's explicit go, **and** completion of the pre-production-enable evidence step for R4 and R6 (section 13.5). Rollback is setting the flag to false, with no redeploy of code.
 
 ## 13. Operations, data and risk ownership
 
 ### 13.1 Running cost and background posture
 
 - **No background job, no polling, no scheduler.** Tuya is called only while building a workspace that an agent has open. With no agent on a call, there are zero Tuya calls.
-- **Upper bound:** 5 requests per second per process, with 1 replica (section 9). That is 18,000 per hour at a sustained ceiling that real traffic never reaches. At 10 times today's call volume, the storm case in section 9 (about 1.5 req/s) would exceed the cap. The extra requests are then queued or fall back within the 3-second budget, and the Tuya quota is not exceeded.
+- **Upper bound:** 5 requests per second per process, with 1 replica (section 9). That is 18,000 per hour at a sustained ceiling that real traffic never reaches. At 10 times today's call volume, the storm case (about 1.5 req/s) would approach the cap. Requests beyond the cap are queued or fall back within the 3-second budget; they are never sent.
 - **External cost:** none. The Tuya project is already paid for and used by the Scheduler, and OOH adds no new subscription.
 
 ### 13.2 Data classification
@@ -303,11 +304,16 @@ Section 5.1 adds counters (calls, failures by reason, rate-limit responses, brea
 
 The design author is the agent. The approver is James, at this gate. Approving this gate records his acceptance in the PR review, which is durable and version-controlled with this doc. Declining it sends these back.
 
-| # | Risk | Why it is acceptable | Owner |
-|---|---|---|---|
-| R1 | The OOH pod holds a key pair that could change schedules | The client has no write path and a GET allowlist, enforced by a unit test (section 9) | James |
-| R2 | Wrong UID in the snapshot | Exact full-name match including the site number means nothing matches, so the circuit falls back. Another site's data can never be shown | James |
-| R3 | A false E outcome on an idle appliance | Same action as B (contact repairs) | James |
-| R4 | The token is shared with the Scheduler, proven from two samples | OOH never calls refresh; an early token change is logged and counted | James |
-| R5 | If replicas are ever raised, the per-process cap multiplies | The build must lower the cap; called out in section 9 | James |
+**Pre-production-enable conditions for R4 and R6** (in addition to the feature flag and the secret): before `TUYA_READ_ENABLED` is set to `true` in production, the following steps must be completed and signed off. They are not release blockers — the flag ships false — but they are production-enable blockers.
 
+- **R4 evidence step:** capture token responses over at least 2 hours and across at least one Scheduler token-refresh cycle, confirming that the token is shared (not per-caller) and that OOH's grant_type=1 calls do not cause early rotation.
+- **R6 evidence step:** establish the Tuya project's rate-limit ceiling (from the Tuya developer console or by asking Tuya support), record the Scheduler's observed steady-state request volume (from its own metrics), and confirm that OOH's ceiling of 5 req/s leaves sufficient headroom — or, if it does not, lower the per-process cap before enabling.
+
+| # | Risk | Honest position | Pre-enable condition | Owner |
+|---|---|---|---|---|
+| R1 | The OOH pod holds a key pair that could change schedules | The client has no write path and a GET allowlist, enforced by a unit test (section 9) | None — mitigated in code | James |
+| R2 | Wrong UID in the snapshot | Exact full-name match including the site number means nothing matches, so the circuit falls back. Another site's data can never be shown | None | James |
+| R3 | A false E outcome on an idle appliance | Same action as B (contact repairs) | None | James |
+| R4 | The token is shared with the Scheduler — proven from only 2 samples 3 s apart. The failure mode is: token rotates unexpectedly, Scheduler loses its token and equipment control breaks | OOH never calls the refresh endpoint. An early token change is logged and counted. But 2 samples are thin evidence, and we have not tested across a Scheduler token-refresh cycle | Complete the R4 evidence step before production enable | James |
+| R5 | If replicas are ever raised, the per-process cap multiplies | The build must lower the cap; called out in section 9 | None at this stage; the cap adjustment is a build-time obligation | James |
+| R6 | OOH traffic could push the shared Tuya project quota into a 429 that hits a Scheduler schedule-WRITE. The 60-second breaker protects OOH reactively but does not protect an in-flight Scheduler write that preceded OOH's backoff, and it is not known whether the Scheduler retries on 429. The Tuya project ceiling and Scheduler steady-state volume are not stated in this design | The 5 req/s per-process cap limits OOH's contribution, and the storm case is about 1.5 req/s. But without the actual ceiling, "sufficient headroom" is asserted, not proven | Complete the R6 evidence step before production enable | James |
