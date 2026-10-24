@@ -33,3 +33,15 @@ Admin → Device control kill-switch. Global or per-site; a reason is mandatory 
 ## Escalation
 
 Platform-side failures (bridge, AKS, Workload Identity, K8s Secrets, pipeline): Spencer. Zendesk-side: IoT team admin. Never force-delete pods on rollout issues — check `kubectl logs` on the NEW pod first (see deployment-failure lessons in the IoT Support dashboard runbook).
+
+## Tuya kitchen circuit read (OOHDASH-140)
+
+Shipped dark: `TUYA_READ_ENABLED=false` by default. Enable only by setting `TUYA_READ_ENABLED=true` in Key Vault (restarts the pod). Credentials: `TUYA_CLIENT_ID` and `TUYA_CLIENT_SECRET` in Key Vault only — never in code or logs.
+
+**Circuit breaker:** 3 consecutive failures or any HTTP 429/Tuya error 1009 → 60 s open. Affected sites fall back to legacy kitchen flow silently. Resets automatically.
+
+**Runtime kill-switch:** Admin → Tuya circuit read off (`OohTuyaReadOff` in Cosmos). Takes effect within 30 s without a restart.
+
+**Metrics:** `tuyaCalls`, `tuyaFailures`, `tuyaRateLimits`, `tuyaBreakerOpenings` exposed on `/metrics` (Prometheus). Alert if `tuyaFailures / tuyaCalls > 0.1` over 5 min.
+
+**Site not in map:** if a site's siteKey (`gk-<siteNo>`) is missing from `data/tuya-sites.json`, that site falls back to legacy kitchen flow. Add the Tuya user UID by copying from `tuya-scheduler/src/data/sites.json` and redeploying.

@@ -1218,37 +1218,254 @@ const FLOWR = {
         const ks = ws.devices.filter(d => d.kind === 'kitchen');
         if (f.stage === 0) {
             if (!ks.length) return '<div class="alert info">No kitchen circuits on Lighthouse here.</div>' + otherShortcut();
-            // OOHDASH-89 (E): the static "Live read:" strip and the per-circuit rows are gone. The offline
-            // auto-divert stays FIRST and unchanged — any offline circuit re-enters the connection check and
-            // never reaches the reshaped happy path. When every circuit is online the backend is confident,
-            // so the flow states ONE high-assurance assessment line and goes straight to the deciding question
-            // (individual-appliance picking is subsumed by the assessment, never a picker). Only assert
-            // "reachable" when confident; otherwise the divert above handles it.
-            const off = ks.some(k => !k.online);
-            if (off) { f.cat = 'connectivity'; f.stage = 0; return FLOWR.connectivity(ws, f); }
-            doneLine('The kitchen circuits are reachable.');
-            return `<div class="stepq">Is the kitchen needed for service <b>right now</b> (food being served / hotel breakfast)?</div>
+
+            // Detect live mode: any kitchen device has a .tuya property
+            const liveKs = ks.filter(d => d.tuya);
+            const isLiveMode = liveKs.length > 0;
+
+            if (!isLiveMode) {
+                // ── Legacy mode: exact existing behaviour ──────────────────────────────
+                const off = ks.some(k => !k.online);
+                if (off) { f.cat = 'connectivity'; f.stage = 0; return FLOWR.connectivity(ws, f); }
+                doneLine('The kitchen circuits are reachable.');
+                return `<div class="stepq">Is the kitchen needed for service <b>right now</b> (food being served / hotel breakfast)?</div>
    <div class="chips"><button class="chip" data-testid="kitchen-critical" onclick="flowStep({crit:1})">Yes — business critical now</button><button class="chip" data-testid="kitchen-notcritical" onclick="flowStep({crit:0})">No — needed later / tomorrow</button></div>`;
+            }
+
+            // ── Live mode ──────────────────────────────────────────────────────────────
+            // Offline divert: any offline circuit → connectivity check (same as legacy)
+            const offlineDevices = ks.filter(d => d.tuya && d.tuya.verdict === 'offline');
+            if (offlineDevices.length > 0) {
+                f.cat = 'connectivity'; f.stage = 0; return FLOWR.connectivity(ws, f);
+            }
+
+            // Store live kitchen devices in flow state for stage 1
+            f.data._liveKs = liveKs.map(d => d.deviceId);
+
+            // Single circuit: auto-select
+            if (liveKs.length === 1) {
+                f.data._selectedCircuit = liveKs[0].deviceId;
+                f.stage = 1;
+                return FLOWR.kitchen(ws, f);
+            }
+
+            // Multiple circuits: picker
+            const chips = liveKs.map((d, i) =>
+                `<button class="chip" data-testid="kitchen-circuit-${i}" onclick="flowStep({_selectedCircuit:'${d.deviceId.replace(/'/g, "\\\\'")}'})">${esc(d.tuya.displayName || d.zone || d.deviceId)}</button>`
+            ).join('');
+            return `<div data-testid="kitchen-picker"><p>Which bit of kitchen equipment is the problem?</p>
+   <div class="chips">${chips}<button data-testid="kitchen-all" class="chip" onclick="flowStep({_selectedCircuit:'__all__'})">Several / all of it</button></div></div>`;
         }
-        if (f.stage === 1) {
-            if (f.data.crit) {
-                doneLine('Business-critical during service — P1');
-                return outcomeP1(f, 'crit', {
-                    subject: 'Kitchen equipment off during service — P1',
-                    detail: 'Kitchen circuits off while the site is actively serving. Remote switching not available; needs immediate IoT action.',
-                    script: 'This is urgent so I’ve escalated it right now — a text has gone to our on-duty manager and someone will call you back shortly. In the meantime the on-site override switch, if you have one, is safe to use.',
-                    p1Summary: 'Kitchen equipment off during service'
+
+        if (f.stage >= 1) {
+            // ── Legacy stage 1 (no live data) ─────────────────────────────────────────
+            if (!f.data._liveKs) {
+                if (f.data.crit) {
+                    doneLine('Business-critical during service — P1');
+                    return outcomeP1(f, 'crit', {
+                        subject: 'Kitchen equipment off during service — P1',
+                        detail: 'Kitchen circuits off while the site is actively serving. Remote switching not available; needs immediate IoT action.',
+                        script: 'This is urgent so I\'ve escalated it right now — a text has gone to our on-duty manager and someone will call you back shortly. In the meantime the on-site override switch, if you have one, is safe to use.',
+                        p1Summary: 'Kitchen equipment off during service'
+                    });
+                }
+                doneLine('Not service-critical tonight');
+                const ksched = ws.devices.find(d => d.kind === 'kitchen')?.schedule || '';
+                return outcomeCaptured(f, 'ncrit', {
+                    subject: 'Kitchen equipment / schedule request',
+                    detail: `Caller needs kitchen equipment outside the current schedule window (${ksched}). Remote switching and schedule changes aren\'t available OOH yet — logged for the IoT team.`,
+                    script: 'The equipment is on a schedule and comes on at its set time. I can\'t safely change that tonight, but I\'ve logged it and the IoT team will sort the times with you tomorrow.',
+                    OohCaptureClass: 'kitchen-powerpause'
                 });
             }
-            doneLine('Not service-critical tonight');
-            const ksched = ws.devices.find(d => d.kind === 'kitchen')?.schedule || '';
-            return outcomeCaptured(f, 'ncrit', {
-                subject: 'Kitchen equipment / schedule request',
-                detail: `Caller needs kitchen equipment outside the current schedule window (${ksched}). Remote switching and schedule changes aren’t available OOH yet — logged for the IoT team.`,
-                script: 'The equipment is on a schedule and comes on at its set time. I can’t safely change that tonight, but I’ve logged it and the IoT team will sort the times with you tomorrow.',
-                OohCaptureClass: 'kitchen-powerpause'
-            });
+
+            // ── Live mode stage 1 ──────────────────────────────────────────────────────
+            const liveKs = (f.data._liveKs || []).map(id => ws.devices.find(d => d.deviceId === id)).filter(Boolean);
+            const selected = f.data._selectedCircuit;
+
+            // Helpers
+            function tFmt(t) { return t ? t.time : '?'; }
+            function dayFmt(t) { if (!t) return ''; return t.dayText && t.dayText !== 'today' ? ` ${t.dayText}` : ''; }
+            function timeFmt(t) { return t ? `${tFmt(t)}${dayFmt(t)}` : '?'; }
+
+            function tuyaFactLine(device, nowTs) {
+                const t = device.tuya;
+                if (!t) return '';
+                const timeStr = new Date(nowTs || Date.now()).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', hour12: false });
+                const relayStr = t.switchOn ? 'ON' : 'OFF';
+                const schedStr = t.schedule?.state || 'unknown';
+                const lastCh = t.schedule?.lastChange;
+                const schedDesc = lastCh ? `expected ${schedStr} since ${tFmt(lastCh)}${dayFmt(lastCh)}` : `schedule state: ${schedStr}`;
+                return `Live Tuya read ${timeStr}: ${t.displayName || device.zone} relay ${relayStr}; ${schedDesc}.`;
+            }
+
+            function verdictCard(device, showFallbackQuestion) {
+                const t = device.tuya;
+                if (!t) return '';
+                const zone = t.displayName || device.zone || device.deviceId;
+                const v = t.verdict;
+                const sched = t.schedule || {};
+                const lc = sched.lastChange;
+                const no = sched.nextOn;
+                const noff = sched.nextOff;
+
+                if (v === 'fallback' || v === 'offline') {
+                    return `<div data-testid="kitchen-fallback"><div class="alert info">Live circuit state couldn\'t be read just now.</div>
+   <div class="stepq">Is the kitchen needed for service <b>right now</b> (food being served / hotel breakfast)?</div>
+   <div class="chips"><button class="chip" data-testid="kitchen-critical" onclick="flowStep({crit:1,_liveKs:null})">Yes — business critical now</button><button class="chip" data-testid="kitchen-notcritical" onclick="flowStep({crit:0,_liveKs:null})">No — needed later / tomorrow</button></div></div>`;
+                }
+
+                let label = '', script = '', chips = '';
+                const fact = tuyaFactLine(device, Date.now());
+
+                if (v === 'A') {
+                    label = `${zone} is OFF but the schedule says it should have come on at ${timeFmt(lc)}.`;
+                    script = `${zone} is off — according to the schedule it should have come on at ${timeFmt(lc)}, so it looks like it hasn\'t started automatically. The PowerPause device has a manual override button on the front — pressing it once should bring the circuit on immediately.`;
+                    chips = `<button class="chip" data-testid="kitchen-override-ok" onclick="flowStep({_kitchenOutcome:'override-ok'})">Sorted with the override</button><button class="chip" data-testid="kitchen-override-fail" onclick="flowStep({_kitchenOutcome:'override-fail'})">Override didn\'t work</button>`;
+                } else if (v === 'B') {
+                    label = `${zone} is ON as expected. Schedule: on from ${timeFmt(lc)} until ${timeFmt(noff)}.`;
+                    script = `The ${zone} is on and the schedule confirms it should be — if the caller says the equipment itself isn\'t working, it\'s probably a hardware fault with the appliance rather than the power supply. The site should contact their repairs team.`;
+                    chips = `<button class="chip" data-testid="kitchen-repairs" onclick="flowStep({_kitchenOutcome:'repairs'})">Site will contact their repairs team</button><button class="chip" data-testid="kitchen-still-ours" onclick="flowStep({_kitchenOutcome:'still-ours'})">Caller still says it\'s our problem</button>`;
+                } else if (v === 'C') {
+                    label = `${zone} is OFF — the schedule has it off until ${timeFmt(no)}.`;
+                    script = `It\'s showing as off, but that\'s what the schedule says at this time of day — it\'s due to come on at ${timeFmt(no)}. If you need it on now, the PowerPause override button on the device will bring it on early. It\'ll go back to the normal schedule at the next scheduled event.`;
+                    chips = `<button class="chip" data-testid="kitchen-override-ok" onclick="flowStep({_kitchenOutcome:'override-ok'})">Sorted with the override</button><button class="chip" data-testid="kitchen-override-fail" onclick="flowStep({_kitchenOutcome:'override-fail'})">Override didn\'t work</button>`;
+                } else if (v === 'D') {
+                    label = `${zone} is OFF but has no active schedule — this circuit should normally be on.`;
+                    script = `That circuit has no schedule — it\'s meant to stay on. This looks like it may have tripped. Check the fuse board first; if that\'s clear, ring back and we\'ll escalate to the IoT team.`;
+                    chips = `<button class="chip" data-testid="kitchen-fuse-fixed" onclick="flowStep({_kitchenOutcome:'fuse-fixed'})">Fuse board had tripped — reset fixed it</button><button class="chip" data-testid="kitchen-fuse-fail" onclick="flowStep({_kitchenOutcome:'fuse-fail'})">Fuse board is fine / still off</button>`;
+                } else if (v === 'E') {
+                    label = `${zone} relay is ON but drawing no power (0W) — the appliance may have tripped internally or been switched off at the unit.`;
+                    script = `Power is reaching the appliance but it\'s not drawing any — the circuit is on, so this is probably a hardware fault with the appliance itself. The site should contact their repairs team.`;
+                    chips = `<button class="chip" data-testid="kitchen-repairs" onclick="flowStep({_kitchenOutcome:'repairs'})">Site will contact their repairs team</button><button class="chip" data-testid="kitchen-still-ours" onclick="flowStep({_kitchenOutcome:'still-ours'})">Caller still says it\'s our problem</button>`;
+                } else if (v === 'B-unscheduled') {
+                    label = `${zone} is ON (it has no schedule, so it stays on).`;
+                    script = `The ${zone} is on and the schedule confirms it should be — if the caller says the equipment itself isn\'t working, it\'s probably a hardware fault with the appliance rather than the power supply. The site should contact their repairs team.`;
+                    chips = `<button class="chip" data-testid="kitchen-repairs" onclick="flowStep({_kitchenOutcome:'repairs'})">Site will contact their repairs team</button><button class="chip" data-testid="kitchen-still-ours" onclick="flowStep({_kitchenOutcome:'still-ours'})">Caller still says it\'s our problem</button>`;
+                } else if (v === 'B-outside') {
+                    label = `${zone} is ON outside its scheduled hours — it has probably been switched on at the PowerPause unit. Next scheduled change: OFF at ${timeFmt(noff)}.`;
+                    script = `The ${zone} is on and the schedule confirms it should be — if the caller says the equipment itself isn\'t working, it\'s probably a hardware fault with the appliance rather than the power supply. The site should contact their repairs team.`;
+                    chips = `<button class="chip" data-testid="kitchen-repairs" onclick="flowStep({_kitchenOutcome:'repairs'})">Site will contact their repairs team</button><button class="chip" data-testid="kitchen-still-ours" onclick="flowStep({_kitchenOutcome:'still-ours'})">Caller still says it\'s our problem</button>`;
+                } else if (v === 'off-unknown') {
+                    label = `${zone} is OFF. Its schedule couldn\'t be read, so the dashboard can\'t tell whether that\'s expected.`;
+                    script = `The ${zone} is showing as off, but I can\'t see its schedule right now. The PowerPause device has a manual override button on the front — pressing it once should bring the circuit on immediately.`;
+                    chips = `<button class="chip" data-testid="kitchen-override-ok" onclick="flowStep({_kitchenOutcome:'override-ok'})">Sorted with the override</button><button class="chip" data-testid="kitchen-override-fail" onclick="flowStep({_kitchenOutcome:'override-fail'})">Override didn\'t work</button>`;
+                }
+
+                return `<div data-testid="kitchen-verdict">
+   <div class="alert info"><b>${esc(label)}</b></div>
+   <div class="script">"${esc(script)}"</div>
+   <div class="chips">${chips}</div>
+   <p class="small" style="margin-top:4px;color:#666">${esc(fact)}</p>
+</div>`;
+            }
+
+            // Handle follow-up outcomes
+            const ko = f.data._kitchenOutcome;
+            if (ko) {
+                const deviceId = f.data._selectedCircuit === '__all__' ? (f.data._liveKs || [])[0] : f.data._selectedCircuit;
+                const device = ws.devices.find(d => d.deviceId === deviceId);
+                const zone = device?.tuya?.displayName || device?.zone || deviceId || 'Kitchen circuit';
+                const fact = device ? tuyaFactLine(device, Date.now()) : '';
+
+                if (ko === 'override-ok') {
+                    const v = device?.tuya?.verdict;
+                    const captureClass = v === 'A' ? 'kitchen-powerpause' : 'kitchen-powerpause';
+                    const captureDetail = v === 'A'
+                        ? `Kitchen circuit didn\'t start on schedule; resolved with the on-site override. ${fact}`
+                        : `Kitchen circuit needed outside its schedule; on-site override used. ${fact}`;
+                    doneLine('Resolved with on-site override');
+                    return outcomeCaptured(f, 'override-ok', {
+                        subject: `Kitchen circuit resolved — override`,
+                        detail: captureDetail,
+                        script: 'That\'s sorted. I\'ve logged it so the IoT team can check the schedule tomorrow.',
+                        OohCaptureClass: captureClass
+                    });
+                }
+                if (ko === 'override-fail') {
+                    doneLine('Override did not work — business critical question');
+                    return `<div class="stepq">Is the kitchen needed for service <b>right now</b>?</div>
+   <div class="chips"><button class="chip" data-testid="kitchen-critical" onclick="flowStep({crit:1,_liveKs:null,_kitchenOutcome:null})">Yes — business critical now</button><button class="chip" data-testid="kitchen-notcritical" onclick="flowStep({crit:0,_liveKs:null,_kitchenOutcome:null})">No — needed later / tomorrow</button></div>`;
+                }
+                if (ko === 'fuse-fixed') {
+                    doneLine('Fuse board tripped — reset fixed it');
+                    return outcomeCaptured(f, 'fuse-fixed', {
+                        subject: 'Kitchen circuit tripped — fixed on site',
+                        detail: `Always-on kitchen circuit had tripped; reset on site. ${fact}`,
+                        script: 'Glad that\'s sorted. I\'ve logged it so the team can check why it tripped.',
+                        OohCaptureClass: 'kitchen-powerpause'
+                    });
+                }
+                if (ko === 'fuse-fail') {
+                    doneLine('Fuse board fine — escalating');
+                    return `<div class="stepq">Is the kitchen needed for service <b>right now</b>?</div>
+   <div class="chips"><button class="chip" data-testid="kitchen-critical" onclick="flowStep({crit:1,_liveKs:null,_kitchenOutcome:null})">Yes — business critical now</button><button class="chip" data-testid="kitchen-notcritical" onclick="flowStep({crit:0,_liveKs:null,_kitchenOutcome:null})">No — needed later / tomorrow</button></div>`;
+                }
+                if (ko === 'repairs') {
+                    doneLine('Site contacting repairs team');
+                    return outcomeCaptured(f, 'repairs', {
+                        subject: `Kitchen appliance fault — site referred to repairs`,
+                        detail: `Power reaching ${zone}; appliance fault suspected; site referred to repairs. ${fact}`,
+                        script: 'I\'ve logged it. If the repairs team can\'t get out tonight and the kitchen can\'t serve, call back and we\'ll escalate.',
+                        OohCaptureClass: 'kitchen-powerpause'
+                    });
+                }
+                if (ko === 'still-ours') {
+                    doneLine('Caller still says it\'s our problem — business critical question');
+                    return `<div class="stepq">Is the kitchen needed for service <b>right now</b>?</div>
+   <div class="chips"><button class="chip" data-testid="kitchen-critical" onclick="flowStep({crit:1,_liveKs:null,_kitchenOutcome:null})">Yes — business critical now</button><button class="chip" data-testid="kitchen-notcritical" onclick="flowStep({crit:0,_liveKs:null,_kitchenOutcome:null})">No — needed later / tomorrow</button></div>`;
+                }
+            }
+
+            // Handle legacy crit after fallback
+            if (f.data.crit !== undefined && !f.data._liveKs) {
+                if (f.data.crit) {
+                    doneLine('Business-critical during service — P1');
+                    return outcomeP1(f, 'crit', {
+                        subject: 'Kitchen equipment off during service — P1',
+                        detail: 'Kitchen circuits off while the site is actively serving. Remote switching not available; needs immediate IoT action.',
+                        script: 'This is urgent so I\'ve escalated it right now — a text has gone to our on-duty manager and someone will call you back shortly. In the meantime the on-site override switch, if you have one, is safe to use.',
+                        p1Summary: 'Kitchen equipment off during service'
+                    });
+                }
+                doneLine('Not service-critical tonight');
+                const ksched = ws.devices.find(d => d.kind === 'kitchen')?.schedule || '';
+                return outcomeCaptured(f, 'ncrit', {
+                    subject: 'Kitchen equipment / schedule request',
+                    detail: `Caller needs kitchen equipment outside the current schedule window (${ksched}). Remote switching and schedule changes aren\'t available OOH yet — logged for the IoT team.`,
+                    script: 'The equipment is on a schedule and comes on at its set time. I can\'t safely change that tonight, but I\'ve logged it and the IoT team will sort the times with you tomorrow.',
+                    OohCaptureClass: 'kitchen-powerpause'
+                });
+            }
+
+            // Show verdict for selected circuit
+            if (selected === '__all__') {
+                // Multi-circuit summary
+                const VERDICT_PRIORITY = ['A', 'D', 'off-unknown', 'E', 'C', 'B-outside', 'B-unscheduled', 'B'];
+                const lines = liveKs.map(d => {
+                    const t = d.tuya;
+                    const zone = t?.displayName || d.zone || d.deviceId;
+                    if (t?.verdict === 'offline') return `<div class="small">${esc(zone)} is not reporting.</div>`;
+                    if (t?.verdict === 'fallback') return `<div class="small">${esc(zone)}: live state unavailable.</div>`;
+                    return `<div class="small">${esc(zone)}: ${esc(t?.verdict || '?')}</div>`;
+                }).join('');
+                // Highest priority verdict for chips
+                let topVerdict = null;
+                for (const pv of VERDICT_PRIORITY) {
+                    if (liveKs.some(d => d.tuya?.verdict === pv)) { topVerdict = pv; break; }
+                }
+                // Show the top device's verdict card
+                const topDevice = liveKs.find(d => d.tuya?.verdict === topVerdict) || liveKs[0];
+                return `<div data-testid="kitchen-all-summary">${lines}</div>${verdictCard(topDevice, false)}`;
+            }
+
+            const device = ws.devices.find(d => d.deviceId === selected);
+            if (!device) {
+                return `<div class="alert info">Circuit not found.</div>`;
+            }
+            return verdictCard(device, true);
         }
+
         return '';
     },
 
@@ -1258,17 +1475,17 @@ const FLOWR = {
         if (f.stage === 0) {
             const anyOnline = lgs.some(d => d.online);
             doneLine('Live read: external lighting ' + (lgs.length ? (anyOnline ? 'device online' : 'device(s) NOT responding') : 'not on Lighthouse here'));
-            if (!lgs.length) return '<div class="alert info">External lighting at this site isn’t on Lighthouse.</div>' + otherShortcut();
+            if (!lgs.length) return '<div class="alert info">External lighting at this site isn\'t on Lighthouse.</div>' + otherShortcut();
             const lgSwitches = lgs.map(lg =>
                 canSwitch(lg)
                     ? `<div class="zoneread"><span style="font-size:20px">💡</span><div><div><b>${esc(lg.zone)}</b> — ${lg.telemetry?.switch_1 ? 'currently ON' : 'currently OFF'}</div><div class="small">${esc(lg.deviceId)}</div></div>${switchButtons(lg, 'lighting-switch')}<span class="tag ${lg.telemetry?.switch_1 ? 'green' : 'grey'}">${lg.telemetry?.switch_1 ? 'on' : 'off'}</span></div>`
                     : ''
             ).join('');
             const anySwitchable = lgs.some(canSwitch);
-            return lgSwitches + `<div class="alert info">${anySwitchable ? 'This lighting circuit can be switched on/off directly above — the change only counts once the device confirms.' : `External lighting can’t be switched remotely from here yet (on the priority list with our platform team).${anyOnline ? '' : ' The lighting controller is also <b>not responding</b>, which often means a tripped fuse board.'}`}</div>
+            return lgSwitches + `<div class="alert info">${anySwitchable ? 'This lighting circuit can be switched on/off directly above — the change only counts once the device confirms.' : `External lighting can\'t be switched remotely from here yet (on the priority list with our platform team).${anyOnline ? '' : ' The lighting controller is also <b>not responding</b>, which often means a tripped fuse board.'}`}</div>
    <div class="script">“${anyOnline
-   ? 'The outside lights have a sensor that brings them on automatically at dusk — so they should usually look after themselves. If tonight’s an exception, flip the Lighthouse lighting switch to override and they’ll come on. That only affects tonight; the sensor picks everything back up automatically from tomorrow, so there’s nothing to reset.'
-   : 'The outside lights have a sensor that brings them on automatically at dusk, so they should usually look after themselves. The lighting controller isn’t responding at the moment — it’s worth checking your fuse board first, as a tripped breaker is the usual cause. If everything looks clear, flip the Lighthouse lighting switch to override — that only covers tonight, and the sensor picks everything back up automatically from tomorrow.'}”</div>
+   ? 'The outside lights have a sensor that brings them on automatically at dusk — so they should usually look after themselves. If tonight\'s an exception, flip the Lighthouse lighting switch to override and they\'ll come on. That only affects tonight; the sensor picks everything back up automatically from tomorrow, so there\'s nothing to reset.'
+   : 'The outside lights have a sensor that brings them on automatically at dusk, so they should usually look after themselves. The lighting controller isn\'t responding at the moment — it\'s worth checking your fuse board first, as a tripped breaker is the usual cause. If everything looks clear, flip the Lighthouse lighting switch to override — that only covers tonight, and the sensor picks everything back up automatically from tomorrow.'}”</div>
    <div class="chips"><button class="chip" onclick="flowStep({r:'ok'})">Caller sorted it with the override</button><button class="chip" onclick="flowStep({r:'cap'})">Still not working — capture &amp; escalate</button></div>`;
         }
         if (f.stage === 1) {
@@ -1276,8 +1493,8 @@ const FLOWR = {
                 doneLine('Resolved via on-site override');
                 return outcomeCaptured(f, 'ok', {
                     subject: 'External lighting — resolved with on-site override',
-                    detail: 'Caller used the manual override successfully after guidance. Logged so the IoT team can check why the schedule/automation didn’t fire.',
-                    script: 'Great — that’s them on. I’ve still logged it so the team can check why they didn’t come on automatically.',
+                    detail: 'Caller used the manual override successfully after guidance. Logged so the IoT team can check why the schedule/automation didn\'t fire.',
+                    script: 'Great — that\'s them on. I\'ve still logged it so the team can check why they didn\'t come on automatically.',
                     OohCaptureClass: 'lighting'
                 });
             }
@@ -1285,7 +1502,7 @@ const FLOWR = {
             return outcomeP1(f, 'cap', {
                 subject: 'External lighting not working — P1',
                 detail: 'Manual override did not resolve the outside lights; possible tripped supply or failed controller. Remote switching not available — needs immediate IoT/electrical follow-up.',
-                script: 'I’ve escalated this as urgent — a text has gone to our on-duty manager and someone will call you back shortly. If the dark frontage is a safety concern right now, your site’s duty-manager procedure for calling out an electrician still applies, as this may be an electrical supply issue rather than the lighting control.',
+                script: 'I\'ve escalated this as urgent — a text has gone to our on-duty manager and someone will call you back shortly. If the dark frontage is a safety concern right now, your site\'s duty-manager procedure for calling out an electrician still applies, as this may be an electrical supply issue rather than the lighting control.',
                 p1Summary: 'External lighting not responding'
             });
         }
@@ -1298,7 +1515,7 @@ const FLOWR = {
         if (f.stage === 0) {
             const anyOnline = fans.some(d => d.online);
             doneLine('Live read: extractor fans ' + (fans.length ? (anyOnline ? 'controller online' : 'controller(s) NOT responding') : 'not on Lighthouse here'));
-            if (!fans.length) return '<div class="alert info">Extractor fans at this site aren’t on Lighthouse.</div>' + otherShortcut();
+            if (!fans.length) return '<div class="alert info">Extractor fans at this site aren\'t on Lighthouse.</div>' + otherShortcut();
             const anySwitchable = fans.some(canSwitch);
             const fanSwitches = fans.map(fan =>
                 canSwitch(fan)
@@ -1308,7 +1525,7 @@ const FLOWR = {
             if (anySwitchable) return fanSwitches + `<div class="alert info">This fan circuit can be switched on/off directly above — the change only counts once the device confirms. If the caller needs a schedule change instead, capture it below.</div>
    <div class="formrow"><label>Capture a schedule/time request (optional)</label><input id="fannote" data-testid="fan-note" placeholder="e.g. fans on until 1am for deep clean"></div>
    <div class="chips"><button class="chip" onclick="flowStep({note:document.getElementById('fannote').value||'(not specified)'})">Capture &amp; escalate</button></div>`;
-            return `<div class="alert info">Fan control isn’t available remotely yet (on the priority list with our platform team). Capture the request — include the times the caller needs.</div>
+            return `<div class="alert info">Fan control isn\'t available remotely yet (on the priority list with our platform team). Capture the request — include the times the caller needs.</div>
    <div class="formrow"><label>What does the caller need? (times, which fans)</label><input id="fannote" data-testid="fan-note" placeholder="e.g. fans on until 1am for deep clean"></div>
    <div class="chips"><button class="chip" onclick="flowStep({note:document.getElementById('fannote').value||'(not specified)'})">Capture &amp; escalate</button></div>`;
         }
@@ -1317,7 +1534,7 @@ const FLOWR = {
             return outcomeCaptured(f, 'cap', {
                 subject: 'Extractor fan request',
                 detail: `Caller request: ${f.data.note}. Remote fan control not available OOH — logged for the IoT team.`,
-                script: 'I’ve logged exactly what you need with the times. The IoT team will action it — if the fans are needed for cooking safety right now, the on-site override switch is the fallback.',
+                script: 'I\'ve logged exactly what you need with the times. The IoT team will action it — if the fans are needed for cooking safety right now, the on-site override switch is the fallback.',
                 OohCaptureClass: 'fans'
             });
         }
@@ -1327,7 +1544,7 @@ const FLOWR = {
     fridge(ws, f) {
         if (f.stage === 0) {
             doneLine('Refrigeration is monitored-only on Lighthouse');
-            return `<div class="alert info">Lighthouse <b>monitors</b> fridge/freezer temperatures but doesn’t control them — a warm fridge is an appliance fault.</div>
+            return `<div class="alert info">Lighthouse <b>monitors</b> fridge/freezer temperatures but doesn\'t control them — a warm fridge is an appliance fault.</div>
    <div class="stepq">Is stock at risk right now (freezer warming, big temperature alarm)?</div>
    <div class="chips"><button class="chip" data-testid="fridge-risk" onclick="flowStep({risk:1})">Yes — stock at risk</button><button class="chip" onclick="flowStep({risk:0})">No — just a query</button></div>`;
         }
@@ -1337,14 +1554,14 @@ const FLOWR = {
                 return outcomeP1(f, 'risk', {
                     subject: 'Refrigeration temperature alarm — stock at risk',
                     detail: 'Caller reports refrigeration failure with stock at risk. Monitoring-only on Lighthouse; escalated for immediate advice + appliance callout guidance.',
-                    script: 'I’ve escalated this as urgent — a text has gone to our on-duty manager. The fridge itself isn’t controlled by Lighthouse, so alongside our callback you should follow your normal appliance repair route — but someone will ring you shortly.',
+                    script: 'I\'ve escalated this as urgent — a text has gone to our on-duty manager. The fridge itself isn\'t controlled by Lighthouse, so alongside our callback you should follow your normal appliance repair route — but someone will ring you shortly.',
                     p1Summary: 'Refrigeration failure — stock at risk'
                 });
             }
             return outcomeScope(f, 'q', {
                 subject: 'Refrigeration query — monitored only',
-                evidence: 'Lighthouse monitors refrigeration temperatures for alerting; the appliances themselves are maintained via the site’s normal repair route.',
-                script: 'Lighthouse keeps an eye on the temperatures but doesn’t control the fridges — for a faulty unit your usual repairs process is the right route. I’ll note the call.'
+                evidence: 'Lighthouse monitors refrigeration temperatures for alerting; the appliances themselves are maintained via the site\'s normal repair route.',
+                script: 'Lighthouse keeps an eye on the temperatures but doesn\'t control the fridges — for a faulty unit your usual repairs process is the right route. I\'ll note the call.'
             });
         }
         return '';
@@ -1353,7 +1570,7 @@ const FLOWR = {
     connectivity(ws, f) {
         // OOHDASH-91 G2: the site-reachability conclusion is anchored on the LoRaWAN hub (lwgateway), the
         // one device every remote command reaches the site through — NOT an arbitrary `find(kind==='gateway')`,
-        // which could narrate an equipment-group gateway's state as "the site". The -r10a / Salus-hub
+        // which could narrate an equipment-group gateway\'s state as "the site". The -r10a / Salus-hub
         // gateways are equipment-group gateways: their state maps to their own group, never the whole site.
         const anchor = siteConnectivityAnchor(ws.devices);
         // Group gateways = non-anchor gateway-kind devices that front an equipment group (resolve to a label;
@@ -1376,25 +1593,25 @@ const FLOWR = {
             }
 
             // Gateway-less site (e.g. 5198): no anchor and no equipment-group gateway to assess. Make NO
-            // whole-site reachability claim; defer to per-device liveness for the flow's own equipment. NO
+            // whole-site reachability claim; defer to per-device liveness for the flow\'s own equipment. NO
             // Lighthouse-unit / gateway / fuse-board framing anywhere.
             if (anchor === null) {
                 const fromKind = f.data.from;
                 const equip = ws.devices.filter(d => d.kind !== 'gateway' && (!fromKind || d.kind === fromKind));
                 const live = !equip.length ? ''
-                    : `<p style="margin:8px 0">The equipment you’re calling about ${equip.every(d => d.online) ? 'is responding' : 'isn’t responding right now'}.</p>`;
-                return `<div class="alert info" data-testid="connectivity-gwless">This site uses direct device connections — we’ll check the equipment directly.</div>
+                    : `<p style="margin:8px 0">The equipment you\'re calling about ${equip.every(d => d.online) ? 'is responding' : 'isn\'t responding right now'}.</p>`;
+                return `<div class="alert info" data-testid="connectivity-gwless">This site uses direct device connections — we\'ll check the equipment directly.</div>
    ${live}
-   <div class="stepq">We check this site’s equipment directly. Log it for the IoT team, or re-check if the caller says it’s working again.</div>
-   <div class="chips"><button class="chip" data-testid="gwless-capture" onclick="flowStep({ofq:'dcap'})">Log it for the IoT team</button><button class="chip" data-testid="gwless-back" onclick="flowStep({ofq:'dback'})">The caller says it’s working again</button></div>`;
+   <div class="stepq">We check this site\'s equipment directly. Log it for the IoT team, or re-check if the caller says it\'s working again.</div>
+   <div class="chips"><button class="chip" data-testid="gwless-capture" onclick="flowStep({ofq:'dcap'})">Log it for the IoT team</button><button class="chip" data-testid="gwless-back" onclick="flowStep({ofq:'dback'})">The caller says it\'s working again</button></div>`;
             }
 
             // Anchor OFFLINE → site unreachable → existing plain-English wall-unit outcome (verbatim, unchanged).
             if (!anchor.online) {
-                return `<div class="alert err" data-testid="connectivity-alert"><b>The Lighthouse gateway at this site is offline.</b> The gateway is the wall-mounted Lighthouse unit that connects the site — no remote command can reach the site while it’s down. This is usually power or internet at the site.</div>
-   <div class="script">“The Lighthouse unit on your wall isn’t responding, which normally means it’s lost power or internet. Could you check the fuse board hasn’t tripped, that the unit has lights on, and the router is up? I’ll stay on the line.”</div>
+                return `<div class="alert err" data-testid="connectivity-alert"><b>The Lighthouse gateway at this site is offline.</b> The gateway is the wall-mounted Lighthouse unit that connects the site — no remote command can reach the site while it\'s down. This is usually power or internet at the site.</div>
+   <div class="script">“The Lighthouse unit on your wall isn\'t responding, which normally means it\'s lost power or internet. Could you check the fuse board hasn\'t tripped, that the unit has lights on, and the router is up? I\'ll stay on the line.”</div>
    <div class="stepq">After the caller checks:</div>
-   <div class="chips"><button class="chip" onclick="flowStep({ofq:'back'})">It’s back online / lights on</button><button class="chip" data-testid="connectivity-stilldead" onclick="flowStep({ofq:'cap'})">Still dead — capture &amp; escalate</button></div>`;
+   <div class="chips"><button class="chip" onclick="flowStep({ofq:'back'})">It\'s back online / lights on</button><button class="chip" data-testid="connectivity-stilldead" onclick="flowStep({ofq:'cap'})">Still dead — capture &amp; escalate</button></div>`;
             }
 
             // Anchor ONLINE + one or more equipment-group gateways OFFLINE → site stays reachable, amber
@@ -1406,16 +1623,16 @@ const FLOWR = {
                 const listItem = l => l === 'the equipment group' ? 'the equipment group' : `the <b>${l}</b>`;
                 let callout, stepq;
                 if (labels.length === 1) {
-                    callout = `The site is reachable, but ${groupPhrase(labels[0])} isn’t responding — its own connection is down. Other equipment at this site can still be reached.`;
-                    stepq = `${groupPhrase(labels[0]).charAt(0).toUpperCase() + groupPhrase(labels[0]).slice(1)} can’t be reached remotely while its connection is down. Log it for the IoT team, or re-check if the caller says it’s working again.`;
+                    callout = `The site is reachable, but ${groupPhrase(labels[0])} isn\'t responding — its own connection is down. Other equipment at this site can still be reached.`;
+                    stepq = `${groupPhrase(labels[0]).charAt(0).toUpperCase() + groupPhrase(labels[0]).slice(1)} can\'t be reached remotely while its connection is down. Log it for the IoT team, or re-check if the caller says it\'s working again.`;
                 } else {
                     const n = NUM_WORDS[labels.length] || String(labels.length);
-                    callout = `The site is reachable, but ${n} of its equipment groups aren’t responding — ${grammaticalList(labels.map(listItem))} — because each has lost its own connection. Other equipment at this site can still be reached.`;
-                    stepq = `These equipment groups can’t be reached remotely while their connection is down. Log it for the IoT team, or re-check if the caller says it’s working again.`;
+                    callout = `The site is reachable, but ${n} of its equipment groups aren\'t responding — ${grammaticalList(labels.map(listItem))} — because each has lost its own connection. Other equipment at this site can still be reached.`;
+                    stepq = `These equipment groups can\'t be reached remotely while their connection is down. Log it for the IoT team, or re-check if the caller says it\'s working again.`;
                 }
                 return `<div class="alert warn" data-testid="connectivity-group-offline">${callout}</div>
    <div class="stepq">${stepq}</div>
-   <div class="chips"><button class="chip" data-testid="group-offline-capture" onclick="flowStep({ofq:'gcap'})">Log it for the IoT team</button><button class="chip" data-testid="group-offline-back" onclick="flowStep({ofq:'gback'})">The caller says it’s working again</button></div>`;
+   <div class="chips"><button class="chip" data-testid="group-offline-capture" onclick="flowStep({ofq:'gcap'})">Log it for the IoT team</button><button class="chip" data-testid="group-offline-back" onclick="flowStep({ofq:'gback'})">The caller says it\'s working again</button></div>`;
             }
 
             // Anchor ONLINE, no group gateway offline → site reachable (green, existing all-good callout).
@@ -1428,7 +1645,7 @@ const FLOWR = {
             return outcomeCaptured(f, 'back', {
                 subject: 'Lighthouse gateway offline — restored on the call',
                 detail: 'Gateway was offline; caller checked fuse board/power and it recovered. Logged for the IoT team to verify overnight stability.',
-                script: 'That’s it back online. Give it ten minutes to settle — I’ve logged it so the team check it stayed healthy overnight.',
+                script: 'That\'s it back online. Give it ten minutes to settle — I\'ve logged it so the team check it stayed healthy overnight.',
                 OohCaptureClass: 'connectivity'
             });
         }
@@ -1440,7 +1657,7 @@ const FLOWR = {
             return outcomeCaptured(f, 'gcap', {
                 subject: `Equipment group gateway offline — ${labelStr} unreachable`,
                 detail: `Site reachable, but the ${labelStr} equipment group gateway${multi ? 's are' : ' is'} offline; that equipment cannot be reached remotely. No remote action possible; needs IoT connectivity investigation${f.data.from ? ` (raised from ${f.data.from} flow)` : ''}.`,
-                script: 'The site itself is online, but the unit that runs that equipment has lost its connection, so I can’t reach it remotely tonight. I’ve logged it as a priority for the IoT team.',
+                script: 'The site itself is online, but the unit that runs that equipment has lost its connection, so I can\'t reach it remotely tonight. I\'ve logged it as a priority for the IoT team.',
                 OohCaptureClass: 'connectivity'
             });
         }
@@ -1449,14 +1666,14 @@ const FLOWR = {
             return outcomeCaptured(f, 'dcap', {
                 subject: 'Equipment unreachable — direct-connection site',
                 detail: `This site uses direct device connections (no site hub). The equipment the caller reported is not responding on its own connection. No remote action possible; needs IoT connectivity investigation${f.data.from ? ` (raised from ${f.data.from} flow)` : ''}.`,
-                script: 'This site’s equipment connects directly rather than through a single hub, and the unit you’re calling about isn’t responding, so I can’t reach it remotely tonight. I’ve logged it as a priority for the IoT team.',
+                script: 'This site\'s equipment connects directly rather than through a single hub, and the unit you\'re calling about isn\'t responding, so I can\'t reach it remotely tonight. I\'ve logged it as a priority for the IoT team.',
                 OohCaptureClass: 'connectivity'
             });
         }
         return outcomeCaptured(f, 'cap', {
             subject: 'Lighthouse gateway / equipment offline',
             detail: `Equipment unreachable after on-site power/router checks. No remote action possible; needs IoT connectivity investigation${f.data.from ? ` (raised from ${f.data.from} flow)` : ''}.`,
-            script: 'It’s not something I can fix remotely while the Lighthouse unit is offline, so I’ve logged it as a priority for the IoT team. Anything electrical — like a tripped board that won’t reset — is one for your own electrician tonight.',
+            script: 'It\'s not something I can fix remotely while the Lighthouse unit is offline, so I\'ve logged it as a priority for the IoT team. Anything electrical — like a tripped board that won\'t reset — is one for your own electrician tonight.',
             OohCaptureClass: 'connectivity'
         });
     },
@@ -1464,7 +1681,7 @@ const FLOWR = {
     contractor(ws, f) {
         if (f.stage === 0) {
             return `<div class="alert warn"><b>Contractor on site</b> calls are always treated as urgent — an engineer is standing there waiting.</div>
-   <div class="formrow"><label>Contractor / company</label><input id="cn" data-testid="contractor-name" placeholder="e.g. the attending engineer’s name and company"></div>
+   <div class="formrow"><label>Contractor / company</label><input id="cn" data-testid="contractor-name" placeholder="e.g. the attending engineer\'s name and company"></div>
    <div class="formrow"><label>What do they need?</label><input id="cw" data-testid="contractor-need" placeholder="e.g. needs BMS access to the heating"></div>
    <div class="chips"><button class="chip" data-testid="contractor-next" onclick="flowStep({cn:document.getElementById('cn').value||'(name not given)',cw:document.getElementById('cw').value||'(not specified)'})">Next — review need</button></div>`;
         }
@@ -1482,7 +1699,7 @@ const FLOWR = {
             return outcomeP1(f, 'p1', {
                 subject: 'Contractor on site needs IoT support — P1',
                 detail: `Contractor ${f.data.cn} on site now: ${f.data.cw}. Escalated immediately.`,
-                script: 'I’ve sent an urgent text to our on-duty manager and they’ll ring the site straight back — usually within a few minutes. Please ask the engineer to hold on.',
+                script: 'I\'ve sent an urgent text to our on-duty manager and they\'ll ring the site straight back — usually within a few minutes. Please ask the engineer to hold on.',
                 p1Summary: `Contractor on site: ${f.data.cw}`
             });
         }
@@ -1493,7 +1710,7 @@ const FLOWR = {
                 return outcomeP1(f, 'ppesc', {
                     subject: 'PowerPause override — Donkey Derby (site 6786) — IoT team escalation',
                     detail: `Contractor ${f.data.cn} on site at Donkey Derby (6786). Local PowerPause override not available at this site. Escalated to IoT team.`,
-                    script: 'I’ve escalated this as a priority — the IoT team will be in touch shortly. IoT direct: 023 814 0228.',
+                    script: 'I\'ve escalated this as a priority — the IoT team will be in touch shortly. IoT direct: 023 814 0228.',
                     p1Summary: 'Contractor: PowerPause — Donkey Derby — IoT escalation',
                     OohCaptureClass: 'kitchen-powerpause'
                 });
@@ -1504,8 +1721,8 @@ const FLOWR = {
    This site uses a different container type; the local override button does not apply.
   </div>
   <div class="script">
-   "I’m sorry — this site can’t be overridden locally. I’m escalating to the IoT team
-   right now and they’ll contact the site directly.
+   "I\'m sorry — this site can\'t be overridden locally. I\'m escalating to the IoT team
+   right now and they\'ll contact the site directly.
    IoT team direct line: <b>023 814 0228</b> — email: <b>iot@airedale-group.co.uk</b>."
   </div>
   <div class="chips">
@@ -1539,7 +1756,7 @@ const FLOWR = {
             return `<div class="script">
    <p><b>${devLabel} override:</b>
    "Press the override button on the front of the ${devLabel} unit <b>once</b> — do not
-   hold it. The override stays active until the device’s next scheduled change. The
+   hold it. The override stays active until the device\'s next scheduled change. The
    equipment should power on within a few seconds."</p>
   </div>
   <div class="alert info">
@@ -1555,7 +1772,7 @@ const FLOWR = {
             return outcomeP1(f, 'ppdone', {
                 subject: 'PowerPause contractor override — guidance given on site',
                 detail: `Contractor ${f.data.cn} given PowerPause override procedure (${f.data.pptype} device). Override active until next scheduled event.`,
-                script: 'I’ve logged this call. The override will hold until the device’s next scheduled change — if the issue returns, ring back and we’ll escalate further.',
+                script: 'I\'ve logged this call. The override will hold until the device\'s next scheduled change — if the issue returns, ring back and we\'ll escalate further.',
                 p1Summary: `Contractor on site: PowerPause override given (${f.data.pptype})`,
                 OohCaptureClass: 'kitchen-powerpause'
             });
@@ -1565,16 +1782,16 @@ const FLOWR = {
         return outcomeP1(f, 'p1', {
             subject: 'Contractor on site needs IoT support — P1',
             detail: `Contractor ${f.data.cn} on site now: ${f.data.cw}. Escalated immediately.`,
-            script: 'I’ve sent an urgent text to our on-duty manager and they’ll ring the site straight back — usually within a few minutes. Please ask the engineer to hold on.',
+            script: 'I\'ve sent an urgent text to our on-duty manager and they\'ll ring the site straight back — usually within a few minutes. Please ask the engineer to hold on.',
             p1Summary: `Contractor on site: ${f.data.cw}`
         });
     },
     other(ws, f) {
         if (f.stage === 0) {
-            return `<div class="stepq">Describe the issue in the caller’s words</div>
+            return `<div class="stepq">Describe the issue in the caller\'s words</div>
    <div class="formrow"><textarea id="otxt" data-testid="other-text" rows="2" placeholder="e.g. “the voltage optimiser needs resetting — is that you?”">${esc(f.data.freeText || '')}</textarea></div>
    <div class="chips">
-    <button class="chip" data-testid="other-check" onclick="flowStep({q:document.getElementById('otxt').value||'(not specified)',path:'check'})">Check if it’s Lighthouse-controlled</button>
+    <button class="chip" data-testid="other-check" onclick="flowStep({q:document.getElementById('otxt').value||'(not specified)',path:'check'})">Check if it\'s Lighthouse-controlled</button>
     <button class="chip" data-testid="other-capture" onclick="flowStep({q:document.getElementById('otxt').value||'(not specified)',qraw:document.getElementById('otxt').value,path:'cap'})">Capture &amp; escalate as described</button>
    </div>`;
         }
@@ -1584,7 +1801,7 @@ const FLOWR = {
             if (f.data.path === 'cap') return otherP1Choice(f);
             return `<div class="stepq">Which of these is it closest to?</div><div class="chips">
     ${state.workspace.scope.map(g => `<button class="chip" data-testid="scope-${g.key}" onclick="flowStep({g:'${g.key}'})">${esc(g.label)}</button>`).join('')}</div>
-   <p class="small" style="margin-top:8px">This checks the live device inventory for <b>this site</b> — it can say with certainty what is and isn’t on Lighthouse here. What it can’t always settle is a fault <i>inside</i> shared kit (e.g. the boiler behind our controls).</p>`;
+   <p class="small" style="margin-top:8px">This checks the live device inventory for <b>this site</b> — it can say with certainty what is and isn\'t on Lighthouse here. What it can\'t always settle is a fault <i>inside</i> shared kit (e.g. the boiler behind our controls).</p>`;
         }
         if (f.stage === 2 && f.data.path === 'normal') {
             // OOHDASH-134: identical to the pre-v1.4.2 Capture outcome.
@@ -1592,7 +1809,7 @@ const FLOWR = {
             return outcomeCaptured(f, 'cap', {
                 subject: 'General issue captured',
                 detail: `Caller reported: ${f.data.q}. Captured verbatim for the IoT team.`,
-                script: 'I’ve logged exactly what you’ve described for the IoT team — they’ll pick it up on the next working day. If it gets urgent tonight, ring back and we’ll escalate.',
+                script: 'I\'ve logged exactly what you\'ve described for the IoT team — they\'ll pick it up on the next working day. If it gets urgent tonight, ring back and we\'ll escalate.',
                 OohCaptureClass: 'general'
             });
         }
@@ -1604,7 +1821,7 @@ const FLOWR = {
             return outcomeP1(f, 'p1', {
                 subject: 'Something else - urgent, escalated as P1',
                 detail: `Caller reported: ${reason}. Did not fit a specific tile; handler judged it urgent tonight.`,
-                script: 'I’ve escalated this as urgent — a text has gone to our on-duty manager and someone will call you back shortly.',
+                script: 'I\'ve escalated this as urgent — a text has gone to our on-duty manager and someone will call you back shortly.',
                 p1Summary: otherP1Summary(reason)
             });
         }
@@ -1618,14 +1835,14 @@ const FLOWR = {
             if (g.level === 'mon') {
                 return outcomeScope(f, 'mon', {
                     subject: `${g.label} — monitored only`,
-                    evidence: `${g.label} is monitored by Lighthouse at this site but not remotely controllable. Caller’s issue: ${f.data.q}`,
-                    script: 'Lighthouse monitors that here but doesn’t control it remotely — I’ll log your request for the IoT team rather than leave you going round in circles.'
+                    evidence: `${g.label} is monitored by Lighthouse at this site but not remotely controllable. Caller\'s issue: ${f.data.q}`,
+                    script: 'Lighthouse monitors that here but doesn\'t control it remotely — I\'ll log your request for the IoT team rather than leave you going round in circles.'
                 });
             }
             return outcomeScope(f, 'none', {
                 subject: `${g.label} — not on Lighthouse at this site`,
-                evidence: `Live inventory shows no Lighthouse ${g.label.toLowerCase()} devices at ${state.workspace.site.siteName}. Caller’s issue: ${f.data.q}`,
-                script: 'That isn’t part of the Lighthouse system at your site — it’ll be one for your usual repairs route. I’ll note the call so there’s a record you asked.'
+                evidence: `Live inventory shows no Lighthouse ${g.label.toLowerCase()} devices at ${state.workspace.site.siteName}. Caller\'s issue: ${f.data.q}`,
+                script: 'That isn\'t part of the Lighthouse system at your site — it\'ll be one for your usual repairs route. I\'ll note the call so there\'s a record you asked.'
             });
         }
         return '';

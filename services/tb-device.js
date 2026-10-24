@@ -1488,8 +1488,30 @@ async function fetchLiveSitesByNumber(siteNo) {
         filter.test(normaliseName(d.name)) || isLegacySalusForSite(d.name, key)
     );
 
-    // Latest telemetry for the matched set.
-    const telemetryById = await fetchTelemetry(matched);
+    // OOHDASH-140: lazy helpers for Tuya (dynamic import to avoid coupling to fixture-mode tests)
+    async function _readSiteListing(br, k) {
+        const { readSiteListing } = await import('./tuya-read.js');
+        return readSiteListing(br, k);
+    }
+    async function _attachTuya(devs, listing, tuyaOpts) {
+        const { attachTuya } = await import('./tuya-read.js');
+        return attachTuya(devs, listing, tuyaOpts);
+    }
+    async function _tuyaReadOff() {
+        const { tuyaReadOff } = await import('./killswitch.js');
+        return tuyaReadOff();
+    }
+
+    const tuyaEnabled = config.tuya?.readEnabled && config.tuya?.clientId && !await _tuyaReadOff().catch(() => true);
+
+    // Latest telemetry + Tuya listing run concurrently
+    const [telemetryById, tuyaListing] = await Promise.all([
+        fetchTelemetry(matched),
+        tuyaEnabled ? _readSiteListing(brand, key).catch(err => {
+            console.warn(`[TUYA] Listing failed for site ${key}: ${err.message}`);
+            return null;
+        }) : Promise.resolve(null)
+    ]);
 
     const now = Date.now();
     const devices = matched.map(d => {
@@ -1516,6 +1538,13 @@ async function fetchLiveSitesByNumber(siteNo) {
         dev.online = applyFreshnessDebounce(uuid, dev.online, now, hardOffline);
         return dev;
     });
+
+    // OOHDASH-140: attach Tuya live state to kitchen devices
+    if (tuyaListing) {
+        await _attachTuya(devices, tuyaListing, { budgetMs: 3000 }).catch(err => {
+            console.warn(`[TUYA] attachTuya failed for site ${key}: ${err.message}`);
+        });
+    }
 
     if (!devices.length) {
         const sites = [];
@@ -1637,6 +1666,39 @@ export async function getSitesByNumber(siteNo) {
             // OOHDASH-114-F1: ensure every fixture site has the boilerControl field.
             const defaultBc = { present: false, isV1: false, isV2: false, heatingControllable: false, dhwControllable: false, deviceId: null, heating: null };
             sites = sites.map(s => ({ ...s, boilerControl: s.boilerControl ?? defaultBc }));
+            // OOHDASH-140: attach fixture Tuya data for kitchen devices that have tuyaFixture blocks
+            const { attachTuya: _fixAttachTuya } = await import('./tuya-read.js').catch(() => ({ attachTuya: null }));
+            if (_fixAttachTuya) {
+                const OWON_FIX_IDS = new Set(['xr5kjdxfxavku0gb', 'vnxcwomqkofjhjcc']);
+                for (const site of sites) {
+                    const fixtureListing = (site.devices || [])
+                        .filter(d => d.kind === 'kitchen' && d.tuyaFixture)
+                        .map(d => {
+                            const tf = d.tuyaFixture;
+                            const statusArr = Array.isArray(tf.status) ? tf.status : [];
+                            const getVal = code => (statusArr.find(s => s.code === code) || {}).value;
+                            const pid = (tf.product_id || '').toLowerCase();
+                            const model = OWON_FIX_IDS.has(pid) ? 'owon' : 'tongou';
+                            const sw1 = getVal('switch_1');
+                            const sw = getVal('switch');
+                            let switchOn = sw1 !== undefined ? (sw1 === true || sw1 === 'true') : sw !== undefined ? (sw === true || sw === 'true') : null;
+                            const cp = getVal('cur_power');
+                            const powerW = model === 'tongou' && cp !== undefined ? Number(cp) / 10 : null;
+                            return {
+                                ...tf,
+                                model,
+                                switchOn,
+                                powerW,
+                                online: tf.online !== false,
+                                readAtMs: Date.now(),
+                                _preloadedSchedule: tf.schedule
+                            };
+                        });
+                    if (fixtureListing.length > 0) {
+                        await _fixAttachTuya(site.devices, fixtureListing, { budgetMs: 3000 }).catch(() => {});
+                    }
+                }
+            }
         }
         lastReadOk = true;
         lastReadError = null;
