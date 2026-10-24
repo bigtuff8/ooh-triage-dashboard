@@ -1233,8 +1233,8 @@ function _decodeBoilerHeatingInner(sharedScope, clientScope, panelLastSeenMs, te
 
     // Decode a boolean-like TB attribute (true/1 → true, false/0 → false, else null).
     function tbBool(v) {
-        if (v === true || v === 1) return true;
-        if (v === false || v === 0) return false;
+        if (v === true || v === 1 || v === 'true' || v === '1') return true;
+        if (v === false || v === 0 || v === 'false' || v === '0') return false;
         return null;
     }
 
@@ -1248,7 +1248,15 @@ function _decodeBoilerHeatingInner(sharedScope, clientScope, panelLastSeenMs, te
         let mask = sc.output1OutputMask;
         if (typeof mask === 'string') { try { mask = JSON.parse(mask); } catch { mask = null; } }
         const z1Configured = Array.isArray(mask) ? !!mask[1] : Object.prototype.hasOwnProperty.call(t, 'output2State');
-        const z2Configured = Array.isArray(mask) ? !!mask[2] : Object.prototype.hasOwnProperty.call(t, 'output3State');
+        function countO3ScheduleEntries() {
+            const raw = sc.output3Schedule;
+            if (raw == null) return 0;
+            try {
+                const s = typeof raw === 'string' ? JSON.parse(raw) : raw;
+                return Array.isArray(s) ? s.length : (Array.isArray(s?.schedule) ? s.schedule.length : 0);
+            } catch { return 0; }
+        }
+        const z2Configured = Array.isArray(mask) ? (!!mask[2] || countO3ScheduleEntries() > 0) : Object.prototype.hasOwnProperty.call(t, 'output3State');
 
         zones = [];
         if (z1Configured) {
