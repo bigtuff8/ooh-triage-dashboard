@@ -262,3 +262,16 @@ test('BH-19: Zone 2 fallback — mask[2]=false but output3Schedule has entries �
     assert.equal(r.zones[1].forced, 'off', 'zone 2 should be forced off');
     assert.equal(r.zones[1].held, true, 'zone 2 should be held');
 });
+
+test('BH-20: Telemetry-ts staleness fallback — panelLastSeenMs=null but recent telemetry → not stale', () => {
+    // Mirrors site 6811: SERVER_SCOPE lastActivityTime absent (null), but TB telemetry
+    // is current. decodeBoilerHeating receives __telemLastSeenMs as fallback via the caller.
+    const ss = { output1OutputMask: [true, true, false, false] };
+    const t = { output1State: 'true', output2State: 'false' };
+    // Simulate caller passing telemLastSeenMs when lastActivityTime is null
+    const panelLastSeenMs = NOW - 60_000; // 1 minute ago — within threshold
+    const r = decodeBoilerHeating(ss, {}, panelLastSeenMs, t, NOW);
+    assert.equal(r.stale, false, 'panel should not be stale when telemetry ts is recent');
+    assert.equal(r.visible, true);
+    assert.equal(r.boilerCalling, true);
+});

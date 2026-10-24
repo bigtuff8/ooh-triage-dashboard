@@ -1372,9 +1372,17 @@ async function fetchTelemetry(devices) {
         const bag = {};
         if (tsRes.status === 'fulfilled') {
             // TB shape: { key: [{ ts, value }] } → flatten to { key: value }.
+            // Also capture max telemetry ts as __telemLastSeenMs — fallback for panelLastSeenMs
+            // when SERVER_SCOPE lastActivityTime is absent (OOHDASH-143 6811 class).
+            let maxTs = null;
             for (const [k, series] of Object.entries(tsRes.value || {})) {
-                if (Array.isArray(series) && series.length) bag[k] = series[0].value;
+                if (Array.isArray(series) && series.length) {
+                    bag[k] = series[0].value;
+                    const ts = series[0].ts;
+                    if (typeof ts === 'number' && ts > 0 && (maxTs === null || ts > maxTs)) maxTs = ts;
+                }
             }
+            bag.__telemLastSeenMs = maxTs;
         } else {
             console.error(`[TB] Telemetry read failed for device ${uuid}: ${tsRes.reason?.message}`);
         }
@@ -1596,7 +1604,7 @@ async function fetchLiveSitesByNumber(siteNo) {
         boilerControlField.heating = decodeBoilerHeating(
             bcBag.__sharedScope ?? null,
             bcBag.__clientScope ?? null,
-            bcBag.__lastActivityTime ?? null,
+            bcBag.__lastActivityTime ?? bcBag.__telemLastSeenMs ?? null,
             bcBag,
             Date.now()
         );
