@@ -199,3 +199,66 @@ test('BH-15: V2 seconds vs V1 ms — V2 override end time is epoch seconds (mult
     assert.ok(r.zones[0].forcedUntilMs > NOW, 'forcedUntilMs should be in the future');
     assert.ok(Math.abs(r.zones[0].forcedUntilMs - endSec * 1000) < 1000, 'forcedUntilMs should be endSec * 1000');
 });
+
+// OOHDASH-143 regression tests — string boolean values + zone-2 schedule fallback
+
+test('BH-16: 6811 regression — string overrides held off both zones, mask[2]=false with active output3Schedule', () => {
+    const ss = {
+        output1OutputMask: [false, true, false, true],
+        output3Schedule: JSON.stringify({ schedule: [{ time: '11:00', value: 22 }, { time: '22:30', value: 15 }] }),
+    };
+    const t = {
+        output1State: 'true',
+        output2State: 'false', output2FallbackEnabled: 'false', output2Override: '-1792758151398',
+        output3State: 'false', output3Override: '-1792758151398',
+    };
+    const r = decodeBoilerHeating(ss, {}, NOW - 1000, t, NOW);
+    assert.equal(r.zones.length, 2, 'both zones should be present');
+    assert.equal(r.zones[0].forced, 'off', 'zone 1 should be forced off');
+    assert.equal(r.zones[0].held, true, 'zone 1 should be held');
+    assert.equal(r.zones[0].on, false, 'zone 1 should be off');
+    assert.equal(r.zones[1].forced, 'off', 'zone 2 should be forced off');
+    assert.equal(r.zones[1].held, true, 'zone 2 should be held');
+});
+
+test('BH-17: V1 string round-trip — "true"/"false" strings decode identically to booleans', () => {
+    const t = {
+        output1State: 'true',
+        output2State: 'true', output2FallbackEnabled: 'false', output2Override: '0',
+        output3State: 'false', output3FallbackEnabled: 'false', output3Override: '0',
+        summerModeActive: 'false',
+    };
+    const r = decodeBoilerHeating(V1_SS, {}, NOW - 1000, t, NOW);
+    assert.equal(r.boilerCalling, true);
+    assert.equal(r.zones[0].on, true);
+    assert.equal(r.zones[1].on, false);
+    assert.equal(r.summerMode, false);
+});
+
+test('BH-18: V2 string integers — "1"/"0" strings decode correctly', () => {
+    const t = {
+        'boiler.enable_output_state': '1',
+        'CHZ1.output_state': '1', 'CHZ1.fallback_enabled': '0', 'CHZ1.override': '0',
+        'CHZ2.output_state': '0', 'CHZ2.fallback_enabled': '0', 'CHZ2.override': '0',
+        'summer_mode': '0',
+    };
+    const r = decodeBoilerHeating({}, V2_CS, NOW - 1000, t, NOW);
+    assert.equal(r.zones[0].on, true);
+    assert.equal(r.zones[1].on, false);
+    assert.equal(r.boilerCalling, true);
+    assert.equal(r.summerMode, false);
+});
+
+test('BH-19: Zone 2 fallback — mask[2]=false but output3Schedule has entries → zone 2 included', () => {
+    const ss = {
+        output1OutputMask: [true, true, false, false],
+        output3Schedule: JSON.stringify({ schedule: [{ time: '08:00', value: 21 }, { time: '23:00', value: 16 }] }),
+    };
+    const t = {
+        output3State: 'false', output3Override: '-1792758151398',
+    };
+    const r = decodeBoilerHeating(ss, {}, NOW - 1000, t, NOW);
+    assert.equal(r.zones.length, 2, 'zone 2 should be present via schedule fallback');
+    assert.equal(r.zones[1].forced, 'off', 'zone 2 should be forced off');
+    assert.equal(r.zones[1].held, true, 'zone 2 should be held');
+});
