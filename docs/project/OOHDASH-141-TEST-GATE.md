@@ -16,8 +16,11 @@ The revert worker has not been exercised against a real panel. The fixture tests
 SECTION: Rollout and release plan
 James approved "Launch it" at the design live-test gate. The feature ships enabled for all boilerControl sites (V1 and V2). No per-site flags to toggle. BOILER_BOOST_REVERT_EXEMPT defaults to 'all' in config.js — no prod env-var required. After James gives go: cut v1.5.0, deploy, then run the live field test at one pub site to confirm end-to-end before calling it done.
 
-DECISION: Live field test timing | Before release (test gate must include a live revert observation) | After release (field test is James and IoT team's acceptance check post-deploy)
-DETAIL: The automated suite covers 100% of the logic. The supervised live test on 2026-10-24 confirmed the V2 dispatch path. A live revert observation adds confidence but requires waiting up to 30 min–2 h in the field. Recommend after-release acceptance: deploy, trigger one boost on a quiet site, observe revert, note outcome.
+DECISION: Live field test timing | After release (field test is James and IoT team's acceptance check post-deploy) | Before release (test gate must include a live revert observation)
+DETAIL: SELECTED — After release. The automated suite covers 100% of the logic. The supervised live test on 2026-10-24 confirmed the V2 dispatch path and Q3 (boiler follows zone). A live revert observation would add confidence but requires waiting 30 min–2 h in the field. James accepted the after-release timing at the design live-test gate ("Launch it"). The live field acceptance (one boost + observed revert at a real site) is the first action after v1.5.0 deploys, not a precondition of this gate.
+
+SECTION: Revert worker background cost and visibility posture
+The revert worker is the existing OohOverrides watcher in overrides.js. It is NOT a standalone daemon or separate process — it runs inside the OOH server process as a lightweight in-process timer. Idle posture: no tokens consumed, no LLM calls, no external API traffic while idle. When a hold's revertAt time fires, it wakes, reads the hold document, and dispatches a single SHARED_SCOPE write (V1) or RPC call (V2), then sleeps again. The 5-minute retry cycle only activates when a revert has already failed — in the normal case (no active holds) nothing runs. The watcher is visible to on-call via the boost-hold-failed alert (commit 118e058) and the Zendesk ticket outcome notes. It consumes no meaningful machine resources or recurring cost at idle.
 -->
 
 # OOHDASH-141 Test gate: pub heating boost
@@ -59,7 +62,11 @@ The revert worker has not been observed against a real panel. Fixture tests conf
 
 James approved "Launch it" at the design live-test gate. Feature ships enabled for all boilerControl sites — no per-site flags. `BOILER_BOOST_REVERT_EXEMPT` defaults to `'all'` in `config.js`; no prod env-var needed.
 
-After James gives the release go: cut v1.5.0, deploy, then run the live field acceptance at one pub site before calling the ticket done.
+After James gives the release go: cut v1.5.0, deploy, then run the live field acceptance at one pub site. The acceptance test must include: (1) a Heat ON boost on a V2 panel with an observed revert, and (2) a V1 panel boost or explicit confirmation that no V1 sites exist in the estate at release time. Only then is the ticket closed.
+
+## Revert worker background posture
+
+The revert worker runs inside the OOH server process as a lightweight in-process timer. It is NOT a separate daemon. Idle: no tokens, no LLM calls, no external traffic — only wakes when a held revert's `revertAt` timestamp fires. On a boost-free night it consumes nothing. The 5-minute retry loop only activates when a revert has already failed. On-call visibility: `boost-hold-failed` alert on Cosmos write failure; Zendesk ticket updated with each revert outcome. No meaningful machine resource or recurring cost at idle.
 
 ## Invariants
 
