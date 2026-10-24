@@ -168,6 +168,154 @@ export function decodeNextChange(scheduleJson, now, opts = {}) {
 }
 
 /**
+ * OOHDASH-140: Evaluate a normalised schedule entry array against a reference time.
+ *
+ * entries: array of { time:'HH:MM', loops:'<7 chars sun-first>', on:boolean, enabled:boolean }
+ * now:     Date (reference time)
+ * opts:    { tz?: string } — defaults to 'Europe/London'
+ *
+ * Returns { state:'on'|'off'|'none'|'off-only', lastChange, nextOn, nextOff, entryCount }
+ * where each time ref is { time:'HH:MM', dayText:'today'|'tomorrow'|'yesterday'|weekdayName, atMs }
+ * or null. loops position 0 = Sunday (sun-first), matching both OWON bit0 and Tongou position 0.
+ */
+export function evaluateSchedule(entries, now, opts = {}) {
+    const tz = opts.tz ?? 'Europe/London';
+    const nowDate = now instanceof Date ? now : new Date(now);
+    const nowMs = nowDate.getTime();
+
+    // Active entries: enabled===true AND loops has at least one '1'
+    const active = (entries || []).filter(e => e.enabled === true && typeof e.loops === 'string' && e.loops.includes('1'));
+
+    if (!active.length) {
+        return { state: 'none', lastChange: null, nextOn: null, nextOff: null, entryCount: 0 };
+    }
+
+    // Check if any ON entries exist
+    const hasOn = active.some(e => e.on === true);
+    if (!hasOn) {
+        return { state: 'off-only', lastChange: null, nextOn: null, nextOff: null, entryCount: active.length };
+    }
+
+    const nowParts = getLocalParts(nowDate, tz);
+
+    // Helper: build candidate UTC for an entry on a given day-offset from today
+    function candidateFor(entry, dayOffset) {
+        const parts = entry.time.split(':');
+        const hh = parseInt(parts[0], 10);
+        const mm = parseInt(parts[1], 10);
+        if (isNaN(hh) || isNaN(mm)) return null;
+        return buildCandidateUtc(nowParts.year, nowParts.month, nowParts.day + dayOffset, hh, mm, tz);
+    }
+
+    // Helper: loops index for sun-first (position 0 = Sunday = JS day 0)
+    function loopsIdx(jsDay) {
+        return jsDay; // sun-first: position 0=Sun matches JS getDay()=0
+    }
+
+    // Helper: dayText for a day offset
+    function dayText(offset) {
+        if (offset === 0) return 'today';
+        if (offset === 1) return 'tomorrow';
+        if (offset === -1) return 'yesterday';
+        const candidate = new Date(nowDate.getTime() + offset * 86400000);
+        const parts = getLocalParts(candidate, tz);
+        return JS_WEEKDAY[parts.jsDay];
+    }
+
+    // Walk BACK up to 7 days to find lastChange
+    let lastChange = null;
+    for (let daysBack = 0; daysBack <= 7 && !lastChange; daysBack++) {
+        // Collect all entries that fire on this day (check jsDay for that candidate date)
+        const candidateDateMs = nowMs - daysBack * 86400000;
+        const candidateDate = new Date(candidateDateMs);
+        const candidateParts = getLocalParts(candidateDate, tz);
+        const jsDay = candidateParts.jsDay;
+
+        // Find entries that fire on this weekday
+        const firingEntries = active.filter(e => e.loops[loopsIdx(jsDay)] === '1');
+        if (!firingEntries.length) continue;
+
+        // For each firing entry, build the UTC time and check if it's <= now
+        const candidates = [];
+        for (const e of firingEntries) {
+            const parts = e.time.split(':');
+            const hh = parseInt(parts[0], 10);
+            const mm = parseInt(parts[1], 10);
+            if (isNaN(hh) || isNaN(mm)) continue;
+            const utc = buildCandidateUtc(candidateParts.year, candidateParts.month, candidateParts.day, hh, mm, tz);
+            if (utc.getTime() <= nowMs) {
+                candidates.push({ e, utc, atMs: utc.getTime() });
+            }
+        }
+
+        if (!candidates.length) continue;
+
+        // Sort by time descending, pick latest
+        candidates.sort((a, b) => b.atMs - a.atMs);
+        // Same-minute conflict resolution: OFF wins
+        const latestMs = candidates[0].atMs;
+        const atSameMinute = candidates.filter(c => c.atMs === latestMs);
+        let winner;
+        if (atSameMinute.length > 1) {
+            // OFF wins on conflict
+            winner = atSameMinute.find(c => c.e.on === false) || atSameMinute[0];
+        } else {
+            winner = candidates[0];
+        }
+
+        const offset = daysBack === 0 ? 0 : -daysBack;
+        lastChange = {
+            time: winner.e.time,
+            dayText: dayText(offset),
+            atMs: winner.atMs,
+            on: winner.e.on
+        };
+    }
+
+    const state = lastChange ? (lastChange.on ? 'on' : 'off') : 'none';
+
+    // Walk FORWARD up to 7 days to find nextOn and nextOff
+    function findNext(wantOn) {
+        for (let daysAhead = 0; daysAhead <= 7; daysAhead++) {
+            const candidateDate = new Date(nowMs + daysAhead * 86400000);
+            const candidateParts = getLocalParts(candidateDate, tz);
+            const jsDay = candidateParts.jsDay;
+
+            const firingEntries = active.filter(e => e.loops[loopsIdx(jsDay)] === '1' && e.on === wantOn);
+            if (!firingEntries.length) continue;
+
+            const candidates = [];
+            for (const e of firingEntries) {
+                const parts = e.time.split(':');
+                const hh = parseInt(parts[0], 10);
+                const mm = parseInt(parts[1], 10);
+                if (isNaN(hh) || isNaN(mm)) continue;
+                const utc = buildCandidateUtc(candidateParts.year, candidateParts.month, candidateParts.day, hh, mm, tz);
+                if (utc.getTime() > nowMs) {
+                    candidates.push({ e, utc, atMs: utc.getTime() });
+                }
+            }
+
+            if (!candidates.length) continue;
+
+            candidates.sort((a, b) => a.atMs - b.atMs);
+            const first = candidates[0];
+            return {
+                time: first.e.time,
+                dayText: dayText(daysAhead),
+                atMs: first.atMs
+            };
+        }
+        return null;
+    }
+
+    const nextOn = findNext(true);
+    const nextOff = findNext(false);
+
+    return { state, lastChange: lastChange ? { time: lastChange.time, dayText: lastChange.dayText, atMs: lastChange.atMs } : null, nextOn, nextOff, entryCount: active.length };
+}
+
+/**
  * Return a human-readable operator string for the next scheduled change, or null.
  *
  * Format (ASCII only, straight apostrophe):

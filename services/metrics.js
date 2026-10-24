@@ -114,6 +114,7 @@ export async function computeMetrics(windowDays = 7) {
     return {
         windowDays,
         since,
+        tuyaCounters: tuyaCounterSnapshot(),
         totals: {
             callOutcomes: callOutcomes.length,
             controlActions: controls.length,
@@ -142,3 +143,12 @@ function median(arr) {
     const mid = Math.floor(s.length / 2);
     return s.length % 2 ? s[mid] : (s[mid - 1] + s[mid]) / 2;
 }
+
+// OOHDASH-140: Tuya read counters (in-process, reset on restart)
+const _tuyaCounters = { tuyaCalls: 0, tuyaFailures: 0, tuyaRateLimits: 0, tuyaBreakerOpenings: 0, tuyaTokenChangedEarly: 0 };
+
+export function recordTuyaEvent(type) {
+    if (Object.prototype.hasOwnProperty.call(_tuyaCounters, type)) _tuyaCounters[type]++;
+}
+
+export function tuyaCounterSnapshot() { return { ..._tuyaCounters }; }

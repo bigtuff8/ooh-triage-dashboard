@@ -1801,6 +1801,122 @@
           "nextChange": null
         }
       }
+    },
+    {
+      "siteNo": "8888",
+      "siteName": "OOHDASH-140 Tuya Fixture Site",
+      "brand": "Greene King",
+      "address": "Test Street, Test Town",
+      "callsLast30Days": 0,
+      "boilerControl": {
+        "present": false,
+        "isV1": false,
+        "isV2": false,
+        "heatingControllable": false,
+        "dhwControllable": false,
+        "deviceId": null,
+        "heating": null
+      },
+      "devices": [
+        {
+          "deviceId": "gk-8888-fryer-1",
+          "zone": "Fryer",
+          "deviceType": "tuya",
+          "deviceTypeLabel": "Kitchen circuit",
+          "kind": "kitchen",
+          "online": true,
+          "controllable": false,
+          "telemetry": { "switch_1": false },
+          "tuyaFixture": {
+            "id": "tuya-fix-8888-fryer",
+            "name": "gk-8888-fryer-1",
+            "product_id": "jdj6ccklup7btq3a",
+            "product_name": "Din Rail Wi-Fi Switch with metering",
+            "online": true,
+            "status": [{"code":"switch_1","value":false},{"code":"cur_power","value":0}],
+            "schedule": [{"time":"00:00","loops":"1111111","functions":[{"code":"switch_1","value":true}],"enable":true,"timezone_id":"Europe/London"}]
+          }
+        },
+        {
+          "deviceId": "gk-8888-glasswasher-1",
+          "zone": "Glass washer",
+          "deviceType": "tuya",
+          "deviceTypeLabel": "Kitchen circuit",
+          "kind": "kitchen",
+          "online": true,
+          "controllable": false,
+          "telemetry": { "switch_1": true },
+          "tuyaFixture": {
+            "id": "tuya-fix-8888-gw",
+            "name": "gk-8888-glasswasher-1",
+            "product_id": "jdj6ccklup7btq3a",
+            "product_name": "Din Rail Wi-Fi Switch with metering",
+            "online": true,
+            "status": [{"code":"switch_1","value":true},{"code":"cur_power","value":500}],
+            "schedule": [{"time":"00:00","loops":"1111111","functions":[{"code":"switch_1","value":true}],"enable":true,"timezone_id":"Europe/London"}]
+          }
+        },
+        {
+          "deviceId": "gk-8888-dishwasher-1",
+          "zone": "Dishwasher",
+          "deviceType": "tuya",
+          "deviceTypeLabel": "Kitchen circuit",
+          "kind": "kitchen",
+          "online": true,
+          "controllable": false,
+          "telemetry": { "switch_1": false },
+          "tuyaFixture": {
+            "id": "tuya-fix-8888-dw",
+            "name": "gk-8888-dishwasher-1",
+            "product_id": "jdj6ccklup7btq3a",
+            "product_name": "Din Rail Wi-Fi Switch with metering",
+            "online": true,
+            "status": [{"code":"switch_1","value":false},{"code":"cur_power","value":0}],
+            "schedule": []
+          }
+        },
+        {
+          "deviceId": "gk-8888-potwash-1",
+          "zone": "Pot wash",
+          "deviceType": "tuya",
+          "deviceTypeLabel": "Kitchen circuit",
+          "kind": "kitchen",
+          "online": true,
+          "controllable": false,
+          "telemetry": { "switch_1": true },
+          "tuyaFixture": {
+            "id": "tuya-fix-8888-pw",
+            "name": "gk-8888-potwash-1",
+            "product_id": "jdj6ccklup7btq3a",
+            "product_name": "Din Rail Wi-Fi Switch with metering",
+            "online": true,
+            "status": [{"code":"switch_1","value":true},{"code":"cur_power","value":0}],
+            "schedule": [{"time":"00:00","loops":"1111111","functions":[{"code":"switch_1","value":true}],"enable":true,"timezone_id":"Europe/London"}]
+          }
+        },
+        {
+          "deviceId": "gk-8888-bainmarie-1",
+          "zone": "Bain-marie",
+          "deviceType": "tuya",
+          "deviceTypeLabel": "Kitchen circuit",
+          "kind": "kitchen",
+          "online": true,
+          "controllable": false,
+          "telemetry": { "switch_1": false },
+          "tuyaFixture": {
+            "id": "tuya-fix-8888-bm",
+            "name": "gk-8888-bainmarie-1",
+            "product_id": "jdj6ccklup7btq3a",
+            "product_name": "Din Rail Wi-Fi Switch with metering",
+            "online": true,
+            "status": [{"code":"switch_1","value":false},{"code":"cur_power","value":0}],
+            "schedule": [
+              {"time":"23:59","loops":"1111111","functions":[{"code":"switch_1","value":true}],"enable":true,"timezone_id":"Europe/London"},
+              {"time":"00:00","loops":"1111111","functions":[{"code":"switch_1","value":false}],"enable":true,"timezone_id":"Europe/London"}
+            ]
+          }
+        }
+      ]
     }
   ]
 }
