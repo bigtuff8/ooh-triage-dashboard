@@ -23,7 +23,7 @@ export default defineConfig({
     webServer: {
         command: 'node server.js',
         url: `http://localhost:${PORT}/healthz`,
-        reuseExistingServer: false,
+        reuseExistingServer: !process.env.CI,
         env: {
             PORT: String(PORT),
             AUTH_MODE: 'dev',

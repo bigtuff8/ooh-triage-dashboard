@@ -46,6 +46,51 @@ test.describe('OOHDASH-114-F1 boilerControl controllability', () => {
     });
 });
 
+test.describe('OOHDASH-139 boiler panel heating flow', () => {
+    test.beforeEach(async ({ page }) => { await signIn(page, 'Test Handler'); });
+
+    test('BP-E1: V2 boiler-panel site (9010) — Bar/Restaurant chip shows, outcome renders, buttons work', async ({ page }) => {
+        await confirmSite(page, '9010', 'Test Boiler Panel V2 (Heating)');
+        await page.locator('[data-testid="tile-heating"]').click();
+        // Bar/Restaurant chip should appear (boiler panel area)
+        await expect(page.locator('button.chip', { hasText: 'Bar/Restaurant' })).toBeVisible();
+        await page.locator('button.chip', { hasText: 'Bar/Restaurant' }).click();
+        // Stage 1: two chips for need (not 4 — boiler panel only has cold/hot)
+        await expect(page.locator('[data-testid="need-cold"]')).toBeVisible();
+        await expect(page.locator('[data-testid="need-hot"]')).toBeVisible();
+        // Click Too cold — should get W2 (all on, boiler calling) for site 9010
+        await page.locator('[data-testid="need-cold"]').click();
+        // Outcome card must render
+        await expect(page.locator('[data-testid="reco-boiler-panel"]')).toBeVisible();
+        // Capture/advice button must be present and clickable (guards curly-quote defect)
+        const actionBtn = page.locator('[data-testid="reco-boiler-panel"] button').first();
+        await expect(actionBtn).toBeVisible();
+        // Click the first action button — must not crash
+        await actionBtn.click();
+    });
+
+    test('BP-E2: V1 boiler-panel site (9011) — Bar/Restaurant chip shows, partial outcome W3 renders', async ({ page }) => {
+        await confirmSite(page, '9011', 'Test Boiler Panel V1 (Heating)');
+        await page.locator('[data-testid="tile-heating"]').click();
+        await expect(page.locator('button.chip', { hasText: 'Bar/Restaurant' })).toBeVisible();
+        await page.locator('button.chip', { hasText: 'Bar/Restaurant' }).click();
+        await page.locator('[data-testid="need-cold"]').click();
+        // W3: partial (zone 1 on, zone 2 off)
+        await expect(page.locator('[data-testid="reco-boiler-panel"]')).toBeVisible();
+        await expect(page.locator('[data-testid="reco-boiler-panel"]')).toContainText('Part of the pub heating is off');
+    });
+
+    test('Regression: Accommodation Salus flow unchanged (site 6832)', async ({ page }) => {
+        await confirmSite(page, '6832', 'Old Grey Mare');
+        await page.locator('[data-testid="tile-heating"]').click();
+        await expect(page.locator('button.chip', { hasText: 'Accommodation' })).toBeVisible();
+        await page.locator('button.chip', { hasText: 'Accommodation' }).click();
+        // Normal Salus flow — 4 need chips present (not 2 like boiler panel)
+        await expect(page.locator('[data-testid="need-warm"]')).toBeVisible();
+        await expect(page.locator('[data-testid="need-cool"]')).toBeVisible();
+    });
+});
+
 test.describe('OOHDASH-115-F2 C&B scope trim', () => {
     test.beforeEach(async ({ page }) => { await signIn(page, 'Test Handler'); });
 
