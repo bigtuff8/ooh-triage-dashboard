@@ -175,10 +175,22 @@ export const config = {
                 copyMinutes: parseInt(env('OOH_COPY_MIN_IT500', '15'), 10),
                 offlineHours: parseInt(env('OOH_OFFLINE_HOURS_IT500', '3'), 10)
             },
-            // Monitor-only classes (boiler panels, intesis, refrigeration, gateways) — never dispatched;
+            // Monitor-only classes (intesis, refrigeration, gateways) — never dispatched;
             // only offlineHours is meaningful (48h, boiler/monitor devices report infrequently).
             monitor: {
                 confirmLimitMs: 0, lateWatchMs: 0, confirmPollMs: 0, copyMinutes: null,
+                offlineHours: parseInt(env('OOH_OFFLINE_HOURS_MONITOR', '48'), 10)
+            },
+            // OOHDASH-141: boiler-panel direct dispatch (V2 one-way RPC, V1 SHARED_SCOPE write).
+            // confirmLimitMs is the V2 limit (E10: 15 s); V1 uses the sub-key confirmLimitMsV1 (2 s).
+            // The config validation loop skips this class (it has null copyMinutes which is fine, and
+            // V1's confirmLimitMsV1 is a sub-key not checked by the loop — intentional).
+            'boiler-panel': {
+                confirmLimitMs: parseInt(env('OOH_CONFIRM_LIMIT_MS_BOILER_V2', '15000'), 10),
+                confirmLimitMsV1: parseInt(env('OOH_CONFIRM_LIMIT_MS_BOILER_V1', '2000'), 10),
+                lateWatchMs: parseInt(env('OOH_LATE_WATCH_MS_BOILER', '180000'), 10),
+                confirmPollMs: parseInt(env('OOH_CONFIRM_POLL_MS_BOILER', '1000'), 10),
+                copyMinutes: null,
                 offlineHours: parseInt(env('OOH_OFFLINE_HOURS_MONITOR', '48'), 10)
             }
         }
@@ -216,6 +228,18 @@ export const config = {
         readEnabled: (process.env.TUYA_READ_ENABLED ?? '').trim().toLowerCase() === 'true',
         clientId: env('TUYA_CLIENT_ID'),
         clientSecret: env('TUYA_CLIENT_SECRET')
+    },
+
+    // OOHDASH-141: pub heating boost flags. All default ON (rollout: enabled for all sites).
+    // The flags act as off-switches so the feature can be pulled without a release.
+    boilerBoost: {
+        enabled: (process.env.BOILER_BOOST_ENABLED ?? '').trim().toLowerCase() !== 'false',
+        onEnabled: (process.env.BOILER_BOOST_ON_ENABLED ?? '').trim().toLowerCase() !== 'false',
+        sitesDeny: (process.env.BOILER_BOOST_SITES_DENY ?? '').split(',').map(s => s.trim()).filter(Boolean),
+        v1ZoneMap: JSON.parse(env('BOILER_BOOST_V1_ZONE_MAP', '{}')),
+        v2DurationToken: (process.env.BOILER_BOOST_V2_DURATION_TOKEN ?? '').trim().toLowerCase() === 'true',
+        // 'all' = exempt from BOTH runtime kill-switch AND WRITES_DISABLED (decision 1, OOHDASH-141 design §6).
+        revertExempt: env('BOILER_BOOST_REVERT_EXEMPT', 'all')
     }
 };
 
@@ -228,6 +252,7 @@ export function validateConfig() {
     // 0 < copyMinutes*60000 (when set) <= confirmLimitMs <= lateWatchMs, and confirmPollMs > 0.
     for (const [cls, c] of Object.entries(config.control.classes)) {
         if (cls === 'monitor') continue;
+        if (cls === 'boiler-panel') continue; // V1 timing is a sub-key not checked here; see above
         const copyMs = (c.copyMinutes || 0) * 60000;
         if (!(c.confirmLimitMs > 0 && c.confirmLimitMs <= c.lateWatchMs && c.confirmPollMs > 0 && copyMs <= c.confirmLimitMs)) {
             problems.push(`control.classes.${cls} timing invalid: require 0 < copyMinutes*60000 <= confirmLimitMs <= lateWatchMs and confirmPollMs > 0`);

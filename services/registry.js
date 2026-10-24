@@ -74,7 +74,11 @@ const REGISTRY = {
     // write guard rejects a switch by construction. The explicit deviceType backstop in the switch
     // case below is a SECOND, independent refusal that holds even if this list were ever mutated.
     'refrigeration': { label: 'Refrigeration (monitor-only)', commands: [] },
-    'boiler-panel': { label: 'Pub boiler panel', commands: [] },
+    'boiler-panel': {
+        label: 'Pub boiler panel',
+        commands: ['boost-on', 'boost-off'],
+        boostMenu: { on: ['30', '60', '120'], off: ['60', '120', 'until-0700'] }
+    },
     'tb-rulechain': { label: 'TB rule-chain (lighting/fans)', commands: [] },
     'gateway': { label: 'Lighthouse gateway', commands: [] }
 };
@@ -122,12 +126,23 @@ const CONTROL_CONTRACT = {
         statusKey: 'setpointSyncStatus', errorKey: 'setpointLastError',
         confirmKeys: ['setPoint'], valueType: 'number', compareRule: 'numeric-0.25',
         controllable: false, dark: true, timingClass: 'salus'            // dark since ~2 Jun
+    },
+    // OOHDASH-141: boiler-panel direct dispatch (not via the IoT Command Gate).
+    // requestedKey is null — boiler boost uses dispatchBoilerRpc / writeSharedScopeAttribute directly.
+    // The null key is filtered from REQUESTED_KEYS so writeServerScopeAttribute can never write to it.
+    'boiler-panel': {
+        requestedKey: null, scope: 'DIRECT',
+        statusKey: null, errorKey: null, confirmKeys: [],
+        valueType: null, compareRule: null,
+        controllable: true, direct: true,
+        timingClass: 'boiler-panel'
     }
 };
 
-// Monitor-only / non-controllable classes — carried for the offline threshold + an explicit
-// non-controllable contract (hot water ex-boost, boiler panels, intesis AC, refrigeration, gateways).
-const MONITOR_ONLY = ['intesis', 'salus-it500-dhw', 'boiler-panel', 'refrigeration', 'tb-rulechain', 'gateway'];
+// Monitor-only / non-controllable classes (for the purpose of the gateway CONTRACT path).
+// 'boiler-panel' is removed from this list (OOHDASH-141): it now has its own CONTROL_CONTRACT
+// entry with scope:'DIRECT' and is dispatched via dispatchBoilerBoost, not the IoT Command Gate.
+const MONITOR_ONLY = ['intesis', 'salus-it500-dhw', 'refrigeration', 'tb-rulechain', 'gateway'];
 
 /**
  * The single per-class contract a flow reads. Merges the static CONTROL_CONTRACT key names with the
@@ -150,8 +165,10 @@ export function capabilitiesContractFor(deviceType) {
 
 // The set of Requested keys the write primitive allow-lists against (defence-in-depth, mirrors the
 // old ATTRIBUTE_FAMILY allow-list). Exported so tb-client can validate without re-deriving.
+// null requestedKey entries (boiler-panel, OOHDASH-141) are filtered out — direct-dispatch paths
+// bypass writeServerScopeAttribute and therefore never reach this list.
 export const REQUESTED_KEYS = Object.freeze(
-    [...new Set(Object.values(CONTROL_CONTRACT).map(c => c.requestedKey))].concat('modeRequested')
+    [...new Set(Object.values(CONTROL_CONTRACT).map(c => c.requestedKey))].filter(Boolean).concat('modeRequested')
 );
 
 /**
@@ -231,9 +248,45 @@ export function validateCommand(device, command, value) {
             // Requested keys (setpointRequested, switchRequested) — verified via OOHDASH-123 Rosetta Stone.
             return { ok: true, attribute: 'hwBoostHoursRequested', value: v };
         }
+        case 'boost-on':
+        case 'boost-off': {
+            // OOHDASH-141: boiler-panel direct boost dispatch.
+            if (!entry.commands.includes(command)) return { ok: false, reason: `${entry.label} does not support ${command}` };
+            // OOHDASH-141 fix: panelVersion may be passed by the caller (control.js knows V1/V2 from
+            // site.boilerControl.isV2). Fall back to a deviceType check for direct callers (tests).
+            const { zone, durationKey, panelVersion: panelVersionParam } = (value && typeof value === 'object') ? value : {};
+            if (!zone || !['CHZ1', 'CHZ2'].includes(zone)) return { ok: false, reason: 'zone must be CHZ1 or CHZ2' };
+            const menuDir = command === 'boost-on' ? 'on' : 'off';
+            const menu = entry.boostMenu?.[menuDir] || [];
+            if (!menu.includes(durationKey)) return { ok: false, reason: `durationKey ${durationKey} not in ${menuDir} menu` };
+            // Check zone is configured on this device (populated by 139 decoder: device.heating.zones)
+            const configuredZones = device.heating?.zones;
+            if (configuredZones && !configuredZones.some(z => z.zone === zone)) {
+                return { ok: false, reason: `Zone ${zone} is not configured on this device` };
+            }
+            const n = menuDir === 'on' ? 1 : -1;
+            // panelVersionParam (from caller) takes precedence; fall back to deviceType for backward compat.
+            const panelVersion = panelVersionParam || (device.deviceType === 'boilercontrol_v2' ? 'v2' : 'v1');
+            let attribute = null;
+            if (panelVersion === 'v1') {
+                attribute = v1ZoneMap(device)[zone] || (zone === 'CHZ1' ? 'output2Override' : 'output3Override');
+            }
+            return { ok: true, zone, n, durationKey, direction: menuDir, panelVersion, attribute };
+        }
         default:
             return { ok: false, reason: `Unknown command "${command}"` };
     }
+}
+
+/**
+ * OOHDASH-141 — returns the CHZ → SHARED_SCOPE attribute mapping for a V1 boiler panel.
+ * Default is { CHZ1: 'output2Override', CHZ2: 'output3Override' }.
+ * A per-site override comes from BOILER_BOOST_V1_ZONE_MAP[siteNo].
+ */
+export function v1ZoneMap(device) {
+    const siteMap = config.boilerBoost?.v1ZoneMap?.[String(device.siteNo)] || {};
+    const defaultMap = { CHZ1: 'output2Override', CHZ2: 'output3Override' };
+    return { ...defaultMap, ...siteMap };
 }
 
 /**

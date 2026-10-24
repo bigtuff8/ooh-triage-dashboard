@@ -26,8 +26,9 @@ const WEEKDAY_JS = {
 /**
  * Read the local date/time parts for a given UTC Date in a named IANA timezone.
  * Returns { year, month (1-based), day, hour (0-23), minute, jsDay (0=Sun) }.
+ * Exported for use by services/boost-window.js (OOHDASH-141).
  */
-function getLocalParts(date, tz) {
+export function getLocalParts(date, tz) {
   const fmt = new Intl.DateTimeFormat('en-GB', {
     timeZone: tz,
     year: 'numeric',
@@ -59,8 +60,9 @@ function getLocalParts(date, tz) {
  * Uses two-step Intl offset: treat target local time as UTC, read back the
  * local interpretation to derive the zone offset, then correct.
  * Date.UTC handles day-of-month overflow (e.g. Jan 33 -> Feb 2) correctly.
+ * Exported for use by services/boost-window.js (OOHDASH-141).
  */
-function buildCandidateUtc(year, month, day, hh, mm, tz) {
+export function buildCandidateUtc(year, month, day, hh, mm, tz) {
   const approxUtcMs = Date.UTC(year, month - 1, day, hh, mm, 0, 0);
   const approxDate = new Date(approxUtcMs);
   const localParts = getLocalParts(approxDate, tz);

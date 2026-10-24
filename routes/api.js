@@ -241,6 +241,15 @@ async function workspacePayload(site) {
         return base;
     });
     const siteWithEffective = { ...site, devices: effectiveDevices };
+    // OOHDASH-141: boostAvailable flags — per-site availability for the boost UI.
+    // Both directions are gated by the master enabled flag and the per-site deny list.
+    // Heat ON also requires boilerBoost.onEnabled.
+    const boostBaseDenied = !config.boilerBoost.enabled || config.boilerBoost.sitesDeny.includes(String(site.siteNo));
+    const boostAvailable = {
+        on: !boostBaseDenied && config.boilerBoost.onEnabled,
+        off: !boostBaseDenied
+    };
+
     return {
         site: { siteNo: site.siteNo, siteName: site.siteName, nameUnverified: site.nameUnverified, accountId: site.accountId, brand: site.brand, address: site.address, callsLast30Days: site.callsLast30Days },
         devices: effectiveDevices,
@@ -249,7 +258,8 @@ async function workspacePayload(site) {
         tickets,
         activeP1Tickets,
         degraded: bridgeDegraded(),
-        boilerControl: site.boilerControl ?? defaultBc
+        boilerControl: site.boilerControl ?? defaultBc,
+        boostAvailable
     };
 }
 
@@ -259,6 +269,24 @@ function stripDemo(device) {
 }
 
 /* ---------------- control (F002/F005/F006/F007/F008/F009) ---------------- */
+
+/* ---------------- boiler boost (OOHDASH-141) ---------------- */
+
+router.post('/boiler-boost', wrap(async (req, res) => {
+    const op = req.session.operator;
+    const { siteNo, deviceId, zones, direction, durationKey, acknowledgedWarnings, callerWords, confirmToken } = req.body;
+    const action = await control.dispatchBoilerBoost({ operator: op, confirmToken, siteNo, deviceId, zones, direction, durationKey, acknowledgedWarnings, callerWords });
+    // Return warnings as 200 so the api helper doesn't throw; frontend checks res.warnings.
+    if (action._warnings) return res.json({ warnings: action._warnings });
+    res.json({ action });
+}));
+
+router.get('/boiler-boost/preview', wrap(async (req, res) => {
+    const { direction, durationKey } = req.query;
+    const { clampBoostWindow } = await import('../services/boost-window.js');
+    const result = clampBoostWindow(Date.now(), direction, durationKey);
+    res.json(result);
+}));
 
 router.post('/control/dispatch', wrap(async (req, res) => {
     const { confirmToken, siteNo, deviceId, command, value, hold, direction } = req.body;
