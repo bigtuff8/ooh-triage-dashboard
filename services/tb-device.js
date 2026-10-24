@@ -1326,6 +1326,21 @@ export function decodeBoilerHeating(sharedScope, clientScope, panelLastSeenMs, t
     }
 }
 
+// OOHDASH-143: extract max valid ts from a TB timeseries response (exported for unit tests).
+// Upper-bound guard (now + 5 min) rejects forward-skewed device clocks so they cannot pin freshness.
+// All timeseries keys come from the TB device API and are device-reported; server-side attributes
+// (active, lastActivityTime) arrive via SERVER_SCOPE, not this endpoint.
+export function _extractMaxTelemTs(tsData, now) {
+    const upperBound = now + 300_000;
+    let maxTs = null;
+    for (const series of Object.values(tsData || {})) {
+        if (!Array.isArray(series) || !series.length) continue;
+        const ts = series[0].ts;
+        if (typeof ts === 'number' && ts > 0 && ts <= upperBound && (maxTs === null || ts > maxTs)) maxTs = ts;
+    }
+    return maxTs;
+}
+
 /**
  * Bulk latest telemetry for a set of TB devices, PLUS the per-device online state (OOHDASH-80). Uses
  * per-device latest-timeseries reads over the read session AND a per-device SERVER_SCOPE `active`
@@ -1372,9 +1387,14 @@ async function fetchTelemetry(devices) {
         const bag = {};
         if (tsRes.status === 'fulfilled') {
             // TB shape: { key: [{ ts, value }] } → flatten to { key: value }.
+            // __telemLastSeenMs = max valid ts across all keys — fallback for panelLastSeenMs
+            // when SERVER_SCOPE lastActivityTime is absent (OOHDASH-143 6811 class).
+            const nowMs = Date.now();
+            const telemTs = _extractMaxTelemTs(tsRes.value, nowMs);
             for (const [k, series] of Object.entries(tsRes.value || {})) {
                 if (Array.isArray(series) && series.length) bag[k] = series[0].value;
             }
+            bag.__telemLastSeenMs = telemTs;
         } else {
             console.error(`[TB] Telemetry read failed for device ${uuid}: ${tsRes.reason?.message}`);
         }
@@ -1596,7 +1616,7 @@ async function fetchLiveSitesByNumber(siteNo) {
         boilerControlField.heating = decodeBoilerHeating(
             bcBag.__sharedScope ?? null,
             bcBag.__clientScope ?? null,
-            bcBag.__lastActivityTime ?? null,
+            bcBag.__lastActivityTime ?? bcBag.__telemLastSeenMs ?? null,
             bcBag,
             Date.now()
         );
