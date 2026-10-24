@@ -1,0 +1,21 @@
+{
+  "run": "selfgate-ooh-triage-dashboard-gate-oohdash-139-test",
+  "phase": "test",
+  "pr": 134,
+  "approvedBy": [
+    "bigtuff8"
+  ],
+  "reviewComments": [
+    "bigtuff8: - Approve this build and release as patch v1.4.7?: Yes — go ahead and cut the release (recommended)\n\n(submitted via the interactive gate review)\n\n<!-- gate:selected [{\"question\":\"Approve this build and release as patch v1.4.7?\",\"answer\":\"Yes — go ahead and cut the release (recommended)\"}] -->"
+  ],
+  "mergeCommit": "84b57249cd50a48ebe78420c6a343b66032778b3",
+  "phaseBranch": "gate/oohdash-139-test",
+  "releaseBranch": "main",
+  "stamp": 1792821590123,
+  "selectedOptions": [
+    {
+      "question": "Approve this build and release as patch v1.4.7?",
+      "answer": "Yes — go ahead and cut the release (recommended)"
+    }
+  ]
+}
