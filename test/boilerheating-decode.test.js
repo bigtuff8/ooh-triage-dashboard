@@ -275,3 +275,29 @@ test('BH-20: Telemetry-ts staleness fallback — panelLastSeenMs=null but recent
     assert.equal(r.visible, true);
     assert.equal(r.boilerCalling, true);
 });
+
+test('BH-21: fetchTelemetry fallback path — __lastActivityTime=null + __telemLastSeenMs=recent → not stale', () => {
+    // Exercises the actual call-site logic: bcBag.__lastActivityTime ?? bcBag.__telemLastSeenMs ?? null
+    // Confirms the ?? chain selects __telemLastSeenMs when lastActivityTime is null (site 6811 case).
+    const bag = { __lastActivityTime: null, __telemLastSeenMs: NOW - 30_000 };
+    const panelLastSeenMs = bag.__lastActivityTime ?? bag.__telemLastSeenMs ?? null;
+    assert.equal(panelLastSeenMs, NOW - 30_000, 'fallback should use __telemLastSeenMs');
+    const ss = { output1OutputMask: [true, true, false, false] };
+    const t = { output1State: 'true', output2State: 'false' };
+    const r = decodeBoilerHeating(ss, {}, panelLastSeenMs, t, NOW);
+    assert.equal(r.stale, false, 'not stale when __telemLastSeenMs is recent');
+});
+
+test('BH-22: fetchTelemetry fallback path — both null (no telemetry ts) → stale (safe degradation)', () => {
+    // Double-absent case: lastActivityTime=null AND no valid telemetry ts (__telemLastSeenMs=null).
+    // maxTs stays null through the loop (initialised null, only updated on valid numeric ts).
+    // Confirms the safe fallback is stale=true, not a garbage verdict.
+    const bag = { __lastActivityTime: null, __telemLastSeenMs: null };
+    const panelLastSeenMs = bag.__lastActivityTime ?? bag.__telemLastSeenMs ?? null;
+    assert.equal(panelLastSeenMs, null, 'double-null yields null (safe)');
+    const ss = { output1OutputMask: [true, true, false, false] };
+    const t = { output1State: 'true', output2State: 'false' };
+    const r = decodeBoilerHeating(ss, {}, panelLastSeenMs, t, NOW);
+    assert.equal(r.stale, true, 'should be stale when both timestamps absent');
+    assert.equal(r.visible, true, 'device is still visible (version detected)');
+});
