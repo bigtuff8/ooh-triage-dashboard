@@ -459,7 +459,9 @@ export async function revertBoilerZoneToAuto(device, version, zone) {
         const key = version === 'v1'
             ? (zone === 'CHZ1' ? 'output2Override' : 'output3Override')
             : `${zone}.override`;
-        const now = Date.now();
+        // +1 ensures ts strictly advances even when called in the same millisecond
+        // as the __setBoilerSim setup in tests (ts > preTs confirm check would fail otherwise).
+        const now = Date.now() + 1;
         boilerAttrSim.set(boilerSimKey(device.deviceId, key), { value: 0, ts: now });
         console.log(`[BOILER-REVERT-EXEMPT] fixture: reverting ${device.deviceId} ${zone} to auto`);
         return { attrTs: now };
