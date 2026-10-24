@@ -210,6 +210,12 @@ export const config = {
         operatorAgentMap: env('OOH_OPERATOR_AGENT_MAP', '{}'),
         autoMergeThreshold: parseFloat(env('OOH_RECON_AUTOMERGE_THRESHOLD', '0.80')),
         linkThreshold: parseFloat(env('OOH_RECON_LINK_THRESHOLD', '0.50'))
+    },
+
+    tuya: {
+        readEnabled: (process.env.TUYA_READ_ENABLED ?? '').trim().toLowerCase() === 'true',
+        clientId: env('TUYA_CLIENT_ID'),
+        clientSecret: env('TUYA_CLIENT_SECRET')
     }
 };
 
@@ -243,6 +249,9 @@ export function validateConfig() {
         if (!config.oidc.issuer || !config.oidc.clientId) {
             problems.push('OIDC_ISSUER and OIDC_CLIENT_ID are required when AUTH_MODE=oidc');
         }
+    }
+    if (config.tuya.readEnabled && (!config.tuya.clientId || !config.tuya.clientSecret)) {
+        console.warn('[CONFIG] TUYA_READ_ENABLED=true but credentials missing');
     }
     if (config.dataMode === 'live') {
         if (!config.bridge.baseUrl) problems.push('BRIDGE_BASE_URL is required when DATA_MODE=live');

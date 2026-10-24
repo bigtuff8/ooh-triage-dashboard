@@ -20,7 +20,8 @@ async function getDoc() {
         OohKillSwitchReason: null,
         OohKillSwitchActor: null,
         OohKillSwitchAt: null,
-        OohWriteKillSwitchSiteList: {} // siteNo -> { reason, actor, at }
+        OohWriteKillSwitchSiteList: {}, // siteNo -> { reason, actor, at }
+        OohTuyaReadOff: false
     };
 }
 
@@ -63,8 +64,28 @@ export async function killSwitchState() {
         reason: doc.OohKillSwitchReason,
         actor: doc.OohKillSwitchActor,
         at: doc.OohKillSwitchAt,
-        sites: doc.OohWriteKillSwitchSiteList
+        sites: doc.OohWriteKillSwitchSiteList,
+        tuyaReadOff: doc.OohTuyaReadOff ?? false
     };
+}
+
+/**
+ * Returns true when the Tuya read kill-switch is engaged (OOHDASH-140).
+ */
+export async function tuyaReadOff() {
+    const doc = await getDoc();
+    return !!doc.OohTuyaReadOff;
+}
+
+/**
+ * Sets the Tuya read kill-switch (OOHDASH-140).
+ */
+export async function setTuyaReadOff(enabled, actor) {
+    const doc = await getDoc();
+    doc.OohTuyaReadOff = !!enabled;
+    const col = await collection('OohAppConfig');
+    await col.upsert(doc);
+    console.warn(`[KILLSWITCH] OohTuyaReadOff ${enabled ? 'ON' : 'OFF'} by ${actor}`);
 }
 
 /**

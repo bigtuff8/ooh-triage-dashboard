@@ -254,7 +254,7 @@ async function workspacePayload(site) {
 }
 
 function stripDemo(device) {
-    const { _demo, ...rest } = device;
+    const { _demo, tuyaFixture, ...rest } = device;
     return rest;
 }
 
@@ -595,6 +595,11 @@ admin.post('/alerts/:id/clear', wrap(async (req, res) => { metrics.clearAlert(re
 
 /* F010 — producer-liveness self-check. GET returns the live assessment of the last OOH period;
  * POST /simulate lets ops (and the test suite) validate the alert wiring with explicit numbers. */
+admin.post('/killswitch/tuya-read', wrap(async (req, res) => {
+    await killswitch.setTuyaReadOff(!!req.body.enabled, req.session.operator.name);
+    res.json(await killswitch.killSwitchState());
+}));
+
 admin.get('/liveness', wrap(async (req, res) => {
     res.json(await liveness.evaluateOvernightActivity(new Date(), { healthy: liveness.producerHealthy() }));
 }));
