@@ -10,7 +10,7 @@ Q4: James -- today's classifier puts Tuya devices named dhw, supplyfan and barfa
 SECTION: What we are building
 When a caller says kitchen equipment is not working, the kitchen flow will read each circuit's live state from Tuya (ON or OFF, plus power draw on Tongou) and its real schedule. It then tells the agent which of the five agreed outcomes applies (A to E). It is read-only. Nothing is ever sent to a device, and Tuya control stays out of scope.
 SECTION: How the live data is read
-The OOH server calls the Tuya EU OpenAPI directly (Option A, your discovery decision). A live check on 2026-10-24 found that one call per site (the site's device list) already returns every circuit's switch state, power and online flag in about half a second. Schedules need one extra call per kitchen circuit, and those are cached for 5 minutes. All Tuya reads run alongside the ThingsBoard reads. They have a hard 3-second budget, so they can never slow the page down by more than that.
+The OOH server calls the Tuya EU OpenAPI directly (Option A, your discovery decision). A live check on 2026-10-24 found that one call per site (the site's device list) already returns every circuit's switch state, power and online flag in about half a second. Schedules need one extra call per kitchen circuit, and those are cached for 5 minutes. All Tuya reads run alongside the ThingsBoard reads. They have a hard 3-second budget, so they can never slow the page down by more than that. OOH is capped at 5 Tuya requests per second, and it backs off for 60 seconds at the first rate-limit signal, so it cannot use up the quota the Tuya Scheduler shares. Tuya gives every caller the same project token (checked live), so OOH cannot break the Scheduler's login.
 SECTION: If Tuya fails
 Your discovery condition was that a Tuya failure must never break the app. In this design it can't. A failure, timeout, missing credentials or unmatched device marks that circuit's live data "unavailable". The kitchen flow then falls back to exactly today's behaviour, with one line saying live circuit state could not be read. After 3 failures in a row the server stops calling Tuya for 60 seconds. The feature ships switched off behind a flag. While it is off the dashboard behaves exactly as it does today.
 SECTION: What changes for the agent
@@ -54,8 +54,9 @@ The backend turns those facts into one of the five outcomes James agreed in disc
 | The same listing also returns each device's `local_key` (the device's local encryption key) | PROVEN | Dropped at parse; never stored, logged or sent to the browser (section 9) |
 | `GET /v2.0/cloud/thing/{id}/shadow/properties?codes=schedule` filters to the schedule property (93 ms) | PROVEN | OWON schedule read is one small call |
 | `GET /v2.0/cloud/timer/device/{id}` returns a plain array; entry keys `time, loops, functions, enable, timezone_id, timer_id, category, date` (86 ms) | PROVEN | Tongou schedule read is one call; `timezone_id` is used when present |
-| Token request returned `expire_time` 2611 s (not a fresh 7200) | DEDUCED | Tuya hands out the project's existing token, so OOH taking a token does not invalidate the Tuya Scheduler's |
+| Two `grant_type=1` token requests 3 s apart returned the **identical** access token (same hash) with `expire_time` counting down (1690 s, then 1687 s). An earlier request had returned 2611 s, not a fresh 7200 | PROVEN | Tuya hands every caller the project's one current token, so OOH taking a token cannot invalidate the Tuya Scheduler's. OOH never calls the refresh-token endpoint, which is the only call that could rotate it |
 | Tongou product name at gk-6863 is "Din Rail Wi-Fi Switch with metering" | PROVEN | The relay key is `switch_1`. The Scheduler's `switch` key applies only to the "wifi din rail switch" / "breaker" product names. The read takes `switch_1` and falls back to `switch` |
+| `k8s/deployment.yaml` pins `replicas: 1` (session affinity) | PROVEN | Per-process token cache, rate limiter and breaker are the whole-app limits today. If replicas ever go above 1, the limits multiply by the replica count (section 9) |
 | `classifyDevice` puts glasswasher, merrychef, coffeemachine, hcupboard, heatedgantry, supplyfan, barfan **and dhw** into `kitchen` once TB reports a switch key. Fridge, freezer and cellar go to refrigeration; extractfan goes to fan; externallighting goes to lighting | PROVEN (unit run of the live classifier) | Kitchen circuit set = existing `kind === 'kitchen'`. The dhw problem is decision Q4 |
 | Existing `services/schedule.js` already handles `loops` strings with `dayOrder: 'sun-first'` and Europe/London DST-safe time maths | PROVEN (code) | Reuse its time helpers; no second time library |
 
@@ -97,7 +98,10 @@ In fixture mode the Tuya client is **never called**. Fixture kitchen devices may
   - `^/v2\.0/cloud/timer/device/[A-Za-z0-9]+(\?last_row_key=[^&]+)?$`
   - `^/v2\.0/cloud/thing/[A-Za-z0-9]+/shadow/properties\?codes=schedule$`
 - Per-request timeout of 2500 ms (AbortController). HTTP 429 or body code 1009 are treated as rate-limited. A non-2xx response, or `success !== true`, is a failure (Scheduler rule A05: a failed read is never treated as "empty").
-- Circuit breaker: 3 consecutive failures open the breaker for 60 s. While it is open, calls fail immediately with reason `circuit-open`.
+- **Global limiter (per process):** at most 4 Tuya requests in flight and at most 5 requests per second (token bucket). Requests over the limit wait inside the 3-second budget and otherwise fail with `rate-limited`. This caps OOH's load at 5 req/s **however many sites are open at once**.
+- Circuit breaker: 3 consecutive failures, or **any** 429/1009 rate-limit response, open the breaker for 60 s. While it is open, calls fail immediately with reason `circuit-open`. OOH backs off first, so the Tuya Scheduler keeps the shared quota.
+- Token errors (Tuya codes 1010 / 1011, token invalid or expired): drop the cached token, re-grant once, then fail. If the token changes before the cached expiry, a warning `tuya_token_changed_early` is logged, which would reveal unexpected rotation.
+- Counters for calls, failures, rate-limit responses and breaker openings are added to the existing `services/metrics.js`.
 - Logging: method, redacted path, status, duration. The token, signature, client id, secret and `local_key` are never logged.
 
 ### 5.2 New module `services/tuya-read.js` (site read, decode, evaluate)
@@ -166,7 +170,7 @@ Rules are applied in order, and the first match wins:
 | 1 | The chosen circuit's verdict. `offline` gives the existing connectivity divert. `fallback` gives the line "Live circuit state couldn't be read just now." followed by the existing business-critical question and existing outcomes. A to E and F1 to F3 give an outcome card (label, script, follow-up chips). "Several / all of it" lists one line per circuit, with offline circuits shown as "[Zone] is not reporting". The script and chips come from the highest-priority verdict present, in the order A, D, F3, E, C, F2, F1, B |
 | 2 | Follow-up chips (section 6.3) end in the existing `outcomeCaptured` / `outcomeP1` helpers |
 
-`[Zone]` / `[device]` is `tuya.displayName`: the TB label if it is not just the raw name, otherwise the name with the `gk-{site}-` prefix removed, dashes turned to spaces and title case (`gk-6863-glasswasher-2` becomes "Glasswasher 2"). A time shows as `HH:MM`, with a day added when it isn't today ("10:30 tomorrow", "11:00 on Sunday").
+`[Zone]` / `[device]` is `tuya.displayName`: the TB label if it is not just the raw name, otherwise a caller-friendly name from the zone token plus its number. The friendly names are fryer: "Fryer", grill: "Grill", glasswasher: "Glass washer", dishwasher: "Dishwasher", potwash: "Pot wash", bainmarie: "Bain-marie", merrychef: "Merrychef oven", hcupboard: "Hot cupboard", heatedgantry: "Heated gantry (pass)", coffeemachine: "Coffee machine", supplyfan: "Kitchen supply fan", barfan: "Bar fan". An unknown token gets title case. The number is dropped when the site has only one of that type, so `gk-6863-glasswasher-2` becomes "Glass washer 2" and `gk-6863-fryer-1` becomes "Fryer". A time shows as `HH:MM`, with a day added when it isn't today ("10:30 tomorrow", "11:00 on Sunday").
 
 ### 6.2 Wording
 
@@ -177,7 +181,7 @@ Rules are applied in order, and the first match wins:
 | Line | When | Outcome label | Agent script |
 |---|---|---|---|
 | F1 | ON, no usable schedule | "[Zone] is ON (it has no schedule, so it stays on)." | Same as B |
-| F2 | ON outside scheduled hours | "[Zone] is ON outside its scheduled hours — it has probably been switched on at the PowerPause unit. The schedule takes over again at [next off time]." | Same as B |
+| F2 | ON outside scheduled hours | "[Zone] is ON outside its scheduled hours — it has probably been switched on at the PowerPause unit. Next scheduled change: OFF at [next off time]." | Same as B |
 | F3 | OFF, schedule unreadable or OFF-only | "[Zone] is OFF. Its schedule couldn't be read, so the dashboard can't tell whether that's expected." | "The [device] is showing as off, but I can't see its schedule right now. The PowerPause device has a manual override button on the front — pressing it once should bring the circuit on." |
 
 ### 6.3 Follow-up chips and outcomes (Q2, for approval)
@@ -231,7 +235,9 @@ No Tuya failure can turn a workspace request into an error response, and none ch
 - **The key pair can write schedules on every linked device** (CIR `TUYA_OPENAPI_ACCESS.md`, blast radius). Mitigation: section 5.1. The module has no write methods and a GET path allowlist. The unit test asserts that the module source contains no `'POST'|'PUT'|'PATCH'|'DELETE'` method strings and that a non-allowlisted path throws.
 - `local_key` is removed at listing parse. A test asserts it is absent from `device.tuya` and from the workspace JSON.
 - **Secrets.** `kv-airedale-prod` is in tenant `238e24db`, and the OOH pod's workload identity is in `002bfc30`, so a direct Key Vault read is not available. Recommended (Q3): Spencer adds `TUYA_CLIENT_ID` / `TUYA_CLIENT_SECRET` to the existing `ooh-dashboard-secrets` secret. Nothing goes in code, docs, logs or the manifest. A message to Spencer will be drafted for James to approve first; nothing will be sent without that.
-- Rate limits are shared with the Tuya Scheduler's cloud project. Expected load is about 2 listing calls per minute per open site, plus at most one schedule call per kitchen circuit every 5 minutes.
+- **Shared quota with the Tuya Scheduler.** Typical load is about 2 listing calls per minute per open site, plus at most one schedule call per kitchen circuit every 5 minutes. Incident storm: 20 sites open at once with 12 kitchen circuits each comes to about 40 listing calls per minute plus 240 schedule calls per 5 minutes, roughly 1.5 req/s. That is below the hard 5 req/s cap. The cap holds at any number of open sites, because extra requests are queued or dropped to the fallback, never sent. Any rate-limit response opens the breaker for 60 s (section 5.1).
+- **Token.** Shared by Tuya's design and verified (section 3). OOH only ever uses `grant_type=1`, never the refresh endpoint, so it cannot rotate the token the Scheduler holds.
+- **Replicas.** The deployment is pinned to 1 replica. If that ever changes, the per-process limiter becomes N × 5 req/s, and the build must then lower the per-process cap to keep the total at or below 5 req/s.
 
 ## 10. Out of scope
 
@@ -259,5 +265,6 @@ No Tuya failure can turn a workspace request into an error response, and none ch
 - **Cost:** no new LLM calls. One Tuya listing call per open site per 30 s and cached schedule calls. Up to 3 s extra on a workspace build only when Tuya is slow; normally about 0.5 s, run in parallel with ThingsBoard.
 - **Risk: false E.** An idle appliance (e.g. a bain-marie at temperature) can legitimately draw 0 W. E says "may have tripped", and its action (contact repairs) is the same as B, so a false E gives the agent the same advice. Accepted.
 - **Risk: snapshot drift.** `data/tuya-sites.json` can fall behind the Scheduler. A missing site degrades to the fallback, never to a wrong answer. The refresh procedure goes in the runbook.
+- **F2 wording and override latching.** The Tongou button holds until the next scheduled timer event (discovery SA2, confirmed). OWON is only assumed to behave the same. F2 therefore states the next scheduled change as a fact and makes no claim about when the override ends.
 - **Risk: write-capable key in the OOH pod.** Mitigated by the GET-only client (section 9). A read-only Tuya project key would be better, but none exists today.
 - **Rollout:** ships dark behind `TUYA_READ_ENABLED=false` in a minor release (v1.5.0). Production enable needs the secret (Q3) **and** James's explicit go. Rollback is setting the flag to false, with no redeploy of code.
