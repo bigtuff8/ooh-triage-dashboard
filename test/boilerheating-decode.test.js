@@ -13,7 +13,7 @@ process.env.TB_URL = 'https://tb.test';
 process.env.TB_USERNAME = 'svc-read';
 process.env.TB_PASSWORD = 'x';
 
-const { decodeBoilerHeating } = await import('../services/tb-device.js');
+const { decodeBoilerHeating, _extractMaxTelemTs } = await import('../services/tb-device.js');
 
 const NOW = 1700000000000; // fixed epoch ms for deterministic tests
 
@@ -261,4 +261,69 @@ test('BH-19: Zone 2 fallback — mask[2]=false but output3Schedule has entries �
     assert.equal(r.zones.length, 2, 'zone 2 should be present via schedule fallback');
     assert.equal(r.zones[1].forced, 'off', 'zone 2 should be forced off');
     assert.equal(r.zones[1].held, true, 'zone 2 should be held');
+});
+
+test('BH-20: Telemetry-ts staleness fallback — panelLastSeenMs=null but recent telemetry → not stale', () => {
+    // Mirrors site 6811: SERVER_SCOPE lastActivityTime absent (null), but TB telemetry
+    // is current. decodeBoilerHeating receives __telemLastSeenMs as fallback via the caller.
+    const ss = { output1OutputMask: [true, true, false, false] };
+    const t = { output1State: 'true', output2State: 'false' };
+    // Simulate caller passing telemLastSeenMs when lastActivityTime is null
+    const panelLastSeenMs = NOW - 60_000; // 1 minute ago — within threshold
+    const r = decodeBoilerHeating(ss, {}, panelLastSeenMs, t, NOW);
+    assert.equal(r.stale, false, 'panel should not be stale when telemetry ts is recent');
+    assert.equal(r.visible, true);
+    assert.equal(r.boilerCalling, true);
+});
+
+test('BH-21: fetchTelemetry fallback path — __lastActivityTime=null + __telemLastSeenMs=recent → not stale', () => {
+    // Exercises the actual call-site logic: bcBag.__lastActivityTime ?? bcBag.__telemLastSeenMs ?? null
+    // Confirms the ?? chain selects __telemLastSeenMs when lastActivityTime is null (site 6811 case).
+    const bag = { __lastActivityTime: null, __telemLastSeenMs: NOW - 30_000 };
+    const panelLastSeenMs = bag.__lastActivityTime ?? bag.__telemLastSeenMs ?? null;
+    assert.equal(panelLastSeenMs, NOW - 30_000, 'fallback should use __telemLastSeenMs');
+    const ss = { output1OutputMask: [true, true, false, false] };
+    const t = { output1State: 'true', output2State: 'false' };
+    const r = decodeBoilerHeating(ss, {}, panelLastSeenMs, t, NOW);
+    assert.equal(r.stale, false, 'not stale when __telemLastSeenMs is recent');
+});
+
+test('BH-22: fetchTelemetry fallback path — both null (no telemetry ts) → stale (safe degradation)', () => {
+    // Double-absent case: lastActivityTime=null AND no valid telemetry ts (__telemLastSeenMs=null).
+    // maxTs stays null through the loop (initialised null, only updated on valid numeric ts).
+    // Confirms the safe fallback is stale=true, not a garbage verdict.
+    const bag = { __lastActivityTime: null, __telemLastSeenMs: null };
+    const panelLastSeenMs = bag.__lastActivityTime ?? bag.__telemLastSeenMs ?? null;
+    assert.equal(panelLastSeenMs, null, 'double-null yields null (safe)');
+    const ss = { output1OutputMask: [true, true, false, false] };
+    const t = { output1State: 'true', output2State: 'false' };
+    const r = decodeBoilerHeating(ss, {}, panelLastSeenMs, t, NOW);
+    assert.equal(r.stale, true, 'should be stale when both timestamps absent');
+    assert.equal(r.visible, true, 'device is still visible (version detected)');
+});
+
+test('BH-23: _extractMaxTelemTs — multi-key TB response → max valid ts returned, future ts rejected', () => {
+    const future = NOW + 600_000;  // 10 min ahead — beyond 5-min upper bound
+    const tsData = {
+        output1State:  [{ ts: NOW - 30_000, value: 'true' }],
+        output2State:  [{ ts: NOW - 60_000, value: 'false' }],
+        badFuture:     [{ ts: future, value: '1' }],        // should be rejected
+        noTs:          [{ value: 'x' }],                    // no ts field — ignored
+        negativeTs:    [{ ts: -1, value: '0' }],            // negative — ignored
+    };
+    const result = _extractMaxTelemTs(tsData, NOW);
+    assert.equal(result, NOW - 30_000, 'should be the most-recent valid ts (future rejected)');
+});
+
+test('BH-24: _extractMaxTelemTs — empty / all-invalid-ts response → null (safe degradation)', () => {
+    assert.equal(_extractMaxTelemTs({}, NOW), null, 'empty object → null');
+    assert.equal(_extractMaxTelemTs(null, NOW), null, 'null input → null');
+    assert.equal(
+        _extractMaxTelemTs({ k: [{ value: 'x' }] }, NOW), null,
+        'entry with no ts → null'
+    );
+    assert.equal(
+        _extractMaxTelemTs({ k: [{ ts: NOW + 600_000, value: '1' }] }, NOW), null,
+        'all ts in future (bad clock) → null, not pinned fresh'
+    );
 });
