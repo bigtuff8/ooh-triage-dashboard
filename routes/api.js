@@ -687,6 +687,10 @@ if (config.dataMode !== 'live') {
         zendesk.resetSeededFixtureTickets();
         res.json({ ok: true });
     }));
+
+    // NOTE: the test-only /api/test/sites/:siteNo/holds/cancel-all endpoint is registered
+    // in server.js BEFORE requireAuth so that the unauthenticated Playwright request
+    // fixture can reach it. It is NOT registered here (auth guard would block it).
 }
 
 /* ---------------- admin (IoT role only) ---------------- */

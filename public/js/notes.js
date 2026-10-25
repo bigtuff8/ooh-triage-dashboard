@@ -39,7 +39,7 @@ function notesField({ id = 'addnotes', bind = null, value = '', helperText } = {
     const helper = helperText ||
         'For the ticket and the IoT helpdesk\'s morning review. Not sent in urgent P1 texts. Keep it factual, no personal details.';
     return `<div class="notes-group">
-  <div class="notes-label">\u{1F4DD} Anything the customer told you that isn\'t captured above, e.g. engineer due at 7am</div>
+  <label class="notes-label">\u{1F4DD} Anything the customer told you that isn\'t captured above, e.g. engineer due at 7am</label>
   <textarea
     id="${id}"
     data-testid="${id}"

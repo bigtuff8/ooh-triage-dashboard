@@ -25,31 +25,42 @@
 import { test, expect } from '@playwright/test';
 import { signIn, confirmSite } from './helpers.js';
 
+/** Fixture sites used by these tests — cancel any active holds before each test. */
+const FIXTURE_SITES = ['9010', '9011'];
+
 /**
- * OOHDASH-144: after clicking the Bar/Restaurant area chip, the hold intercept may appear
- * (if a prior test dispatched a boost that is still active). Dismiss it so the direction
- * chips become visible, then return the direction to click.
+ * Cancel all active boost holds for the given site via the test-only endpoint
+ * (POST /api/test/sites/:siteNo/holds/cancel-all). This marks active holds as
+ * 'test-cancelled' in Cosmos without dispatching to TB or requiring auth/confirm token.
+ * Ensures each BB-E test starts with a clean zone state regardless of prior dispatches.
+ */
+async function cancelActiveHolds(request, siteNo) {
+    await request.post(`/api/test/sites/${siteNo}/holds/cancel-all`).catch(() => {});
+}
+
+/**
+ * OOHDASH-144 §8.3: after clicking the Bar/Restaurant area chip, the hold intercept may
+ * appear. Dismiss it so the direction chips become visible.
  */
 async function reachDirectionStep(page) {
-    // Wait for either the hold intercept or the direction chips
     const holdCard = page.locator('[data-testid="reco-boost-hold"]');
     const needCold = page.locator('[data-testid="need-cold"]');
-    // Race: whichever appears first
     await Promise.race([
         holdCard.waitFor({ timeout: 8000 }),
         needCold.waitFor({ timeout: 8000 })
-    ]).catch(() => { /* timeout — proceed */ });
-
-    const holdVisible = await holdCard.isVisible().catch(() => false);
-    if (holdVisible) {
-        // Dismiss the hold intercept and wait for direction chips
+    ]).catch(() => {});
+    if (await holdCard.isVisible().catch(() => false)) {
         await page.locator('[data-testid="bp-hold-continue"]').click();
         await expect(needCold).toBeVisible({ timeout: 5000 });
     }
 }
 
 test.describe('OOHDASH-141 boiler boost e2e', () => {
-    test.beforeEach(async ({ page }) => {
+    test.beforeEach(async ({ page, request }) => {
+        // Cancel any active holds on fixture sites so each test starts with a clean zone state.
+        for (const site of FIXTURE_SITES) {
+            await cancelActiveHolds(request, site);
+        }
         await signIn(page, 'Test Handler');
     });
 
