@@ -1,6 +1,6 @@
 <!-- gate:contract
 SECTION: What we are building
-OOHDASH-144 design, revised 2026-10-25 to take in what the v1.5.3 release was trying to do. Four things for the pub heating boost shipped in OOHDASH-141. 1. An operator can end a boost early. 2. An operator can boost more than one pub zone in one go. 3. The heating answer cards match the buttons they show, so a card never says "we can't change it from here" next to a button that does. 4. The three cards that have been blank since v1.5.0 are fixed. Your discovery choices are built in: cancel appears in both places, and multi-zone ships in this ticket. Cancel uses the existing revert. It sets the zone back to automatic, exactly like a boost that ran out of time. No new kind of write to the panel, no schedule changes. A clickable mockup of every new and changed screen is attached.
+OOHDASH-144 design, revised 2026-10-25 to take in what the v1.5.3 release was trying to do. Four things for the pub heating boost shipped in OOHDASH-141. 1. An operator can end a boost early. 2. An operator can boost more than one pub zone in one go. 3. The heating answer cards match the buttons they show, so a card never says "we can't change it from here" next to a button that does. 4. The three cards that have been blank since v1.5.0 are fixed. 5. The operator's notes box, which appears on every flow, gets text the same size as everything around it and its own subtle, distinct panel. Your discovery choices are built in: cancel appears in both places, and multi-zone ships in this ticket. Cancel uses the existing revert. It sets the zone back to automatic, exactly like a boost that ran out of time. No new kind of write to the panel, no schedule changes. A clickable mockup of every new and changed screen is attached.
 
 SECTION: What changed since discovery: the v1.5.3 release
 v1.5.3 (released and rolled back on 2026-10-25) changed this same code. Its goals are now part of this ticket and are redone properly here; it does not ship separately. It did two things. First, it removed broken empty branches that have made three answer cards (summer mode, back-up cycle, already off) show a blank card with no buttons since v1.5.0. That was a real defect, and it is still live on v1.5.2 today. Second, it changed the too-hot card so it no longer says "we can't switch it off" when the Heat OFF button is showing. That was the right idea, but the edit used curly quote marks in the code, which stopped every triage flow loading. That is why it was rolled back. It also fixed only one of the four cards with this problem. The fix is needed and is kept in this design; the method is redone. Main still holds the broken v1.5.3 code, so the build starts from main and replaces it.
@@ -27,11 +27,14 @@ Today each zone has its own "Heat ON (zone 1)" button that fires straight away. 
 SECTION: Heating answer cards: one wording rule
 Each card now has two versions. The plain version is used when the button is not offered, and is your approved wording unchanged. The boost version is used when the button is offered: it says the operator can switch the heating on (or off) for a set time, that it goes back to its normal timetable afterwards, and that it is logged for the IoT team either way. It never promises the result before it happens; v1.5.3's "I'll do that now" is dropped, because the operator still has to pick the zone and how long. Headlines state the situation only (for example "Pub heating is on"), so they read correctly in the ticket too. Where a zone is under an OOH boost, the card says so ("Pub zone 1 is on a timed OOH boost until 21:30") and offers "Cancel early" instead of a button pushing the opposite way. The same words are used everywhere: heat ON for a set time is a "boost", heat OFF for a set time is a "hold", and every cancel button says "Cancel early". The three blank cards get your approved wording back, unchanged. Every new sentence is in the mockup for you to read.
 
+SECTION: Operator notes box: same size, clearly its own area
+Added to scope on 2026-10-25 at your request. The "Additional notes for the IoT team" box appears on every flow, on the ambiguous-site screen, on the Tonight query and after a ticket is made. Today its text and example text are 16px, larger than the 14px used everywhere else. That size was chosen in OOHDASH-119 to stop iPhones zooming in when you tap the box, but it was applied on every screen, not just phones. The box also looks like any other part of the page. The new design: text and example text at 14px like the rest of the page, kept at 16px on phone-width screens only so the no-zoom behaviour stays. The box sits in its own light panel: a pale grey-blue background, a thin border, and a soft violet stripe down the left edge, with a small 📝 label. When you click into it, the edge highlights the same way the search boxes do. It stays visually secondary: no bold colour, no extra size. The label, example text, helper line and the 1000-character counter are unchanged. The same style is used for the "Add a note to ticket" box after a ticket is made. The mockup shows it before and after.
+
 SECTION: Boost result card
 The result lists each zone separately, using what the panel reported back, not just what was picked. Confirmed: "Pub zone 1: heat ON until 21:30." Sent but not yet confirmed: "Pub zone 2: sent, the panel has not confirmed yet. It will still switch back at 21:30." Could not reach the panel: "Pub zone 2: could not reach the panel, NOT boosted." That last case adds a "Capture for the IoT team" button. After any boost the site page refreshes, so the cancel banner shows straight away. If the operator picked the wrong zone, they can undo it at once.
 
 SECTION: Tests the build must add
-Server: a cancel works for a running hold; a hold from another site gets a not-found; a hold that has ended gets a not-found; a non-boiler hold gets a not-found; an unconfirmed site is refused; each panel outcome gives the right result; and the workspace lists only running boiler holds for that site. Browser (Playwright): banner shows and cancel works; the second-tap confirm; the stale hold refresh; the hold card at the start of the questions; the zone picker with one zone, two zones and All zones; Continue greyed out with nothing picked; and a two-zone result where one zone fails. The existing BB-E1 to BB-E7 tests are updated for the new single entry button. New card tests: all nine heating cards render a headline and buttons (this guards against the blank-card bug coming back); the plain and boost versions of the four changed cards; and the OOH-hold versions. A syntax check of every browser script runs in the unit tests, so a typo like v1.5.3's fails at once.
+Server: a cancel works for a running hold; a hold from another site gets a not-found; a hold that has ended gets a not-found; a non-boiler hold gets a not-found; an unconfirmed site is refused; each panel outcome gives the right result; and the workspace lists only running boiler holds for that site. Browser (Playwright): banner shows and cancel works; the second-tap confirm; the stale hold refresh; the hold card at the start of the questions; the zone picker with one zone, two zones and All zones; Continue greyed out with nothing picked; and a two-zone result where one zone fails. The existing BB-E1 to BB-E7 tests are updated for the new single entry button. New card tests: all nine heating cards render a headline and buttons (this guards against the blank-card bug coming back); the plain and boost versions of the four changed cards; and the OOH-hold versions. A syntax check of every browser script runs in the unit tests, so a typo like v1.5.3's fails at once. Notes box tests: text is the same size as the page on desktop and stays 16px on phones; the panel and focus highlight are present.
 
 SECTION: What does not change
 No schedule or optimum-start keys are written. Cancel only ever sets a zone to automatic (0). The boiler output and output1Override are never written. The kill-switch exemption for reverts applies to cancel unchanged. The backend already accepts several zones in one boost, so no new write path is added. Nothing is released or switched on in production without your go.
@@ -65,6 +68,7 @@ Five changes, all on top of the OOHDASH-141 boost machinery:
 | E | `public/js/flows.js` | hold-active intercept, single boost entry, `bp-zones` step, per-zone result card |
 | F | `public/js/flows.js` `bpOutcomeCard` | absorbs v1.5.3: replaces the broken W8 block, keeps the W4/W7/W9 branch fix, adds boost-aware and OOH-hold-aware wording for W3/W5/W6/W8 (§7.5–7.7) |
 | G | `test/browser-js-syntax.test.js` (new) | every `public/js/*.js` must compile (guards against a repeat of v1.5.3) |
+| H | `public/js/notes.js` + `public/css/styles.css` | notes box: inline styles move to classes; 14px text (16px on phones); distinct secondary panel (§7.9) |
 
 No change to `services/control.js` `dispatchBoilerBoost()` (already takes `zones: [...]`), `tb-client.js`, `registry.js`, `boost-window.js`, or config/flags.
 
@@ -80,6 +84,8 @@ No change to `services/control.js` `dispatchBoilerBoost()` (already takes `zones
 7. **Approved wording predates boost.** The W1–W9 wording was approved on 2026-10-23 (OOHDASH-139 D1). OOHDASH-141 added Heat ON/OFF buttons to W3, W5, W6 and W8 on 2026-10-24 without changing the words. So each of those cards says "can't change it from here" next to a button that can. v1.5.3 fixed W8 only, and its new script ("I'll do that now") promises a result before the operator has picked zone or duration.
 8. **Cards misattribute OOH's own holds.** `boilerHeatingOutcome()` sees an OOH OFF hold as `forced:'off'`, so a cold call returns W5: "deliberately switched off at the boiler panel", with Heat ON offered on top. An OOH ON boost shows the forced-on sentence "switched on at the panel". If the operator passes the intercept (§7.1), the card blames the panel or an engineer for OOH's action. It also offers a button that stacks an opposite override instead of cancelling the existing one.
 9. **Captures copy the operator instructions into the ticket.** `bp-esc` / `bp-advice` call `bpOutcomeCard(wcode, heating, nowMs)` without `boostAvailable` and send `card.operatorText` as the capture detail. That text is written to the operator ("Log it for the IoT team…"), not for the ticket.
+
+10. **Per-zone dispatch return shape (verified; answers the design-panel block of 2026-10-25).** `dispatchBoilerBoost()` already loops zones and returns per-zone results, so no `control.js` change is needed. Each zone pushes `{ zone, outcome, dispatchError, panelVersion }` to `zoneOutcomes` (`services/control.js:693`), where `outcome` is `CONFIRMED`, `IN-FLIGHT-TIMEOUT` or `NON-DELIVERY`. Each zone whose hold persists pushes `{ zone, overrideId }` to `overrideIds` (`control.js:725`). The returned action carries `zones: zoneOutcomes` (`control.js:780`), `clamped` (`:785`), `revertAtMs` (`:786`) and `overrideIds` (`:788`). One `revertAtMs` applies to all zones, because one clamp is computed per request. Guardrail validation runs for every zone before any write (`control.js` zone-validation loop), so a bad zone rejects the whole request rather than leaving half of it done.
 
 ## 3. Workspace extension: `activeBoostHolds`
 
@@ -101,7 +107,7 @@ Payload field: `activeBoostHolds: Array<Hold> | null`. `null` means the read fai
 | `createdBy` | string or null | operator name |
 | `ending` | bool | true when a cancel or revert retry is already in flight: show "Returning to timetable…", no Cancel button |
 
-`status:'reverting'` (lease held mid-revert) and `revert-failed` are not listed. Those are IoT-team matters already alerted and noted on the ticket. (`holdLabel`, `createdBy` and `siteNo` are the persisted names, verified in `scheduleOverride()`.)
+`status:'reverting'` (lease held mid-revert) and `revert-failed` are not listed. During the up-to-12-hour retry window a hold that did not confirm stays `active` with `revertAttempts > 0`, so it remains in the banner as "ending" (no Cancel button). It drops off only once it is finally marked `revert-failed`, at which point the IoT alert, the ticket note and the Admin overrides table carry it (design-panel advisory: accepted as is). Those are IoT-team matters already alerted and noted on the ticket. (`holdLabel`, `createdBy` and `siteNo` are the persisted names, verified in `scheduleOverride()`.)
 
 ## 4. Cancel route
 
@@ -208,6 +214,7 @@ It replaces the per-zone buttons with one button. `Boost heat ON` (`data-testid=
   - Toggle chips `Pub zone 1` (`bp-zone-CHZ1`), `Pub zone 2` (`bp-zone-CHZ2`) with `aria-pressed` and the `sel` class when picked; `All zones / not sure` (`bp-zone-all`) selects every candidate. Tapping a picked zone un-picks it.
   - `Continue` (`bp-zones-continue`) is `disabled` while `selectedZones` is empty → `flowStep({need:'bp-boost'})`. `Back` → `flowStep({need: f.data.bpCallDir})`.
 - Helpers on the page: `toggleZone(id)` and `selectAllZones(ids)`. Each mutates `state.flow.data.selectedZones` and calls `render()`. There are no API calls.
+- Nothing is pre-selected in either direction; `All zones / not sure` is a deliberate tap, never a default (design-panel advisory on Decision 2).
 - `All zones` applies to OFF as well, subject to Decision 2. If James picks "Heat ON only", the `bp-zone-all` chip is omitted when `direction === 'off'`.
 
 ### 7.4 Duration + send (`bp-boost`, `bp-boost-send`)
@@ -265,6 +272,24 @@ The cancel result shows inline on the card using the §6 wording. Hold facts com
 
 `bp-esc` and `bp-advice` now call `bpOutcomeCard(wcode, heating, nowMs, ws.boostAvailable, holds)`, so the subject matches what the operator saw. The capture `detail` changes from `card.operatorText` to `card.ticketText`. The ticket gets each card's existing plain, operator-neutral state sentence, not instructions written to the operator. The capture subject is the situation-only headline.
 
+### 7.9 Operator notes box (FLOW-BOX and POST-LINK)
+
+Today `notesField()` (`public/js/notes.js:41-58`) and the post-submit box (`notes.js:168-200`) use inline styles: the textarea is `font-size:16px` (OOHDASH-119 design §mobile: "16px to stop iOS zooming on focus", applied at all widths), with a 1px plain border and no container styling. It also references an undefined `--text-muted` token. Body text is 14px (`styles.css:18`), `.small` is 12.5px, and the other inputs (`.issueinput`, `.formrow`) use 14–15px with a 1.5px border and a violet focus ring.
+
+New classes in `styles.css`; all inline styles in `notes.js` are replaced by them:
+
+| Element | Style |
+|---|---|
+| `.notes-group` (container) | `background: var(--surface-variant)`; `border: 1px solid var(--border)`; `border-left: 3px solid var(--notes-accent)`; `border-radius: var(--radius-md)`; `padding: 10px 12px`; `margin-top: 12px`. New token `--notes-accent: #C7D2FE` (pale violet from the primary family) |
+| `.notes-label` | text unchanged, prefixed with 📝; 12.5px, weight 600, `color: var(--text-secondary)` |
+| `.notes-input` (textarea) | `font-size: 14px; line-height: 22px` (same as body); `padding: 8px 10px`; `border: 1.5px solid var(--border)`; `border-radius: var(--radius-sm)`; `background: var(--surface)`; `resize: vertical` |
+| `.notes-input::placeholder` | `color: var(--text-disabled)`; inherits 14px |
+| `.notes-input:focus` | `border-color: var(--primary); box-shadow: 0 0 0 3px var(--primary-light); outline: none` (same as `.issueinput:focus`) |
+| helper + counter | existing `.small`; `--text-muted` replaced by `--text-secondary` |
+| phone (`@media (max-width: 700px)`) | `.notes-input { font-size: 16px }`. This keeps the OOHDASH-119 iOS no-zoom behaviour and its test E13 |
+
+Unchanged: label text, placeholder text, helper text, `maxlength`/counter logic, autosave, focus-restore (`app.js:133`), position (below the step choices, above `.flowfoot`) and the `addnotes-echo` line. The notes box keeps lower visual weight than the step question and outcome card: there is no bold colour and no shadow, and the stripe is the pale violet, not `--primary`.
+
 ### 7.8 Wording glossary (applies to every new and changed string)
 
 | Term | Use | Never |
@@ -296,6 +321,9 @@ Apostrophes inside UI text stay typographic (’), matching the approved 139 wor
 | BHC-9 | handler-role operator can cancel (or 403 if Decision 1 = IoT only) |
 | BHC-10 | `addBoostRevertNote` prefixes "Cancelled early by …" when `cancelRequestedBy` set; unchanged otherwise |
 | BHC-11 | `revertOutcome` written on every `revertBoiler` branch (extends `boiler-overrides.test.js`) |
+| NB-1 | notes textarea computed font-size equals body font-size (14px) at 1280px width, and is at least 16px at 390px (keeps OOHDASH-119 E13) |
+| NB-2 | `.notes-group` has a left border colour of `--notes-accent` and a background of `--surface-variant`; textarea focus shows the primary ring |
+| NB-3 | `notes.js` contains no inline `font-size:16px` and no `--text-muted` reference |
 | SYN-1 | new `test/browser-js-syntax.test.js`: each `public/js/*.js` compiles with `new vm.Script(source)`, and no curly quote sits in a JS delimiter position (e.g. `=== ‘`, `(‘`, `‘)`) |
 
 **Playwright** (`tests/boiler-boost.spec.js`; fixture sites 9010 V2 / 9011 V1; seed holds through the existing test-only routes or fixture store):

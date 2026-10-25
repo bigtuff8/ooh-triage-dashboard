@@ -196,10 +196,19 @@ table.tbl tr.rowoff td{background:var(--danger-light)}
 .zrow{padding:6px 0;border-bottom:1px solid var(--border)}
 .zrow:last-child{border-bottom:0}
 button[disabled]{opacity:.45;cursor:not-allowed}
-@media (max-width:700px){.wsgrid{grid-template-columns:1fr!important}}
+:root{--notes-accent:#C7D2FE}
+.notes-group{background:var(--surface-variant);border:1px solid var(--border);border-left:3px solid var(--notes-accent);border-radius:var(--radius-md);padding:10px 12px;margin-top:12px}
+.notes-label{display:block;font-size:12.5px;font-weight:600;color:var(--text-secondary);margin-bottom:6px}
+.notes-input{width:100%;box-sizing:border-box;font-size:14px;line-height:22px;padding:8px 10px;border:1.5px solid var(--border);border-radius:var(--radius-sm);background:var(--surface);resize:vertical;outline:none}
+.notes-input::placeholder{color:var(--text-disabled)}
+.notes-input:focus{border-color:var(--primary);box-shadow:0 0 0 3px var(--primary-light)}
+.notes-meta{display:flex;justify-content:space-between;align-items:center;margin-top:4px}
+.mk-cmp{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.mk-cmp h4{margin:0 0 6px;font-size:13px;color:var(--text-secondary)}
+@media (max-width:700px){.wsgrid{grid-template-columns:1fr!important}.notes-input{font-size:16px}.mk-cmp{grid-template-columns:1fr}}
 </style>
 <div class="mk-wrap">
- <h2 style="margin:0 0 4px">OOHDASH-144 mockup: cancel a running boost, pick zones, consistent heating cards</h2>
+ <h2 style="margin:0 0 4px">OOHDASH-144 mockup: cancel a running boost, pick zones, consistent heating cards, notes box</h2>
  <p class="mk-note">Clickable mockup using the live app's styles. Site: <b>Black Bull, Corbridge (7639)</b>, V2 panel, two pub zones. Pick a scenario, then click through. Nothing here talks to a server.</p>
  <div class="mk-nav" id="nav"></div>
  <div class="wsgrid" style="display:grid;grid-template-columns:2fr 1fr;gap:14px">
@@ -228,8 +237,26 @@ var SCEN = [
  ['stale','6. Cancel: already ended'],
  ['pending','7. Cancel: panel not confirmed yet'],
  ['superseded','8. Cancel: someone else changed it'],
- ['cards','9. Heating answer cards (wording)']
+ ['cards','9. Heating answer cards (wording)'],
+ ['notes','10. Notes box: before and after']
 ];
+var NOTE_PH='Anything the caller or site told you that isn’t captured above, e.g. engineer due at 7am';
+var NOTE_HELP='For the ticket and the IoT team’s morning review. Not sent in urgent P1 texts. Keep it factual, no personal details.';
+function notesNew(){
+ return '<div class="notes-group" data-testid="addnotes-group"><label class="notes-label" for="mk-notes">📝 Additional notes for the IoT team (optional)</label>'+
+ '<textarea id="mk-notes" class="notes-input" rows="2" maxlength="1000" placeholder="'+NOTE_PH+'" oninput="document.getElementById(\'mk-cnt\').textContent=this.value.length+\' / 1000\'"></textarea>'+
+ '<div class="notes-meta"><span class="small">'+NOTE_HELP+'</span><span class="small" id="mk-cnt" style="white-space:nowrap;margin-left:8px">0 / 1000</span></div></div>';
+}
+function notesOld(){
+ return '<div style="margin-top:10px"><label style="display:block;font-size:0.85em;font-weight:600;margin-bottom:4px">Additional notes for the IoT team (optional)</label>'+
+ '<textarea rows="2" style="width:100%;box-sizing:border-box;font-size:16px;padding:6px 8px;border:1px solid var(--border,#ccc);border-radius:6px;resize:vertical" placeholder="'+NOTE_PH+'"></textarea>'+
+ '<div style="display:flex;justify-content:space-between;align-items:center;margin-top:3px"><span class="small" style="color:#666">'+NOTE_HELP+'</span><span class="small" style="white-space:nowrap;margin-left:8px;color:#666">0 / 1000</span></div></div>';
+}
+function notesCompare(){
+ var step='<div class="stepq">What does the caller need?</div><div class="chips"><button class="chip">Too cold / not working</button><button class="chip">Too hot / wants it off</button></div>';
+ return '<p class="mk-note">Same flow step, notes box as it is today (left) and as designed (right). Click into each box to see the focus state. On a phone-width screen the new box keeps 16px text so iPhones do not zoom.</p>'+
+ '<div class="mk-cmp"><div><h4>Today</h4><div class="mk-flow">'+step+notesOld()+'</div></div><div><h4>New</h4><div class="mk-flow">'+step+notesNew()+'</div></div></div>';
+}
 var CARDS = [
  ['W3','Too cold: part of the pub off'],['W5','Too cold: switched off on purpose'],['W6','Too cold: off on its timetable'],['W8','Too hot: heating on'],
  ['W5H','Too cold: OOH hold running'],['W8B','Too hot: OOH boost running'],['W4','Summer mode (was blank)'],['W7','Back-up cycle (was blank)'],['W9','Too hot: already off (was blank)']
@@ -286,6 +313,7 @@ function reset(k){
  if (k==='banner'){S.holds.push({id:'h2',zone:'CHZ2',dir:'off',until:'07:00',by:'Tony'});S.step='idle';}
  if (k==='stale'||k==='pending'||k==='superseded'){S.step='idle';}
  if(k==='cards'){S.holds=[];S.step='cards';}
+ if(k==='notes'){S.holds=[];S.step='notes';}
  render();
 }
 function zl(z){return 'Pub zone '+(z==='CHZ1'?'1':'2');}
@@ -326,6 +354,7 @@ function banner(){
 function flow(){
  var s=S.step;
  if(s==='cards') return cardsView();
+ if(s==='notes') return notesCompare();
  if(s==='idle') return '<h3 style="margin-top:0">What is the caller reporting?</h3><p class="small">(Normal site page. The banner above is visible before any question is asked.)</p><button class="btn primary" onclick="S.step=\'stage1\';render()">Start heating questions →</button>';
  if(s==='stage1'){
   if(S.holds.length && !S.holdAck){
@@ -382,7 +411,8 @@ function toggleZone(z){var i=S.sel.indexOf(z);if(i>=0)S.sel.splice(i,1);else S.s
 function render(){
  document.getElementById('nav').innerHTML=SCEN.map(function(x){return '<button class="'+(S.scen===x[0]?'on':'')+'" onclick="reset(\''+x[0]+'\')">'+x[1]+'</button>'}).join('');
  document.getElementById('banner').innerHTML=banner();
- document.getElementById('flow').innerHTML=flow();
+ var fh=flow(); var showNotes=['idle','notes','sending'].indexOf(S.step)<0;
+ document.getElementById('flow').innerHTML=fh+(showNotes?notesNew():'');
 }
 reset('banner');
 </script>
