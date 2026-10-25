@@ -1,0 +1,339 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>OOHDASH-144 mockup</title>
+<style>
+/* OOH Dashboard — design-spec §1 (Airedale IoT family palette, Ant Design patterns) */
+:root{
+  --primary:#594AE2;--primary-dark:#4338CA;--primary-light:#EEF2FF;
+  --success:#10B981;--success-light:#D1FAE5;
+  --warning:#F59E0B;--warning-light:#FEF3C7;
+  --danger:#EF4444;--danger-light:#FEE2E2;
+  --info:#3B82F6;--info-light:#DBEAFE;
+  --surface:#FFFFFF;--surface-variant:#F8FAFC;--background:#F1F5F9;
+  --sidebar-bg:#1E293B;--sidebar-text:#94A3B8;--sidebar-active:#334155;
+  --text-primary:#1E293B;--text-secondary:#64748B;--text-disabled:#94A3B8;
+  --border:#E2E8F0;
+  --urgency-critical:#DC2626;--urgency-critical-bg:#FEF2F2;
+  --radius-sm:6px;--radius-md:8px;--radius-lg:12px;
+  --shadow-sm:0 1px 2px rgba(0,0,0,.05);--shadow-md:0 4px 6px -1px rgba(0,0,0,.1);--shadow-lg:0 10px 15px -3px rgba(0,0,0,.1);
+  --mono:ui-monospace,Consolas,'Cascadia Mono',monospace;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:Inter,system-ui,-apple-system,'Segoe UI',sans-serif;font-size:14px;line-height:22px;color:var(--text-primary);background:var(--background)}
+button{font:inherit;cursor:pointer}
+input,select,textarea{font:inherit}
+.mono{font-family:var(--mono);font-size:12.5px;font-weight:500}
+#app{display:flex;min-height:100vh}
+.sidebar{width:240px;background:var(--sidebar-bg);color:var(--sidebar-text);display:flex;flex-direction:column;position:fixed;top:0;bottom:0;left:0;z-index:20}
+.sidebar .brand{padding:20px 20px 16px;color:#fff;font-weight:700;font-size:16px;letter-spacing:.2px;border-bottom:1px solid #33415555}
+.sidebar .brand small{display:block;font-weight:400;font-size:11.5px;color:var(--sidebar-text);margin-top:2px}
+.nav{padding:12px 8px;flex:1}
+.nav button{display:flex;align-items:center;gap:10px;width:100%;text-align:left;background:none;border:0;color:var(--sidebar-text);padding:10px 12px;border-radius:var(--radius-md);font-size:14px;margin-bottom:2px}
+.nav button:hover{background:var(--sidebar-active);color:#fff}
+.nav button.active{background:var(--sidebar-active);color:#fff;font-weight:600}
+.sidebar .foot{padding:14px 16px;border-top:1px solid #33415555;font-size:12.5px}
+.opchip{display:flex;align-items:center;gap:10px;margin-bottom:10px}
+.opchip .avatar{width:32px;height:32px;border-radius:50%;background:var(--primary);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:600;font-size:13px}
+.opchip .nm{color:#fff;font-weight:600;line-height:16px}
+.opchip .rl{font-size:11.5px;line-height:14px}
+.main{margin-left:240px;flex:1;display:flex;flex-direction:column;min-width:0}
+.topbar{height:52px;background:var(--surface);border-bottom:1px solid var(--border);display:flex;align-items:center;gap:16px;padding:0 24px;position:sticky;top:0;z-index:10}
+.topbar .ctx{font-weight:600}
+.topbar .ver{margin-left:auto;color:var(--text-disabled);font-size:12px}
+.banner{padding:8px 24px;font-size:13.5px;font-weight:500;display:flex;align-items:center;gap:10px}
+.banner.kill{background:var(--danger-light);color:#991B1B;border-bottom:1px solid #FECACA}
+/* R8/S10: control-is-live signal — an ENABLED state (green), deliberately distinct from the red .kill block. */
+.banner.live{background:var(--success-light);color:#065F46;border-bottom:1px solid #A7F3D0}
+.banner.notice{background:var(--info-light);color:#1E40AF;border-bottom:1px solid #BFDBFE}
+.content{padding:18px 24px;max-width:1240px;width:100%;margin:0 auto}
+.content.narrow{max-width:760px}
+.card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-md);box-shadow:var(--shadow-sm);padding:18px;margin-bottom:12px}
+.card.tight{padding:12px 14px;margin-bottom:10px}
+.card h2{font-size:18px;line-height:26px;font-weight:600;margin-bottom:4px}
+.card h3{font-size:14.5px;line-height:20px;font-weight:600;margin-bottom:6px}
+.sub{color:var(--text-secondary);font-size:13px}
+.small{font-size:12.5px;line-height:17px;color:var(--text-secondary)}
+.btn{border:1px solid var(--border);background:var(--surface);color:var(--text-primary);border-radius:var(--radius-md);padding:8px 16px;font-weight:500;font-size:14px}
+.btn:hover{border-color:var(--primary);color:var(--primary)}
+.btn.primary{background:var(--primary);border-color:var(--primary);color:#fff}
+.btn.primary:hover{background:var(--primary-dark);color:#fff}
+.btn.big{padding:12px 22px;font-size:15px}
+.btn.link{border:none;background:none;color:var(--primary);padding:4px 6px}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+.tag{display:inline-flex;align-items:center;gap:5px;font-size:11.5px;font-weight:600;border-radius:var(--radius-sm);padding:1px 7px;line-height:17px;white-space:nowrap}
+.tag.green{background:var(--success-light);color:#065F46}
+.tag.amber{background:var(--warning-light);color:#92400E}
+.tag.red{background:var(--danger-light);color:#991B1B}
+.tag.blue{background:var(--info-light);color:#1E40AF}
+.tag.grey{background:#F1F5F9;color:var(--text-secondary)}
+.tag.violet{background:var(--primary-light);color:var(--primary-dark)}
+.dot{width:7px;height:7px;border-radius:50%;display:inline-block}
+.alert{border-radius:var(--radius-md);padding:11px 14px;font-size:13.5px;margin:10px 0;line-height:20px}
+.alert.warn{background:var(--warning-light);color:#92400E}
+.alert.err{background:var(--danger-light);color:#991B1B}
+.alert.info{background:var(--info-light);color:#1E40AF}
+.alert.ok{background:var(--success-light);color:#065F46}
+table.tbl{width:100%;border-collapse:collapse;font-size:13px}
+table.tbl th{text-align:left;color:var(--text-secondary);font-size:11px;text-transform:uppercase;letter-spacing:.4px;font-weight:600;padding:5px 8px;border-bottom:1px solid var(--border)}
+table.tbl td{padding:6px 8px;border-bottom:1px solid var(--surface-variant);vertical-align:middle}
+table.tbl tr:last-child td{border-bottom:none}
+table.tbl tr.rowoff td{background:var(--danger-light)}
+.searchwrap{position:relative}
+.searchwrap input{width:100%;height:46px;border:1.5px solid var(--border);border-radius:var(--radius-md);padding:0 16px;font-size:15px;outline:none}
+.searchwrap input:focus{border-color:var(--primary);box-shadow:0 0 0 3px var(--primary-light)}
+.sresults{position:absolute;top:50px;left:0;right:0;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-md);box-shadow:var(--shadow-lg);z-index:15;overflow:hidden}
+.sresults .ri{display:flex;align-items:center;gap:12px;padding:10px 14px;cursor:pointer;border-bottom:1px solid var(--surface-variant)}
+.sresults .ri:hover,.sresults .ri.sel{background:var(--primary-light)}
+.sresults .empty{padding:14px;color:var(--text-secondary);font-size:13.5px}
+.tiles{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}
+.tile{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-md);padding:10px 12px;cursor:pointer;transition:all .15s ease-out}
+.tile:hover{border-color:var(--primary);box-shadow:var(--shadow-md)}
+.tile .tt{font-weight:600;font-size:13.5px;line-height:18px}
+.tile .td{font-size:11.5px;color:var(--text-secondary);line-height:15px;margin-top:2px}
+.issueinput{width:100%;height:44px;border:1.5px solid var(--border);border-radius:var(--radius-md);padding:0 14px;font-size:14.5px;outline:none;margin-bottom:10px}
+.issueinput:focus{border-color:var(--primary);box-shadow:0 0 0 3px var(--primary-light)}
+.sugg{margin:-2px 0 10px;display:flex;gap:8px;flex-wrap:wrap;align-items:center;font-size:13px;color:var(--text-secondary)}
+.wsgrid{display:grid;grid-template-columns:minmax(0,7fr) minmax(0,5fr);gap:12px;align-items:start}
+@media(max-width:1100px){.wsgrid{grid-template-columns:minmax(0,1fr)}.tiles{grid-template-columns:repeat(2,1fr)}}
+.flowpanel{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);box-shadow:var(--shadow-md);overflow:hidden}
+.flowhead{padding:12px 18px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px;background:var(--surface-variant)}
+.flowbody{padding:18px}
+.flowfoot{padding:8px 18px;border-top:1px solid var(--border);display:flex;align-items:center;gap:12px;font-size:12px;color:var(--text-secondary)}
+.stepdone{display:flex;gap:8px;align-items:center;color:var(--text-secondary);font-size:13px;padding:5px 0;border-bottom:1px dashed var(--surface-variant)}
+.stepdone .tick{color:var(--success);font-weight:700}
+.stepq{font-size:15px;font-weight:600;margin:14px 0 10px}
+.chips{display:flex;flex-wrap:wrap;gap:8px}
+.chip{border:1.5px solid var(--border);background:var(--surface);border-radius:var(--radius-md);padding:9px 16px;font-size:14px;font-weight:500;cursor:pointer;min-height:40px}
+.chip:hover{border-color:var(--primary);color:var(--primary)}
+.chip.sel{border-color:var(--primary);background:var(--primary-light);color:var(--primary-dark);font-weight:600}
+.chip.p1{border-color:var(--danger);color:#991B1B;background:var(--surface);font-weight:600}
+.chip.p1:hover{background:var(--danger-light);border-color:var(--danger);color:#991B1B}
+.chip:disabled,.chip:disabled:hover{opacity:.5;cursor:not-allowed;border-color:var(--border);color:inherit;background:var(--surface)}
+.p1-explainer{font-size:13px;line-height:19px;color:var(--text-secondary);border-left:3px solid var(--danger);padding:6px 12px;margin:12px 0 4px}
+.p1-explainer p{margin:0 0 4px}
+.p1-blocked-note{color:#991B1B;margin:4px 0 8px}
+.zoneread{border:1px solid var(--border);border-radius:var(--radius-md);padding:10px 14px;margin:8px 0;display:flex;align-items:center;gap:14px;flex-wrap:wrap}
+.zoneread .t{font-size:20px;font-weight:700}
+.script{background:var(--surface-variant);border-left:3px solid var(--primary);border-radius:0 var(--radius-md) var(--radius-md) 0;padding:11px 14px;font-size:14px;font-style:italic;margin:10px 0;line-height:21px}
+.reco{border:1.5px solid var(--border);border-radius:var(--radius-lg);padding:16px;margin:12px 0;background:var(--surface-variant)}
+.reco b.hd{display:block;font-size:15px;margin-bottom:6px}
+.outcome{border-radius:var(--radius-lg);padding:16px;margin-top:14px}
+.outcome.applied{background:var(--success-light)}
+.outcome.captured{background:var(--info-light)}
+.outcome.p1{background:var(--urgency-critical-bg);border:1px solid #FECACA}
+.outcome.scope{background:#F1F5F9}
+.outcome.noaction{background:#F1F5F9;border:1px dashed var(--border)}
+.outcome h3{margin-bottom:6px;font-size:15px}
+.outbtns{display:flex;gap:10px;margin-top:12px;flex-wrap:wrap}
+.callsofar{background:var(--surface-variant);border-radius:var(--radius-md);padding:8px 12px;margin-bottom:10px;font-size:13px}
+.overlay{position:fixed;inset:0;background:rgba(15,23,42,.45);z-index:40;display:flex;align-items:center;justify-content:center;padding:20px}
+.modal{background:var(--surface);border-radius:var(--radius-lg);box-shadow:var(--shadow-lg);width:520px;max-width:100%;max-height:92vh;overflow:auto}
+.modal .mh{padding:16px 20px;border-bottom:1px solid var(--border);font-weight:600;font-size:16px;display:flex;justify-content:space-between;align-items:center}
+.modal .mb{padding:20px}
+.modal .mf{padding:14px 20px;border-top:1px solid var(--border);display:flex;justify-content:flex-end;gap:10px}
+.target{background:var(--surface-variant);border:1px solid var(--border);border-radius:var(--radius-md);padding:10px 14px;margin-bottom:16px;font-size:13.5px}
+/* B0/R0 · C9 — site identity is the most prominent element of the confirm target */
+.target-identity .target-name,.target .target-name{font-size:22px;font-weight:700;line-height:1.2;display:block}
+.target-tech{font-size:12.5px;color:var(--text-disabled);margin-top:4px}
+.target-identity.unverified .target-name{font-size:15px;font-weight:600}
+.muted{color:var(--text-disabled)}
+.stepper{display:flex;align-items:center;gap:14px;justify-content:center;margin:14px 0 6px}
+.stepper button{width:48px;height:48px;border-radius:var(--radius-md);border:1.5px solid var(--border);background:var(--surface);font-size:22px;font-weight:700;color:var(--primary)}
+.stepper button:hover{border-color:var(--primary)}
+.stepper button:disabled{color:var(--text-disabled)}
+.stepper .val{font-size:34px;font-weight:700;min-width:110px;text-align:center}
+.guard{text-align:center;font-size:12.5px;color:var(--text-secondary)}
+.syncsteps{display:flex;align-items:center;gap:8px;margin:16px 0}
+.ss{flex:1;text-align:center;padding:10px 6px;border-radius:var(--radius-md);background:var(--surface-variant);font-size:12.5px;font-weight:600;color:var(--text-disabled)}
+.ss.on{background:var(--primary-light);color:var(--primary-dark)}
+.ss.ok{background:var(--success-light);color:#065F46}
+.ss.bad{background:var(--danger-light);color:#991B1B}
+.ss.wait{animation:pulse 1.2s ease-in-out infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.55}}
+.drawer{position:fixed;top:0;right:0;bottom:0;width:480px;max-width:95vw;background:var(--surface);box-shadow:var(--shadow-lg);z-index:45;display:flex;flex-direction:column}
+.drawer .dh{padding:16px 20px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;font-weight:600}
+.drawer .db{padding:20px;overflow:auto;flex:1}
+.timeline{border-left:2px solid var(--border);margin-left:6px;padding-left:16px}
+.tlitem{position:relative;padding-bottom:14px}
+.tlitem:before{content:'';position:absolute;left:-21px;top:5px;width:8px;height:8px;border-radius:50%;background:var(--primary)}
+.tlitem .tw{font-size:11.5px;color:var(--text-disabled)}
+#toasts{position:fixed;top:16px;right:16px;z-index:60;display:flex;flex-direction:column;gap:8px}
+.toast{background:var(--surface);border:1px solid var(--border);border-left:4px solid var(--success);border-radius:var(--radius-md);box-shadow:var(--shadow-lg);padding:12px 16px;font-size:13.5px;min-width:280px;animation:slidein .2s ease-out}
+@keyframes slidein{from{transform:translateX(30px);opacity:0}to{transform:none;opacity:1}}
+.tabs{display:flex;gap:4px;border-bottom:1px solid var(--border);margin-bottom:14px}
+.tabs button{border:none;background:none;padding:9px 14px;font-size:14px;font-weight:500;color:var(--text-secondary);border-bottom:2px solid transparent}
+.tabs button.on{color:var(--primary);border-bottom-color:var(--primary);font-weight:600}
+.tabs .cnt{background:var(--surface-variant);border-radius:9px;padding:0 6px;font-size:11.5px;margin-left:5px}
+.sw{position:relative;width:40px;height:22px;border-radius:11px;background:#CBD5E1;border:none;transition:background .15s}
+.sw.on{background:var(--success)}
+.sw.off{background:var(--danger)}
+.sw:after{content:'';position:absolute;top:2px;left:2px;width:18px;height:18px;border-radius:50%;background:#fff;transition:left .15s}
+.sw.on:after{left:20px}
+.formrow{margin-bottom:12px}
+.formrow label{display:block;font-size:12.5px;font-weight:600;margin-bottom:4px;color:var(--text-secondary)}
+.formrow input,.formrow textarea,.formrow select{width:100%;border:1.5px solid var(--border);border-radius:var(--radius-sm);padding:8px 10px;outline:none}
+.formrow input:focus,.formrow textarea:focus{border-color:var(--primary)}
+.scopelist li{list-style:none;display:flex;justify-content:space-between;align-items:center;padding:4px 0;border-bottom:1px solid var(--surface-variant);font-size:13px}
+@media(max-width:900px){
+  .sidebar{width:100%;height:56px;bottom:0;top:auto;flex-direction:row;align-items:center}
+  .sidebar .brand,.sidebar .foot{display:none}
+  .nav{display:flex;padding:6px;flex:1}
+  .main{margin-left:0;padding-bottom:64px}
+  .wsgrid{grid-template-columns:minmax(0,1fr)}
+  .modal{width:100%;max-height:100vh;border-radius:0}
+}
+
+</style></head><body>
+<style>
+.mk-wrap{max-width:1100px;margin:0 auto;padding:16px}
+.mk-nav{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 14px}
+.mk-nav button{border:1px solid var(--border);background:var(--surface);border-radius:999px;padding:5px 12px;cursor:pointer;font:inherit;font-size:13px}
+.mk-nav button.on{background:var(--primary);color:#fff;border-color:var(--primary)}
+.mk-note{font-size:12px;color:var(--text-secondary);margin:4px 0 12px}
+.hb{display:flex;flex-direction:column;gap:6px;margin:0 0 10px}
+.hb .row{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.hb .row .txt{flex:1;min-width:220px}
+.mk-flow{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);padding:18px}
+.zrow{padding:6px 0;border-bottom:1px solid var(--border)}
+.zrow:last-child{border-bottom:0}
+button[disabled]{opacity:.45;cursor:not-allowed}
+@media (max-width:700px){.wsgrid{grid-template-columns:1fr!important}}
+</style>
+<div class="mk-wrap">
+ <h2 style="margin:0 0 4px">OOHDASH-144 mockup: cancel a running boost + pick zones</h2>
+ <p class="mk-note">Clickable mockup using the live app's styles. Site: <b>Black Bull, Corbridge (7639)</b>, V2 panel, two pub zones. Pick a scenario, then click through. Nothing here talks to a server.</p>
+ <div class="mk-nav" id="nav"></div>
+ <div class="wsgrid" style="display:grid;grid-template-columns:2fr 1fr;gap:14px">
+  <div>
+   <div class="card" style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;padding:14px 18px;margin-bottom:10px">
+    <div><h2 style="display:inline">Black Bull</h2> <span class="mono">7639</span> <span class="small">Corbridge</span></div>
+    <button class="btn link" style="margin-left:auto">End call</button>
+   </div>
+   <div id="banner"></div>
+   <div class="mk-flow" id="flow"></div>
+  </div>
+  <div>
+   <div class="card tight"><h3>What Lighthouse controls at this site</h3>
+    <ul class="scopelist"><li><span>Heating</span><span class="tag green">Controlled</span></li><li><span>Hot water</span><span class="tag blue">Monitored</span></li><li><span>Kitchen</span><span class="tag green">Controlled</span></li><li><span>Lighting</span><span class="tag green">Controlled</span></li><li><span>Fans</span><span class="tag grey">Not on Lighthouse</span></li></ul></div>
+  </div>
+ </div>
+</div>
+<script>
+var S = {};
+var SCEN = [
+ ['banner','1. Banner: boost running'],
+ ['intercept','2. Heating questions: boost running'],
+ ['zones-on','3. Too cold: pick zones'],
+ ['zones-off','4. Too hot: pick zones'],
+ ['result-partial','5. Result: one zone failed'],
+ ['stale','6. Cancel: boost already ended'],
+ ['pending','7. Cancel: panel not confirmed yet'],
+ ['superseded','8. Cancel: someone else changed it']
+];
+function reset(k){
+ S = {scen:k, holds:[{id:'h1',zone:'CHZ1',dir:'on',until:'21:30',by:'Kelly'}], cancel:{}, step:'stage1', sel:[], holdAck:false, dir:'on'};
+ if (k==='zones-on'){S.holds=[];S.step='w6';S.dir='on';}
+ if (k==='zones-off'){S.holds=[];S.step='w8';S.dir='off';}
+ if (k==='result-partial'){S.holds=[];S.step='result';S.dir='on';S.sel=['CHZ1','CHZ2'];}
+ if (k==='banner'){S.holds.push({id:'h2',zone:'CHZ2',dir:'off',until:'07:00',by:'Tony'});S.step='idle';}
+ if (k==='stale'||k==='pending'||k==='superseded'){S.step='idle';}
+ render();
+}
+function zl(z){return 'Pub zone '+(z==='CHZ1'?'1':'2');}
+function holdLine(h){return h.dir==='on'
+ ? '🔥 '+zl(h.zone)+': heat <b>ON</b> boost until <b>'+h.until+'</b> · started by '+h.by
+ : '❄ '+zl(h.zone)+': heat held <b>OFF</b> until <b>'+h.until+'</b> · started by '+h.by;}
+function cancelUi(h){
+ var c=S.cancel[h.id];
+ if(!c) return '<button class="btn" data-testid="boost-cancel-'+h.zone+'" onclick="S.cancel[\''+h.id+'\']=\'confirm\';render()">Cancel early</button>';
+ if(c==='confirm') return '<span>Cancel the boost for '+zl(h.zone).toLowerCase()+' now? It goes back to its normal timetable.</span> <button class="btn primary" onclick="doCancel(\''+h.id+'\')">Yes, cancel</button> <button class="btn" onclick="delete S.cancel[\''+h.id+'\'];render()">Keep it</button>';
+ if(c==='cancelling') return '<span class="small">Cancelling… this can take up to 30 seconds while the panel confirms.</span>';
+ return '';
+}
+function doCancel(id){
+ S.cancel[id]='cancelling';render();
+ setTimeout(function(){
+  var r = S.scen==='stale'?'stale':S.scen==='pending'?'pending':S.scen==='superseded'?'superseded':'reverted';
+  S.cancel[id]=r; render();
+  if(r==='stale') setTimeout(function(){S.holds=S.holds.filter(function(h){return h.id!==id});delete S.cancel[id];render();},1500);
+ },1200);
+}
+function resultRow(h){
+ var c=S.cancel[h.id];
+ if(c==='reverted') return '<div class="alert ok" style="margin:0"><b>✅ '+zl(h.zone)+' boost cancelled. The zone is back on its normal timetable.</b><div class="small" style="margin-top:4px">Say to caller: “I’ve cancelled that; the heating’s back on its normal timetable.”</div> <button class="btn" style="margin-top:6px" onclick="S.holds=S.holds.filter(function(x){return x.id!==\''+h.id+'\'});delete S.cancel[\''+h.id+'\'];render()">Dismiss</button></div>';
+ if(c==='superseded') return '<div class="alert warn" style="margin:0">⚠ Someone else has changed '+zl(h.zone).toLowerCase()+' since the boost, so we left it alone. Logged for the IoT team. <button class="btn" onclick="S.holds=S.holds.filter(function(x){return x.id!==\''+h.id+'\'});delete S.cancel[\''+h.id+'\'];render()">Dismiss</button></div>';
+ if(c==='pending') return '<div class="alert info" style="margin:0">⏳ '+zl(h.zone)+': cancel sent; the panel hasn’t confirmed yet. We’ll keep trying, and the IoT team is alerted if it doesn’t take.</div>';
+ if(c==='stale') return '<div class="alert info" style="margin:0">This boost has already ended. Refreshing…</div>';
+ return null;
+}
+function banner(){
+ if(!S.holds.length) return '';
+ var rows=S.holds.map(function(h){
+  var r=resultRow(h); if(r) return '<div data-testid="boost-hold-row-'+h.zone+'">'+r+'</div>';
+  return '<div class="row" data-testid="boost-hold-row-'+h.zone+'"><span class="txt">'+holdLine(h)+'</span>'+cancelUi(h)+'</div>';
+ }).join('');
+ return '<div class="alert info hb" data-testid="boost-hold-banner"><b>Heating boost running at this site</b>'+rows+'</div>';
+}
+function flow(){
+ var s=S.step;
+ if(s==='idle') return '<h3 style="margin-top:0">What is the caller reporting?</h3><p class="small">(Normal site page. The banner above is visible before any question is asked.)</p><button class="btn primary" onclick="S.step=\'stage1\';render()">Start heating questions →</button>';
+ if(s==='stage1'){
+  if(S.holds.length && !S.holdAck){
+   var lines=S.holds.map(function(h){var r=resultRow(h);return '<div class="zrow">'+(r||holdLine(h)+' &nbsp;'+cancelUi(h))+'</div>';}).join('');
+   var h0=S.holds[0];
+   return '<div class="zoneread"><span class="small">Pub zone 1 <b class="ok">on</b> · Pub zone 2 <b class="warn">off</b> · panel reported just now</span></div>'+
+   '<div class="reco" data-testid="reco-boost-hold"><b class="hd">A heating boost is already running here</b>'+lines+
+   '<div class="k">Say to caller</div><p class="script">“We’ve already got the heating on a timed boost. It runs until '+h0.until+', then goes back to its normal timetable.”</p>'+
+   '<div class="outbtns"><button class="btn primary" data-testid="bp-hold-continue" onclick="S.holdAck=true;render()">The caller needs something else</button><button class="btn" onclick="S.step=\'noact\';render()">End with no action</button></div></div>';
+  }
+  return '<div class="stepq">What does the caller need?</div><div class="chips"><button class="chip" onclick="S.step=\'w6\';S.dir=\'on\';render()">Too cold / not working</button><button class="chip" onclick="S.step=\'w8\';S.dir=\'off\';render()">Too hot / wants it off</button></div>';
+ }
+ if(s==='noact') return '<div class="outcome noaction"><h3>Pub heating query: no action</h3></div>';
+ if(s==='w6'||s==='w8'){
+  var on=s==='w6';
+  return '<div class="reco" data-testid="reco-boiler-panel"><b class="hd">'+(on?'Pub heating is off at the controls right now':'Pub heating is on, and we can’t switch it off from here')+'</b>'+
+  '<div class="k">What to tell the operator</div><p>'+(on?'The panel isn’t asking the boiler for heat. It isn’t in summer mode and nobody has switched it off on purpose, so it’s most likely outside its heating times.':'The panel is heating pub zone 1 and pub zone 2.')+'</p>'+
+  '<div class="outbtns">'+(on?'<button class="btn boost-on" data-testid="bp-boost-on" onclick="S.step=\'zones\';S.sel=[];render()">Boost heat ON</button>':'<button class="btn boost-off" data-testid="bp-boost-off" onclick="S.step=\'zones\';S.sel=[];render()">Hold heat OFF</button>')+
+  '<button class="btn primary">Capture &amp; escalate for the IoT team</button><button class="btn">End with no action</button></div>'+
+  '<p class="mk-note" style="margin-top:8px">Was: one button per zone (“Heat ON (zone 1)”, “Heat ON (zone 2)”) that fired straight away.</p></div>';
+ }
+ if(s==='zones'){
+  var on2=S.dir==='on';
+  function chip(z){var p=S.sel.indexOf(z)>=0;return '<button class="chip'+(p?' sel':'')+'" aria-pressed="'+p+'" data-testid="bp-zone-'+z+'" onclick="toggleZone(\''+z+'\')">'+zl(z)+'</button>';}
+  return '<div class="reco" data-testid="reco-boost-zones"><b class="hd">'+(on2?'Boost heat ON':'Hold heat OFF')+': which area?</b>'+
+  '<div class="k">Say to caller</div><p class="script">“'+(on2?'Is it one part of the pub that’s cold, or the whole pub?':'Is it too warm in one part of the pub, or everywhere?')+'”</p>'+
+  '<p class="small">If they can say which area, pick that zone. If they’re not sure, pick All zones.</p>'+
+  '<div class="chips">'+chip('CHZ1')+chip('CHZ2')+'<button class="chip'+(S.sel.length===2?' sel':'')+'" data-testid="bp-zone-all" onclick="S.sel=[\'CHZ1\',\'CHZ2\'];render()">All zones / not sure</button></div>'+
+  '<div style="margin-top:12px;display:flex;gap:8px"><button class="btn primary" data-testid="bp-zones-continue" '+(S.sel.length?'':'disabled')+' onclick="S.step=\'dur\';render()">Continue</button><button class="btn" onclick="S.step=\''+(on2?'w6':'w8')+'\';render()">Back</button></div></div>';
+ }
+ if(s==='dur'){
+  var d=S.dir==='on'?[['30','30 minutes'],['60','1 hour'],['120','2 hours']]:[['60','1 hour'],['120','2 hours'],['until-0700','Until 07:00']];
+  return '<div class="reco" data-testid="reco-boost-dur"><b class="hd">Heat '+(S.dir==='on'?'ON':'OFF')+': '+S.sel.map(function(z){return zl(z).toLowerCase()}).join(' + ')+'</b><p style="margin:6px 0">How long?</p><div class="chips">'+
+  d.map(function(x){return '<button class="chip" onclick="S.step=\'sending\';render();setTimeout(function(){S.step=\'result\';render()},1000)">'+x[1]+'</button>'}).join('')+'</div></div>';
+ }
+ if(s==='sending') return '<div class="alert info">Sending boost…</div>';
+ if(s==='result'){
+  var partial=S.scen==='result-partial';
+  var until=S.dir==='on'?'21:30':'07:00';
+  var rows=S.sel.map(function(z,i){
+   if(partial&&i===1) return '<div class="zrow" data-testid="boost-zone-result-'+z+'">❌ '+zl(z)+': couldn’t reach the panel, <b>not boosted</b>.</div>';
+   return '<div class="zrow" data-testid="boost-zone-result-'+z+'">✅ '+zl(z)+': heat '+(S.dir==='on'?'ON':'OFF')+' until <b>'+until+'</b></div>';
+  }).join('');
+  if(!S._added && !partial){S._added=1;S.sel.forEach(function(z,i){S.holds.push({id:'n'+i,zone:z,dir:S.dir,until:until,by:'You'})});setTimeout(render,0);}
+  if(!S._added && partial){S._added=1;S.holds.push({id:'n0',zone:'CHZ1',dir:'on',until:until,by:'You'});setTimeout(render,0);}
+  return '<div class="outcome captured" data-testid="outcome-boost"><h3>Heat '+(S.dir==='on'?'ON':'OFF')+': pub heating</h3>'+rows+
+  '<p style="margin-top:8px">Ticket #48213 raised. The IoT team will check the panel after the boost ends.</p></div>'+
+  '<div class="outbtns" style="margin-top:10px">'+(partial?'<button class="btn primary" data-testid="bp-capture">Capture for the IoT team</button>':'')+'<button class="btn">Done, end this issue</button></div>'+
+  '<p class="mk-note" style="margin-top:8px">The site page refreshes after a boost, so the banner above now shows the new hold with “Cancel early”.</p>';
+ }
+ return '';
+}
+function toggleZone(z){var i=S.sel.indexOf(z);if(i>=0)S.sel.splice(i,1);else S.sel.push(z);render();}
+function render(){
+ document.getElementById('nav').innerHTML=SCEN.map(function(x){return '<button class="'+(S.scen===x[0]?'on':'')+'" onclick="reset(\''+x[0]+'\')">'+x[1]+'</button>'}).join('');
+ document.getElementById('banner').innerHTML=banner();
+ document.getElementById('flow').innerHTML=flow();
+}
+reset('banner');
+</script>
+
+</body></html>
