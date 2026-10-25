@@ -257,7 +257,11 @@ async function workspacePayload(site) {
 
     // OOHDASH-144 §8.1a: boiler-panel sites with boostAvailable show Heating as "Controllable from here"
     // (even though device.controllable is false — the boost system is the control path, not the registry).
-    const heatingBoostControllable = (boostAvailable.on || boostAvailable.off) && site.boilerControl?.present;
+    // Pub heating boost requires: boost enabled + boilerControl present + at least one heating zone.
+    // DHW-only sites (boilerControl.present but no heating.zones) remain "Monitored only" for Heating.
+    const heatingBoostControllable = (boostAvailable.on || boostAvailable.off)
+        && site.boilerControl?.present
+        && (site.boilerControl?.heating?.zones?.length ?? 0) > 0;
 
     // OOHDASH-144: inject timetable data into boilerControl zones.
     // In live mode, zoneTimetable() is computed inside tb-device.js from SHARED_SCOPE attributes and

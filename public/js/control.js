@@ -159,9 +159,9 @@ function drawControl() {
    <div style="text-align:right"><button class="btn primary" data-testid="sync-release" onclick="ctlRelease()">Done — carry on</button></div>`;
     } else if (st === 'in-flight') {
         if (a.status === 'accepted') {
-            tail = `<p class="small" style="text-align:center" aria-live="polite"><span class="spin"></span> <b>Accepted by the system</b> — waiting for the device to show the change in its own reading. <b>“Confirmed” only means device-proven.</b></p>`;
+            tail = `<p class="small" style="text-align:center" aria-live="polite"><span class="spin"></span> <b>Accepted by the system</b> — waiting for the device to show the change in its own reading. <b>"Confirmed" only means device-proven.</b></p>`;
         } else {
-            tail = `<p class="small" style="text-align:center" aria-live="polite"><span class="spin"></span> Sent to the device — waiting for it to confirm… <b>“Confirmed” only means the device\'s own reading proved it.</b></p>`;
+            tail = `<p class="small" style="text-align:center" aria-live="polite"><span class="spin"></span> Sent to the device — waiting for it to confirm… <b>"Confirmed" only means the device\'s own reading proved it.</b></p>`;
         }
     } else if (st === 'confirmed') {
         tail = `<div class="alert ok" data-testid="sync-confirmed" aria-live="polite">✅ <b>Confirmed — device reports ${esc(confirmReadingText(c))}${a.confirmedLate ? ' (confirmed late)' : ''}.</b> This is the only outcome we ever show as success.${a.confirmedLate ? ' This came in after we told you it was not yet confirmed — tell the caller it\'s now done.' : ''}${holdSuffix}</div><div style="text-align:right"><button class="btn primary" data-testid="sync-done" onclick="ctlFinish()">Done</button></div>`;
@@ -284,7 +284,7 @@ async function ctlRelease() {
     startCtlBgWatch(action?.actionId, what);
     const html = `<div class="outcome captured" data-testid="outcome-awaiting"><h3>📨 Sent — awaiting the device</h3>
   <p>${what} (${ctlValTxt(c)}) is on its way to <span class="mono">${esc(c.device.deviceId)}</span>. It should take effect within about <b>${action?.copyMinutes} minutes</b>. We\'re watching in the background and will update the ticket when the device confirms.</p>
-  <div class="script">“That\'s gone to the thermostat now — it can take a few minutes to take effect. I\'ve logged it, and we\'ll keep an eye on it; if it doesn\'t respond we\'ll follow it up.”</div>
+  <div class="script">"That\'s gone to the thermostat now — it can take a few minutes to take effect. I\'ve logged it, and we\'ll keep an eye on it; if it doesn\'t respond we\'ll follow it up."</div>
   ${ticketId ? `<p class="small">Ticket <b>#${ticketId}</b></p>` : ''}%%NOTESPOST%%${outButtons()}</div>`;
     window.ctl = null;
     closeModal();
@@ -370,7 +370,7 @@ async function ctlFinish() {
     } catch (err) {
         html = `<div class="outcome applied" data-testid="outcome-applied"><h3>✅ Change applied — device confirmed</h3><p>${detail}</p>
   <div class="alert err">The change IS applied, but recording the ticket failed: ${esc(err.message)}. Tell the IoT team via Tonight → Raise a query so the audit trail is complete.</div>
-  <div class="script">“${script}”</div>${outButtons()}</div>`;
+  <div class="script">"${script}"</div>${outButtons()}</div>`;
     }
     if (state.flow) { state.flow.stage = 99; state.flow.data._outcomeHtml = html; }
     render();
@@ -409,7 +409,7 @@ async function ctlEscalate() {
         registerIssue(`${what} — NOT applied`, 'blue', res.ticket.id);
         html = `<div class="outcome captured" data-testid="outcome-escalated"><h3>📥 Captured for the IoT team</h3>
   <p>Attempted ${what} (${ctlValTxt(c)}) on <span class="mono">${esc(c.device.deviceId)}</span> but ${why}. <b>The change must be treated as not applied.</b></p>
-  <div class="script">“I tried to make that change remotely but the device hasn\'t confirmed it, so I\'m not going to tell you it\'s done when it may not be. I\'ve logged it as a priority instead${notConfirmed ? ' — it may still land, and the team will check' : ''}.”</div>
+  <div class="script">"I tried to make that change remotely but the device hasn\'t confirmed it, so I\'m not going to tell you it\'s done when it may not be. I\'ve logged it as a priority instead${notConfirmed ? ' — it may still land, and the team will check' : ''}."</div>
   <p class="small">Ticket <b>#${res.ticket.id}</b></p>%%NOTESPOST%%${outButtons()}</div>`;
     } catch (err) {
         html = `<div class="alert err">Couldn\'t record the escalation: ${esc(err.message)} — raise it via Tonight → Raise a query so it isn\'t lost.</div>${outButtons()}`;

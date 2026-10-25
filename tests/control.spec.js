@@ -98,7 +98,7 @@ test.describe('control & sync', () => {
         await startHeatingFlow(page, 'bar-restaurant'); // IT500-BAR-6832
         await page.locator('[data-testid="need-off"]').click();
         const reco = page.locator('[data-testid="reco-frost"]');
-        await expect(reco).toContainText('no “off” switch');
+        await expect(reco).toContainText('no "off" switch');
         await expect(reco).toContainText('frost-hold');
         await page.locator('[data-testid="frost-decline"]').click();
         await page.locator('[data-testid="record-outcome"]').click();
@@ -163,7 +163,7 @@ test.describe('control & sync', () => {
         await page.locator('[data-testid="tile-fridge"]').click();
         await page.locator('[data-testid="fridge-risk"]').click(); // P1 path
         await page.locator('[data-testid="record-outcome"]').click();
-        await expect(page.locator('.flowbody')).toContainText("Couldn’t record the outcome: Zendesk exploded");
+        await expect(page.locator('.flowbody')).toContainText("Couldn't record the outcome: Zendesk exploded");
         await page.locator('button:has-text("Try again")').click();
         await page.locator('[data-testid="record-outcome"]').click();
         await expect(page.locator('[data-testid="outcome-p1"]')).toContainText('logged as ticket', { timeout: 15000 });

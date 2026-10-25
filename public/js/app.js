@@ -225,13 +225,13 @@ async function searchInput(q) {
     } catch (err) {
         srch.hits = [];
         box.innerHTML = `<div class="sresults"><div class="empty">${err.degraded
-            ? '<b>The device inventory is unreachable right now.</b> You can still capture the caller\'s issue — go to a manual capture via “Something else” once the site is known, or raise it in Tonight → Raise a query.'
+            ? '<b>The device inventory is unreachable right now.</b> You can still capture the caller\'s issue — go to a manual capture via "Something else" once the site is known, or raise it in Tonight → Raise a query.'
             : esc(err.message)}</div></div>`;
         return;
     }
     srch.hits = results;
     if (!results.length) {
-        box.innerHTML = `<div class="sresults"><div class="empty" data-testid="search-empty"><b>No site matches “${esc(q)}”.</b><br>Check the house number with the caller. If it\'s still not found, the site may not be on Lighthouse — search by pub name, or capture &amp; escalate.</div></div>`;
+        box.innerHTML = `<div class="sresults"><div class="empty" data-testid="search-empty"><b>No site matches "${esc(q)}".</b><br>Check the house number with the caller. If it\'s still not found, the site may not be on Lighthouse — search by pub name, or capture &amp; escalate.</div></div>`;
         return;
     }
     box.innerHTML = `<div class="sresults" data-testid="search-results">${results.map((s, i) =>

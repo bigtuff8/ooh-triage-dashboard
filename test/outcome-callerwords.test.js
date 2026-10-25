@@ -128,7 +128,7 @@ test('D-10a card echo: the outcome card echoes the typed words when present, esc
     ctx.startTileFlow('fridge');
     const html = await driveRealScopeOutcome(ctx, state, WS);
     assert.match(html, /data-testid="outcome-callerwords"/, 'the card carries the caller-words echo element');
-    assert.match(html, /Recorded from the caller: “stock is warming in the freezer”/,
+    assert.match(html, /Recorded from the caller: "stock is warming in the freezer"/,
         'the card echoes the exact typed words');
 });
 

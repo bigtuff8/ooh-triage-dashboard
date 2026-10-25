@@ -297,7 +297,7 @@ window.submitPendingOutcome = function submitPendingOutcome(key) {
     }).then(res => {
         notesDraftClear(); // OOHDASH-119: clear sessionStorage draft on success
         const echo = f.data.freeText
-            ? `<div class="stepdone small" data-testid="outcome-callerwords"><span>💬</span>Recorded from the caller: “${esc(f.data.freeText)}”</div>`
+            ? `<div class="stepdone small" data-testid="outcome-callerwords"><span>💬</span>Recorded from the caller: "${esc(f.data.freeText)}"</div>`
             : '';
         const notesEcho = (f.data.additionalNotes || '').trim()
             ? (() => {
@@ -305,8 +305,8 @@ window.submitPendingOutcome = function submitPendingOutcome(key) {
                 const tid = res?.ticket?.id ?? null; // guard: id may be absent on degraded response
                 const ref = tid ? `ticket #${tid}` : 'the ticket';
                 const mid = isP1
-                    ? `Your notes are on ${ref} for the morning review: “${esc(f.data.additionalNotes)}” (not in the urgent text)`
-                    : `Your notes are on ${ref}: “${esc(f.data.additionalNotes)}”`;
+                    ? `Your notes are on ${ref} for the morning review: "${esc(f.data.additionalNotes)}" (not in the urgent text)`
+                    : `Your notes are on ${ref}: "${esc(f.data.additionalNotes)}"`;
                 return `<div class="stepdone small" data-testid="addnotes-echo"><span>📝</span>${mid}</div>`;
             })()
             : '';
@@ -330,7 +330,7 @@ function outcomeCaptured(f, key, { subject, detail, script, OohCaptureClass }) {
         { type: 'capture', subject, detail, OohCaptureClass, issueLabel: subject, issueCls: 'blue' },
         res => `<div class="outcome captured" data-testid="outcome-captured"><h3>📥 Captured for the IoT team</h3><p>${detail}</p>
   <p style="margin-top:4px">This will be actioned on the <b>next working day</b> — it is logged, not lost.</p>
-  <div class="script">“${script}”</div><p class="small">Ticket <b>#${res.ticket.id}</b></p></div>`);
+  <div class="script">"${script}"</div><p class="small">Ticket <b>#${res.ticket.id}</b></p></div>`);
 }
 
 function outcomeP1(f, key, { subject, detail, script, p1Summary, OohCaptureClass }) {
@@ -338,7 +338,7 @@ function outcomeP1(f, key, { subject, detail, script, p1Summary, OohCaptureClass
         { type: 'escalate-p1', subject, detail, p1Summary, OohCaptureClass: OohCaptureClass || null, issueLabel: subject, issueCls: 'red' },
         res => `<div class="outcome p1" data-testid="outcome-p1"><h3>🚨 Escalated — P1</h3><p>${detail}</p>
   <p style="margin-top:4px" data-testid="p1-dispatch-status">The P1 is logged as ticket <b>#${res.ticket.id}</b> in the IoT Support dashboard, which pages the on-duty manager.</p>
-  <div class="script">“${script}”</div><p class="small">Ticket <b>#${res.ticket.id}</b></p></div>`);
+  <div class="script">"${script}"</div><p class="small">Ticket <b>#${res.ticket.id}</b></p></div>`);
 }
 
 /* ------------------------ OOHDASH-134: P1 Escalation in "Something else" ------------------------ */
@@ -410,14 +410,14 @@ function outcomeScope(f, key, { subject, evidence, script }) {
     return finishOutcome(f, key,
         { type: 'scope-only', subject, detail: evidence, issueLabel: subject, issueCls: 'grey' },
         res => `<div class="outcome scope" data-testid="outcome-scope"><h3>ℹ️ Not on Lighthouse at this site</h3><p>${evidence}</p>
-  <div class="script">“${script}”</div><p class="small">Logged as ticket <b>#${res.ticket.id}</b> (scope-only) so we can track “blame Lighthouse” calls</p></div>`);
+  <div class="script">"${script}"</div><p class="small">Logged as ticket <b>#${res.ticket.id}</b> (scope-only) so we can track "blame Lighthouse" calls</p></div>`);
 }
 
 function outcomeNoAction(f, key, { subject, detail, script }) {
     return finishOutcome(f, key,
         { type: 'no-action', subject, detail, issueLabel: subject, issueCls: 'grey' },
         res => `<div class="outcome noaction" data-testid="outcome-noaction"><h3>📝 Call logged — no action taken</h3><p>${detail}</p>
-  ${script ? `<div class="script">“${script}”</div>` : ''}<p class="small">Ticket <b>#${res.ticket.id}</b></p></div>`);
+  ${script ? `<div class="script">"${script}"</div>` : ''}<p class="small">Ticket <b>#${res.ticket.id}</b></p></div>`);
 }
 
 function otherShortcut() {
@@ -1416,19 +1416,19 @@ function boilerPanelHeatingBranch(ws, f, panelDevice, site) {
             // Single candidate — go straight to boost
             var cZone = candidates[0].zone || ('CHZ' + candidates[0].n);
             var cLabel = boostDir === 'on' ? 'Turn heating on' : 'Turn heating off';
-            boostBtns = '<button class=”btn boost-' + boostDir + '” data-testid=”bp-boost-' + boostDir + '-' + cZone + '” onclick=”flowStep({need:\'bp-boost\',direction:\'' + boostDir + '\',zones:[\'' + cZone + '\']})”>' + cLabel + '</button>';
+            boostBtns = '<button class="btn boost-' + boostDir + '" data-testid="bp-boost-' + boostDir + '-' + cZone + '" onclick="flowStep({need:\'bp-boost\',direction:\'' + boostDir + '\',zones:[\'' + cZone + '\']})">' + cLabel + '</button>';
         } else if (candidates.length > 1) {
             // Multiple candidates — zone picker (candidates re-derived in handler from bpWcode)
             var cLabel2 = boostDir === 'on' ? 'Turn the heating on' : 'Turn the heating off';
-            boostBtns = '<button class=”btn boost-' + boostDir + '” data-testid=”bp-zones-btn” onclick=”flowStep({need:\'bp-zones\',direction:\'' + boostDir + '\'})”>' + cLabel2 + '</button>';
+            boostBtns = '<button class="btn boost-' + boostDir + '" data-testid="bp-zones-btn" onclick="flowStep({need:\'bp-zones\',direction:\'' + boostDir + '\'})">' + cLabel2 + '</button>';
         }
-        var wrapBtn = '<button class=”btn primary” data-testid=”bp-checklog” onclick=”flowStep({need:\'bp-wrap\'})”>Check and log</button>';
+        var wrapBtn = '<button class="btn primary" data-testid="bp-checklog" onclick="flowStep({need:\'bp-wrap\'})">Check and log</button>';
         return readout +
-            '<div class=”reco” data-testid=”reco-boiler-panel”>' +
-            '<b class=”hd”>' + esc(card.headline) + '</b>' +
+            '<div class="reco" data-testid="reco-boiler-panel">' +
+            '<b class="hd">' + esc(card.headline) + '</b>' +
             card.sayHtml +
             card.gtkHtml +
-            '<div class=”outbtns”>' + boostBtns + wrapBtn + '</div>' +
+            '<div class="outbtns">' + boostBtns + wrapBtn + '</div>' +
             '</div>';
     }
 
@@ -1443,7 +1443,7 @@ var _bpZoneSelected = null;
 function bpZoneSelect(zId) {
     _bpZoneSelected = zId;
     // Toggle aria-pressed on chips
-    var chips = document.querySelectorAll('[id^=”bpzc-”]');
+    var chips = document.querySelectorAll('[id^="bpzc-"]');
     chips.forEach(function(c) { c.setAttribute('aria-pressed', 'false'); c.classList.remove('selected'); });
     var chosen = document.getElementById('bpzc-' + zId);
     if (chosen) { chosen.setAttribute('aria-pressed', 'true'); chosen.classList.add('selected'); }
@@ -1612,7 +1612,7 @@ const FLOWR = {
                 // from the candidate set and served by the dedicated `aircon` referral flow), so the old
                 // `z.deviceType === 'intesis'` off-held branch here is dead and has been removed. Salus
                 // heat-only units offer the frost-hold below.
-                return `<div class="reco" data-testid="reco-frost"><b class="hd">This thermostat has no “off” switch.</b>It\'s a Salus heat-only unit. The closest safe action is a <b>frost-hold</b>: set it to 5°C, so the heating stays off unless the building risks freezing. Normal service resumes when the hold ends.<div class="outbtns"><button class="btn primary" data-testid="frost-recommended" onclick="flowStep({frost:1})">Set frost-hold 5°C (recommended)</button><button class="btn" data-testid="frost-decline" onclick="flowStep({offnoact:1})">End with no action</button></div></div>`;
+                return `<div class="reco" data-testid="reco-frost"><b class="hd">This thermostat has no "off" switch.</b>It\'s a Salus heat-only unit. The closest safe action is a <b>frost-hold</b>: set it to 5°C, so the heating stays off unless the building risks freezing. Normal service resumes when the hold ends.<div class="outbtns"><button class="btn primary" data-testid="frost-recommended" onclick="flowStep({frost:1})">Set frost-hold 5°C (recommended)</button><button class="btn" data-testid="frost-decline" onclick="flowStep({offnoact:1})">End with no action</button></div></div>`;
             }
             if (need === 'broken') {
                 doneLine('Reported: heating not working');
@@ -2004,9 +2004,9 @@ const FLOWR = {
             ).join('');
             const anySwitchable = lgs.some(canSwitch);
             return lgSwitches + `<div class="alert info">${anySwitchable ? 'This lighting circuit can be switched on/off directly above — the change only counts once the device confirms.' : `External lighting can\'t be switched remotely from here yet (on the priority list with our platform team).${anyOnline ? '' : ' The lighting controller is also <b>not responding</b>, which often means a tripped fuse board.'}`}</div>
-   <div class="script">“${anyOnline
+   <div class="script">"${anyOnline
    ? 'The outside lights have a sensor that brings them on automatically at dusk — so they should usually look after themselves. If tonight\'s an exception, flip the Lighthouse lighting switch to override and they\'ll come on. That only affects tonight; the sensor picks everything back up automatically from tomorrow, so there\'s nothing to reset.'
-   : 'The outside lights have a sensor that brings them on automatically at dusk, so they should usually look after themselves. The lighting controller isn\'t responding at the moment — it\'s worth checking your fuse board first, as a tripped breaker is the usual cause. If everything looks clear, flip the Lighthouse lighting switch to override — that only covers tonight, and the sensor picks everything back up automatically from tomorrow.'}”</div>
+   : 'The outside lights have a sensor that brings them on automatically at dusk, so they should usually look after themselves. The lighting controller isn\'t responding at the moment — it\'s worth checking your fuse board first, as a tripped breaker is the usual cause. If everything looks clear, flip the Lighthouse lighting switch to override — that only covers tonight, and the sensor picks everything back up automatically from tomorrow.'}"</div>
    <div class="chips"><button class="chip" onclick="flowStep({r:'ok'})">Caller sorted it with the override</button><button class="chip" onclick="flowStep({r:'cap'})">Still not working — capture &amp; escalate</button></div>`;
         }
         if (f.stage === 1) {
@@ -2130,7 +2130,7 @@ const FLOWR = {
             // Anchor OFFLINE → site unreachable → existing plain-English wall-unit outcome (verbatim, unchanged).
             if (!anchor.online) {
                 return `<div class="alert err" data-testid="connectivity-alert"><b>The Lighthouse gateway at this site is offline.</b> The gateway is the wall-mounted Lighthouse unit that connects the site — no remote command can reach the site while it\'s down. This is usually power or internet at the site.</div>
-   <div class="script">“The Lighthouse unit on your wall isn\'t responding, which normally means it\'s lost power or internet. Could you check the fuse board hasn\'t tripped, that the unit has lights on, and the router is up? I\'ll stay on the line.”</div>
+   <div class="script">"The Lighthouse unit on your wall isn\'t responding, which normally means it\'s lost power or internet. Could you check the fuse board hasn\'t tripped, that the unit has lights on, and the router is up? I\'ll stay on the line."</div>
    <div class="stepq">After the caller checks:</div>
    <div class="chips"><button class="chip" onclick="flowStep({ofq:'back'})">It\'s back online / lights on</button><button class="chip" data-testid="connectivity-stilldead" onclick="flowStep({ofq:'cap'})">Still dead — capture &amp; escalate</button></div>`;
             }
@@ -2310,14 +2310,14 @@ const FLOWR = {
     other(ws, f) {
         if (f.stage === 0) {
             return `<div class="stepq">Describe the issue in the caller\'s words</div>
-   <div class="formrow"><textarea id="otxt" data-testid="other-text" rows="2" placeholder="e.g. “the voltage optimiser needs resetting — is that you?”">${esc(f.data.freeText || '')}</textarea></div>
+   <div class="formrow"><textarea id="otxt" data-testid="other-text" rows="2" placeholder="e.g. "the voltage optimiser needs resetting — is that you?"">${esc(f.data.freeText || '')}</textarea></div>
    <div class="chips">
     <button class="chip" data-testid="other-check" onclick="flowStep({q:document.getElementById('otxt').value||'(not specified)',path:'check'})">Check if it\'s Lighthouse-controlled</button>
     <button class="chip" data-testid="other-capture" onclick="flowStep({q:document.getElementById('otxt').value||'(not specified)',qraw:document.getElementById('otxt').value,path:'cap'})">Capture &amp; escalate as described</button>
    </div>`;
         }
         if (f.stage === 1) {
-            if (!f.data._oline) { doneLine('Issue: “' + esc(f.data.q) + '”'); f.data._oline = 1; }
+            if (!f.data._oline) { doneLine('Issue: "' + esc(f.data.q) + '"'); f.data._oline = 1; }
             // OOHDASH-134: Capture now opens a two-button choice (P1 Escalation / normal priority).
             if (f.data.path === 'cap') return otherP1Choice(f);
             return `<div class="stepq">Which of these is it closest to?</div><div class="chips">

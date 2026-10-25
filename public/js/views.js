@@ -77,7 +77,7 @@ function renderAmbiguous() {
     $('#view').innerHTML = `<div class="content narrow"><div class="card" style="border-color:var(--warning)" data-testid="ambiguous-card">
    <h2>⚠️ House ID ${esc(a.siteNo)} is ambiguous</h2>
    <p class="sub" style="margin:8px 0">This ID matches more than one site (${a.matches.map(m => `<b>${esc(m.siteName)}</b>`).join(' and ')}). To protect against changing the wrong site, remote control is blocked for ambiguous IDs.</p>
-   <div class="script">“I can\'t safely make changes for this site number tonight — I\'ll log this for the IoT team as a priority and they\'ll pick it up.”</div>
+   <div class="script">"I can\'t safely make changes for this site number tonight — I\'ll log this for the IoT team as a priority and they\'ll pick it up."</div>
 
    ${notesField({ id: 'addnotes-amb' })}
    <div style="margin-top:10px">
@@ -114,7 +114,7 @@ function renderConfirmGate() {
    ${siteSubline(s)}
    ${unverifiedNotice(s)}
    <p style="margin:10px 0 4px">${esc(s.deviceSummary)}</p>
-   <div class="script">“Can I just confirm — you\'re calling from <b>${esc(s.siteName)}</b>, site number <b>${esc(s.siteNo)}</b>?”</div>
+   <div class="script">"Can I just confirm — you\'re calling from <b>${esc(s.siteName)}</b>, site number <b>${esc(s.siteNo)}</b>?"</div>
 
    <div style="display:flex;gap:10px;margin-top:16px">
     <button class="btn primary big" data-testid="confirm-site" onclick="confirmSite()">✓ This is the right site</button>
@@ -189,7 +189,7 @@ function renderWorkspace() {
    <div class="card">
    ${callSoFar()}
    <h3>What is the customer reporting?</h3>
-   <input class=”issueinput” id=”iq” data-testid=”smart-entry” placeholder=”Type it in the customer&#39;s words — e.g. &quot;pub is freezing&quot;, &quot;no power in the kitchen&quot;...” autocomplete=”off” oninput=”issueSearch(this.value)”>
+   <input class="issueinput" id="iq" data-testid="smart-entry" placeholder="Type it in the customer&#39;s words — e.g. &quot;pub is freezing&quot;, &quot;no power in the kitchen&quot;..." autocomplete="off" oninput="issueSearch(this.value)">
    <div class="sugg" id="isugg"></div>
    <div class="tiles" data-testid="category-tiles">${CATS.map(c => `<div class="tile" data-testid="tile-${c.k}" onclick="startTileFlow('${c.k}')"><div class="tt">${c.ic} ${c.t}</div><div class="td">${c.d}</div></div>`).join('')}</div></div>`;
 
@@ -207,7 +207,7 @@ function renderWorkspace() {
   <div>
    <div class="card tight"><h3>What Lighthouse controls at this site</h3><ul class="scopelist" data-testid="scope-list">
     ${ws.scope.map(g => `<li><span${g.level === 'none' ? ' style="color:var(--text-disabled)"' : ''}>${esc(g.label)}</span>${scopeTag(g)}</li>`).join('')}
-   </ul><p class="small" style="margin-top:6px">Live from the device inventory — use it to answer “isn\'t that you?”</p></div>
+   </ul><p class="small" style="margin-top:6px">Live from the device inventory — use it to answer "isn\'t that you?"</p></div>
    <div class="card tight"><h3>Open tickets for this site</h3>${siteTickets(ws)}</div>
   </div></div></div>`;
     if (!state.flow) $('#iq')?.focus();
@@ -385,7 +385,7 @@ function drawerShell(ticketId, cbTicket, threadHtml) {
     return `<div class="dh">Ticket #${ticketId}<button class="btn link" onclick="state.drawer=null;paintDrawer()">✕</button></div><div class="db">
   ${cbTicket ? `<p><b>${esc(cbTicket.subject)}</b></p>
   <p class="small" style="margin-bottom:10px">Opened ${esc(cbTicket.createdFriendly)} · <span class="tag blue">${esc(cbTicket.status.agent)}</span></p>
-  <h3>Read to the caller</h3><div class="script" data-testid="caller-script">“${esc(cbTicket.script)}”</div>
+  <h3>Read to the caller</h3><div class="script" data-testid="caller-script">"${esc(cbTicket.script)}"</div>
   ${cbTicket.visit ? '<div class="alert warn" data-testid="chargeable-warning">⚠️ <b>Engineer visit involved</b> — remind the caller: if the fault turns out not to be Lighthouse equipment, the visit may be chargeable.</div>' : ''}
   <h3 style="margin-top:14px">Caller expects an update by…</h3>
   <div style="display:flex;gap:8px;margin-bottom:14px"><input type="date" id="fud" style="border:1.5px solid var(--border);border-radius:6px;padding:7px 10px"><button class="btn" onclick="saveFollowUp(${ticketId})">Save follow-up</button></div>` : ''}
@@ -424,7 +424,7 @@ async function saveFollowUp(ticketId) {
 function vCallback() {
     const cb = state.cb;
     $('#view').innerHTML = `<div class="content narrow">
-  <div class="card"><h2>Callback Lookup</h2><p class="sub" style="margin-bottom:12px">“I called earlier — what\'s happening?” Find the site, read the script. Use ↑ ↓ and Enter to pick.</p>
+  <div class="card"><h2>Callback Lookup</h2><p class="sub" style="margin-bottom:12px">"I called earlier — what\'s happening?" Find the site, read the script. Use ↑ ↓ and Enter to pick.</p>
   <div class="searchwrap"><input id="cbq" data-testid="callback-search" placeholder="House number or pub name" autocomplete="off"><div id="cbres"></div></div></div>
   ${cb.error ? `<div class="alert err">${esc(cb.error)}</div>` : ''}
   ${cb.data ? cbTickets() : ''}
