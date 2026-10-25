@@ -93,8 +93,16 @@ test('BB-REG-6: boost-off CHZ1 until-0700 is valid', () => {
     assert.equal(result.durationKey, 'until-0700');
 });
 
+/* ── BB-REG-6b: boost-off until-next-on → ok (C1 fix: was missing) ─── */
+test('BB-REG-6b: boost-off CHZ1 until-next-on is valid (C1: until-next-on now in OFF menu)', () => {
+    const result = registry.validateCommand(v1Device(), 'boost-off', { zone: 'CHZ1', durationKey: 'until-next-on' });
+    assert.equal(result.ok, true);
+    assert.equal(result.direction, 'off');
+    assert.equal(result.durationKey, 'until-next-on');
+});
+
 /* ── BB-REG-7: boost-off 30m → not in OFF menu ─────────────────────── */
-test('BB-REG-7: boost-off durationKey "30m" fails — 30m is not in OFF menu [1h, 2h, until-0700]', () => {
+test('BB-REG-7: boost-off durationKey "30m" fails — 30m is not in OFF menu [1h, 2h, until-0700, until-next-on]', () => {
     const result = registry.validateCommand(v1Device(), 'boost-off', { zone: 'CHZ1', durationKey: '30' });
     assert.equal(result.ok, false);
     assert.match(result.reason, /durationKey/);
@@ -167,5 +175,6 @@ test('BB-REG-13: capabilitiesFor("boiler-panel").commands includes boost-on and 
     assert.ok(caps.commands.includes('boost-off'));
     // Boost menu sanity check
     assert.deepEqual(caps.boostMenu.on, ['30', '60', '120']);
-    assert.deepEqual(caps.boostMenu.off, ['60', '120', 'until-0700']);
+    // until-next-on is in the OFF menu (C1 fix: design section 7 / OOHDASH-144-DESIGN §7)
+    assert.deepEqual(caps.boostMenu.off, ['60', '120', 'until-0700', 'until-next-on']);
 });

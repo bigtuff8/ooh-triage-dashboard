@@ -1028,7 +1028,15 @@ function wrapUpSubmit() {
         render();
     }).catch(function(err) {
         f.data['_wrap_pend'] = null;
-        f.data['_wrap_err'] = err.message || 'unknown error';
+        // Map raw error codes to plain English (design section 12 glossary).
+        // Never show raw codes on screen.
+        var rawCode = err.message || 'unknown error';
+        var mappedMsg = rawCode;
+        if (rawCode === 'append-refused') mappedMsg = "Couldn't add to the existing ticket. Use the log button below to log as a new ticket instead.";
+        else if (rawCode === 'expired-token') mappedMsg = "The site confirmation has expired. Re-confirm the site and try again.";
+        else if (rawCode === 'site-mismatch') mappedMsg = "The confirmed site doesn't match this hold. Re-confirm the site and try again.";
+        else if (rawCode === 'hold-not-found') mappedMsg = "Couldn't find the original hold record. Log as a new ticket using the button below.";
+        f.data['_wrap_err'] = mappedMsg;
         render();
     });
 }
@@ -1063,7 +1071,7 @@ function boilerPanelHeatingBranch(ws, f, panelDevice, site) {
     // Build readout line (§8.1a)
     function buildReadout() {
         if (!heating || !heating.visible) {
-            return '<div class="zoneread"><span class="small">Pub boiler panel — no reading</span></div>';
+            return '<div class="zoneread"><span class="small">Pub heating controls — no reading</span></div>';
         }
         var zones = heating.zones || [];
         var zoneParts = zones.map(function(z) {
@@ -1375,6 +1383,10 @@ function boilerPanelHeatingBranch(ws, f, panelDevice, site) {
             f.data['_out_' + bsKey] = bsCardHtml +
                 '<div class="outbtns"><button class="btn primary" data-testid="bp-finish-notes" onclick="flowStep({need:\'bp-wrap\'})">Finish and add notes</button></div>';
             f.data._outcomeHtml = bsCardHtml;
+            // C2 fix: the boost consumed the original confirmToken; the server returns a
+            // fresh one so wrapUpSubmit's append check (hasSiteConfirmation) finds a valid
+            // confirmation for this session. Store it immediately.
+            if (res.confirmToken) state.confirmToken = res.confirmToken;
             refreshWorkspace().catch(function() {});
             render();
         }).catch(function(err) {
@@ -1398,14 +1410,14 @@ function boilerPanelHeatingBranch(ws, f, panelDevice, site) {
         f.data.wrapKind = card.wrapKind;
         // Build ticket/log sentence from wcode
         var bpLogSegs = [];
-        if (wcode === 'W1') bpLogSegs.push('Heating could not be checked (panel last reported ' + panelAgo(heating && heating.panelLastSeenMs) + ').');
-        else if (wcode === 'W2') bpLogSegs.push('Panel calling for heat, all zones on. Likely boiler or radiator fault; site advised to call their heating engineer.');
+        if (wcode === 'W1') bpLogSegs.push('Heating could not be checked (heating controls last updated ' + panelAgo(heating && heating.panelLastSeenMs) + ').');
+        else if (wcode === 'W2') bpLogSegs.push('All zones on, heating calling. Likely a boiler or radiator fault; site advised to call their heating engineer.');
         else if (wcode === 'W3') { var offZ3 = (heating && heating.zones || []).filter(function(z) { return !z.on; }).map(function(z) { return 'zone ' + z.n; }).join(' and '); bpLogSegs.push('Part of pub heating off (' + (offZ3 || 'zone 2') + ').' ); }
         else if (wcode === 'W4') bpLogSegs.push('Heating in summer mode (off season).');
-        else if (wcode === 'W5') bpLogSegs.push('Heating forced off at panel.');
+        else if (wcode === 'W5') bpLogSegs.push('Heating switched off by hand.');
         else if (wcode === 'W6') { var nc6 = heating && heating.nextChange; bpLogSegs.push('Heating off on timetable' + (nc6 ? ', next change at ' + nc6 : '') + '.'); }
-        else if (wcode === 'W7') bpLogSegs.push('Heating running on fallback cycle (room sensor not reporting).');
-        else if (wcode === 'W8') { var onZ8 = (heating && heating.zones || []).filter(function(z) { return z.on; }).map(function(z) { return 'zone ' + z.n; }).join(' and '); bpLogSegs.push('Heating on (' + (onZ8 || 'zones') + '). Caller wants it off.'); }
+        else if (wcode === 'W7') bpLogSegs.push('Heating running on a timed back-up (room sensor not reporting).');
+        else if (wcode === 'W8') { var onZ8 = (heating && heating.zones || []).filter(function(z) { return z.on; }).map(function(z) { return 'zone ' + z.n; }).join(' and '); bpLogSegs.push('Heating on (' + (onZ8 || 'zones') + '). Customer wants it off.'); }
         else if (wcode === 'W9') bpLogSegs.push('Pub heating already off. Warmth from another source.');
         f.data._wrapLogSentence = bpLogSegs.join(' ');
         // Build action buttons
@@ -1511,7 +1523,7 @@ const FLOWR = {
             const airconChip = siteHasAircon()
                 ? `<div class="chips" style="margin-top:8px"><button class="chip" data-testid="aircon-shortcut" onclick="startFlow('aircon', state.flow.data.freeText||'', {carryNotes:true})">❄️ Air conditioning (handled by the IoT team)</button></div>`
                 : '';
-            return `<div class="stepq">Which area is the caller talking about?</div><div class="chips">${areaChips}${fallbackChip}</div>${airconChip}` + unplacedNoteHtml;
+            return `<div class="stepq">Which area is the customer talking about?</div><div class="chips">${areaChips}${fallbackChip}</div>${airconChip}` + unplacedNoteHtml;
         }
         // Resolve the chosen area (by name) to its device SET, then to the coldest-online representative.
         const chosenArea = f.data.area === '__unmapped__' ? null : f.data.area;

@@ -91,7 +91,7 @@ test.describe('tonight & callback', () => {
         await expect(page.locator('.drawer #thread')).toContainText('Test Handler');
     });
 
-    test('smart issue entry suggests flows from the caller’s words and carries them into the flow', async ({ page }) => {
+    test("smart issue entry suggests flows from the caller's words and carries them into the flow", async ({ page }) => {
         await signIn(page, 'Test Handler');
         await confirmSite(page, '6832', 'Old Grey Mare');
         await page.locator('[data-testid="smart-entry"]').pressSequentially('pub is freezing cold', { delay: 30 });
@@ -99,10 +99,10 @@ test.describe('tonight & callback', () => {
         await page.locator('[data-testid="suggest-heating"]').click();
         // caller's words pinned to the flow
         await expect(page.locator('[data-testid="flow-panel"]')).toContainText('pub is freezing cold');
-        await expect(page.locator('[data-testid="flow-panel"]')).toContainText('Which area is the caller talking about?');
+        await expect(page.locator('[data-testid="flow-panel"]')).toContainText('Which area is the customer talking about?');
     });
 
-    test('smart issue entry works with quotes/apostrophes in the caller’s words (rework-1 regression)', async ({ page }) => {
+    test('smart issue entry works with quotes/apostrophes in the caller\'s words (rework-1 regression)', async ({ page }) => {
         // Tester finding 2026-07-11: apostrophes ("won't", "it's") broke the inline
         // onclick handlers — the chip did nothing and the caller's words were lost.
         const callerWords = `it's freezing and the heating won't come on`;
@@ -114,7 +114,7 @@ test.describe('tonight & callback', () => {
         page.on('pageerror', e => consoleErrors.push(e.message));
         await page.locator('[data-testid="suggest-heating"]').click();
         // the flow MUST start and carry the words verbatim (apostrophes intact)
-        await expect(page.locator('[data-testid="flow-panel"]')).toContainText('Which area is the caller talking about?');
+        await expect(page.locator('[data-testid="flow-panel"]')).toContainText('Which area is the customer talking about?');
         await expect(page.locator('[data-testid="flow-panel"]')).toContainText(callerWords);
         expect(consoleErrors).toEqual([]);
 

@@ -73,6 +73,31 @@ export function isConfirmed(token, siteNo, operatorId) {
 }
 
 /**
+ * OOHDASH-144 §9 handover-safe append authority check.
+ *
+ * Returns true when this operator has ANY active (unconsumed) site confirmation for siteNo.
+ * Used by the outcomes append path: the original boost token has already been consumed by
+ * dispatchBoilerBoost (consumeConfirmation), so we cannot check that specific token.
+ * Instead we check that the operator has confirmed this site on their current call — which
+ * is true for the original agent (who confirmed before the boost) AND a different agent who
+ * picks up after a handover and has re-confirmed the same site.
+ *
+ * This does NOT consume the confirmation, so it remains valid for any further operations.
+ * It does NOT make the boost control token reusable — that token is permanently gone.
+ *
+ * Design citation: "If a different agent finishes the issue, for example after a handover,
+ * they can still add to the same ticket as long as they have confirmed the same site on their
+ * call" (design section "Keeping it to one ticket in the awkward cases").
+ */
+export function hasSiteConfirmation(siteNo, operatorId) {
+    pruneConfirmations();
+    for (const c of confirmations.values()) {
+        if (c.siteNo === String(siteNo) && c.operatorId === operatorId) return true;
+    }
+    return false;
+}
+
+/**
  * Atomically validates AND consumes a confirmation token for a dispatch (C2 single-use).
  * On a full match it deletes the token in the SAME synchronous event-loop tick as the get()
  * — no await in between — then returns true; a second dispatch with the same token finds

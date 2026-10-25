@@ -314,7 +314,13 @@ router.post('/boiler-boost', wrap(async (req, res) => {
     const action = await control.dispatchBoilerBoost({ operator: op, confirmToken, siteNo, deviceId, zones, direction, durationKey, acknowledgedWarnings, callerWords, appendToHoldId: appendToHoldId || null });
     // Return warnings as 200 so the api helper doesn't throw; frontend checks res.warnings.
     if (action._warnings) return res.json({ warnings: action._warnings });
-    res.json({ action });
+    // C2 fix (OOHDASH-144 §9 handover-safe append): the boost consumed the confirmation token,
+    // so issue a fresh one for the same site. The browser stores it and uses it in the wrapup
+    // append check (hasSiteConfirmation). The consumed token is permanently gone — cannot be
+    // replayed for another boost (it no longer exists). The fresh token authorises only this
+    // session's subsequent non-control reads/appends, not a new control write.
+    const refreshed = await resolution.confirmSite(siteNo, op);
+    res.json({ action, confirmToken: refreshed.token });
 }));
 
 /* OOHDASH-144 §5 — put back to normal early (any signed-in OOH role, same gate as boiler-boost). */
@@ -484,12 +490,19 @@ router.post('/outcomes', wrap(async (req, res) => {
         const col = await collection('OohOverrides');
         const holdDoc = await col.get(appendToHoldId);
 
+        // Authority check (OOHDASH-144 §9 handover-safe append):
+        // Use hasSiteConfirmation rather than isConfirmed(token): the boost already consumed the
+        // original token via consumeConfirmation, so isConfirmed would always return false.
+        // hasSiteConfirmation checks that this operator has ANY active confirmation for siteNo
+        // (their current call confirmed this site). This allows the original agent OR a handover
+        // agent who re-confirmed the same site to append — matching the design panel ruling.
+        // The check is non-consuming so it doesn't affect any subsequent operation.
         const canAppend = holdDoc &&
             holdDoc.ticketId &&
             String(holdDoc.siteNo) === String(siteNo) &&
             holdDoc.deviceType === 'boiler-panel' &&
             (Date.now() - new Date(holdDoc.createdAt).getTime()) < 12 * 60 * 60 * 1000 &&
-            resolution.isConfirmed(req.body.confirmToken, siteNo, op.id);
+            resolution.hasSiteConfirmation(siteNo, op.id);
 
         if (!canAppend) {
             return res.status(409).json({ error: 'append-refused', message: 'Cannot append to that hold: site not confirmed, hold not found, or older than 12 h' });
