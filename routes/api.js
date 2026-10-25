@@ -21,6 +21,7 @@ import * as audit from '../services/audit.js';
 import * as metrics from '../services/metrics.js';
 import * as liveness from '../services/liveness.js';
 import * as notices from '../services/notices.js';
+import { zoneTimetable } from '../services/schedule.js';
 
 const router = Router();
 
@@ -250,16 +251,47 @@ async function workspacePayload(site) {
         off: !boostBaseDenied
     };
 
+    // OOHDASH-144: active boiler-panel holds for the banner + flow intercept.
+    // Reads from the Cosmos store; null on failure (fail-soft — banner simply doesn't show).
+    const activeBoostHolds = await overrides.activeBoostHoldsForSite(site.siteNo);
+
+    // OOHDASH-144 §8.1a: boiler-panel sites with boostAvailable show Heating as "Controllable from here"
+    // (even though device.controllable is false — the boost system is the control path, not the registry).
+    const heatingBoostControllable = (boostAvailable.on || boostAvailable.off) && site.boilerControl?.present;
+
+    // OOHDASH-144: inject timetable data into boilerControl zones.
+    // In live mode, zoneTimetable() is computed inside tb-device.js from SHARED_SCOPE attributes and
+    // the zone objects already carry `timetable`. In fixture mode, the fixture stores zone schedules
+    // under `boilerControl.heating.schedules[zoneId]` (added in §13b fixture changes) and we compute
+    // the timetable here so the same code path works for both modes.
+    let bcForPayload = site.boilerControl ?? defaultBc;
+    if (bcForPayload.heating?.zones && bcForPayload.heating.schedules) {
+        const tz = config.control?.schedule?.tz ?? 'Europe/London';
+        const now = Date.now();
+        const schedules = bcForPayload.heating.schedules;
+        const enrichedZones = bcForPayload.heating.zones.map(z => {
+            if (z.timetable != null) return z; // already set (live mode)
+            const sched = z.zone ? schedules[z.zone] : null;
+            const timetable = sched ? (zoneTimetable(sched, now, tz) ?? null) : null;
+            return { ...z, timetable };
+        });
+        bcForPayload = { ...bcForPayload, heating: { ...bcForPayload.heating, zones: enrichedZones } };
+    }
+
     return {
         site: { siteNo: site.siteNo, siteName: site.siteName, nameUnverified: site.nameUnverified, accountId: site.accountId, brand: site.brand, address: site.address, callsLast30Days: site.callsLast30Days },
         devices: effectiveDevices,
-        scope: scopeGroups.map(g => ({ key: g.key, label: g.label, level: g.level(siteWithEffective) })),
+        scope: scopeGroups.map(g => {
+            if (g.key === 'heating' && heatingBoostControllable) return { key: g.key, label: g.label, level: 'ctl' };
+            return { key: g.key, label: g.label, level: g.level(siteWithEffective) };
+        }),
         anyOffline: site.devices.some(d => !d.online),
         tickets,
         activeP1Tickets,
         degraded: bridgeDegraded(),
-        boilerControl: site.boilerControl ?? defaultBc,
-        boostAvailable
+        boilerControl: bcForPayload,
+        boostAvailable,
+        activeBoostHolds
     };
 }
 
@@ -274,11 +306,76 @@ function stripDemo(device) {
 
 router.post('/boiler-boost', wrap(async (req, res) => {
     const op = req.session.operator;
-    const { siteNo, deviceId, zones, direction, durationKey, acknowledgedWarnings, callerWords, confirmToken } = req.body;
-    const action = await control.dispatchBoilerBoost({ operator: op, confirmToken, siteNo, deviceId, zones, direction, durationKey, acknowledgedWarnings, callerWords });
+    const { siteNo, deviceId, zones, direction, durationKey, acknowledgedWarnings, callerWords, confirmToken, appendToHoldId } = req.body;
+    const action = await control.dispatchBoilerBoost({ operator: op, confirmToken, siteNo, deviceId, zones, direction, durationKey, acknowledgedWarnings, callerWords, appendToHoldId: appendToHoldId || null });
     // Return warnings as 200 so the api helper doesn't throw; frontend checks res.warnings.
     if (action._warnings) return res.json({ warnings: action._warnings });
     res.json({ action });
+}));
+
+/* OOHDASH-144 §5 — put back to normal early (any signed-in OOH role, same gate as boiler-boost). */
+router.post('/sites/:siteNo/booster-holds/:id/cancel', wrap(async (req, res) => {
+    const op = req.session.operator;
+    const { siteNo, id } = req.params;
+    const { confirmToken } = req.body || {};
+
+    // 1. Site must be confirmed for this call.
+    if (!resolution.isConfirmed(confirmToken, siteNo, op.id)) {
+        return res.status(409).json({ error: 'not-confirmed', message: 'Confirm the site before putting heating back to normal' });
+    }
+
+    // 2. Load the hold doc.
+    const { collection } = await import('../services/store.js');
+    const col = await collection('OohOverrides');
+    const doc = await col.get(id);
+    if (!doc || doc.deviceType !== 'boiler-panel' || String(doc.siteNo) !== String(siteNo)) {
+        return res.status(404).json({ error: 'hold-not-found' });
+    }
+
+    // 3. Hold must still be active.
+    if (doc.status !== 'active') {
+        return res.status(404).json({ error: 'hold-ended' });
+    }
+
+    // 4. Cancel (trigger prompt revert).
+    try {
+        await overrides.cancelOverride(id, op);
+    } catch (e) {
+        if (e.code === 'concurrency' || e.status === 409) {
+            return res.status(409).json({ error: 'hold-changed', message: e.message });
+        }
+        throw e;
+    }
+
+    // Read back the doc to get the result.
+    const after = await col.get(id);
+    const ro = after?.revertOutcome || after?.status || 'pending';
+    let result;
+    if ((after?.status === 'reverted') && ro === 'written') result = 'reverted';
+    else if ((after?.status === 'reverted') && ro === 'already-auto') result = 'already-auto';
+    else if (after?.status === 'superseded-by-other') result = 'superseded';
+    else if ((after?.status === 'reverted') && ro === 'same-direction-skip') result = 'left-forced';
+    else result = 'pending';
+
+    await audit.logAction({
+        actionType: 'boiler-boost-cancel',
+        operator: op,
+        siteNo,
+        detail: `Put heating back to normal (hold ${id}, zone ${doc.boilerZone}, result: ${result})`,
+        outcome: result,
+        ticketId: doc.ticketId || null
+    });
+
+    res.json({
+        result,
+        hold: {
+            id,
+            boilerZone: doc.boilerZone || null,
+            direction: doc.direction || null,
+            status: after?.status || 'unknown',
+            ticketId: doc.ticketId || null
+        }
+    });
 }));
 
 router.get('/boiler-boost/preview', wrap(async (req, res) => {
@@ -372,10 +469,39 @@ export function buildOutcomeTranscript({ action, type, siteNo, siteName, detail,
 
 router.post('/outcomes', wrap(async (req, res) => {
     const op = req.session.operator;
-    const { type, siteNo, siteName, subject, detail, callerWords, OohCaptureClass, actionId, holdText, p1Summary, additionalNotes } = req.body;
+    const { type, siteNo, siteName, subject, detail, callerWords, OohCaptureClass, actionId, holdText, p1Summary, additionalNotes, appendToHoldId, holdIds, actions: actionLines } = req.body;
     if (!type || !siteNo || !subject || !detail) {
         return res.status(400).json({ error: 'type, siteNo, subject and detail are required' });
     }
+
+    // OOHDASH-144 §9.2: append to an existing hold's ticket rather than creating a new one.
+    if (appendToHoldId) {
+        const { collection } = await import('../services/store.js');
+        const col = await collection('OohOverrides');
+        const holdDoc = await col.get(appendToHoldId);
+
+        const canAppend = holdDoc &&
+            holdDoc.ticketId &&
+            String(holdDoc.siteNo) === String(siteNo) &&
+            holdDoc.deviceType === 'boiler-panel' &&
+            (Date.now() - new Date(holdDoc.createdAt).getTime()) < 12 * 60 * 60 * 1000 &&
+            resolution.isConfirmed(req.body.confirmToken, siteNo, op.id);
+
+        if (!canAppend) {
+            return res.status(409).json({ error: 'append-refused', message: 'Cannot append to that hold: site not confirmed, hold not found, or older than 12 h' });
+        }
+
+        const summary = [
+            subject && `Summary: ${subject}`,
+            detail && `What we found: ${detail}`,
+            ...(Array.isArray(actionLines) ? actionLines.map(l => `Action: ${l}`) : []),
+            additionalNotes ? `Notes: ${additionalNotes}` : null
+        ].filter(Boolean).join('\n');
+        await zendesk.addIssueSummaryComment(holdDoc.ticketId, `[OOH ISSUE SUMMARY] Added by ${op.name}:\n${summary}`);
+        await audit.logAction({ actionType: type, operator: op, siteNo, detail: subject, outcome: 'appended', ticketId: holdDoc.ticketId });
+        return res.json({ ticket: { id: holdDoc.ticketId }, appended: true });
+    }
+
     const isP1 = type === 'escalate-p1';
 
     // F001 — build the timestamped [TRG] transcript from the control action (if any) + context.

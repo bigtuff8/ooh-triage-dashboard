@@ -19,7 +19,8 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const root = join(__dirname, '..');
 
 // OOHDASH-123: +1 for the DD-WAIT-HANDOFF ctlRelease outcome post (slow-class "sent, awaiting confirm").
-const EXPECTED_CALL_COUNT = 6;
+// OOHDASH-144: +1 for the wrapUpSubmit api.post call (body variable carries additionalNotes).
+const EXPECTED_CALL_COUNT = 7;
 
 function checkFile(relPath) {
     const src = readFileSync(join(root, relPath), 'utf8');
@@ -28,10 +29,13 @@ function checkFile(relPath) {
     const results = [];
     let m;
     while ((m = callRe.exec(src)) !== null) {
-        // Extract up to 500 chars following the opening parenthesis of the call
+        // Check up to 500 chars BEFORE the call (for body-variable pattern where additionalNotes
+        // is set on a pre-built body object above the api.post line) and up to 500 chars AFTER.
         const start = m.index;
-        const context = src.slice(start, start + 500);
-        results.push({ file: relPath, context, hasAdditionalNotes: context.includes('additionalNotes') });
+        const before = src.slice(Math.max(0, start - 500), start);
+        const after = src.slice(start, start + 500);
+        const context = before + after;
+        results.push({ file: relPath, context: after, hasAdditionalNotes: context.includes('additionalNotes') });
     }
     return results;
 }

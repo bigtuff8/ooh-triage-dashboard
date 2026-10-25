@@ -37,22 +37,22 @@ function notesField({ id = 'addnotes', bind = null, value = '', helperText } = {
         : `${currentLen} / ${maxChars}`;
     const counterColor = currentLen >= maxChars ? 'var(--danger,#c00)' : currentLen >= warnAt ? 'var(--warning,#f80)' : 'var(--text-muted,#666)';
     const helper = helperText ||
-        'For the ticket and the IoT team’s morning review. Not sent in urgent P1 texts. Keep it factual, no personal details.';
-    return `<div class="notes-group" style="margin-top:10px">
-  <label for="${id}" style="display:block;font-size:0.85em;font-weight:600;margin-bottom:4px">Additional notes for the IoT team (optional)</label>
+        'For the ticket and the IoT helpdesk\'s morning review. Not sent in urgent P1 texts. Keep it factual, no personal details.';
+    return `<div class="notes-group">
+  <div class="notes-label">\u{1F4DD} Anything the customer told you that isn\'t captured above, e.g. engineer due at 7am</div>
   <textarea
     id="${id}"
     data-testid="${id}"
+    class="notes-input"
     ${bind ? `data-bind="${bind}"` : ''}
     maxlength="${maxChars}"
     rows="2"
-    style="width:100%;box-sizing:border-box;font-size:16px;padding:6px 8px;border:1px solid var(--border,#ccc);border-radius:6px;resize:vertical"
-    placeholder="Anything the caller or site told you that isn’t captured above, e.g. engineer due at 7am"
+    placeholder="Anything the customer told you that isn\'t captured above, e.g. engineer due at 7am"
     oninput="notesInput(this)"
   >${safeValue}</textarea>
   <div style="display:flex;justify-content:space-between;align-items:center;margin-top:3px">
-   <span class="small" style="color:var(--text-muted,#666)">${helper}</span>
-   <span id="${id}-counter" class="small" style="white-space:nowrap;margin-left:8px;color:${counterColor}">${counterText}</span>
+   <span class="small" style="color:var(--text-secondary)">${helper}</span>
+   <span id="${id}-counter" class="notes-counter" style="color:${counterColor}">${counterText}</span>
   </div>
 </div>`;
 }
@@ -77,7 +77,7 @@ function notesInput(el) {
         counter.textContent = len >= maxChars
             ? `${len} / ${maxChars}, limit reached`
             : `${len} / ${maxChars}`;
-        counter.style.color = len >= maxChars ? 'var(--danger,#c00)' : len >= warnAt ? 'var(--warning,#f80)' : 'var(--text-muted,#666)';
+        counter.style.color = len >= maxChars ? 'var(--danger,#EF4444)' : len >= warnAt ? 'var(--warning,#F59E0B)' : 'var(--text-secondary,#64748B)';
     }
     // Write to in-memory flow state when bound to the flow panel
     if (el.dataset.bind === 'flow' && typeof state !== 'undefined' && state?.flow?.data) {
@@ -194,7 +194,7 @@ function notesPostBox(ticketId, { expanded = false } = {}) {
     style="width:100%;box-sizing:border-box;font-size:16px;padding:6px 8px;border:1px solid var(--border,#ccc);border-radius:6px;resize:vertical"
   >${safeD}</textarea>
   <div style="margin-top:6px">
-   <span class="small" style="color:var(--danger,#c00);display:block;margin-bottom:4px">⚠ Couldn’t save the note: ${safeMsg}. Try again, or add it later from Tonight → ticket.</span>
+   <span class="small" style="color:var(--danger,#c00);display:block;margin-bottom:4px">⚠ Couldn\'t save the note: ${safeMsg}. Try again, or add it later from Tonight → ticket.</span>
    <button class="btn primary" data-testid="addnotes-post-save" onclick="saveNotesPost(${ticketId})">Try again</button>
    <button class="btn link" style="margin-left:8px" onclick="window._postNotesReset()">Cancel</button>
   </div>
@@ -261,7 +261,7 @@ async function saveNotesPost(ticketId) {
             } else if (err.status === 400) {
                 friendly = err.message; // already a user-facing validation string
             } else {
-                friendly = 'Couldn’t save — please try again.';
+                friendly = 'Couldn\'t save — please try again.';
             }
             state.flow.data._postNotes = 'error';
             state.flow.data._postNotesError = friendly;

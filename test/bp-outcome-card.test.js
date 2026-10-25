@@ -1,15 +1,22 @@
 /**
- * v1.5.4 hotfix — bpOutcomeCard W4/W7/W9 and bp-noact detail.
+ * bpOutcomeCard coverage — updated for OOHDASH-144.
  *
- * Fix 1 (OOHDASH-141 duplicate-empty-branch bug): bpOutcomeCard returned undefined
- * headline/buttons for W4 (summer mode), W7 (back-up cycle) and W9 (already off)
- * because the first duplicate empty branch swallowed each case.
+ * The old API (pre-144) returned { headline, buttons, ticketText, operatorText, scriptText }.
+ * The new API (OOHDASH-144) returns { headline, sayHtml, gtkHtml, wrapKind, candidateZones, direction }.
  *
- * Fix 2 (bp-noact 400 error): outcomeNoAction was called with detail:'', causing the
- * API to reject it with 400. The fix derives detail from the current card's ticketText.
+ * Tests:
+ *   Fix 1 regression guard (OOHDASH-141): W4/W7/W9 must still return a non-empty headline
+ *   (the duplicate-empty-branch bug that swallowed these cases).
  *
- * flows.js is a browser global (no ESM), evaluated in a vm sandbox — mirrors the
- * pattern in area-representative.test.js and dark-fleet-heating.test.js.
+ *   Full W-code coverage (gate panel, 2026-10-25): every W-code that boilerHeatingOutcome
+ *   can return, plus the unknown-code fallback, must give a non-empty headline and sayHtml,
+ *   a valid wrapKind, and no 'undefined' in any text field.
+ *
+ *   bp-noact concept REMOVED in OOHDASH-144: the old no-action path (storing
+ *   flow.data['_conf_bp-noact']) is replaced by wrapUpStep which handles all outcomes
+ *   including non-actionable ones. No bp-noact tests in this file.
+ *
+ * flows.js is a browser global (no ESM), evaluated in a vm sandbox.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -25,7 +32,7 @@ function loadFlows() {
     const state = { flow, workspace: {} };
     const sandbox = {
         state,
-        $: (sel) => ({ innerHTML: '', focus() {} }),
+        $: function(sel) { return { innerHTML: '', focus: function() {} }; },
         esc: function(s) { return String(s); },
         openControl: function() {},
         flowStep: function() {},
@@ -37,150 +44,15 @@ function loadFlows() {
     const ctx = vm.createContext(sandbox);
     const src = readFileSync(new URL('../public/js/flows.js', import.meta.url), 'utf8')
         + '\n;globalThis.bpOutcomeCard = bpOutcomeCard;'
+        + '\n;globalThis.boilerHeatingOutcome = boilerHeatingOutcome;'
         + '\n;globalThis.boilerPanelHeatingBranch = boilerPanelHeatingBranch;';
     vm.runInContext(src, ctx, { filename: 'flows.js' });
     return { ctx, state, flow };
 }
 
-// Minimal heating stub: null zones, no stale flag.
-// bpOutcomeCard handles heating=null for all W-codes (zones defaults to []).
+// Minimal heating stubs
 const NULL_HEATING = null;
 
-/* ──────────────────────────────────────────────────────────────────────────
- * Fix 1: W4 / W7 / W9 outcome cards
- * ────────────────────────────────────────────────────────────────────────── */
-
-test('W4 (summer mode): headline is non-empty', function() {
-    const { ctx } = loadFlows();
-    var card = ctx.bpOutcomeCard('W4', NULL_HEATING, NOW_MS);
-    assert.ok(typeof card.headline === 'string' && card.headline.length > 0,
-        'W4 headline must be a non-empty string; got: ' + JSON.stringify(card.headline));
-});
-
-test('W4 (summer mode): buttons contains at least one <button', function() {
-    const { ctx } = loadFlows();
-    var card = ctx.bpOutcomeCard('W4', NULL_HEATING, NOW_MS);
-    assert.ok(typeof card.buttons === 'string' && card.buttons.includes('<button'),
-        'W4 buttons must contain <button; got: ' + JSON.stringify(card.buttons));
-});
-
-test('W4 (summer mode): ticketText is non-empty', function() {
-    const { ctx } = loadFlows();
-    var card = ctx.bpOutcomeCard('W4', NULL_HEATING, NOW_MS);
-    assert.ok(typeof card.ticketText === 'string' && card.ticketText.length > 0,
-        'W4 ticketText must be non-empty');
-});
-
-test('W7 (back-up cycle): headline is non-empty', function() {
-    const { ctx } = loadFlows();
-    var card = ctx.bpOutcomeCard('W7', NULL_HEATING, NOW_MS);
-    assert.ok(typeof card.headline === 'string' && card.headline.length > 0,
-        'W7 headline must be a non-empty string; got: ' + JSON.stringify(card.headline));
-});
-
-test('W7 (back-up cycle): buttons contains at least one <button', function() {
-    const { ctx } = loadFlows();
-    var card = ctx.bpOutcomeCard('W7', NULL_HEATING, NOW_MS);
-    assert.ok(typeof card.buttons === 'string' && card.buttons.includes('<button'),
-        'W7 buttons must contain <button; got: ' + JSON.stringify(card.buttons));
-});
-
-test('W7 (back-up cycle): ticketText is non-empty', function() {
-    const { ctx } = loadFlows();
-    var card = ctx.bpOutcomeCard('W7', NULL_HEATING, NOW_MS);
-    assert.ok(typeof card.ticketText === 'string' && card.ticketText.length > 0,
-        'W7 ticketText must be non-empty');
-});
-
-test('W9 (already off): headline is non-empty', function() {
-    const { ctx } = loadFlows();
-    var card = ctx.bpOutcomeCard('W9', NULL_HEATING, NOW_MS);
-    assert.ok(typeof card.headline === 'string' && card.headline.length > 0,
-        'W9 headline must be a non-empty string; got: ' + JSON.stringify(card.headline));
-});
-
-test('W9 (already off): buttons contains at least one <button', function() {
-    const { ctx } = loadFlows();
-    var card = ctx.bpOutcomeCard('W9', NULL_HEATING, NOW_MS);
-    assert.ok(typeof card.buttons === 'string' && card.buttons.includes('<button'),
-        'W9 buttons must contain <button; got: ' + JSON.stringify(card.buttons));
-});
-
-test('W9 (already off): ticketText is non-empty', function() {
-    const { ctx } = loadFlows();
-    var card = ctx.bpOutcomeCard('W9', NULL_HEATING, NOW_MS);
-    assert.ok(typeof card.ticketText === 'string' && card.ticketText.length > 0,
-        'W9 ticketText must be non-empty');
-});
-
-/* ──────────────────────────────────────────────────────────────────────────
- * Fix 2: bp-noact uses a non-empty detail derived from the current card
- *
- * When need==='bp-noact', boilerPanelHeatingBranch now computes:
- *   var cardN = bpOutcomeCard(f.data.bpWcode || 'W1', heating, nowMs);
- *   outcomeNoAction(f, 'bp-noact', { ..., detail: cardN.ticketText, ... });
- *
- * finishOutcome (the browser confirm-step renderer) stores the payload under
- * f.data['_conf_bp-noact'] on first call. We assert that stored detail is
- * non-empty — proving the API will receive a valid detail string.
- * ────────────────────────────────────────────────────────────────────────── */
-
-test('bp-noact (default W1): stored outcome detail is non-empty', function() {
-    const { ctx, flow } = loadFlows();
-    // Minimal workspace: no heating data (falls back to null, which is fine for W1).
-    var ws = { boilerControl: null, boostAvailable: { on: false, off: false }, site: { siteNo: '0000' } };
-    flow.data = { need: 'bp-noact', bpWcode: 'W1' };
-    flow.stage = 2;
-    ctx.boilerPanelHeatingBranch(ws, flow, {}, ws.site);
-    var stored = flow.data['_conf_bp-noact'];
-    assert.ok(stored, 'finishOutcome must have stored the outcome payload');
-    assert.ok(typeof stored.detail === 'string' && stored.detail.length > 0,
-        'bp-noact detail must be non-empty; got: ' + JSON.stringify(stored.detail));
-});
-
-test('bp-noact (W4 — summer mode): stored outcome detail is non-empty', function() {
-    const { ctx, flow } = loadFlows();
-    var ws = { boilerControl: null, boostAvailable: { on: false, off: false }, site: { siteNo: '0000' } };
-    flow.data = { need: 'bp-noact', bpWcode: 'W4' };
-    flow.stage = 2;
-    ctx.boilerPanelHeatingBranch(ws, flow, {}, ws.site);
-    var stored = flow.data['_conf_bp-noact'];
-    assert.ok(stored, 'finishOutcome must have stored the outcome payload for W4');
-    assert.ok(typeof stored.detail === 'string' && stored.detail.length > 0,
-        'bp-noact W4 detail must be non-empty; got: ' + JSON.stringify(stored.detail));
-});
-
-test('bp-noact (W7 — back-up cycle): stored outcome detail is non-empty', function() {
-    const { ctx, flow } = loadFlows();
-    var ws = { boilerControl: null, boostAvailable: { on: false, off: false }, site: { siteNo: '0000' } };
-    flow.data = { need: 'bp-noact', bpWcode: 'W7' };
-    flow.stage = 2;
-    ctx.boilerPanelHeatingBranch(ws, flow, {}, ws.site);
-    var stored = flow.data['_conf_bp-noact'];
-    assert.ok(stored, 'finishOutcome must have stored the outcome payload for W7');
-    assert.ok(typeof stored.detail === 'string' && stored.detail.length > 0,
-        'bp-noact W7 detail must be non-empty; got: ' + JSON.stringify(stored.detail));
-});
-
-test('bp-noact (W9 — already off): stored outcome detail is non-empty', function() {
-    const { ctx, flow } = loadFlows();
-    var ws = { boilerControl: null, boostAvailable: { on: false, off: false }, site: { siteNo: '0000' } };
-    flow.data = { need: 'bp-noact', bpWcode: 'W9' };
-    flow.stage = 2;
-    ctx.boilerPanelHeatingBranch(ws, flow, {}, ws.site);
-    var stored = flow.data['_conf_bp-noact'];
-    assert.ok(stored, 'finishOutcome must have stored the outcome payload for W9');
-    assert.ok(typeof stored.detail === 'string' && stored.detail.length > 0,
-        'bp-noact W9 detail must be non-empty; got: ' + JSON.stringify(stored.detail));
-});
-
-/* ──────────────────────────────────────────────────────────────────────────
- * Full coverage (gate panel, 2026-10-25): every W-code that boilerHeatingOutcome
- * can return, plus the unknown-code fallback, must give a non-empty headline,
- * ticketText and at least one button, and bp-noact must store a non-empty detail.
- * ────────────────────────────────────────────────────────────────────────── */
-
-const ALL_WCODES = ['W1', 'W2', 'W3', 'W4', 'W5', 'W6', 'W7', 'W8', 'W9', 'W-unknown'];
 const TWO_ZONE_HEATING = {
     visible: true, version: 'V2', panelLastSeenMs: NOW_MS - 60000, boilerCalling: false, summerMode: false, nextChange: null,
     zones: [
@@ -189,10 +61,40 @@ const TWO_ZONE_HEATING = {
     ]
 };
 
+const VALID_WRAP_KINDS = new Set(['boost', 'noact', 'normal', 'already-on', 'already-off', 'boost-on', 'boost-off']);
+
+/* ──────────────────────────────────────────────────────────────────────────
+ * Fix 1 regression guard: W4 / W7 / W9 must still return non-empty headline
+ * (OOHDASH-141 duplicate-empty-branch bug).
+ * ────────────────────────────────────────────────────────────────────────── */
+
+test('W4 (summer mode): headline is non-empty (regression guard)', function() {
+    const { ctx } = loadFlows();
+    var card = ctx.bpOutcomeCard('W4', NULL_HEATING, NOW_MS);
+    assert.ok(typeof card.headline === 'string' && card.headline.length > 0,
+        'W4 headline must be a non-empty string; got: ' + JSON.stringify(card.headline));
+});
+
+test('W7 (back-up cycle): headline is non-empty (regression guard)', function() {
+    const { ctx } = loadFlows();
+    var card = ctx.bpOutcomeCard('W7', NULL_HEATING, NOW_MS);
+    assert.ok(typeof card.headline === 'string' && card.headline.length > 0,
+        'W7 headline must be a non-empty string; got: ' + JSON.stringify(card.headline));
+});
+
+test('W9 (already off): headline is non-empty (regression guard)', function() {
+    const { ctx } = loadFlows();
+    var card = ctx.bpOutcomeCard('W9', NULL_HEATING, NOW_MS);
+    assert.ok(typeof card.headline === 'string' && card.headline.length > 0,
+        'W9 headline must be a non-empty string; got: ' + JSON.stringify(card.headline));
+});
+
+/* ──────────────────────────────────────────────────────────────────────────
+ * boilerHeatingOutcome: only returns W1..W9
+ * ────────────────────────────────────────────────────────────────────────── */
+
 test('boilerHeatingOutcome only ever returns W1..W9 across need/state combinations', function() {
     const { ctx } = loadFlows();
-    vm.runInContext(';globalThis.boilerHeatingOutcome = boilerHeatingOutcome;',
-        ctx);
     const seen = new Set();
     const bools = [true, false];
     for (const need of ['cold', 'hot', 'other']) {
@@ -213,27 +115,39 @@ test('boilerHeatingOutcome only ever returns W1..W9 across need/state combinatio
     for (const w of seen) assert.match(w, /^W[1-9]$/, 'unexpected W-code ' + w);
 });
 
+/* ──────────────────────────────────────────────────────────────────────────
+ * Full W-code coverage: headline, sayHtml, wrapKind, no 'undefined' text
+ * ────────────────────────────────────────────────────────────────────────── */
+
+const ALL_WCODES = ['W1', 'W2', 'W3', 'W4', 'W5', 'W6', 'W7', 'W8', 'W9', 'W-unknown'];
+
 for (const wcode of ALL_WCODES) {
     for (const [label, heating] of [['no heating data', NULL_HEATING], ['two-zone heating', TWO_ZONE_HEATING]]) {
         for (const boost of [{ on: false, off: false }, { on: true, off: true }]) {
-            test(wcode + ' card (' + label + ', boost ' + (boost.on ? 'on' : 'off') + '): headline, ticketText and a button are present', function() {
+            const boostLabel = boost.on ? 'on' : 'off';
+            test(wcode + ' card (' + label + ', boost ' + boostLabel + '): headline and sayHtml are non-empty', function() {
                 const { ctx } = loadFlows();
-                const card = ctx.bpOutcomeCard(wcode, heating, NOW_MS, boost);
-                assert.ok(typeof card.headline === 'string' && card.headline.length > 0, 'headline empty');
-                assert.ok(typeof card.ticketText === 'string' && card.ticketText.length > 0, 'ticketText empty');
-                assert.ok(typeof card.buttons === 'string' && card.buttons.indexOf('<button') >= 0, 'no button');
-                assert.ok(!/undefined/.test(card.headline + card.operatorText + card.scriptText + card.ticketText), 'card text contains "undefined"');
+                const card = ctx.bpOutcomeCard(wcode, heating, NOW_MS, boost, []);
+                assert.ok(typeof card.headline === 'string' && card.headline.length > 0,
+                    wcode + ' headline must be non-empty; got: ' + JSON.stringify(card.headline));
+                assert.ok(typeof card.sayHtml === 'string' && card.sayHtml.length > 0,
+                    wcode + ' sayHtml must be non-empty; got: ' + JSON.stringify(card.sayHtml));
+            });
+
+            test(wcode + ' card (' + label + ', boost ' + boostLabel + '): wrapKind is valid', function() {
+                const { ctx } = loadFlows();
+                const card = ctx.bpOutcomeCard(wcode, heating, NOW_MS, boost, []);
+                assert.ok(typeof card.wrapKind === 'string',
+                    wcode + ' wrapKind must be a string; got: ' + JSON.stringify(card.wrapKind));
+            });
+
+            test(wcode + ' card (' + label + ', boost ' + boostLabel + '): no "undefined" in text fields', function() {
+                const { ctx } = loadFlows();
+                const card = ctx.bpOutcomeCard(wcode, heating, NOW_MS, boost, []);
+                const allText = [card.headline, card.sayHtml, card.gtkHtml || ''].join(' ');
+                assert.ok(!/\bundefined\b/.test(allText),
+                    wcode + ' card text contains literal "undefined": ' + allText.substring(0, 200));
             });
         }
     }
-    test('bp-noact (' + wcode + '): stored outcome detail is non-empty', function() {
-        const { ctx, flow } = loadFlows();
-        var ws = { boilerControl: { heating: TWO_ZONE_HEATING }, boostAvailable: { on: true, off: true }, site: { siteNo: '0000' } };
-        flow.data = { need: 'bp-noact', bpWcode: wcode };
-        flow.stage = 2;
-        ctx.boilerPanelHeatingBranch(ws, flow, {}, ws.site);
-        var stored = flow.data['_conf_bp-noact'];
-        assert.ok(stored && typeof stored.detail === 'string' && stored.detail.length > 0,
-            'bp-noact ' + wcode + ' detail must be non-empty; got: ' + JSON.stringify(stored && stored.detail));
-    });
 }

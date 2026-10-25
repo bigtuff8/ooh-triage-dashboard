@@ -178,3 +178,32 @@ table.tbl tr.rowoff td{background:var(--danger-light)}
   .wsgrid{grid-template-columns:minmax(0,1fr)}
   .modal{width:100%;max-height:100vh;border-radius:0}
 }
+
+/* OOHDASH-144: new agent-screen standard (§8.1) */
+/* "Say to the customer" block — impossible to miss */
+.say{background:var(--primary-light);border-left:4px solid var(--primary);border-radius:0 var(--radius-md) var(--radius-md) 0;padding:11px 14px;font-size:14px;font-style:normal;margin:10px 0;line-height:22px;color:var(--text-primary)}
+.say .say-label{display:block;font-size:12px;font-weight:700;color:var(--primary-dark);margin-bottom:5px;letter-spacing:.2px}
+/* "Good to know" block — secondary, agent-only, no box */
+.gtk{font-size:14px;color:var(--text-secondary);margin:8px 0;line-height:20px}
+.gtk .gtk-label{display:block;font-size:12px;font-weight:600;color:var(--text-secondary);margin-bottom:3px}
+/* Automatic-log notification (§9.3) */
+.autolog{background:#EFF6FF;border:1px solid #BFDBFE;border-radius:var(--radius-md);padding:10px 14px;font-size:13.5px;margin:10px 0;color:#1E40AF;line-height:20px}
+/* Check and log wrap-up panel (§9) */
+.wrapup{border:1.5px solid var(--border);border-radius:var(--radius-lg);padding:16px;margin:12px 0;background:var(--surface)}
+.wrapup h3{font-size:16px;font-weight:700;margin-bottom:12px}
+.wrapup .wu-section{margin-bottom:10px;font-size:14px;line-height:22px}
+.wrapup .wu-section strong{display:block;font-size:12px;font-weight:700;color:var(--text-secondary);text-transform:uppercase;letter-spacing:.4px;margin-bottom:3px}
+.wrapup .wu-actions li{list-style:none;padding:3px 0;color:var(--text-primary)}
+/* boost-hold banner row (§10.1) */
+.hold-banner{background:var(--info-light);border:1px solid #BFDBFE;border-radius:var(--radius-md);padding:12px 16px;margin-bottom:10px}
+.hold-banner .hb-title{font-weight:600;font-size:14px;color:#1E40AF;margin-bottom:8px}
+.hold-banner .hb-row{display:flex;align-items:center;gap:10px;padding:4px 0;flex-wrap:wrap;font-size:13.5px}
+.hold-banner .hb-row .hb-state{flex:1;min-width:0}
+/* Notes box CSS classes (§11, replaces inline styles in notes.js) */
+:root{--notes-accent:#C7D2FE}
+.notes-group{background:var(--surface-variant);border:1px solid var(--border);border-left:3px solid var(--notes-accent);border-radius:var(--radius-md);padding:10px 14px;margin:10px 0}
+.notes-label{font-size:12.5px;font-weight:600;color:var(--text-secondary);margin-bottom:5px}
+.notes-input{width:100%;border:1.5px solid var(--border);border-radius:var(--radius-sm);padding:8px 10px;font:inherit;font-size:14px;line-height:22px;resize:vertical;outline:none;background:var(--surface);color:var(--text-primary)}
+.notes-input:focus{border-color:var(--primary);box-shadow:0 0 0 3px var(--primary-light)}
+@media(max-width:700px){.notes-input{font-size:16px}}
+.notes-counter{font-size:11.5px;color:var(--text-secondary);text-align:right;margin-top:3px}
