@@ -173,3 +173,67 @@ test('bp-noact (W9 — already off): stored outcome detail is non-empty', functi
     assert.ok(typeof stored.detail === 'string' && stored.detail.length > 0,
         'bp-noact W9 detail must be non-empty; got: ' + JSON.stringify(stored.detail));
 });
+
+/* ──────────────────────────────────────────────────────────────────────────
+ * Full coverage (gate panel, 2026-10-25): every W-code that boilerHeatingOutcome
+ * can return, plus the unknown-code fallback, must give a non-empty headline,
+ * ticketText and at least one button, and bp-noact must store a non-empty detail.
+ * ────────────────────────────────────────────────────────────────────────── */
+
+const ALL_WCODES = ['W1', 'W2', 'W3', 'W4', 'W5', 'W6', 'W7', 'W8', 'W9', 'W-unknown'];
+const TWO_ZONE_HEATING = {
+    visible: true, version: 'V2', panelLastSeenMs: NOW_MS - 60000, boilerCalling: false, summerMode: false, nextChange: null,
+    zones: [
+        { n: 1, zone: 'CHZ1', on: true, fallback: false, forced: null, forcedUntilMs: null, held: false, roomTemp: 19.5 },
+        { n: 2, zone: 'CHZ2', on: false, fallback: false, forced: 'off', forcedUntilMs: NOW_MS + 3600000, held: false, roomTemp: 17.1 }
+    ]
+};
+
+test('boilerHeatingOutcome only ever returns W1..W9 across need/state combinations', function() {
+    const { ctx } = loadFlows();
+    vm.runInContext(';globalThis.boilerHeatingOutcome = boilerHeatingOutcome;',
+        ctx);
+    const seen = new Set();
+    const bools = [true, false];
+    for (const need of ['cold', 'hot', 'other']) {
+        for (const stale of bools) for (const calling of bools) for (const summer of bools)
+        for (const z1on of bools) for (const z2on of bools) for (const fb of bools) for (const forcedOff of bools) {
+            const h = {
+                visible: true, panelLastSeenMs: stale ? NOW_MS - 2 * 3600000 : NOW_MS - 60000,
+                boilerCalling: calling, summerMode: summer,
+                zones: [
+                    { n: 1, on: z1on, fallback: fb, forced: null },
+                    { n: 2, on: z2on, fallback: false, forced: (!z2on && forcedOff) ? 'off' : null }
+                ]
+            };
+            seen.add(ctx.boilerHeatingOutcome(h, need, NOW_MS));
+        }
+        seen.add(ctx.boilerHeatingOutcome(null, need, NOW_MS));
+    }
+    for (const w of seen) assert.match(w, /^W[1-9]$/, 'unexpected W-code ' + w);
+});
+
+for (const wcode of ALL_WCODES) {
+    for (const [label, heating] of [['no heating data', NULL_HEATING], ['two-zone heating', TWO_ZONE_HEATING]]) {
+        for (const boost of [{ on: false, off: false }, { on: true, off: true }]) {
+            test(wcode + ' card (' + label + ', boost ' + (boost.on ? 'on' : 'off') + '): headline, ticketText and a button are present', function() {
+                const { ctx } = loadFlows();
+                const card = ctx.bpOutcomeCard(wcode, heating, NOW_MS, boost);
+                assert.ok(typeof card.headline === 'string' && card.headline.length > 0, 'headline empty');
+                assert.ok(typeof card.ticketText === 'string' && card.ticketText.length > 0, 'ticketText empty');
+                assert.ok(typeof card.buttons === 'string' && card.buttons.indexOf('<button') >= 0, 'no button');
+                assert.ok(!/undefined/.test(card.headline + card.operatorText + card.scriptText + card.ticketText), 'card text contains "undefined"');
+            });
+        }
+    }
+    test('bp-noact (' + wcode + '): stored outcome detail is non-empty', function() {
+        const { ctx, flow } = loadFlows();
+        var ws = { boilerControl: { heating: TWO_ZONE_HEATING }, boostAvailable: { on: true, off: true }, site: { siteNo: '0000' } };
+        flow.data = { need: 'bp-noact', bpWcode: wcode };
+        flow.stage = 2;
+        ctx.boilerPanelHeatingBranch(ws, flow, {}, ws.site);
+        var stored = flow.data['_conf_bp-noact'];
+        assert.ok(stored && typeof stored.detail === 'string' && stored.detail.length > 0,
+            'bp-noact ' + wcode + ' detail must be non-empty; got: ' + JSON.stringify(stored && stored.detail));
+    });
+}
