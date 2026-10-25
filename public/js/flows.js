@@ -795,7 +795,7 @@ function bpOutcomeCard(wcode, heating, nowMs, boostAvailable) {
                   '<button class="btn primary" data-testid="bp-capture" onclick="flowStep({need:\'bp-esc\'})">Capture &amp; escalate for the IoT team</button>' +
                   '<button class="btn" data-testid="bp-advice" onclick="flowStep({need:\'bp-advice\'})">Advise heating engineer &amp; log it</button>' +
                   '<button class="btn" data-testid="bp-noact" onclick="flowStep({need:\'bp-noact\'})">End with no action</button>';
-    } else if (wcode === 'W4') {} else if (wcode === 'W4') {
+    } else if (wcode === 'W4') {
         headline = "Pub heating is in summer mode";
         operatorText = "The panel has switched the pub heating off for the summer season. It isn’t a fault, but we can’t change it from here. If the site needs heating, log it for the IoT team.";
         scriptText = "The heating controls are still set to summer mode, which is why the heating isn’t coming on. I can’t change that from here, but I’ve logged it so the team can switch it back for you.";
@@ -841,7 +841,7 @@ function bpOutcomeCard(wcode, heating, nowMs, boostAvailable) {
         buttons = boostBtnsW6 +
                   '<button class="btn primary" data-testid="bp-capture" onclick="flowStep({need:\'bp-esc\'})">Capture &amp; escalate for the IoT team</button>' +
                   '<button class="btn" data-testid="bp-noact" onclick="flowStep({need:\'bp-noact\'})">End with no action</button>';
-    } else if (wcode === 'W7') {} else if (wcode === 'W7') {
+    } else if (wcode === 'W7') {
         var fallbackZone = zones.find(function(z) { return z.fallback; }) || zones[0] || { n: 1 };
         headline = "Heating is running on a back-up cycle";
         operatorText = "The panel has lost the room temperature reading for pub zone " + fallbackZone.n + ", so it’s heating that zone on a timed on/off cycle instead. Rooms can feel cooler than normal. The IoT team needs to check the room sensor.";
@@ -849,28 +849,34 @@ function bpOutcomeCard(wcode, heating, nowMs, boostAvailable) {
         ticketText = "Pub heating at time of call: pub zone " + fallbackZone.n + " on back-up (fallback) cycle, room sensor not reporting. Captured for the IoT team.";
         buttons = '<button class="btn primary" data-testid="bp-capture" onclick="flowStep({need:\'bp-esc\'})">Capture &amp; escalate for the IoT team</button>' +
                   '<button class="btn" data-testid="bp-noact" onclick="flowStep({need:\'bp-noact\'})">End with no action</button>';
-    } else if (wcode === 'W8') {
+    } else if (wcode === ‘W8’) {
         var onZonesW8obj = zones.filter(function(z) { return z.on; });
-        var onZoneIdsW8 = onZonesW8obj.map(function(z) { return z.zone || ('CHZ' + z.n); });
-        var onZonesW8 = onZonesW8obj.map(function(z) { return 'pub zone ' + z.n; });
-        var onListW8 = onZonesW8.length > 0 ? onZonesW8.join(' and ') : 'pub zones';
-        headline = "Pub heating is on, and we can’t switch it off from here";
-        operatorText = "The panel is heating " + esc(onListW8) + ". Pub heating on this panel can’t be changed remotely. Log it for the IoT team. In the meantime the site can turn the radiator valves down.";
-        scriptText = "The heating is on at the controls and I can’t change it from here tonight. Turning the radiator valves down will help in the meantime. I’ve logged it for the team.";
-        ticketText = "Pub heating at time of call: on (" + esc(onListW8) + "). Caller wants it lower/off; captured for the IoT team.";
-        var boostBtnsW8 = '';
+        var onZoneIdsW8 = onZonesW8obj.map(function(z) { return z.zone || (‘CHZ’ + z.n); });
+        var onZonesW8 = onZonesW8obj.map(function(z) { return ‘pub zone ‘ + z.n; });
+        var onListW8 = onZonesW8.length > 0 ? onZonesW8.join(‘ and ‘) : ‘pub zones’;
+        var boostBtnsW8 = ‘’;
         if (boostAvailable.off && onZoneIdsW8.length > 0) {
             onZoneIdsW8.forEach(function(zId) {
-                var zLabel = zId === 'CHZ1' ? 'zone 1' : 'zone 2';
-                boostBtnsW8 += '<button class="btn boost-off" data-testid="bp-boost-off-' + zId + '" onclick="flowStep({need:\'bp-boost\',direction:\'off\',zone:\'' + zId + '\'})">' + 'Heat OFF (' + zLabel + ')</button>';
+                var zLabel = zId === ‘CHZ1’ ? ‘zone 1’ : ‘zone 2’;
+                boostBtnsW8 += ‘<button class="btn boost-off" data-testid="bp-boost-off-’ + zId + ‘" onclick="flowStep({need:\’bp-boost\’,direction:\’off\’,zone:\’’ + zId + ‘\’})">’ + ‘Heat OFF (‘ + zLabel + ‘)</button>’;
             });
         } else if (boostAvailable.off) {
-            boostBtnsW8 = '<button class="btn boost-off" data-testid="bp-boost-off" onclick="flowStep({need:\'bp-boost\',direction:\'off\',zone:\'CHZ1\'})">Heat OFF</button>';
+            boostBtnsW8 = ‘<button class="btn boost-off" data-testid="bp-boost-off" onclick="flowStep({need:\’bp-boost\’,direction:\’off\’,zone:\’CHZ1\’})">Heat OFF</button>’;
         }
+        if (boostBtnsW8) {
+            headline = "Pub heating is on — you can switch it off";
+            operatorText = "The panel is heating " + esc(onListW8) + ". Use the button below to switch it off. Log it for the IoT team at the same time.";
+            scriptText = "The heating is on. I can switch it off from here — I’ll do that now and log it for the team.";
+        } else {
+            headline = "Pub heating is on, and we can’t switch it off from here";
+            operatorText = "The panel is heating " + esc(onListW8) + ". Pub heating on this panel can’t be changed remotely. Log it for the IoT team. In the meantime the site can turn the radiator valves down.";
+            scriptText = "The heating is on at the controls and I can’t change it from here tonight. Turning the radiator valves down will help in the meantime. I’ve logged it for the team.";
+        }
+        ticketText = "Pub heating at time of call: on (" + esc(onListW8) + "). Caller wants it lower/off; captured for the IoT team.";
         buttons = boostBtnsW8 +
-                  '<button class="btn primary" data-testid="bp-capture" onclick="flowStep({need:\'bp-esc\'})">Capture &amp; escalate for the IoT team</button>' +
-                  '<button class="btn" data-testid="bp-noact" onclick="flowStep({need:\'bp-noact\'})">End with no action</button>';
-    } else if (wcode === 'W9') {} else if (wcode === 'W9') {
+                  ‘<button class="btn primary" data-testid="bp-capture" onclick="flowStep({need:\’bp-esc\’})">Capture &amp; escalate for the IoT team</button>’ +
+                  ‘<button class="btn" data-testid="bp-noact" onclick="flowStep({need:\’bp-noact\’})">End with no action</button>’;
+    } else if (wcode === 'W9') {
         headline = "Pub heating is already off";
         operatorText = "The panel isn’t heating any pub zone right now, so the warmth isn’t coming from the pub heating controls. Ask whether another heater, or the accommodation heating, is on.";
         scriptText = "Our controls show the pub heating is off right now, so the warmth is coming from somewhere else, perhaps a radiator on manual or another heater. I’ve noted the call.";
