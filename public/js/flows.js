@@ -923,8 +923,19 @@ function wrapUpStep(ws, f, heating) {
     }
 
     if (f.data['_wrap_err']) {
-        return '<div class="alert err" data-testid="wrap-error">We couldn\'t log this: ' + esc(f.data['_wrap_err']) +
-            ' <button class="btn" onclick="state.flow.data[\'_wrap_err\']=null;state.flow.data[\'_wrap_pend\']=null;render()">Try again</button></div>';
+        // §9.2: append-refused and hold-not-found are not transient — offer a new-ticket button
+        // instead of "Try again" (which would just fail again). The earlier ticket ID is shown
+        // as evidence so the agent knows what they were trying to add to.
+        var errCode = f.data['_wrap_err_code'] || '';
+        var isAppendFail = (errCode === 'append-refused' || errCode === 'hold-not-found');
+        var errTicket = f.data['_wrap_err_ticket'];
+        var evidenceHtml = (isAppendFail && errTicket)
+            ? '<div class="small" style="margin-top:4px">Earlier ticket: #' + esc(String(errTicket)) + '</div>'
+            : '';
+        var actionBtn = isAppendFail
+            ? '<button class="btn primary" data-testid="wrap-new-ticket" onclick="wrapUpForceNew()" style="margin-top:8px">Log for the IoT helpdesk and finish</button>'
+            : '<button class="btn" onclick="state.flow.data[\'_wrap_err\']=null;state.flow.data[\'_wrap_pend\']=null;render()">Try again</button>';
+        return '<div class="alert err" data-testid="wrap-error">' + esc(f.data['_wrap_err']) + evidenceHtml + ' ' + actionBtn + '</div>';
     }
 
     if (f.data['_wrap_pend']) {
@@ -1001,6 +1012,9 @@ function wrapUpSubmit() {
     var detail = f.data._wrapHeadline || subject;
     var logSentence = f.data._wrapLogSentence || detail;
 
+    // §9.2: if the agent is re-submitting after append-refused, bypass the append path.
+    var forceNew = !!f.data['_wrap_force_new'];
+
     var body = {
         type: f.data.wrapKind === 'no-action' ? 'no-action' : 'capture',
         siteNo: ws.site.siteNo,
@@ -1011,9 +1025,11 @@ function wrapUpSubmit() {
         additionalNotes: f.data.additionalNotes || null,
         OohCaptureClass: 'boiler-panel-heating',
         actions: actionLines,
-        holdIds: holdIds
+        holdIds: holdIds,
+        // Cite the earlier ticket when re-submitting after append-refused (§9.2 Related: #N).
+        relatedToTicketId: forceNew ? (f.data['_wrap_related_ticket'] || null) : null
     };
-    if (appendToHoldId && existingTicketId) {
+    if (appendToHoldId && existingTicketId && !forceNew) {
         body.appendToHoldId = appendToHoldId;
         body.confirmToken = state.confirmToken;
     }
@@ -1024,6 +1040,8 @@ function wrapUpSubmit() {
         f.data['_wrap_done'] = true;
         f.data['_wrap_ticket'] = tkt;
         f.data['_wrap_subject'] = subject;
+        f.data['_wrap_force_new'] = null;
+        f.data['_wrap_related_ticket'] = null;
         // Refresh workspace so banner clears if we put something back
         refreshWorkspace().catch(function() {});
         render();
@@ -1033,13 +1051,38 @@ function wrapUpSubmit() {
         // Never show raw codes on screen.
         var rawCode = err.message || 'unknown error';
         var mappedMsg = rawCode;
-        if (rawCode === 'append-refused') mappedMsg = "Couldn't add to the existing ticket. Use the log button below to log as a new ticket instead.";
+        if (rawCode === 'append-refused') mappedMsg = "Couldn't add to the existing ticket. Use the button below to log as a new ticket instead.";
         else if (rawCode === 'expired-token') mappedMsg = "The site confirmation has expired. Re-confirm the site and try again.";
         else if (rawCode === 'site-mismatch') mappedMsg = "The confirmed site doesn't match this hold. Re-confirm the site and try again.";
-        else if (rawCode === 'hold-not-found') mappedMsg = "Couldn't find the original hold record. Log as a new ticket using the button below.";
+        else if (rawCode === 'hold-not-found') mappedMsg = "Couldn't find the original hold record. Use the button below to log as a new ticket instead.";
+        // Store the raw code so wrapUpStep can pick the right recovery action (§9.2).
+        f.data['_wrap_err_code'] = rawCode;
+        // Store the ticket we were trying to append to — shown as evidence and used as Related: #N.
+        if (rawCode === 'append-refused' || rawCode === 'hold-not-found') {
+            f.data['_wrap_err_ticket'] = existingTicketId;
+        }
         f.data['_wrap_err'] = mappedMsg;
         render();
     });
+}
+
+/**
+ * wrapUpForceNew — §9.2 fallback when append-refused / hold-not-found.
+ * Clears the error state and re-submits as a brand-new ticket, passing the
+ * earlier ticket id so the server can cite "Related: #N" in the first comment.
+ */
+function wrapUpForceNew() {
+    if (!state.flow || !state.flow.data) return;
+    var f = state.flow;
+    var relatedTicket = f.data['_wrap_err_ticket'] || null;
+    // Clear error flags
+    f.data['_wrap_err'] = null;
+    f.data['_wrap_err_code'] = null;
+    f.data['_wrap_err_ticket'] = null;
+    // Signal that this submit must bypass the append path and cite the earlier ticket
+    f.data['_wrap_force_new'] = true;
+    f.data['_wrap_related_ticket'] = relatedTicket;
+    wrapUpSubmit();
 }
 
 /**

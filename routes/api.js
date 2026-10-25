@@ -479,7 +479,7 @@ export function buildOutcomeTranscript({ action, type, siteNo, siteName, detail,
 
 router.post('/outcomes', wrap(async (req, res) => {
     const op = req.session.operator;
-    const { type, siteNo, siteName, subject, detail, callerWords, OohCaptureClass, actionId, holdText, p1Summary, additionalNotes, appendToHoldId, holdIds, actions: actionLines } = req.body;
+    const { type, siteNo, siteName, subject, detail, callerWords, OohCaptureClass, actionId, holdText, p1Summary, additionalNotes, appendToHoldId, holdIds, actions: actionLines, relatedToTicketId } = req.body;
     if (!type || !siteNo || !subject || !detail) {
         return res.status(400).json({ error: 'type, siteNo, subject and detail are required' });
     }
@@ -537,6 +537,17 @@ router.post('/outcomes', wrap(async (req, res) => {
         // OOHDASH-119: additional notes ride alongside but are NOT written to the P1 SMS or audit log.
         additionalNotes: additionalNotes || null
     });
+
+    // §9.2: if the client re-submitted after an append-refused, cite the earlier ticket in an
+    // internal comment so the IoT helpdesk can link the two records.
+    if (relatedToTicketId) {
+        try {
+            await zendesk.addIssueSummaryComment(ticket.id, `[OOH] Related: #${relatedToTicketId}`);
+        } catch (err) {
+            console.error(`[API] Failed to add Related comment to ticket #${ticket.id}: ${err.message}`);
+            // Non-fatal: the new ticket is still created and logged.
+        }
+    }
 
     let p1 = null;
     if (isP1) {
