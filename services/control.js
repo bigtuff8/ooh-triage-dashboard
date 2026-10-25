@@ -547,7 +547,7 @@ export function controlQueueStatus() {
  * Dispatches a pub heating boost (ON or OFF) to a boiler-panel device.
  * Returns the action record, or { _warnings } for a 409 pre-read warning.
  */
-export async function dispatchBoilerBoost({ operator, confirmToken, siteNo, deviceId, zones, direction, durationKey, acknowledgedWarnings, callerWords }) {
+export async function dispatchBoilerBoost({ operator, confirmToken, siteNo, deviceId, zones, direction, durationKey, acknowledgedWarnings, callerWords, appendToHoldId }) {
     // F004 — validate confirmation token (non-consuming). We consume it just before the first
     // write so that a warnings-only pre-read can be followed by a second acknowledged request
     // without the token being spent on the read. The window between isConfirmed and
@@ -590,8 +590,25 @@ export async function dispatchBoilerBoost({ operator, confirmToken, siteNo, devi
     // so V1/V2 discrimination comes from site.boilerControl.isV2 (set at site-read time).
     const panelVersion = site.boilerControl?.isV2 ? 'v2' : 'v1';
 
-    // Clamp: 01:00/07:00 window check
-    const clampResult = clampBoostWindow(Date.now(), direction, durationKey);
+    // Clamp: 01:00/07:00 window check.
+    // For until-next-on, compute the earliest nextOn.atMs across the requested zones so the
+    // server resolves the dynamic duration (§7). A null here falls back to until-0700.
+    let nextOnMs = null;
+    if (durationKey === 'until-next-on' && direction === 'off') {
+        const { zoneTimetable: zt } = await import('./schedule.js');
+        const { collection } = await import('./store.js');
+        // We need the zone timetables — re-read from the device's SHARED_SCOPE.
+        // Use site.boilerControl.heating.zones which was read moments ago (no extra round-trip).
+        const heatingZones = site.boilerControl?.heating?.zones || [];
+        for (const requestedZone of zones) {
+            const zData = heatingZones.find(z => z.zone === requestedZone || z.zone === ('CHZ' + requestedZone));
+            if (zData?.timetable?.nextOn?.atMs) {
+                const atMs = zData.timetable.nextOn.atMs;
+                if (nextOnMs === null || atMs < nextOnMs) nextOnMs = atMs;
+            }
+        }
+    }
+    const clampResult = clampBoostWindow(Date.now(), direction, durationKey, 'Europe/London', nextOnMs);
     if (!clampResult.ok) {
         throw Object.assign(new Error(clampResult.message), { status: 422, code: clampResult.code });
     }
@@ -730,41 +747,75 @@ export async function dispatchBoilerBoost({ operator, confirmToken, siteNo, devi
         }
     }
 
-    // Create Zendesk ticket (synchronous; failure raises alert but does not cancel hold)
+    // Create or append Zendesk ticket (synchronous; failure raises alert but does not cancel hold).
+    // OOHDASH-144 §9.2a: if appendToHoldId is provided and valid, add to the existing ticket instead
+    // of creating a new one (one ticket per issue).
     let ticketId = null;
-    try {
-        const preStateMap = Object.fromEntries(preStates.map(z => [z.zone, z]));
-        const { createBoostTicket } = await _zendeskBoost();
-        const ticket = await createBoostTicket({
-            operator,
-            callerWords,
-            siteNo: site.siteNo,
-            siteName: site.siteName,
-            panelVersion,
-            zones,
-            direction,
-            durationKey,
-            requestedMin: clampResult.requestedMin,
-            effectiveMin: clampResult.effectiveMin,
-            clamped: clampResult.clamped,
-            revertAtMs: clampResult.revertAtMs,
-            previousStates: preStates,
-            acknowledgedWarnings: !!acknowledgedWarnings,
-            outcomes: zoneOutcomes
-        });
-        ticketId = ticket.id;
-        // Attach ticketId to all holds
-        const { collection } = await import('./store.js');
-        const col = await collection('OohOverrides');
+    let appendResolved = false;
+    if (appendToHoldId) {
+        try {
+            const { collection: col2 } = await import('./store.js');
+            const col = await col2('OohOverrides');
+            const holdDoc = await col.get(appendToHoldId);
+            if (
+                holdDoc &&
+                holdDoc.ticketId &&
+                String(holdDoc.siteNo) === String(siteNo) &&
+                holdDoc.deviceType === 'boiler-panel' &&
+                (Date.now() - new Date(holdDoc.createdAt).getTime()) < 12 * 60 * 60 * 1000
+            ) {
+                ticketId = holdDoc.ticketId;
+                appendResolved = true;
+                const { addBoostActionNote } = await _zendeskBoost();
+                if (addBoostActionNote) {
+                    await addBoostActionNote(ticketId, {
+                        operator, zones, direction, durationKey,
+                        revertAtMs: clampResult.revertAtMs, outcomes: zoneOutcomes
+                    });
+                }
+            }
+        } catch (e) {
+            console.error(`[CONTROL] appendToHoldId resolve failed: ${e.message}`);
+        }
+    }
+    if (!appendResolved) {
+        try {
+            const preStateMap = Object.fromEntries(preStates.map(z => [z.zone, z]));
+            const { createBoostTicket } = await _zendeskBoost();
+            const ticket = await createBoostTicket({
+                operator,
+                callerWords,
+                siteNo: site.siteNo,
+                siteName: site.siteName,
+                panelVersion,
+                zones,
+                direction,
+                durationKey,
+                requestedMin: clampResult.requestedMin,
+                effectiveMin: clampResult.effectiveMin,
+                clamped: clampResult.clamped,
+                fallback: clampResult.fallback || null,
+                revertAtMs: clampResult.revertAtMs,
+                previousStates: preStates,
+                acknowledgedWarnings: !!acknowledgedWarnings,
+                outcomes: zoneOutcomes
+            });
+            ticketId = ticket.id;
+        } catch (err) {
+            console.error(`[CONTROL] Boost ticket creation failed: ${err.message}`);
+            raiseAlert('boost-ticket-failed', `Zendesk ticket creation failed for boiler boost on ${deviceId}: ${err.message}`);
+        }
+    }
+    // Attach ticketId to all holds
+    if (ticketId) {
+        const { collection: col3 } = await import('./store.js');
+        const col = await col3('OohOverrides');
         for (const { zone, overrideId } of overrideIds) {
             try {
                 const doc = await col.get(overrideId);
                 if (doc) { doc.ticketId = ticketId; await col.upsert(doc); }
             } catch (e) { console.error(`[CONTROL] boost ticketId attach failed for ${zone}: ${e.message}`); }
         }
-    } catch (err) {
-        console.error(`[CONTROL] Boost ticket creation failed: ${err.message}`);
-        raiseAlert('boost-ticket-failed', `Zendesk ticket creation failed for boiler boost on ${deviceId}: ${err.message}`);
     }
 
     recordControlEvent(`boiler-boost-${direction}`);
@@ -783,6 +834,7 @@ export async function dispatchBoilerBoost({ operator, confirmToken, siteNo, devi
         requestedMin: clampResult.requestedMin,
         effectiveMin: clampResult.effectiveMin,
         clamped: clampResult.clamped,
+        fallback: clampResult.fallback || null,
         revertAtMs: clampResult.revertAtMs,
         ticketId,
         overrideIds,

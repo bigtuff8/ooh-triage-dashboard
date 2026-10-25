@@ -1718,7 +1718,8 @@
               "forced": null,
               "forcedUntilMs": null,
               "held": false,
-              "roomTemp": 18.7
+              "roomTemp": 18.7,
+              "zone": "CHZ1"
             },
             {
               "n": 2,
@@ -1727,11 +1728,46 @@
               "forced": null,
               "forcedUntilMs": null,
               "held": false,
-              "roomTemp": 19.3
+              "roomTemp": 19.3,
+              "zone": "CHZ2"
             }
           ],
           "summerMode": false,
-          "nextChange": null
+          "nextChange": null,
+          "schedules": {
+            "CHZ1": {
+              "schedule": [
+                {
+                  "value": 21,
+                  "time": "06:30",
+                  "loops": "1111111",
+                  "timer_id": "t1"
+                },
+                {
+                  "value": 15,
+                  "time": "23:00",
+                  "loops": "1111111",
+                  "timer_id": "t2"
+                }
+              ]
+            },
+            "CHZ2": {
+              "schedule": [
+                {
+                  "value": 21,
+                  "time": "06:30",
+                  "loops": "1111111",
+                  "timer_id": "t1"
+                },
+                {
+                  "value": 15,
+                  "time": "23:00",
+                  "loops": "1111111",
+                  "timer_id": "t2"
+                }
+              ]
+            }
+          }
         }
       }
     },
@@ -1785,7 +1821,8 @@
               "forced": null,
               "forcedUntilMs": null,
               "held": false,
-              "roomTemp": 18.7
+              "roomTemp": 18.7,
+              "zone": "CHZ1"
             },
             {
               "n": 2,
@@ -1794,11 +1831,46 @@
               "forced": null,
               "forcedUntilMs": null,
               "held": false,
-              "roomTemp": null
+              "roomTemp": null,
+              "zone": "CHZ2"
             }
           ],
           "summerMode": false,
-          "nextChange": null
+          "nextChange": null,
+          "schedules": {
+            "CHZ1": {
+              "schedule": [
+                {
+                  "value": 21,
+                  "time": "06:30",
+                  "loops": "1111111",
+                  "timer_id": "t3"
+                },
+                {
+                  "value": 15,
+                  "time": "23:00",
+                  "loops": "1111111",
+                  "timer_id": "t4"
+                }
+              ]
+            },
+            "CHZ2": {
+              "schedule": [
+                {
+                  "value": 21,
+                  "time": "06:30",
+                  "loops": "1111100",
+                  "timer_id": "t5"
+                },
+                {
+                  "value": 15,
+                  "time": "23:00",
+                  "loops": "1111100",
+                  "timer_id": "t6"
+                }
+              ]
+            }
+          }
         }
       }
     },
@@ -1826,15 +1898,39 @@
           "kind": "kitchen",
           "online": true,
           "controllable": false,
-          "telemetry": { "switch_1": false },
+          "telemetry": {
+            "switch_1": false
+          },
           "tuyaFixture": {
             "id": "tuya-fix-8888-fryer",
             "name": "gk-8888-fryer-1",
             "product_id": "jdj6ccklup7btq3a",
             "product_name": "Din Rail Wi-Fi Switch with metering",
             "online": true,
-            "status": [{"code":"switch_1","value":false},{"code":"cur_power","value":0}],
-            "schedule": [{"time":"00:00","loops":"1111111","functions":[{"code":"switch_1","value":true}],"enable":true,"timezone_id":"Europe/London"}]
+            "status": [
+              {
+                "code": "switch_1",
+                "value": false
+              },
+              {
+                "code": "cur_power",
+                "value": 0
+              }
+            ],
+            "schedule": [
+              {
+                "time": "00:00",
+                "loops": "1111111",
+                "functions": [
+                  {
+                    "code": "switch_1",
+                    "value": true
+                  }
+                ],
+                "enable": true,
+                "timezone_id": "Europe/London"
+              }
+            ]
           }
         },
         {
@@ -1845,15 +1941,39 @@
           "kind": "kitchen",
           "online": true,
           "controllable": false,
-          "telemetry": { "switch_1": true },
+          "telemetry": {
+            "switch_1": true
+          },
           "tuyaFixture": {
             "id": "tuya-fix-8888-gw",
             "name": "gk-8888-glasswasher-1",
             "product_id": "jdj6ccklup7btq3a",
             "product_name": "Din Rail Wi-Fi Switch with metering",
             "online": true,
-            "status": [{"code":"switch_1","value":true},{"code":"cur_power","value":500}],
-            "schedule": [{"time":"00:00","loops":"1111111","functions":[{"code":"switch_1","value":true}],"enable":true,"timezone_id":"Europe/London"}]
+            "status": [
+              {
+                "code": "switch_1",
+                "value": true
+              },
+              {
+                "code": "cur_power",
+                "value": 500
+              }
+            ],
+            "schedule": [
+              {
+                "time": "00:00",
+                "loops": "1111111",
+                "functions": [
+                  {
+                    "code": "switch_1",
+                    "value": true
+                  }
+                ],
+                "enable": true,
+                "timezone_id": "Europe/London"
+              }
+            ]
           }
         },
         {
@@ -1864,14 +1984,25 @@
           "kind": "kitchen",
           "online": true,
           "controllable": false,
-          "telemetry": { "switch_1": false },
+          "telemetry": {
+            "switch_1": false
+          },
           "tuyaFixture": {
             "id": "tuya-fix-8888-dw",
             "name": "gk-8888-dishwasher-1",
             "product_id": "jdj6ccklup7btq3a",
             "product_name": "Din Rail Wi-Fi Switch with metering",
             "online": true,
-            "status": [{"code":"switch_1","value":false},{"code":"cur_power","value":0}],
+            "status": [
+              {
+                "code": "switch_1",
+                "value": false
+              },
+              {
+                "code": "cur_power",
+                "value": 0
+              }
+            ],
             "schedule": []
           }
         },
@@ -1883,15 +2014,39 @@
           "kind": "kitchen",
           "online": true,
           "controllable": false,
-          "telemetry": { "switch_1": true },
+          "telemetry": {
+            "switch_1": true
+          },
           "tuyaFixture": {
             "id": "tuya-fix-8888-pw",
             "name": "gk-8888-potwash-1",
             "product_id": "jdj6ccklup7btq3a",
             "product_name": "Din Rail Wi-Fi Switch with metering",
             "online": true,
-            "status": [{"code":"switch_1","value":true},{"code":"cur_power","value":0}],
-            "schedule": [{"time":"00:00","loops":"1111111","functions":[{"code":"switch_1","value":true}],"enable":true,"timezone_id":"Europe/London"}]
+            "status": [
+              {
+                "code": "switch_1",
+                "value": true
+              },
+              {
+                "code": "cur_power",
+                "value": 0
+              }
+            ],
+            "schedule": [
+              {
+                "time": "00:00",
+                "loops": "1111111",
+                "functions": [
+                  {
+                    "code": "switch_1",
+                    "value": true
+                  }
+                ],
+                "enable": true,
+                "timezone_id": "Europe/London"
+              }
+            ]
           }
         },
         {
@@ -1902,17 +2057,50 @@
           "kind": "kitchen",
           "online": true,
           "controllable": false,
-          "telemetry": { "switch_1": false },
+          "telemetry": {
+            "switch_1": false
+          },
           "tuyaFixture": {
             "id": "tuya-fix-8888-bm",
             "name": "gk-8888-bainmarie-1",
             "product_id": "jdj6ccklup7btq3a",
             "product_name": "Din Rail Wi-Fi Switch with metering",
             "online": true,
-            "status": [{"code":"switch_1","value":false},{"code":"cur_power","value":0}],
+            "status": [
+              {
+                "code": "switch_1",
+                "value": false
+              },
+              {
+                "code": "cur_power",
+                "value": 0
+              }
+            ],
             "schedule": [
-              {"time":"23:59","loops":"1111111","functions":[{"code":"switch_1","value":true}],"enable":true,"timezone_id":"Europe/London"},
-              {"time":"00:00","loops":"1111111","functions":[{"code":"switch_1","value":false}],"enable":true,"timezone_id":"Europe/London"}
+              {
+                "time": "23:59",
+                "loops": "1111111",
+                "functions": [
+                  {
+                    "code": "switch_1",
+                    "value": true
+                  }
+                ],
+                "enable": true,
+                "timezone_id": "Europe/London"
+              },
+              {
+                "time": "00:00",
+                "loops": "1111111",
+                "functions": [
+                  {
+                    "code": "switch_1",
+                    "value": false
+                  }
+                ],
+                "enable": true,
+                "timezone_id": "Europe/London"
+              }
             ]
           }
         }

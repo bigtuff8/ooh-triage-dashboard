@@ -461,6 +461,14 @@ async function addInternalComment(ticketId, body) {
 }
 
 /**
+ * OOHDASH-144: export addInternalComment for the outcomes append path (§9.2).
+ * Plain-text internal comment; no HTML. Caller must escape any user-supplied content.
+ */
+export async function addIssueSummaryComment(ticketId, body) {
+    return addInternalComment(ticketId, body);
+}
+
+/**
  * F015 — the feedback thread: OOH/TRG internal comments on a ticket, oldest first.
  */
 export async function getFeedbackThread(ticketId) {

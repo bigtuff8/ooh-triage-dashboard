@@ -14,12 +14,12 @@ function siteSubline(s) {
 }
 
 /**
- * B0/R0 · C9 — the confirm-gate warning shown when a site's name could not be verified (live
+ * B0/R0 · C9 — the confirm-gate warning shown when a site\'s name could not be verified (live
  * Zendesk miss). Keeps a wrong-site dispatch honest: confirm the house number by voice.
  */
 function unverifiedNotice(s) {
     return s.nameUnverified
-        ? `<div class="alert warn" data-testid="confirm-unverified">⚠ <b>Site name unverified</b> — we couldn’t resolve a recognisable name for this house number. Confirm the house number by voice before making any change.</div>`
+        ? `<div class="alert warn" data-testid="confirm-unverified">⚠ <b>Site name unverified</b> — we couldn\'t resolve a recognisable name for this house number. Confirm the house number by voice before making any change.</div>`
         : '';
 }
 
@@ -27,7 +27,7 @@ function unverifiedNotice(s) {
 function vHome() {
     $('#view').innerHTML = `<div class="content narrow">
   <div class="card" style="padding:26px">
-   <h2>Who’s calling?</h2>
+   <h2>Who\'s calling?</h2>
    <p class="sub" style="margin-bottom:14px">Ask for the <b>house number</b> (4 digits) — or search by pub name. Use ↑ ↓ and Enter to pick.</p>
    <div class="searchwrap"><input id="sq" data-testid="site-search" placeholder="e.g. 6832 or Old Grey Mare" autocomplete="off"><div id="sres"></div></div>
    <p class="small" style="margin-top:12px">Caller ringing back about an earlier issue? <button class="btn link" onclick="go('callback')">Use Callback Lookup →</button></p>
@@ -36,7 +36,7 @@ function vHome() {
    <h3>Recent calls tonight (yours)</h3>
    ${state.recent.length ? state.recent.map(r =>
         `<div class="stepdone" style="cursor:pointer" onclick="openSite('${esc(r.siteNo)}')"><span>📞</span> <b>${esc(r.siteName)}</b> <span class="mono">${esc(r.siteNo)}</span> <span class="small" style="margin-left:auto">${esc(r.t)}</span></div>`).join('')
-        : '<p class="small">No calls yet this shift. The whole shift’s activity is under <b>Tonight</b>.</p>'}
+        : '<p class="small">No calls yet this shift. The whole shift\'s activity is under <b>Tonight</b>.</p>'}
   </div></div>`;
     bindSearch('sq', 'sres', openSite);
     $('#sq').focus();
@@ -77,7 +77,7 @@ function renderAmbiguous() {
     $('#view').innerHTML = `<div class="content narrow"><div class="card" style="border-color:var(--warning)" data-testid="ambiguous-card">
    <h2>⚠️ House ID ${esc(a.siteNo)} is ambiguous</h2>
    <p class="sub" style="margin:8px 0">This ID matches more than one site (${a.matches.map(m => `<b>${esc(m.siteName)}</b>`).join(' and ')}). To protect against changing the wrong site, remote control is blocked for ambiguous IDs.</p>
-   <div class="script">“I can’t safely make changes for this site number tonight — I’ll log this for the IoT team as a priority and they’ll pick it up.”</div>
+   <div class="script">"I can\'t safely make changes for this site number tonight — I\'ll log this for the IoT team as a priority and they\'ll pick it up."</div>
 
    ${notesField({ id: 'addnotes-amb' })}
    <div style="margin-top:10px">
@@ -114,7 +114,7 @@ function renderConfirmGate() {
    ${siteSubline(s)}
    ${unverifiedNotice(s)}
    <p style="margin:10px 0 4px">${esc(s.deviceSummary)}</p>
-   <div class="script">“Can I just confirm — you’re calling from <b>${esc(s.siteName)}</b>, site number <b>${esc(s.siteNo)}</b>?”</div>
+   <div class="script">"Can I just confirm — you\'re calling from <b>${esc(s.siteName)}</b>, site number <b>${esc(s.siteNo)}</b>?"</div>
 
    <div style="display:flex;gap:10px;margin-top:16px">
     <button class="btn primary big" data-testid="confirm-site" onclick="confirmSite()">✓ This is the right site</button>
@@ -153,6 +153,17 @@ function scheduleWorkspaceRefresh() {
     }, 30000);
 }
 
+// One-shot workspace refresh called by flow handlers after a control action, so the
+// banner and hold list are current without waiting for the 30-second auto-timer.
+// Does NOT call render() — caller is responsible for that.
+async function refreshWorkspace() {
+    if (!state.confirmToken || !state.siteNo) return;
+    try {
+        const { workspace } = await api.get(`/api/sites/${encodeURIComponent(state.siteNo)}/workspace?confirmToken=${state.confirmToken}`);
+        state.workspace = workspace;
+    } catch { /* keep last reads */ }
+}
+
 // Presence-driven scope tag. Hot water gets an out-of-scope-with-context reading
 // at `mon` ("monitored / not adjustable from here") rather than the generic
 // "Monitored only", so a combi observed-but-not-controllable reads honestly and
@@ -177,8 +188,8 @@ function renderWorkspace() {
    ${ws.degraded ? `<div class="alert warn" data-testid="degraded-banner">⚠️ Live reads are unavailable — flows will capture &amp; escalate rather than make changes.</div>` : ''}
    <div class="card">
    ${callSoFar()}
-   <h3>What is the caller reporting?</h3>
-   <input class="issueinput" id="iq" data-testid="smart-entry" placeholder="Type it in the caller’s words — e.g. “pub is freezing”, “no power in the kitchen”…" autocomplete="off" oninput="issueSearch(this.value)">
+   <h3>What is the customer reporting?</h3>
+   <input class="issueinput" id="iq" data-testid="smart-entry" placeholder="Type it in the customer&#39;s words — e.g. &quot;pub is freezing&quot;, &quot;no power in the kitchen&quot;..." autocomplete="off" oninput="issueSearch(this.value)">
    <div class="sugg" id="isugg"></div>
    <div class="tiles" data-testid="category-tiles">${CATS.map(c => `<div class="tile" data-testid="tile-${c.k}" onclick="startTileFlow('${c.k}')"><div class="tt">${c.ic} ${c.t}</div><div class="td">${c.d}</div></div>`).join('')}</div></div>`;
 
@@ -190,12 +201,13 @@ function renderWorkspace() {
     <button class="btn link" style="margin-left:auto" onclick="endCall()">End call</button>
    </div>
    ${renderP1Banner(ws)}
+   ${renderBoostHoldBanner(ws)}
    ${flowHtml}
   </div>
   <div>
    <div class="card tight"><h3>What Lighthouse controls at this site</h3><ul class="scopelist" data-testid="scope-list">
     ${ws.scope.map(g => `<li><span${g.level === 'none' ? ' style="color:var(--text-disabled)"' : ''}>${esc(g.label)}</span>${scopeTag(g)}</li>`).join('')}
-   </ul><p class="small" style="margin-top:6px">Live from the device inventory — use it to answer “isn’t that you?”</p></div>
+   </ul><p class="small" style="margin-top:6px">Live from the device inventory — use it to answer "isn\'t that you?"</p></div>
    <div class="card tight"><h3>Open tickets for this site</h3>${siteTickets(ws)}</div>
   </div></div></div>`;
     if (!state.flow) $('#iq')?.focus();
@@ -219,6 +231,119 @@ function renderP1Banner(ws) {
   <span style="font-size:1.2em;flex-shrink:0">🚨</span>
   <div><b>Active P1 escalation on record for this site — review before advising.</b>${linkHtml}${tickets.length > 1 ? ` <span class="small">(${tickets.length} active P1 tickets)</span>` : ''}</div>
 </div>`;
+}
+
+// OOHDASH-144 §10.1 — boost hold banner (shown at the top of the site page).
+// State machine: idle → confirm → working → done/pending/changed/error.
+var _holdBannerConfirm = {}; // { [holdId]: 'confirm'|'working'|'done'|'pending'|'changed'|'error' }
+var _holdBannerResult = {};  // { [holdId]: { result, hold } }
+
+function renderBoostHoldBanner(ws) {
+    var holds = ws.activeBoostHolds;
+    if (!holds || !holds.length) return '';
+
+    function fmtTime(isoOrMs) {
+        if (!isoOrMs) return '';
+        var d = new Date(isoOrMs);
+        return d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+    }
+
+    var rows = holds.map(function(h) {
+        var phase = _holdBannerConfirm[h.id] || 'idle';
+        var dir = h.direction === 'on' ? 'on' : 'off';
+        var dirEmoji = dir === 'on' ? '🔥' : '❄';
+        var zLabel = h.boilerZone === 'CHZ2' ? 'Zone 2' : 'Zone 1';
+        var untilStr = fmtTime(h.revertAt);
+        var who = h.createdBy ? h.createdBy.split(' ')[0] : 'someone';
+
+        var stateHtml = '';
+        if (phase === 'idle') {
+            var desc = dirEmoji + ' ' + zLabel + ': heating turned ' + dir + (untilStr ? ' until ' + untilStr : '') + ', by ' + esc(who);
+            stateHtml = '<div class="hb-row"><span class="hb-state">' + desc + '</span>' +
+                '<button class="btn" data-testid="hb-cancel-' + h.id + '" onclick="holdBannerCancel(\'' + h.id + '\')">' +
+                'Put back to normal now</button></div>';
+        } else if (phase === 'confirm') {
+            stateHtml = '<div class="hb-row"><span class="hb-state">Put ' + zLabel + ' back to its normal timetable now?</span>' +
+                '<button class="btn primary" data-testid="hb-confirm-yes-' + h.id + '" onclick="holdBannerConfirmYes(\'' + h.id + '\',\'' + h.boilerZone + '\')">Yes, put it back</button>' +
+                '<button class="btn" onclick="holdBannerKeep(\'' + h.id + '\')">Keep it</button></div>';
+        } else if (phase === 'working') {
+            stateHtml = '<div class="hb-row"><span class="hb-state">⏳ Putting it back… this can take up to 30 seconds.</span></div>';
+        } else if (phase === 'done') {
+            var r = _holdBannerResult[h.id] || {};
+            var tkt = (r.hold || {}).ticketId;
+            var tktStr = tkt ? ' Noted on ticket #' + tkt + '.' : '';
+            stateHtml = '<div class="hb-row alert ok" style="margin:0"><span class="hb-state">✅ ' + zLabel + ' is back to normal.' + esc(tktStr) + ' ' +
+                '<span class="say" style="display:inline;background:none;border:none;padding:0;font-size:inherit">Say to the customer: "That\'s done. Your heating is back on its normal timetable."</span>' +
+                '</span><button class="btn" onclick="holdBannerDismiss(\'' + h.id + '\')">Dismiss</button></div>';
+        } else if (phase === 'pending') {
+            var tkt2 = ((_holdBannerResult[h.id] || {}).hold || {}).ticketId;
+            var tktStr2 = tkt2 ? ' on ticket #' + tkt2 : '';
+            stateHtml = '<div class="hb-row alert warn" style="margin:0"><span class="hb-state">⏳ We\'ve asked the heating to go back to normal, but the controls haven\'t confirmed yet. We\'ll keep trying. If the heating doesn\'t switch off in the next few minutes, the IoT helpdesk is alerted automatically' + esc(tktStr2) + '.</span></div>';
+        } else if (phase === 'changed') {
+            var tkt3 = ((_holdBannerResult[h.id] || {}).hold || {}).ticketId;
+            var tktStr3 = tkt3 ? ' Logged on ticket #' + tkt3 + ' for the IoT helpdesk to check.' : '';
+            stateHtml = '<div class="hb-row alert warn" style="margin:0"><span class="hb-state">⚠ Someone has changed ' + zLabel + ' at the heating controls since we did, so we\'ve left it as it is.' + esc(tktStr3) + '</span><button class="btn" onclick="holdBannerDismiss(\'' + h.id + '\')">Dismiss</button></div>';
+        } else if (phase === 'error') {
+            stateHtml = '<div class="hb-row alert err" style="margin:0"><span class="hb-state">Couldn\'t put it back: ' + esc((_holdBannerResult[h.id] || {}).error || 'unknown error') + '</span>' +
+                '<button class="btn" onclick="holdBannerCancel(\'' + h.id + '\')">Try again</button></div>';
+        }
+        return stateHtml;
+    }).join('');
+
+    return '<div class="hold-banner" data-testid="boost-hold-banner">' +
+        '<div class="hb-title">We\'ve changed the heating at this site</div>' + rows + '</div>';
+}
+
+function holdBannerCancel(id) {
+    _holdBannerConfirm[id] = 'confirm';
+    render();
+}
+
+function holdBannerKeep(id) {
+    delete _holdBannerConfirm[id];
+    render();
+}
+
+function holdBannerDismiss(id) {
+    delete _holdBannerConfirm[id];
+    delete _holdBannerResult[id];
+    // Remove from workspace holds so banner disappears.
+    if (state.workspace && state.workspace.activeBoostHolds) {
+        state.workspace.activeBoostHolds = state.workspace.activeBoostHolds.filter(function(h) { return h.id !== id; });
+    }
+    render();
+}
+
+function holdBannerConfirmYes(id, zone) {
+    _holdBannerConfirm[id] = 'working';
+    render();
+    api.post('/api/sites/' + state.workspace.site.siteNo + '/booster-holds/' + id + '/cancel', { confirmToken: state.confirmToken }).then(function(res) {
+        var result = res.result;
+        _holdBannerResult[id] = res;
+        if (result === 'reverted' || result === 'already-auto') {
+            _holdBannerConfirm[id] = 'done';
+        } else if (result === 'pending') {
+            _holdBannerConfirm[id] = 'pending';
+        } else if (result === 'superseded' || result === 'left-forced') {
+            _holdBannerConfirm[id] = 'changed';
+        } else {
+            _holdBannerConfirm[id] = 'done';
+        }
+        // Remove from active holds so flow intercept clears.
+        if (state.workspace && state.workspace.activeBoostHolds) {
+            state.workspace.activeBoostHolds = state.workspace.activeBoostHolds.filter(function(h) { return h.id !== id; });
+        }
+        // Also push a put-back action to the flow if one is running.
+        if (state.flow && state.flow.data) {
+            state.flow.data.actions = state.flow.data.actions || [];
+            state.flow.data.actions.push({ kind: 'put-back', zones: [zone], result: result, ticketId: (res.hold || {}).ticketId || null, atMs: Date.now() });
+        }
+        render();
+    }).catch(function(err) {
+        _holdBannerResult[id] = { error: err.message || 'unknown error' };
+        _holdBannerConfirm[id] = 'error';
+        render();
+    });
 }
 
 // OOHDASH-89/91 (E, shared decision): the always-on "Live device status" side card and its
@@ -250,7 +375,7 @@ async function openTicketDrawer(ticketId, cbTicket) {
             `<div class="tlitem"><div class="tw">${esc(new Date(c.at).toLocaleString('en-GB', { weekday: 'short', hour: '2-digit', minute: '2-digit' }))}</div>${esc(c.body)}</div>`).join('')}</div>`
             : '<p class="small">No notes yet.</p>';
     } catch (err) {
-        threadHtml = `<div class="alert err">Couldn’t load the thread: ${esc(err.message)}</div>`;
+        threadHtml = `<div class="alert err">Couldn\'t load the thread: ${esc(err.message)}</div>`;
     }
     state.drawer = drawerShell(ticketId, cbTicket, threadHtml);
     paintDrawer();
@@ -260,7 +385,7 @@ function drawerShell(ticketId, cbTicket, threadHtml) {
     return `<div class="dh">Ticket #${ticketId}<button class="btn link" onclick="state.drawer=null;paintDrawer()">✕</button></div><div class="db">
   ${cbTicket ? `<p><b>${esc(cbTicket.subject)}</b></p>
   <p class="small" style="margin-bottom:10px">Opened ${esc(cbTicket.createdFriendly)} · <span class="tag blue">${esc(cbTicket.status.agent)}</span></p>
-  <h3>Read to the caller</h3><div class="script" data-testid="caller-script">“${esc(cbTicket.script)}”</div>
+  <h3>Read to the caller</h3><div class="script" data-testid="caller-script">"${esc(cbTicket.script)}"</div>
   ${cbTicket.visit ? '<div class="alert warn" data-testid="chargeable-warning">⚠️ <b>Engineer visit involved</b> — remind the caller: if the fault turns out not to be Lighthouse equipment, the visit may be chargeable.</div>' : ''}
   <h3 style="margin-top:14px">Caller expects an update by…</h3>
   <div style="display:flex;gap:8px;margin-bottom:14px"><input type="date" id="fud" style="border:1.5px solid var(--border);border-radius:6px;padding:7px 10px"><button class="btn" onclick="saveFollowUp(${ticketId})">Save follow-up</button></div>` : ''}
@@ -299,7 +424,7 @@ async function saveFollowUp(ticketId) {
 function vCallback() {
     const cb = state.cb;
     $('#view').innerHTML = `<div class="content narrow">
-  <div class="card"><h2>Callback Lookup</h2><p class="sub" style="margin-bottom:12px">“I called earlier — what’s happening?” Find the site, read the script. Use ↑ ↓ and Enter to pick.</p>
+  <div class="card"><h2>Callback Lookup</h2><p class="sub" style="margin-bottom:12px">"I called earlier — what\'s happening?" Find the site, read the script. Use ↑ ↓ and Enter to pick.</p>
   <div class="searchwrap"><input id="cbq" data-testid="callback-search" placeholder="House number or pub name" autocomplete="off"><div id="cbres"></div></div></div>
   ${cb.error ? `<div class="alert err">${esc(cb.error)}</div>` : ''}
   ${cb.data ? cbTickets() : ''}
@@ -315,7 +440,7 @@ async function pickCallbackSite(siteNo) {
         state.cb.data = await api.get(`/api/callback/${encodeURIComponent(siteNo)}`);
     } catch (err) {
         state.cb.error = err.degraded
-            ? 'Zendesk is unreachable — take the caller’s details and start a new call to capture the issue; it will be logged as soon as connectivity returns.'
+            ? 'Zendesk is unreachable — take the caller\'s details and start a new call to capture the issue; it will be logged as soon as connectivity returns.'
             : err.message;
     }
     render();
@@ -386,16 +511,16 @@ function paintTonight() {
     <td>${OUTCOME_CHIP[a.outcome] || esc(a.outcome || '')}</td>
     <td>${a.ticketId ? `<button class="btn link" style="padding:0" onclick="openTicketDrawer(${a.ticketId})">#${a.ticketId}</button>` : '—'}</td></tr>`).join('')}</table>`
         : `<p class="small" style="padding:10px 0" data-testid="tonight-empty">${q ? 'No activity matching that filter tonight.' : 'No activity yet tonight.'}</p>`}
-   <p class="small" style="margin-top:10px">The IoT team’s morning review (mark-as-reviewed, P1 acknowledgements, feedback) happens in the <b>IoT Support dashboard</b>, which receives all of this automatically.</p>
+   <p class="small" style="margin-top:10px">The IoT team\'s morning review (mark-as-reviewed, P1 acknowledgements, feedback) happens in the <b>IoT Support dashboard</b>, which receives all of this automatically.</p>
   </div></div>`;
 }
 
 function raiseQuery() {
     openModal(`<div data-testid="query-modal"><div class="mh">Raise a query with the IoT team<button class="btn link" onclick="closeModal()">✕</button></div><div class="mb">
-  <p class="sub" style="margin-bottom:10px">For anything older than tonight, or anything you’re unsure about — this goes straight onto a ticket for the team.</p>
+  <p class="sub" style="margin-bottom:10px">For anything older than tonight, or anything you\'re unsure about — this goes straight onto a ticket for the team.</p>
 
   <div class="formrow"><label>Site (if known)</label><input id="qsite" data-testid="query-site" placeholder="e.g. 6832"></div>
-  <div class="formrow"><label>Your query</label><textarea id="qtxt" data-testid="query-text" rows="3" placeholder="e.g. Caller says they rang two nights ago about fryers — can’t see it tonight"></textarea></div>
+  <div class="formrow"><label>Your query</label><textarea id="qtxt" data-testid="query-text" rows="3" placeholder="e.g. Caller says they rang two nights ago about fryers — can\'t see it tonight"></textarea></div>
 
   ${notesField({ id: 'addnotes-q' })}
  </div><div class="mf"><button class="btn" onclick="closeModal()">Cancel</button><button class="btn primary" data-testid="query-send" onclick="sendQuery()">Send query</button></div></div>`);
@@ -444,7 +569,7 @@ function paintAdmin() {
     const a = state.admin;
     const m = a.metrics;
     $('#view').innerHTML = `<div class="content narrow">
-  <div class="alert info" style="margin-top:0">The morning <b>Review Queue</b> (mark-as-reviewed, P1 log, handler feedback) lives in the <b>IoT Support dashboard</b> (F026). This page holds the OOH app’s own safety rails.</div>
+  <div class="alert info" style="margin-top:0">The morning <b>Review Queue</b> (mark-as-reviewed, P1 log, handler feedback) lives in the <b>IoT Support dashboard</b> (F026). This page holds the OOH app\'s own safety rails.</div>
   ${a.alerts.length ? `<div class="card" style="border-color:var(--danger)"><h3>🔔 Active alerts</h3>${a.alerts.map(al =>
         `<div class="stepdone"><span>⚠️</span><div style="flex:1"><b>${esc(al.code)}</b><div class="small">${esc(al.message)} · ${esc(new Date(al.raisedAt).toLocaleString('en-GB'))}${al.count > 1 ? ` · ×${al.count}` : ''}</div></div><button class="btn link" onclick="clearAlert('${al.id}')">Clear</button></div>`).join('')}</div>` : ''}
   <div class="card" data-testid="admin-killswitch">
@@ -483,7 +608,7 @@ function paintAdmin() {
   </div>
   <div class="card" data-testid="admin-notices"><h3>New-site / shift notices</h3>
    ${a.nt.length ? a.nt.map(n => `<div class="stepdone"><span>📣</span><div style="flex:1"><b>${esc(n.OohNoticeTitle)}</b><div class="small">${esc(n.OohNoticeBody)}</div></div><button class="btn link" onclick="retireNotice('${n.noticeId}')">Retire</button></div>`).join('') : '<p class="small">No active notices.</p>'}
-   <div class="formrow" style="margin-top:10px"><label>New notice</label><input id="ntitle" data-testid="notice-title" placeholder="Title (shows on handlers’ New Call page)"><textarea id="nbody" data-testid="notice-body" rows="2" style="margin-top:6px" placeholder="Body"></textarea></div>
+   <div class="formrow" style="margin-top:10px"><label>New notice</label><input id="ntitle" data-testid="notice-title" placeholder="Title (shows on handlers' New Call page)"><textarea id="nbody" data-testid="notice-body" rows="2" style="margin-top:6px" placeholder="Body"></textarea></div>
    <button class="btn" data-testid="notice-publish" onclick="publishNotice()">Publish notice</button>
   </div>
   <div class="card"><h3>Data-quality flags</h3>

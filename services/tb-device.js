@@ -29,7 +29,7 @@ import { readFileSync } from 'fs';
 import { config } from '../config.js';
 import { resolveSiteName } from './zendesk.js';
 import * as registry from './registry.js';
-import { describeNextChange } from './schedule.js';
+import { describeNextChange, zoneTimetable } from './schedule.js';
 
 /**
  * Lazily resolves tb-client.readRequest ONLY on the live read path. A static import would force
@@ -1263,13 +1263,15 @@ function _decodeBoilerHeatingInner(sharedScope, clientScope, panelLastSeenMs, te
             const on = tbBool(t.output2State);
             const fallback = tbBool(t.output2FallbackEnabled);
             const { forced, forcedUntilMs, held } = parseOverride(t.output2Override ?? null, on, 'V1', now);
-            zones.push({ n: 1, on, fallback, forced, forcedUntilMs, held, roomTemp: safeTemp(t.roomSensor1Temp) });
+            const timetable = zoneTimetable(sc.output2Schedule ?? null, now, config.control?.schedule?.tz ?? 'Europe/London');
+            zones.push({ n: 1, zone: 'CHZ1', on, fallback, forced, forcedUntilMs, held, roomTemp: safeTemp(t.roomSensor1Temp), timetable: timetable ?? null });
         }
         if (z2Configured) {
             const on = tbBool(t.output3State);
             const fallback = tbBool(t.output3FallbackEnabled);
             const { forced, forcedUntilMs, held } = parseOverride(t.output3Override ?? null, on, 'V1', now);
-            zones.push({ n: 2, on, fallback, forced, forcedUntilMs, held, roomTemp: safeTemp(t.roomSensor2Temp) });
+            const timetable = zoneTimetable(sc.output3Schedule ?? null, now, config.control?.schedule?.tz ?? 'Europe/London');
+            zones.push({ n: 2, zone: 'CHZ2', on, fallback, forced, forcedUntilMs, held, roomTemp: safeTemp(t.roomSensor2Temp), timetable: timetable ?? null });
         }
     } else {
         // V2
@@ -1292,13 +1294,15 @@ function _decodeBoilerHeatingInner(sharedScope, clientScope, panelLastSeenMs, te
             const on = tbBool(t['CHZ1.output_state']);
             const fallback = tbBool(t['CHZ1.fallback_enabled']);
             const { forced, forcedUntilMs, held } = parseOverride(t['CHZ1.override'] ?? null, on, 'V2', now);
-            zones.push({ n: 1, on, fallback, forced, forcedUntilMs, held, roomTemp: safeTemp(t['CHZ1.room_temp']) });
+            const timetable = zoneTimetable(sc['CHZ1.schedule'] ?? null, now, config.control?.schedule?.tz ?? 'Europe/London');
+            zones.push({ n: 1, zone: 'CHZ1', on, fallback, forced, forcedUntilMs, held, roomTemp: safeTemp(t['CHZ1.room_temp']), timetable: timetable ?? null });
         }
         if (z2Configured) {
             const on = tbBool(t['CHZ2.output_state']);
             const fallback = tbBool(t['CHZ2.fallback_enabled']);
             const { forced, forcedUntilMs, held } = parseOverride(t['CHZ2.override'] ?? null, on, 'V2', now);
-            zones.push({ n: 2, on, fallback, forced, forcedUntilMs, held, roomTemp: safeTemp(t['CHZ2.room_temp']) });
+            const timetable = zoneTimetable(sc['CHZ2.schedule'] ?? null, now, config.control?.schedule?.tz ?? 'Europe/London');
+            zones.push({ n: 2, zone: 'CHZ2', on, fallback, forced, forcedUntilMs, held, roomTemp: safeTemp(t['CHZ2.room_temp']), timetable: timetable ?? null });
         }
     }
 
@@ -1377,7 +1381,7 @@ async function fetchTelemetry(devices) {
             isBoilerControl
                 // OOHDASH-123 (WU13): also read the schedule attributes (V1 output1..4Schedule,
                 // V2 CHZ1/DHW schedule) for the next-scheduled-change decode (design §10, decoded display).
-                ? readSharedScopeAttributes(uuid, 'output1OutputMask,output1Schedule,output2Schedule,output3Schedule,output4Schedule,CHZ1.schedule,DHW.schedule,schedules')
+                ? readSharedScopeAttributes(uuid, 'output1OutputMask,output1Schedule,output2Schedule,output3Schedule,output4Schedule,CHZ1.schedule,CHZ2.schedule,DHW.schedule,schedules')
                 : isPowerPause
                     // PowerPause stores its programme under SHARED_SCOPE `schedules` only.
                     ? readSharedScopeAttributes(uuid, 'schedules')

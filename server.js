@@ -107,6 +107,34 @@ app.use('/api', rateLimit({
     max: parseInt(process.env.RATE_LIMIT_MAX || '240', 10), // per client IP; raised for test runs
     message: { error: 'Too many requests — please wait a moment' }
 }));
+// OOHDASH-144: test-only pre-auth route — cancel active boiler-panel holds and reset
+// the in-memory fixture TB sim so each BB-E test starts with a clean zone state.
+// Registered BEFORE requireAuth so the Playwright APIRequestContext (no session) can
+// reach it. Gated by dataMode so it is never registered in production.
+if (config.dataMode !== 'live') {
+    app.post('/api/test/sites/:siteNo/holds/cancel-all', async (req, res) => {
+        try {
+            const { collection } = await import('./services/store.js');
+            const { __resetSim } = await import('./services/tb-client.js');
+            const col = await collection('OohOverrides');
+            const docs = await col.query(o =>
+                o.status === 'active' &&
+                o.deviceType === 'boiler-panel' &&
+                String(o.siteNo) === String(req.params.siteNo)
+            );
+            for (const doc of docs) {
+                doc.status = 'test-cancelled';
+                doc.cancelRequestedBy = 'test-cleanup';
+                await col.upsert(doc);
+            }
+            __resetSim();
+            res.json({ cancelled: docs.length });
+        } catch (err) {
+            console.error('[test-route] cancel-all failed:', err.message);
+            res.status(500).json({ error: err.message });
+        }
+    });
+}
 app.use('/api', requireAuth, apiRouter);
 // Any /api path not matched by the router is a 404 JSON — never the SPA shell
 app.use('/api', (req, res) => res.status(404).json({ error: 'Unknown API route' }));

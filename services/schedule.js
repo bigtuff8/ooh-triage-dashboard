@@ -333,3 +333,100 @@ export function describeNextChange(scheduleJson, now, opts = {}) {
   if (!result.ok) return null;
   return `based on the device's stored schedule, next change to ${result.value} at ${result.timeText} ${result.dayText}`;
 }
+
+/**
+ * OOHDASH-144: per-zone timetable decode for the pub heating flow.
+ *
+ * Reads a boiler-zone schedule (V1 output2/3Schedule, V2 CHZ1/CHZ2.schedule) and returns
+ * whether the timetable is the same every day, the current setpoint, and the next time the
+ * zone comes on (a step up in setpoint value) within 24 hours.
+ *
+ * Returns null on parse failure or empty schedule.
+ * Returns { everyDay: false, currentTempC: null, nextOn: null } when timetable varies by day
+ * (SQ-13 weekday order unconfirmed — we only decode when every-day, so day order is irrelevant).
+ *
+ * @param {object|Array|string|null} scheduleJson
+ * @param {number} nowMs  Current time as ms since epoch
+ * @param {string} [tz='Europe/London']
+ * @returns {{ everyDay: boolean, currentTempC: number|null, nextOn: { atMs: number, timeText: string, dayText: string, tempC: number|null }|null }|null}
+ */
+export function zoneTimetable(scheduleJson, nowMs, tz = 'Europe/London') {
+    try {
+        const parsed = parseInput(scheduleJson);
+        if (!parsed || parsed === 'unsafe' || parsed.length === 0) return null;
+
+        // Retain well-formed entries: must have a valid HH:MM time, a 7-char loops string, and a numeric value.
+        const entries = parsed.filter(e =>
+            e && typeof e.time === 'string' && /^\d{1,2}:\d{2}$/.test(e.time) &&
+            typeof e.loops === 'string' && e.loops.length === 7 &&
+            typeof e.value === 'number'
+        );
+        if (entries.length === 0) return null;
+
+        // everyDay: true only when every entry has loops === '1111111'.
+        const everyDay = entries.every(e => e.loops === '1111111');
+        if (!everyDay) return { everyDay: false, currentTempC: null, nextOn: null };
+
+        const now = new Date(nowMs);
+        const nowParts = getLocalParts(now, tz);
+        const nowMinutes = nowParts.hour * 60 + nowParts.minute;
+
+        // Sort entries by time of day (ascending).
+        const sorted = entries.slice().sort((a, b) => {
+            const [ah, am] = a.time.split(':').map(Number);
+            const [bh, bm] = b.time.split(':').map(Number);
+            return (ah * 60 + am) - (bh * 60 + bm);
+        });
+
+        // currentTempC: value of the latest entry at or before now, walking back to yesterday if needed.
+        let currentEntry = null;
+        for (const e of sorted) {
+            const [hh, mm] = e.time.split(':').map(Number);
+            if (hh * 60 + mm <= nowMinutes) currentEntry = e;
+        }
+        if (!currentEntry) {
+            // No entry before now today — use the last entry (wraps across midnight from yesterday).
+            currentEntry = sorted[sorted.length - 1];
+        }
+        const currentTempC = currentEntry ? currentEntry.value : null;
+
+        // nextOn: first future entry (today then tomorrow) whose value is strictly greater than the
+        // entry in force just before it (step up = the zone is coming on / heating).
+        let nextOn = null;
+        for (const dayOff of [0, 1]) {
+            if (nextOn) break;
+            for (const e of sorted) {
+                const [hh, mm] = e.time.split(':').map(Number);
+                const candidateUtc = buildCandidateUtc(
+                    nowParts.year, nowParts.month, nowParts.day + dayOff, hh, mm, tz
+                );
+                const atMs = candidateUtc.getTime();
+                if (atMs <= nowMs) continue; // must be strictly future
+                if (atMs - nowMs > 24 * 60 * 60 * 1000) continue; // within 24 h
+
+                // Entry in force just before this one (same-day earlier, else wrap to last of day).
+                const eMinutes = hh * 60 + mm;
+                let prev = null;
+                for (const pe of sorted) {
+                    const [ph, pm] = pe.time.split(':').map(Number);
+                    if (ph * 60 + pm < eMinutes) prev = pe;
+                }
+                if (!prev) prev = sorted[sorted.length - 1]; // wrap
+
+                if (prev && e.value > prev.value) {
+                    nextOn = {
+                        atMs,
+                        timeText: e.time,
+                        dayText: dayOff === 0 ? 'today' : 'tomorrow',
+                        tempC: e.value
+                    };
+                    break;
+                }
+            }
+        }
+
+        return { everyDay: true, currentTempC, nextOn };
+    } catch {
+        return null;
+    }
+}

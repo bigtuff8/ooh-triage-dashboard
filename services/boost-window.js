@@ -17,8 +17,11 @@
 import { getLocalParts, buildCandidateUtc } from './schedule.js';
 
 // Duration keys: numeric-minute strings as sent by the UI ('30', '60', '120') plus
-// named aliases ('30m', '1h', '2h') for backwards compat and the until-0700 special.
-const DURATION_MIN = { '30': 30, '60': 60, '120': 120, 'until-0700': null, '30m': 30, '1h': 60, '2h': 120 };
+// named aliases ('30m', '1h', '2h') for backwards compat and the until-0700 / until-next-on specials.
+const DURATION_MIN = { '30': 30, '60': 60, '120': 120, 'until-0700': null, 'until-next-on': null, '30m': 30, '1h': 60, '2h': 120 };
+
+// 11-hour cap for until-next-on: must fit inside the 12 h retry window.
+const UNTIL_NEXT_ON_MAX_MS = 11 * 60 * 60 * 1000;
 const MIN_REMAINING_MS = 15 * 60 * 1000; // 15-minute minimum after clamp
 
 /**
@@ -51,12 +54,13 @@ function findNextLocalBoundary(nowMs, localParts, targetHour, tz) {
  *
  * @param {number} nowMs - current time as ms since epoch
  * @param {'on'|'off'} direction
- * @param {'30m'|'1h'|'2h'|'until-0700'} durationKey
+ * @param {'30m'|'1h'|'2h'|'until-0700'|'until-next-on'} durationKey
  * @param {string} [tz='Europe/London']
- * @returns {{ ok: true, revertAtMs, requestedMin, effectiveMin, clamped }
+ * @param {number|null} [nextOnMs] - for until-next-on: the earliest nextOn.atMs across chosen zones, or null
+ * @returns {{ ok: true, revertAtMs, requestedMin, effectiveMin, clamped, fallback?: 'until-0700' }
  *           |{ ok: false, code, message }}
  */
-export function clampBoostWindow(nowMs, direction, durationKey, tz = 'Europe/London') {
+export function clampBoostWindow(nowMs, direction, durationKey, tz = 'Europe/London', nextOnMs = null) {
     if (!Object.prototype.hasOwnProperty.call(DURATION_MIN, durationKey)) {
         return { ok: false, code: 'invalid-duration', message: `Invalid duration key: ${durationKey}` };
     }
@@ -100,6 +104,21 @@ export function clampBoostWindow(nowMs, direction, durationKey, tz = 'Europe/Lon
     }
 
     // direction === 'off'
+    if (durationKey === 'until-next-on') {
+        // Dynamic: use the earliest nextOn.atMs across the chosen zones, with 15 min / 11 h guards.
+        const M07 = findNextLocalBoundary(nowMs, localParts, 7, tz);
+        if (
+            nextOnMs === null ||
+            nextOnMs - nowMs < MIN_REMAINING_MS ||
+            nextOnMs - nowMs > UNTIL_NEXT_ON_MAX_MS
+        ) {
+            // Fall back to until-0700
+            const effectiveMin = Math.round((M07 - nowMs) / 60000);
+            return { ok: true, revertAtMs: M07, requestedMin: null, effectiveMin, clamped: false, fallback: 'until-0700' };
+        }
+        const effectiveMin = Math.round((nextOnMs - nowMs) / 60000);
+        return { ok: true, revertAtMs: nextOnMs, requestedMin: null, effectiveMin, clamped: false };
+    }
     if (durationKey === 'until-0700') {
         // Morning edge M: earliest UTC after now where local >= 07:00
         const M = findNextLocalBoundary(nowMs, localParts, 7, tz);

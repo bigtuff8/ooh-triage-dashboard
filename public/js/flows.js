@@ -14,7 +14,7 @@ const CATS = [
     { k: 'fan', ic: '🌀', t: 'Extractor fans', d: 'Fans on/off or wrong times' },
     { k: 'fridge', ic: '🧊', t: 'Fridges & freezers', d: 'Temperature alarms, not cooling' },
     { k: 'contractor', ic: '🧰', t: 'Contractor on site', d: 'Engineer needs Lighthouse info now' },
-    { k: 'other', ic: '✍️', t: 'Something else / not sure', d: 'Describe it in the caller’s words' }
+    { k: 'other', ic: '✍️', t: 'Something else / not sure', d: "Describe it in the customer\'s words" }
 ];
 const HIDDENCATS = [
     { k: 'connectivity', ic: '📡', t: 'Connection check', d: 'Lighthouse gateway / equipment not responding' },
@@ -26,7 +26,7 @@ const HIDDENCATS = [
 const KEYWORDS = [
     { k: 'hotwater', words: ['hot water', 'no water', 'shower', 'tap', 'washing up', 'wash up'] },
     // OOHDASH-82 (design §6): aircon keywords route a typed request straight to the referral. Ordered
-    // before heating so "air con" / "aircon" / "cooling" score to aircon, not heating's 'warm'/'cold'.
+    // before heating so "air con" / "aircon" / "cooling" score to aircon, not heating\'s 'warm'/'cold'.
     { k: 'aircon', words: ['air con', 'aircon', 'a/c', 'air conditioning', 'cooling', 'air-con'] },
     { k: 'heating', words: ['heat', 'cold', 'freez', 'warm', 'too hot', 'boiling hot', 'radiator', 'temperature', 'thermostat', 'boiler'] },
     { k: 'kitchen', words: ['fryer', 'grill', 'glasswash', 'dishwash', 'oven', 'merrychef', 'kitchen', 'equipment', 'no power', 'lincat', 'coffee', 'pot wash', 'deep clean'] },
@@ -41,9 +41,9 @@ function catOf(k) { return CATS.concat(HIDDENCATS).find(c => c.k === k); }
 
 function issueSearch(q) {
     const box = $('#isugg');
-    // The caller's words are held in state and read back by startSuggestedFlow —
+    // The caller\'s words are held in state and read back by startSuggestedFlow —
     // NEVER interpolated into inline handler source (quotes in natural speech,
-    // e.g. "won't", break a JS string inside an onclick attribute).
+    // e.g. "won\'t", break a JS string inside an onclick attribute).
     state.smartEntryText = q;
     q = q.trim().toLowerCase();
     if (q.length < 3) { box.innerHTML = ''; return; }
@@ -63,7 +63,7 @@ function startSuggestedFlow(k) {
 
 /**
  * Starts a category-tile flow, carrying the typed caller words from state (Test 10).
- * Symmetric with startSuggestedFlow — the tile path must carry the handler's words too.
+ * Symmetric with startSuggestedFlow — the tile path must carry the handler\'s words too.
  * The text stays in state.smartEntryText and is NEVER interpolated into the onclick
  * attribute (quotes/apostrophes in natural speech would break the inline handler).
  */
@@ -114,7 +114,7 @@ function doneLine(txt) { state.flow.done.push(txt); }
 const HEATING_AREA_ORDER = ['Accommodation', 'Bar/Restaurant'];
 
 /**
- * The site's heating devices for the area model — Salus iT700/iT500 (design §7.1), PLUS pub
+ * The site\'s heating devices for the area model — Salus iT700/iT500 (design §7.1), PLUS pub
  * boiler-panel devices so the existing boiler-panel read/guidance branch is not lost (design §7.1
  * notes the boiler-panel case must still be handled; §7.5 keeps its branch working unchanged). This
  * structurally excludes gateways, aircon (intesis, now kind `aircon`), and temp sensors, so no
@@ -218,8 +218,8 @@ function renderFlow() {
         : '';
     return `<div class="flowpanel" data-testid="flow-panel">
   <div class="flowhead"><span style="font-size:18px">${c.ic}</span><b>${c.t}</b><span class="small" style="margin-left:6px">guided flow</span><button class="btn link" style="margin-left:auto" onclick="cancelFlow()">Cancel issue</button></div>
-  <div class="flowbody">${f.data.freeText ? `<div class="stepdone"><span>💬</span>Caller's words: "${esc(f.data.freeText)}"</div>` : ''}${f.done.map(d => `<div class="stepdone"><span class="tick">✓</span>${d}</div>`).join('')}${body}${notesBox}</div>
-  <div class="flowfoot"><span>Operator: <b>${esc(state.me.operator.name)}</b></span><span style="margin-left:auto">Everything here is recorded to the Zendesk ticket automatically</span></div>
+  <div class="flowbody">${f.data.freeText ? `<div class="stepdone"><span>💬</span>Customer\'s words: "${esc(f.data.freeText)}"</div>` : ''}${f.done.map(d => `<div class="stepdone"><span class="tick">✓</span>${d}</div>`).join('')}${body}${notesBox}</div>
+  <div class="flowfoot"><span>You: <b>${esc(state.me.operator.name)}</b></span><span style="margin-left:auto">Each issue is logged to a ticket when you finish it</span></div>
  </div>`;
 }
 
@@ -250,7 +250,7 @@ function finishOutcome(f, key, payload, renderCard) {
     // Error state — show inline retry
     if (f.data['_err_' + key]) {
         const msg = f.data['_err_' + key];
-        return `<div class="alert err">Couldn’t record the outcome: ${esc(msg)}
+        return `<div class="alert err">Couldn\'t record the outcome: ${esc(msg)}
    <button class="chip" style="margin-left:8px" onclick="state.flow.data['_err_${key}']=null;state.flow.data['_pend_${key}']=null;state.flow.data['_conf_${key}']=null;render()">Try again</button></div>`;
     }
     // Store the payload and renderCard idempotently on first visit
@@ -297,7 +297,7 @@ window.submitPendingOutcome = function submitPendingOutcome(key) {
     }).then(res => {
         notesDraftClear(); // OOHDASH-119: clear sessionStorage draft on success
         const echo = f.data.freeText
-            ? `<div class="stepdone small" data-testid="outcome-callerwords"><span>💬</span>Recorded from the caller: “${esc(f.data.freeText)}”</div>`
+            ? `<div class="stepdone small" data-testid="outcome-callerwords"><span>💬</span>Recorded from the caller: "${esc(f.data.freeText)}"</div>`
             : '';
         const notesEcho = (f.data.additionalNotes || '').trim()
             ? (() => {
@@ -305,8 +305,8 @@ window.submitPendingOutcome = function submitPendingOutcome(key) {
                 const tid = res?.ticket?.id ?? null; // guard: id may be absent on degraded response
                 const ref = tid ? `ticket #${tid}` : 'the ticket';
                 const mid = isP1
-                    ? `Your notes are on ${ref} for the morning review: “${esc(f.data.additionalNotes)}” (not in the urgent text)`
-                    : `Your notes are on ${ref}: “${esc(f.data.additionalNotes)}”`;
+                    ? `Your notes are on ${ref} for the morning review: "${esc(f.data.additionalNotes)}" (not in the urgent text)`
+                    : `Your notes are on ${ref}: "${esc(f.data.additionalNotes)}"`;
                 return `<div class="stepdone small" data-testid="addnotes-echo"><span>📝</span>${mid}</div>`;
             })()
             : '';
@@ -330,7 +330,7 @@ function outcomeCaptured(f, key, { subject, detail, script, OohCaptureClass }) {
         { type: 'capture', subject, detail, OohCaptureClass, issueLabel: subject, issueCls: 'blue' },
         res => `<div class="outcome captured" data-testid="outcome-captured"><h3>📥 Captured for the IoT team</h3><p>${detail}</p>
   <p style="margin-top:4px">This will be actioned on the <b>next working day</b> — it is logged, not lost.</p>
-  <div class="script">“${script}”</div><p class="small">Ticket <b>#${res.ticket.id}</b></p></div>`);
+  <div class="script">"${script}"</div><p class="small">Ticket <b>#${res.ticket.id}</b></p></div>`);
 }
 
 function outcomeP1(f, key, { subject, detail, script, p1Summary, OohCaptureClass }) {
@@ -338,7 +338,7 @@ function outcomeP1(f, key, { subject, detail, script, p1Summary, OohCaptureClass
         { type: 'escalate-p1', subject, detail, p1Summary, OohCaptureClass: OohCaptureClass || null, issueLabel: subject, issueCls: 'red' },
         res => `<div class="outcome p1" data-testid="outcome-p1"><h3>🚨 Escalated — P1</h3><p>${detail}</p>
   <p style="margin-top:4px" data-testid="p1-dispatch-status">The P1 is logged as ticket <b>#${res.ticket.id}</b> in the IoT Support dashboard, which pages the on-duty manager.</p>
-  <div class="script">“${script}”</div><p class="small">Ticket <b>#${res.ticket.id}</b></p></div>`);
+  <div class="script">"${script}"</div><p class="small">Ticket <b>#${res.ticket.id}</b></p></div>`);
 }
 
 /* ------------------------ OOHDASH-134: P1 Escalation in "Something else" ------------------------ */
@@ -376,7 +376,7 @@ function otherP1Choice(f) {
    </div>
    <div class="p1-explainer" data-testid="other-p1-explainer">
     <p>A P1 is anything that is immediately health and safety or business trading affecting.</p>
-    <p>Please only use this option after you've attempted to follow through one of the circumstance tiles.</p>
+    <p>Please only use this option after you\'ve attempted to follow through one of the circumstance tiles.</p>
     <p>P1 escalation will send a text to the escalation manager on the IoT Support team immediately upon submission.</p>
    </div>`;
 }
@@ -410,14 +410,14 @@ function outcomeScope(f, key, { subject, evidence, script }) {
     return finishOutcome(f, key,
         { type: 'scope-only', subject, detail: evidence, issueLabel: subject, issueCls: 'grey' },
         res => `<div class="outcome scope" data-testid="outcome-scope"><h3>ℹ️ Not on Lighthouse at this site</h3><p>${evidence}</p>
-  <div class="script">“${script}”</div><p class="small">Logged as ticket <b>#${res.ticket.id}</b> (scope-only) so we can track “blame Lighthouse” calls</p></div>`);
+  <div class="script">"${script}"</div><p class="small">Logged as ticket <b>#${res.ticket.id}</b> (scope-only) so we can track "blame Lighthouse" calls</p></div>`);
 }
 
 function outcomeNoAction(f, key, { subject, detail, script }) {
     return finishOutcome(f, key,
         { type: 'no-action', subject, detail, issueLabel: subject, issueCls: 'grey' },
         res => `<div class="outcome noaction" data-testid="outcome-noaction"><h3>📝 Call logged — no action taken</h3><p>${detail}</p>
-  ${script ? `<div class="script">“${script}”</div>` : ''}<p class="small">Ticket <b>#${res.ticket.id}</b></p></div>`);
+  ${script ? `<div class="script">"${script}"</div>` : ''}<p class="small">Ticket <b>#${res.ticket.id}</b></p></div>`);
 }
 
 function otherShortcut() {
@@ -437,8 +437,8 @@ function canSwitch(d) {
 
 /**
  * Per-circuit Turn ON / Turn OFF buttons — only the OPPOSITE of the current state is offered (a
- * circuit reading ON shows Turn OFF, and vice-versa). Renders nothing when the device isn't
- * switchable (canSwitch false) — the flow's capture fallback still applies.
+ * circuit reading ON shows Turn OFF, and vice-versa). Renders nothing when the device isn\'t
+ * switchable (canSwitch false) — the flow\'s capture fallback still applies.
  */
 function switchButtons(d, testid) {
     if (!canSwitch(d)) return '';
@@ -497,7 +497,7 @@ function siteConnectivityAnchor(devices) {
 }
 
 /**
- * equipmentGroupLabel(device) -> string | null. Pure, read-only. Resolves a non-anchor gateway's
+ * equipmentGroupLabel(device) -> string | null. Pure, read-only. Resolves a non-anchor gateway\'s
  * equipment group to its natural-English operator label on the SAME split-segment basis as the anchor
  * rule: find the gateway token (r10a/gw/gateway) segment, take the segment IMMEDIATELY preceding it, map
  * via GROUP_LABELS. Unknown token → the safe generic 'the equipment group' (NEVER the raw token). Returns
@@ -567,14 +567,14 @@ function dhwOverrideOutcome(dhwOverride, nowMs) {
     // Re-apply staleness
     if (panelLastSeenMs == null || (nowMs - panelLastSeenMs) > _BOILER_STALE_MS) {
         var ago = _dhwFmtAgo(panelLastSeenMs, nowMs);
-        var reason = ago ? 'last reported ' + ago : "isn't reporting";
+        var reason = ago ? 'last reported ' + ago : "isn\'t reporting";
         return {
             state: 'cant-confirm',
-            headline: "Hot water override: can't confirm",
+            headline: "Hot water override: can\'t confirm",
             explanation: ago
-                ? "The boiler panel last reported " + ago + ", so we can't tell whether the hot water is overridden. Don't tell the caller it is on or off; log it and escalate as normal."
-                : "The boiler panel isn't reporting, so we can't tell whether the hot water is overridden. Don't tell the caller it is on or off; log it and escalate as normal.",
-            script: "I can't see the current hot water setting from here right now, so I'll log it for the team to check.",
+                ? "The boiler panel last reported " + ago + ", so we can\'t tell whether the hot water is overridden. Don\'t tell the caller it is on or off; log it and escalate as normal."
+                : "The boiler panel isn\'t reporting, so we can\'t tell whether the hot water is overridden. Don\'t tell the caller it is on or off; log it and escalate as normal.",
+            script: "I can\'t see the current hot water setting from here right now, so I\'ll log it for the team to check.",
             ticketSentence: 'Hot water override at time of call: could not be confirmed (' + reason + ').'
         };
     }
@@ -596,7 +596,7 @@ function dhwOverrideOutcome(dhwOverride, nowMs) {
             state: 'auto',
             headline: 'Hot water override: Auto (on schedule)',
             explanation: 'Nobody has overridden the hot water on the boiler panel. It is following its normal timetable, so an override is not the reason for the problem.',
-            script: "The hot water controls haven't been overridden - they're running on the normal timetable.",
+            script: "The hot water controls haven\'t been overridden - they\'re running on the normal timetable.",
             ticketSentence: 'Hot water override at time of call: Auto (on schedule).'
         };
     }
@@ -616,7 +616,7 @@ function dhwOverrideOutcome(dhwOverride, nowMs) {
             state: 'on-until',
             headline: 'Hot water override: Override ON until ' + timeStr,
             explanation: 'Hot water has already been set to run from the boiler panel and stays on until ' + timeStr + '. The controls are asking for hot water, so if there is still none, the likely cause is the boiler or the cylinder.',
-            script: "The hot water has already been switched on from the controls and will stay on until " + timeStr + ". If it's still not coming through, it's likely the boiler itself, so I'll log it for the team.",
+            script: "The hot water has already been switched on from the controls and will stay on until " + timeStr + ". If it\'s still not coming through, it\'s likely the boiler itself, so I\'ll log it for the team.",
             ticketSentence: 'Hot water override at time of call: Override ON until ' + timeStr + '.'
         };
     }
@@ -625,8 +625,8 @@ function dhwOverrideOutcome(dhwOverride, nowMs) {
         return {
             state: 'off-until',
             headline: 'Hot water override: Override OFF until ' + timeStr2,
-            explanation: "Hot water has been deliberately switched off from the boiler panel until " + timeStr2 + ". That is the likely reason there is no hot water. It goes back to its normal timetable at " + timeStr2 + ". We can't change it from here, so escalate if the caller needs it sooner.",
-            script: "The hot water has been switched off on purpose at the controls until " + timeStr2 + ", then it goes back to normal. I'll log that you need it back sooner so the team can look at it.",
+            explanation: "Hot water has been deliberately switched off from the boiler panel until " + timeStr2 + ". That is the likely reason there is no hot water. It goes back to its normal timetable at " + timeStr2 + ". We can\'t change it from here, so escalate if the caller needs it sooner.",
+            script: "The hot water has been switched off on purpose at the controls until " + timeStr2 + ", then it goes back to normal. I\'ll log that you need it back sooner so the team can look at it.",
             ticketSentence: 'Hot water override at time of call: Override OFF until ' + timeStr2 + '.'
         };
     }
@@ -634,8 +634,8 @@ function dhwOverrideOutcome(dhwOverride, nowMs) {
         return {
             state: 'on-v1',
             headline: 'Hot water override: Override ON',
-            explanation: "Hot water has been set to run from the boiler panel. This type of panel doesn't give an end time. The controls are asking for hot water, so if there is still none, the likely cause is the boiler or the cylinder.",
-            script: "The hot water has been switched on from the controls. If it's still not coming through, it's likely the boiler itself, so I'll log it for the team.",
+            explanation: "Hot water has been set to run from the boiler panel. This type of panel doesn\'t give an end time. The controls are asking for hot water, so if there is still none, the likely cause is the boiler or the cylinder.",
+            script: "The hot water has been switched on from the controls. If it\'s still not coming through, it\'s likely the boiler itself, so I\'ll log it for the team.",
             ticketSentence: 'Hot water override at time of call: Override ON.'
         };
     }
@@ -643,8 +643,8 @@ function dhwOverrideOutcome(dhwOverride, nowMs) {
         return {
             state: 'off-v1',
             headline: 'Hot water override: Override OFF',
-            explanation: "Hot water has been deliberately switched off on the boiler panel. That is the likely reason there is no hot water. This type of panel doesn't say when it ends, and we can't change it from here, so escalate it.",
-            script: "The hot water has been switched off on purpose at the controls. I'll log it so the team can switch it back on for you.",
+            explanation: "Hot water has been deliberately switched off on the boiler panel. That is the likely reason there is no hot water. This type of panel doesn\'t say when it ends, and we can\'t change it from here, so escalate it.",
+            script: "The hot water has been switched off on purpose at the controls. I\'ll log it so the team can switch it back on for you.",
             ticketSentence: 'Hot water override at time of call: Override OFF.'
         };
     }
@@ -652,23 +652,23 @@ function dhwOverrideOutcome(dhwOverride, nowMs) {
     var ccExplanation, ccTicket;
     if (effectiveReason === 'stale') {
         var ago2 = _dhwFmtAgo(panelLastSeenMs, nowMs);
-        var reason2 = ago2 ? 'last reported ' + ago2 : "isn't reporting";
+        var reason2 = ago2 ? 'last reported ' + ago2 : "isn\'t reporting";
         ccExplanation = ago2
-            ? "The boiler panel last reported " + ago2 + ", so we can't tell whether the hot water is overridden. Don't tell the caller it is on or off; log it and escalate as normal."
-            : "The boiler panel isn't reporting, so we can't tell whether the hot water is overridden. Don't tell the caller it is on or off; log it and escalate as normal.";
+            ? "The boiler panel last reported " + ago2 + ", so we can\'t tell whether the hot water is overridden. Don\'t tell the caller it is on or off; log it and escalate as normal."
+            : "The boiler panel isn\'t reporting, so we can\'t tell whether the hot water is overridden. Don\'t tell the caller it is on or off; log it and escalate as normal.";
         ccTicket = 'Hot water override at time of call: could not be confirmed (' + reason2 + ').';
     } else if (effectiveReason === 'not-reconfirmed') {
-        ccExplanation = "The boiler panel hasn't re-confirmed its hot water override recently, so we can't tell whether it is still in place. Don't tell the caller it is on or off; log it and escalate as normal.";
-        ccTicket = "Hot water override at time of call: could not be confirmed (panel hasn't re-confirmed recently).";
+        ccExplanation = "The boiler panel hasn\'t re-confirmed its hot water override recently, so we can\'t tell whether it is still in place. Don\'t tell the caller it is on or off; log it and escalate as normal.";
+        ccTicket = "Hot water override at time of call: could not be confirmed (panel hasn\'t re-confirmed recently).";
     } else {
-        ccExplanation = "The boiler panel's hot water override reading doesn't make sense right now, so we can't tell whether it is overridden. Don't tell the caller it is on or off; log it and escalate as normal.";
-        ccTicket = "Hot water override at time of call: could not be confirmed (reading doesn't make sense).";
+        ccExplanation = "The boiler panel\'s hot water override reading doesn\'t make sense right now, so we can\'t tell whether it is overridden. Don\'t tell the caller it is on or off; log it and escalate as normal.";
+        ccTicket = "Hot water override at time of call: could not be confirmed (reading doesn\'t make sense).";
     }
     return {
         state: 'cant-confirm',
-        headline: "Hot water override: can't confirm",
+        headline: "Hot water override: can\'t confirm",
         explanation: ccExplanation,
-        script: "I can't see the current hot water setting from here right now, so I'll log it for the team to check.",
+        script: "I can\'t see the current hot water setting from here right now, so I\'ll log it for the team to check.",
         ticketSentence: ccTicket
     };
 }
@@ -720,13 +720,14 @@ function boilerHeatingOutcome(heating, need, nowMs) {
 }
 
 /**
- * bpOutcomeCard(wcode, heating, nowMs, boostAvailable) — returns all card fields for a W-code.
- * boostAvailable = { on: bool, off: bool } from the workspace payload (OOHDASH-141).
+ * bpOutcomeCard(wcode, heating, nowMs, boostAvailable, activeBoostHolds) — OOHDASH-144 rebuild.
+ * Returns { headline, sayHtml, gtkHtml, wrapKind, candidateZones, direction } per the new standard.
+ * boostAvailable = { on: bool, off: bool }. activeBoostHolds from workspace.
  */
-function bpOutcomeCard(wcode, heating, nowMs, boostAvailable) {
+function bpOutcomeCard(wcode, heating, nowMs, boostAvailable, activeBoostHolds) {
     boostAvailable = boostAvailable || { on: false, off: false };
+    activeBoostHolds = activeBoostHolds || [];
     var zones = (heating && heating.zones) || [];
-    var version = heating && heating.version;
 
     function panelAgo(ms) {
         if (ms === null || ms === undefined) return 'never';
@@ -736,166 +737,311 @@ function bpOutcomeCard(wcode, heating, nowMs, boostAvailable) {
         return Math.floor(diff / 3600000) + ' hours ago';
     }
 
-    function forcedTimeStr(zone) {
-        if (version === 'V2' && zone.forcedUntilMs && zone.forcedUntilMs > nowMs) {
-            var d = new Date(zone.forcedUntilMs);
-            var hh = String(d.getHours()).padStart(2, '0');
-            var mm2 = String(d.getMinutes()).padStart(2, '0');
-            return 'until ' + hh + ':' + mm2;
+    function say(text) {
+        return '<div class="say" data-testid="say-block"><span class="say-label">🗣 Say to the customer</span>' + text + '</div>';
+    }
+
+    function gtk(text) {
+        if (!text) return '';
+        return '<div class="gtk" data-testid="gtk-block"><span class="gtk-label">ℹ Good to know (for you, not the customer)</span>' + text + '</div>';
+    }
+
+    // Helper: find the earliest nextOn across a set of zone objects
+    function earliestNextOn(zoneObjs) {
+        var best = null;
+        for (var i = 0; i < zoneObjs.length; i++) {
+            var tt = zoneObjs[i].timetable;
+            if (tt && tt.everyDay && tt.nextOn) {
+                if (!best || tt.nextOn.atMs < best.atMs) best = tt.nextOn;
+            }
         }
-        if (zone.held) return 'and is being held';
+        return best;
+    }
+
+    // Helper: timetable clause for a set of zones (", which next comes on at HH:MM")
+    function nextOnClause(zoneObjs) {
+        var n = earliestNextOn(zoneObjs);
+        if (!n) return '';
+        var day = (n.dayText && n.dayText !== 'today') ? (n.dayText + ' ') : '';
+        return ', which next comes on at ' + day + n.timeText;
+    }
+
+    // Helper: "good to know" temp clause
+    function tempGtk(zoneObjs) {
+        var n = earliestNextOn(zoneObjs);
+        if (!n || n.tempC == null) return '';
+        return 'At ' + n.timeText + ' it heats the pub to ' + n.tempC + '°C if the room is cooler than that.';
+    }
+
+    // Helper: is this zone under an OOH hold?
+    function oohHold(zoneId) {
+        return activeBoostHolds.find(function(h) { return h.boilerZone === zoneId; }) || null;
+    }
+
+    // Helper: forced-until text for a zone (V2 only)
+    function forcedUntilText(z) {
+        if (z.forcedUntilMs && z.forcedUntilMs > nowMs) {
+            var d = new Date(z.forcedUntilMs);
+            return ' until ' + d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+        }
         return '';
     }
 
-    // Forced-on add-on sentence
-    var forcedOnZone = zones.find(function(z) { return z.on === true && z.forced === 'on'; });
-    var forcedOnSentence = '';
-    if (forcedOnZone) {
-        var ts = forcedTimeStr(forcedOnZone);
-        forcedOnSentence = 'Pub zone ' + forcedOnZone.n + ' has been switched on at the panel' +
-            (ts ? ' (' + ts + ')' : '') + ", so it's running outside its normal timetable.";
-    }
-
-    var headline, operatorText, scriptText, ticketText, buttons;
+    var headline, sayHtml, gtkHtml = '', wrapKind = 'capture', candidateZones = [], direction = 'on';
     var ago = panelAgo(heating && heating.panelLastSeenMs);
 
     if (wcode === 'W1') {
-        headline = "Pub heating: can’t check right now";
-        operatorText = "The pub’s boiler panel last reported " + ago + ", so we can’t see what the heating is doing. Don’t tell the caller whether it is on or off. Log it for the IoT team.";
-        scriptText = "I can’t see the pub heating controls from here at the moment, so I’ve logged it for the team to check.";
-        ticketText = "Pub heating at time of call: could not be checked (boiler panel last reported " + ago + ").";
-        buttons = '<button class="btn primary" data-testid="bp-capture" onclick="flowStep({need:\'bp-esc\'})">Capture &amp; escalate for the IoT team</button>' +
-                  '<button class="btn" data-testid="bp-noact" onclick="flowStep({need:\'bp-noact\'})">End with no action</button>';
+        headline = "We can\'t see the pub heating right now";
+        sayHtml = say("I can\'t see your heating controls from here at the moment, so I\'ll log it for our team to check first thing.");
+        gtkHtml = gtk('The heating controls last reported ' + esc(ago) + '. Don\'t tell the customer whether the heating is on or off.');
+        wrapKind = 'capture';
     } else if (wcode === 'W2') {
-        headline = "Lighthouse is asking the boiler for heat";
-        operatorText = "The panel is calling for heat and every pub heating zone is switched on. The controls are doing their job, so the fault is most likely the boiler itself, the pipework, or the radiators and valves. The site needs their gas or heating engineer.";
-        scriptText = "Our controls are asking the boiler for heat right now, so the problem looks like it’s with the boiler or the radiators rather than the controls. Please call your heating engineer. I’ve logged tonight’s call.";
-        ticketText = "Pub heating at time of call: panel calling for heat, all pub zones on. Likely a boiler/heating-side fault; site advised to call their heating engineer.";
-        buttons = '<button class="btn primary" data-testid="bp-advice" onclick="flowStep({need:\'bp-advice\'})">Advise site &amp; log it (recommended)</button>' +
-                  '<button class="btn" data-testid="bp-capture" onclick="flowStep({need:\'bp-esc\'})">Capture &amp; escalate for the IoT team</button>';
+        headline = "The heating controls are asking the boiler for heat";
+        sayHtml = say("Our controls are asking your boiler for heat right now, so they\'re doing their job. The problem is most likely the boiler itself or the radiators, so please call your heating engineer. I\'ll log tonight\'s call.");
+        gtkHtml = '';
+        wrapKind = 'advice';
     } else if (wcode === 'W3') {
-        var onZonesW3 = zones.filter(function(z) { return z.on; }).map(function(z) { return 'pub zone ' + z.n; });
         var offZonesW3 = zones.filter(function(z) { return !z.on; });
-        var offZoneIdsW3 = offZonesW3.map(function(z) { return z.zone || ('CHZ' + z.n); });
-        var offListW3 = offZonesW3.map(function(z) { return 'pub zone ' + z.n; }).join(', ') || 'pub zone 2';
-        var onListW3 = onZonesW3.join(', ') || 'pub zone 1';
-        var onListCapW3 = onListW3.charAt(0).toUpperCase() + onListW3.slice(1);
+        candidateZones = offZonesW3.filter(function(z) { return !oohHold(z.zone || ('CHZ' + z.n)); });
+        var nextOnW3 = nextOnClause(candidateZones.length ? candidateZones : offZonesW3);
         headline = "Part of the pub heating is off";
-        operatorText = esc(onListCapW3) + " is on, but " + esc(offListW3) + " is off right now. The panel doesn’t tell us why from here, and we can’t switch zones remotely. Log it for the IoT team. If the caller says the cold area is the part that’s heating, treat it as a boiler or radiator problem and advise their heating engineer.";
-        scriptText = "Part of the heating is on, but one area is switched off at the controls. I can’t change that from here, so I’ve logged it for the team.";
-        ticketText = "Pub heating at time of call: " + esc(onListW3) + " on, " + esc(offListW3) + " off. Captured for the IoT team.";
-        var boostBtnsW3 = '';
-        if (boostAvailable.on && offZoneIdsW3.length > 0) {
-            offZoneIdsW3.forEach(function(zId) {
-                var zLabel = zId === 'CHZ1' ? 'zone 1' : 'zone 2';
-                boostBtnsW3 += '<button class="btn boost-on" data-testid="bp-boost-on-' + zId + '" onclick="flowStep({need:\'bp-boost\',direction:\'on\',zone:\'' + zId + '\'})">' + 'Heat ON (' + zLabel + ')</button>';
-            });
-        }
-        buttons = boostBtnsW3 +
-                  '<button class="btn primary" data-testid="bp-capture" onclick="flowStep({need:\'bp-esc\'})">Capture &amp; escalate for the IoT team</button>' +
-                  '<button class="btn" data-testid="bp-advice" onclick="flowStep({need:\'bp-advice\'})">Advise heating engineer &amp; log it</button>' +
-                  '<button class="btn" data-testid="bp-noact" onclick="flowStep({need:\'bp-noact\'})">End with no action</button>';
+        var canOn = boostAvailable.on && candidateZones.length > 0;
+        sayHtml = say('Part of your heating is switched off at the controls right now.' +
+            (canOn ? ' I can turn it on from here for a set time, and then it goes back to its normal timetable' + nextOnW3 + '.' : '') +
+            " I\'ll log it for our team to look at properly.");
+        gtkHtml = gtk("If the customer says the cold area is the part that\'s already heating, it\'s more likely the boiler or radiators, so advise their heating engineer instead.");
+        direction = 'on';
+        wrapKind = 'capture';
     } else if (wcode === 'W4') {
-        headline = "Pub heating is in summer mode";
-        operatorText = "The panel has switched the pub heating off for the summer season. It isn’t a fault, but we can’t change it from here. If the site needs heating, log it for the IoT team.";
-        scriptText = "The heating controls are still set to summer mode, which is why the heating isn’t coming on. I can’t change that from here, but I’ve logged it so the team can switch it back for you.";
-        ticketText = "Pub heating at time of call: off, panel in summer mode. Site needs heating; captured for the IoT team.";
-        buttons = '<button class="btn primary" data-testid="bp-capture" onclick="flowStep({need:\'bp-esc\'})">Capture &amp; escalate for the IoT team</button>' +
-                  '<button class="btn" data-testid="bp-noact" onclick="flowStep({need:\'bp-noact\'})">End with no action</button>';
+        headline = "The heating is switched off for the summer";
+        sayHtml = say("Your heating controls are still on their summer setting, which keeps the heating off. I can\'t change that from here, but I\'ll log it so our team can switch it back for you.");
+        gtkHtml = '';
+        wrapKind = 'capture';
     } else if (wcode === 'W5') {
-        var forcedOffZone = zones.find(function(z) { return !z.on && z.forced === 'off'; }) || zones[0] || { n: 1 };
-        var forcedOffZoneId = forcedOffZone.zone || ('CHZ' + forcedOffZone.n);
-        var tsW5 = forcedTimeStr(forcedOffZone);
-        var tsPhraseW5 = tsW5 || (forcedOffZone.held ? 'and is being held off' : '');
-        headline = "Pub heating has been switched off on purpose";
-        operatorText = "Pub zone " + forcedOffZone.n + " has been deliberately switched off at the boiler panel" +
-            (tsPhraseW5 ? " (" + tsPhraseW5 + ")" : "") +
-            ". That’s the likely reason it’s cold. We can’t change it from here, so log it for the IoT team if the site needs the heating back on.";
-        scriptText = "That part of the heating has been switched off on purpose at the controls. I can’t change it from here, but I’ve logged that you need it back on so the team can sort it.";
-        ticketText = "Pub heating at time of call: pub zone " + forcedOffZone.n + " forced OFF at the panel" +
-            (tsPhraseW5 ? " (" + tsPhraseW5 + ")" : "") + ". Site needs heat; captured for the IoT team.";
-        buttons = (boostAvailable.on
-            ? '<button class="btn boost-on" data-testid="bp-boost-on-' + forcedOffZoneId + '" onclick="flowStep({need:\'bp-boost\',direction:\'on\',zone:\'' + forcedOffZoneId + '\'})">' + 'Heat ON (zone ' + forcedOffZone.n + ')</button>'
-            : '') +
-                  '<button class="btn primary" data-testid="bp-capture" onclick="flowStep({need:\'bp-esc\'})">Capture &amp; escalate for the IoT team</button>' +
-                  '<button class="btn" data-testid="bp-noact" onclick="flowStep({need:\'bp-noact\'})">End with no action</button>';
-    } else if (wcode === 'W6') {
-        var allZoneIdsW6 = zones.length > 0 ? zones.map(function(z) { return z.zone || ('CHZ' + z.n); }) : ['CHZ1'];
-        var nc = heating && heating.nextChange;
-        headline = "Pub heating is off at the controls right now";
-        operatorText = "The panel isn’t asking the boiler for heat. It isn’t in summer mode and nobody has switched it off on purpose, so it’s most likely outside its heating times." +
-            (nc ? " Based on the panel’s stored timetable, the next change is " + esc(nc) + "." : "") +
-            " We can’t switch it on from here.";
-        scriptText = "The heating is off on its timetable at the moment" +
-            (nc ? " and is due back on at " + esc(nc) : "") +
-            ". I can’t turn it on from here, so I’ve logged it for the team.";
-        ticketText = "Pub heating at time of call: off at the panel (no summer mode, not forced off" +
-            (nc ? "; next scheduled change " + esc(nc) : "") + "). Captured for the IoT team.";
-        var boostBtnsW6 = '';
-        if (boostAvailable.on) {
-            allZoneIdsW6.forEach(function(zId) {
-                var zLabel = zId === 'CHZ1' ? 'zone 1' : 'zone 2';
-                boostBtnsW6 += '<button class="btn boost-on" data-testid="bp-boost-on-' + zId + '" onclick="flowStep({need:\'bp-boost\',direction:\'on\',zone:\'' + zId + '\'})">' + 'Heat ON (' + zLabel + ')</button>';
-            });
+        var forcedOffZone = zones.find(function(z) { return !z.on && z.forced === 'off'; }) || zones[0] || { n: 1, zone: 'CHZ1' };
+        var foZoneId = forcedOffZone.zone || ('CHZ' + forcedOffZone.n);
+        var foHold = oohHold(foZoneId);
+        var fuText = forcedUntilText(forcedOffZone);
+        if (foHold) {
+            // This zone was turned off by OOH — different wording
+            var foHoldUntil = foHold.revertAt ? new Date(foHold.revertAt).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }) : '';
+            headline = "We turned this heating off earlier";
+            sayHtml = say("We turned that part of your heating off earlier" + (foHoldUntil ? ', until ' + foHoldUntil : '') + ". I can put it back to normal now, so it follows its usual timetable again.");
+            gtkHtml = '';
+            candidateZones = []; // no further turn-on; offer put-back only
+        } else {
+            headline = "Someone has switched the heating off at the controls";
+            var canOnW5 = boostAvailable.on && !foHold;
+            sayHtml = say("Part of your heating has been switched off by hand at the controls" + (fuText ? fuText : '') + "." +
+                (canOnW5 ? " I can turn it back on from here for a set time." : "") +
+                " I\'ll log it so our team can check why it was switched off.");
+            gtkHtml = gtk("Someone at the pub or an engineer may have done this on purpose, so check with the customer before turning it back on.");
+            candidateZones = canOnW5 ? [forcedOffZone] : [];
+            direction = 'on';
         }
-        buttons = boostBtnsW6 +
-                  '<button class="btn primary" data-testid="bp-capture" onclick="flowStep({need:\'bp-esc\'})">Capture &amp; escalate for the IoT team</button>' +
-                  '<button class="btn" data-testid="bp-noact" onclick="flowStep({need:\'bp-noact\'})">End with no action</button>';
+        wrapKind = 'capture';
+    } else if (wcode === 'W6') {
+        var allZonesW6 = zones.length > 0 ? zones : [{ n: 1, zone: 'CHZ1' }];
+        candidateZones = allZonesW6.filter(function(z) { return !oohHold(z.zone || ('CHZ' + z.n)); });
+        var nextOnW6 = nextOnClause(allZonesW6);
+        var canOnW6 = boostAvailable.on && candidateZones.length > 0;
+        headline = "The heating is off on its timetable";
+        sayHtml = say("Your heating is off on its normal timetable right now" + (nextOnW6 ? ' and is next due on' + nextOnW6.replace(', which next comes on', '') : '') + "." +
+            (canOnW6 ? " I can turn it on from here for a set time if you need it." : " I can\'t turn it on from here, so I\'ll log it for our team.") +
+            " I\'ll log the call.");
+        gtkHtml = gtk(tempGtk(allZonesW6));
+        direction = 'on';
+        wrapKind = 'capture';
     } else if (wcode === 'W7') {
         var fallbackZone = zones.find(function(z) { return z.fallback; }) || zones[0] || { n: 1 };
-        headline = "Heating is running on a back-up cycle";
-        operatorText = "The panel has lost the room temperature reading for pub zone " + fallbackZone.n + ", so it’s heating that zone on a timed on/off cycle instead. Rooms can feel cooler than normal. The IoT team needs to check the room sensor.";
-        scriptText = "The heating is running, but on a back-up setting because a temperature sensor isn’t reporting. I’ve logged it for the team to fix the sensor.";
-        ticketText = "Pub heating at time of call: pub zone " + fallbackZone.n + " on back-up (fallback) cycle, room sensor not reporting. Captured for the IoT team.";
-        buttons = '<button class="btn primary" data-testid="bp-capture" onclick="flowStep({need:\'bp-esc\'})">Capture &amp; escalate for the IoT team</button>' +
-                  '<button class="btn" data-testid="bp-noact" onclick="flowStep({need:\'bp-noact\'})">End with no action</button>';
+        headline = "The heating is running on a simple timer";
+        sayHtml = say("Your heating is running, but on a simple timer because one of the room temperature sensors isn\'t working, so it may feel cooler than normal. I\'ll log it for our team to fix the sensor.");
+        gtkHtml = '';
+        wrapKind = 'capture';
     } else if (wcode === 'W8') {
-        var onZonesW8obj = zones.filter(function(z) { return z.on; });
-        var onZoneIdsW8 = onZonesW8obj.map(function(z) { return z.zone || ('CHZ' + z.n); });
-        var onZonesW8 = onZonesW8obj.map(function(z) { return 'pub zone ' + z.n; });
-        var onListW8 = onZonesW8.length > 0 ? onZonesW8.join(' and ') : 'pub zones';
-        headline = "Pub heating is on, and we can’t switch it off from here";
-        operatorText = "The panel is heating " + esc(onListW8) + ". Pub heating on this panel can’t be changed remotely. Log it for the IoT team. In the meantime the site can turn the radiator valves down.";
-        scriptText = "The heating is on at the controls and I can’t change it from here tonight. Turning the radiator valves down will help in the meantime. I’ve logged it for the team.";
-        ticketText = "Pub heating at time of call: on (" + esc(onListW8) + "). Caller wants it lower/off; captured for the IoT team.";
-        var boostBtnsW8 = '';
-        if (boostAvailable.off && onZoneIdsW8.length > 0) {
-            onZoneIdsW8.forEach(function(zId) {
-                var zLabel = zId === 'CHZ1' ? 'zone 1' : 'zone 2';
-                boostBtnsW8 += '<button class="btn boost-off" data-testid="bp-boost-off-' + zId + '" onclick="flowStep({need:\'bp-boost\',direction:\'off\',zone:\'' + zId + '\'})">' + 'Heat OFF (' + zLabel + ')</button>';
-            });
-        } else if (boostAvailable.off) {
-            boostBtnsW8 = '<button class="btn boost-off" data-testid="bp-boost-off" onclick="flowStep({need:\'bp-boost\',direction:\'off\',zone:\'CHZ1\'})">Heat OFF</button>';
-        }
-        buttons = boostBtnsW8 +
-                  '<button class="btn primary" data-testid="bp-capture" onclick="flowStep({need:\'bp-esc\'})">Capture &amp; escalate for the IoT team</button>' +
-                  '<button class="btn" data-testid="bp-noact" onclick="flowStep({need:\'bp-noact\'})">End with no action</button>';
+        var onZonesW8 = zones.filter(function(z) { return z.on; });
+        var oohOnZones = onZonesW8.filter(function(z) { return !!oohHold(z.zone || ('CHZ' + z.n)); });
+        candidateZones = onZonesW8.filter(function(z) { return !oohHold(z.zone || ('CHZ' + z.n)); });
+        var nextOnW8 = nextOnClause(onZonesW8);
+        var canOffW8 = boostAvailable.off && candidateZones.length > 0;
+        var oohAddOn = oohOnZones.map(function(z) {
+            var h = oohHold(z.zone || ('CHZ' + z.n));
+            var until = h && h.revertAt ? new Date(h.revertAt).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }) : '';
+            return 'We turned zone ' + z.n + ' on earlier' + (until ? ', until ' + until : '') + '. I can put that back to normal now.';
+        }).join(' ');
+        headline = "The heating is on";
+        sayHtml = say("Your heating is on at the controls right now." +
+            (oohAddOn ? ' ' + oohAddOn : '') +
+            (canOffW8 ? " I can turn it off from here for a set time, and then it goes back to its normal timetable" + nextOnW8 + "." : " I can\'t change it from here tonight. Turning the radiators down will help in the meantime.") +
+            " I\'ll log the call.");
+        gtkHtml = '';
+        direction = 'off';
+        wrapKind = 'capture';
     } else if (wcode === 'W9') {
-        headline = "Pub heating is already off";
-        operatorText = "The panel isn’t heating any pub zone right now, so the warmth isn’t coming from the pub heating controls. Ask whether another heater, or the accommodation heating, is on.";
-        scriptText = "Our controls show the pub heating is off right now, so the warmth is coming from somewhere else, perhaps a radiator on manual or another heater. I’ve noted the call.";
-        ticketText = "Pub heating at time of call: off at the panel. Caller reports too warm; heat source is not the pub heating controls.";
-        buttons = '<button class="btn" data-testid="bp-noact" onclick="flowStep({need:\'bp-noact\'})">Log it &amp; end</button>' +
-                  '<button class="btn primary" data-testid="bp-capture" onclick="flowStep({need:\'bp-esc\'})">Capture &amp; escalate for the IoT team</button>';
+        headline = "The pub heating is already off";
+        sayHtml = say("Our controls show your pub heating is off right now, so the warmth is coming from somewhere else, perhaps a radiator turned up by hand or another heater. I\'ll log the call.");
+        gtkHtml = gtk('Ask whether a portable heater or the rooms upstairs have heating on.');
+        wrapKind = 'no-action';
     } else {
-        headline = "Pub heating: can’t check right now";
-        operatorText = "Could not determine the heating state. Log it for the IoT team.";
-        scriptText = "I can’t see the pub heating controls from here at the moment, so I’ve logged it for the team to check.";
-        ticketText = "Pub heating at time of call: could not be determined.";
-        buttons = '<button class="btn primary" data-testid="bp-capture" onclick="flowStep({need:\'bp-esc\'})">Capture &amp; escalate for the IoT team</button>' +
-                  '<button class="btn" data-testid="bp-noact" onclick="flowStep({need:\'bp-noact\'})">End with no action</button>';
+        headline = "We can\'t see the pub heating right now";
+        sayHtml = say("I can\'t see your heating controls from here at the moment, so I\'ll log it for our team to check.");
+        gtkHtml = '';
+        wrapKind = 'capture';
     }
 
-    return { headline: headline, operatorText: operatorText, scriptText: scriptText, ticketText: ticketText, buttons: buttons, forcedOnSentence: forcedOnSentence };
+    return { headline: headline, sayHtml: sayHtml, gtkHtml: gtkHtml, wrapKind: wrapKind, candidateZones: candidateZones, direction: direction };
 }
 
 /**
- * boilerPanelHeatingBranch(ws, f, panelDevice, site) — handles the entire boiler panel heating flow.
- * Entered when the chosen area's device set has a boiler-panel device.
+ * wrapUpStep — "Check and log" (§9). Shared by all pub heating outcomes.
+ * Handles first-log and append-to-existing-ticket paths.
+ */
+function wrapUpStep(ws, f, heating) {
+    var nowMs = Date.now();
+    var actions = f.data.actions || [];
+    // Find any ticketId already logged in this issue
+    var existingTicketId = null;
+    for (var i = 0; i < actions.length; i++) {
+        if (actions[i].ticketId) { existingTicketId = actions[i].ticketId; break; }
+    }
+
+    if (f.data['_wrap_done']) {
+        // Already submitted — show the green banner + out buttons
+        var tkt = f.data['_wrap_ticket'];
+        var bannerText = '✅ Logged: ticket #' + tkt + ' is with the IoT helpdesk';
+        var actionLines = (actions.length ? actions.map(function(a) {
+            return '• ' + esc(a.kind + (a.atMs ? ' at ' + new Date(a.atMs).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }) : ''));
+        }) : ['• Noted']).join('');
+        if (f.data.additionalNotes) actionLines += '\n• Notes: ' + esc(f.data.additionalNotes);
+        registerIssue(esc(f.data._wrapSubject || 'Pub heating'), 'violet', tkt);
+        f.stage = 99;
+        return '<div class="outcome applied" data-testid="wrap-logged">' +
+            '<div style="font-size:15px;font-weight:700;margin-bottom:8px">' + bannerText + '</div>' +
+            '<div class="small" style="white-space:pre-line">' + actionLines + '</div>' +
+            '</div>' + outButtons();
+    }
+
+    if (f.data['_wrap_err']) {
+        return '<div class="alert err" data-testid="wrap-error">We couldn\'t log this: ' + esc(f.data['_wrap_err']) +
+            ' <button class="btn" onclick="state.flow.data[\'_wrap_err\']=null;state.flow.data[\'_wrap_pend\']=null;render()">Try again</button></div>';
+    }
+
+    if (f.data['_wrap_pend']) {
+        return '<div class="alert info">Logging…</div>';
+    }
+
+    // Build the sections
+    var wrapTitle = f.data.wrapKind === 'no-action' ? 'Check and log' : 'Check and log';
+    var whatSaid = f.data.freeText ? esc(f.data.freeText) : '<span class="small" style="color:var(--text-secondary)">Nothing recorded</span>';
+    var whatFound = esc(f.data._wrapHeadline || (heating && heating.zones && heating.zones.length ? 'Heating checked' : 'Pub heating checked'));
+    var whatDidLines = actions.length ? actions.map(function(a) {
+        var timeStr = a.atMs ? new Date(a.atMs).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }) + ' ' : '';
+        var kindLabel = { 'turn-on': 'Turned the heating on', 'turn-off': 'Turned the heating off', 'put-back': 'Put heating back to normal' }[a.kind] || a.kind;
+        var zoneStr = a.zones && a.zones.length ? ', ' + a.zones.map(function(z) { return z.replace('CHZ', 'zone '); }).join(' and ') : '';
+        var untilStr = a.untilMs ? ', until ' + new Date(a.untilMs).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }) : '';
+        var logStr = a.ticketId ? ' (logged automatically, ticket #' + a.ticketId + ')' : '';
+        return '<li>' + esc(timeStr + kindLabel + zoneStr + untilStr) + esc(logStr) + '</li>';
+    }).join('') : '<li>Nothing changed</li>';
+    var whatLog = esc(f.data._wrapLogSentence || 'Pub heating call logged for the IoT helpdesk.');
+    var btnLabel = existingTicketId
+        ? 'Add to ticket #' + existingTicketId + ' and finish'
+        : 'Log for the IoT helpdesk and finish';
+
+    var html = '<div class="wrapup" data-testid="wrap-up">' +
+        '<h3>Check and log</h3>' +
+        '<div class="wu-section"><strong>What the customer said</strong>' + whatSaid + '</div>' +
+        '<div class="wu-section"><strong>What we found</strong>' + whatFound + '</div>' +
+        '<div class="wu-section"><strong>What we did</strong><ul class="wu-actions">' + whatDidLines + '</ul></div>' +
+        '<div class="wu-section"><strong>What we\'ll log</strong>' + whatLog + '</div>' +
+        '<div class="outbtns" style="margin-top:14px">' +
+        '<button class="btn primary" data-testid="wrap-submit" onclick="wrapUpSubmit()">' + btnLabel + '</button>' +
+        '</div></div>';
+
+    return html;
+}
+
+// Called when the agent clicks the submit button in Check and log.
+function wrapUpSubmit() {
+    if (!state.flow || !state.flow.data) return;
+    var f = state.flow;
+    if (f.data['_wrap_pend']) return; // prevent double-click
+    var ws = state.workspace;
+    var actions = f.data.actions || [];
+    var existingTicketId = null;
+    for (var i = 0; i < actions.length; i++) {
+        if (actions[i].ticketId) { existingTicketId = actions[i].ticketId; break; }
+    }
+    f.data['_wrap_pend'] = true;
+    render();
+
+    var actionLines = actions.map(function(a) {
+        var timeStr = a.atMs ? new Date(a.atMs).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }) + ' ' : '';
+        var kindLabel = { 'turn-on': 'Turned the heating on', 'turn-off': 'Turned the heating off', 'put-back': 'Put heating back to normal' }[a.kind] || a.kind;
+        var zoneStr = a.zones && a.zones.length ? ', ' + a.zones.map(function(z) { return z.replace('CHZ', 'zone '); }).join(' and ') : '';
+        var untilStr = a.untilMs ? ', until ' + new Date(a.untilMs).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }) : '';
+        return timeStr + kindLabel + zoneStr + untilStr;
+    });
+
+    // Find hold ids from actions
+    var holdIds = [];
+    for (var j = 0; j < actions.length; j++) {
+        if (actions[j].holdIds) holdIds = holdIds.concat(actions[j].holdIds);
+    }
+    // Find the first hold with a ticket for the append path
+    var appendToHoldId = null;
+    for (var k = 0; k < actions.length; k++) {
+        if (actions[k].ticketId && actions[k].holdIds && actions[k].holdIds.length) {
+            appendToHoldId = actions[k].holdIds[0];
+            break;
+        }
+    }
+
+    var subject = f.data._wrapSubject || 'Pub heating';
+    var detail = f.data._wrapHeadline || subject;
+    var logSentence = f.data._wrapLogSentence || detail;
+
+    var body = {
+        type: f.data.wrapKind === 'no-action' ? 'no-action' : 'capture',
+        siteNo: ws.site.siteNo,
+        siteName: ws.site.siteName,
+        subject: subject,
+        detail: logSentence,
+        callerWords: f.data.freeText || null,
+        additionalNotes: f.data.additionalNotes || null,
+        OohCaptureClass: 'boiler-panel-heating',
+        actions: actionLines,
+        holdIds: holdIds
+    };
+    if (appendToHoldId && existingTicketId) {
+        body.appendToHoldId = appendToHoldId;
+        body.confirmToken = state.confirmToken;
+    }
+
+    api.post('/api/outcomes', body).then(function(res) {
+        var tkt = (res.ticket && res.ticket.id) ? res.ticket.id : (res.ticketId || '?');
+        f.data['_wrap_pend'] = null;
+        f.data['_wrap_done'] = true;
+        f.data['_wrap_ticket'] = tkt;
+        f.data['_wrap_subject'] = subject;
+        // Refresh workspace so banner clears if we put something back
+        refreshWorkspace().catch(function() {});
+        render();
+    }).catch(function(err) {
+        f.data['_wrap_pend'] = null;
+        f.data['_wrap_err'] = err.message || 'unknown error';
+        render();
+    });
+}
+
+/**
+ * boilerPanelHeatingBranch(ws, f, panelDevice, site) — OOHDASH-144 rebuild.
+ * Handles the entire pub heating flow (W-codes, zone picker, boost, check-and-log).
  */
 function boilerPanelHeatingBranch(ws, f, panelDevice, site) {
     var heating = ws.boilerControl && ws.boilerControl.heating ? ws.boilerControl.heating : null;
     var nowMs = Date.now();
+    var boostAvailable = ws.boostAvailable || { on: false, off: false };
+    var activeBoostHolds = ws.activeBoostHolds || [];
 
     function panelAgo(ms) {
         if (ms === null || ms === undefined) return 'never';
@@ -906,11 +1052,15 @@ function boilerPanelHeatingBranch(ws, f, panelDevice, site) {
     }
 
     function fmtTemp(v) {
-        if (typeof v !== 'number' || !isFinite(v) || v < -30 || v > 110) return '—';
+        if (typeof v !== 'number' || !isFinite(v) || v < -30 || v > 110) return null;
         return v.toFixed(1) + '°C';
     }
 
-    // Build readout line
+    function fmtTime(ms) {
+        return new Date(ms).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+    }
+
+    // Build readout line (§8.1a)
     function buildReadout() {
         if (!heating || !heating.visible) {
             return '<div class="zoneread"><span class="small">Pub boiler panel — no reading</span></div>';
@@ -918,113 +1068,233 @@ function boilerPanelHeatingBranch(ws, f, panelDevice, site) {
         var zones = heating.zones || [];
         var zoneParts = zones.map(function(z) {
             var stateHtml = z.on === true ? '<b class="ok">on</b>' : (z.on === false ? '<b class="warn">off</b>' : '—');
-            return 'Pub zone ' + z.n + ' ' + stateHtml;
+            return 'Zone ' + z.n + ' ' + stateHtml;
         }).join(' · ');
-        var temps = zones.map(function(z) { return fmtTemp(z.roomTemp); }).join(' / ');
+        var temps = zones.map(function(z) { return fmtTemp(z.roomTemp); }).filter(Boolean).join(' / ');
         var ago = panelAgo(heating.panelLastSeenMs);
         var readoutText = (zoneParts || 'no zones') +
-            (temps && temps !== '—' ? ' · room ' + temps : '') +
-            ' · panel reported ' + ago;
+            (temps ? ' · Room ' + temps : '') +
+            ' · Heating controls last reported ' + ago;
         return '<div class="zoneread"><span class="small">' + readoutText + '</span></div>';
     }
 
     var readout = buildReadout();
+    var need = f.data.need;
 
-    // Stage 1: ask what the caller needs (two chips only for boiler panel)
+    // Check and log step (§9)
+    if (need === 'bp-wrap') {
+        return wrapUpStep(ws, f, heating);
+    }
+
+    // INTERCEPT: active holds running at this site (§8.3)
+    if (f.stage === 1 && activeBoostHolds.length > 0 && !f.data._holdInterceptDismissed) {
+        doneLine('Area: <b>Bar/Restaurant</b>');
+        var zones0 = (heating && heating.zones) || [];
+        var holdRows = activeBoostHolds.map(function(h) {
+            var dir = h.direction === 'on' ? 'on' : 'off';
+            var until = h.revertAt ? fmtTime(new Date(h.revertAt)) : '';
+            var who = h.createdBy ? h.createdBy.split(' ')[0] : 'someone';
+            var emoji = dir === 'on' ? '🔥' : '❄';
+            var tt = zones0.find(function(z) { return z.zone === h.boilerZone; });
+            var nextOnClause = '';
+            if (tt && tt.timetable && tt.timetable.everyDay && tt.timetable.nextOn) {
+                var n = tt.timetable.nextOn;
+                var dayPfx = (n.dayText && n.dayText !== 'today') ? (n.dayText + ' ') : '';
+                nextOnClause = ', which next comes on at ' + dayPfx + n.timeText;
+            }
+            var zNum = h.boilerZone === 'CHZ2' ? '2' : '1';
+            var sayText = dir === 'on'
+                ? "We\'ve already turned your heating on until " + until + ". After that it goes back to its normal timetable" + nextOnClause + "."
+                : "We\'ve already turned your heating off until " + until + ". After that it goes back to its normal timetable" + nextOnClause + ".";
+            return '<div style="margin:6px 0">' + emoji + ' <b>Zone ' + zNum + ': heating turned ' + dir + (until ? ' until ' + until : '') + ', by ' + esc(who) + '</b>' +
+                ' <button class="btn" data-testid="hb-cancel-' + h.id + '" onclick="holdBannerCancel(\'' + h.id + '\')">Put back to normal now</button></div>';
+        }).join('');
+        var firstHold = activeBoostHolds[0];
+        var firstDir = firstHold.direction === 'on' ? 'on' : 'off';
+        var firstUntil = firstHold.revertAt ? fmtTime(new Date(firstHold.revertAt)) : '';
+        var firstTT = zones0.find(function(z) { return z.zone === firstHold.boilerZone; });
+        var firstNextOn = '';
+        if (firstTT && firstTT.timetable && firstTT.timetable.everyDay && firstTT.timetable.nextOn) {
+            var fn = firstTT.timetable.nextOn;
+            firstNextOn = ', which next comes on at ' + ((fn.dayText && fn.dayText !== 'today') ? fn.dayText + ' ' : '') + fn.timeText;
+        }
+        var interceptSay = firstDir === 'on'
+            ? "We\'ve already turned your heating on until " + firstUntil + ". After that it goes back to its normal timetable" + firstNextOn + "."
+            : "We\'ve already turned your heating off until " + firstUntil + ". After that it goes back to its normal timetable" + firstNextOn + ".";
+        return readout + '<div class="reco" data-testid="reco-boost-hold">' +
+            '<b class="hd">We\'ve already changed the heating here</b>' + holdRows +
+            '<div class="say" data-testid="say-block"><span class="say-label">🗣 Say to the customer</span>' + esc(interceptSay) + '</div>' +
+            '<div class="outbtns">' +
+            '<button class="btn" data-testid="bp-hold-continue" onclick="flowStep({need:\'bp-hold-continue\'})">The customer needs something else</button>' +
+            '<button class="btn" data-testid="bp-hold-noact" onclick="flowStep({need:\'bp-wrap\',wrapKind:\'no-action\'})">No further action</button>' +
+            '</div></div>';
+    }
+
+    if (need === 'bp-hold-continue') {
+        f.data._holdInterceptDismissed = true;
+        f.stage = 1;
+        f.data.need = null;
+        return boilerPanelHeatingBranch(ws, f, panelDevice, site);
+    }
+
+    // Stage 1: ask what the customer needs
     if (f.stage === 1) {
-        doneLine('Area: <b>Bar/Restaurant (pub boiler panel)</b>');
+        doneLine('Area: <b>Bar/Restaurant</b>');
         return readout +
-            '<div class="stepq">What does the caller need?</div>' +
+            '<div class="stepq">What does the customer need?</div>' +
             '<div class="chips">' +
             '<button class="chip" data-testid="need-cold" onclick="flowStep({need:\'cold\'})">Too cold / not working</button>' +
             '<button class="chip" data-testid="need-hot" onclick="flowStep({need:\'hot\'})">Too hot / wants it off</button>' +
             '</div>';
     }
 
-    var need = f.data.need;
+    // Zone picker (§8.4)
+    if (need === 'bp-zones') {
+        var bzDir = f.data.direction || 'on';
+        // Re-derive candidates fresh (avoids embedding large JSON in onclick handlers)
+        var bzCard0 = bpOutcomeCard(f.data.bpWcode || 'W6', heating, nowMs, boostAvailable, activeBoostHolds);
+        var bzCandidates = bzCard0.candidateZones || [];
+        var bzDirLabel = bzDir === 'on' ? 'turn on all of them' : 'turn off all of them';
+        doneLine('Choosing which zone');
+        var bzChips = bzCandidates.map(function(z) {
+            var zId = z.zone || ('CHZ' + z.n);
+            var zLabel = 'Zone ' + z.n + ' only';
+            return '<button class="chip" role="button" aria-pressed="false" data-testid="bp-zone-' + zId + '" ' +
+                'onclick="bpZoneSelect(\'' + zId + '\')" id="bpzc-' + zId + '">' + zLabel + '</button>';
+        }).join('');
+        bzChips += '<button class="chip" role="button" aria-pressed="false" data-testid="bp-zone-all" id="bpzc-all" onclick="bpZoneSelect(\'all\')">All zones (not sure)</button>';
+        var bpCancelDir2 = f.data.bpCallDir || 'cold';
+        return '<div class="reco" data-testid="reco-bp-zones">' +
+            '<b class="hd">Which part of the pub?</b>' +
+            '<div class="say" data-testid="say-block"><span class="say-label">🗣 Say to the customer</span>' +
+            "Your heating is split into sections, called zones, which were set up with the original pipework. Our system can\'t see which rooms each zone covers. Do you know which part of the pub each one heats? If you\'re not sure, I\'ll " + esc(bzDirLabel) + '.' +
+            '</div>' +
+            '<div class="chips" style="margin-top:10px">' + bzChips + '</div>' +
+            '<div class="outbtns" style="margin-top:10px">' +
+            '<button class="btn primary" id="bpz-continue" disabled data-testid="bp-zones-continue" onclick="bpZoneContinue()">Continue</button>' +
+            '<button class="btn" onclick="flowStep({need:\'' + bpCancelDir2 + '\'})">Back</button>' +
+            '</div></div>';
+    }
 
-    // Outcome button clicks
-    if (need === 'bp-esc') {
-        var wcode1 = f.data.bpWcode || 'W1';
-        var card1 = bpOutcomeCard(wcode1, heating, nowMs);
-        return outcomeCaptured(f, 'bp-esc', { subject: card1.headline, detail: card1.operatorText, script: card1.scriptText, OohCaptureClass: 'boiler-panel-heating' });
-    }
-    if (need === 'bp-advice') {
-        var wcode2 = f.data.bpWcode || 'W2';
-        var card2 = bpOutcomeCard(wcode2, heating, nowMs);
-        return outcomeCaptured(f, 'bp-advice', { subject: card2.headline, detail: card2.operatorText, script: card2.scriptText, OohCaptureClass: 'boiler-panel-advice' });
-    }
-    if (need === 'bp-noact') {
-        var cardN = bpOutcomeCard(f.data.bpWcode || 'W1', heating, nowMs);
-        return outcomeNoAction(f, 'bp-noact', { subject: 'Pub heating query — no action', detail: cardN.ticketText, script: '' });
-    }
-
-    // OOHDASH-141: boost duration picker
+    // Boost duration picker (§8.5)
     if (need === 'bp-boost') {
         var bpDir = f.data.direction || 'on';
-        var bpZone = f.data.zone || 'CHZ1';
-        var bpZLabel = bpZone === 'CHZ1' ? 'Zone 1' : 'Zone 2';
-        var bpDirLabel = bpDir === 'on' ? 'Heat ON' : 'Heat OFF';
-        var bpDurations = bpDir === 'on'
-            ? [{key:'30',label:'30 minutes'},{key:'60',label:'1 hour'},{key:'120',label:'2 hours'}]
-            : [{key:'60',label:'1 hour'},{key:'120',label:'2 hours'},{key:'until-0700',label:'Until 07:00'}];
-        doneLine('Boost: ' + bpDirLabel + ' — ' + bpZLabel + ' — choose duration');
+        var bpZones = f.data.zones || [f.data.zone || 'CHZ1'];
+        var bpZLabel = bpZones.length > 1 ? 'All zones' : (bpZones[0] === 'CHZ2' ? 'Zone 2' : 'Zone 1');
+        var bpDirLabel = bpDir === 'on' ? 'Turn the heating on' : 'Turn the heating off';
+        // Compute until-next-on from zone timetables
+        var heatingZones0 = (heating && heating.zones) || [];
+        var earliestNextOnMs = null;
+        var earliestNextOnTime = null;
+        var earliestNextOnDay = null;
+        var earliestNextOnTemp = null;
+        for (var bi = 0; bi < bpZones.length; bi++) {
+            var zData = heatingZones0.find(function(z) { return z.zone === bpZones[bi]; });
+            if (zData && zData.timetable && zData.timetable.everyDay && zData.timetable.nextOn) {
+                var n2 = zData.timetable.nextOn;
+                if (earliestNextOnMs === null || n2.atMs < earliestNextOnMs) {
+                    earliestNextOnMs = n2.atMs;
+                    earliestNextOnTime = n2.timeText;
+                    earliestNextOnDay = n2.dayText;
+                    earliestNextOnTemp = n2.tempC;
+                }
+            }
+        }
+        var untilNextOnOk = earliestNextOnMs !== null &&
+            (earliestNextOnMs - nowMs) >= 15 * 60 * 1000 &&
+            (earliestNextOnMs - nowMs) <= 11 * 60 * 60 * 1000;
+        var bpDurations;
+        if (bpDir === 'on') {
+            bpDurations = [{ key: '30', label: '30 minutes' }, { key: '60', label: '1 hour' }, { key: '120', label: '2 hours' }];
+        } else {
+            bpDurations = [{ key: '60', label: '1 hour' }, { key: '120', label: '2 hours' }];
+            if (untilNextOnOk) {
+                var dayPart = (earliestNextOnDay && earliestNextOnDay !== 'today') ? (earliestNextOnDay + ' ') : '';
+                bpDurations.push({ key: 'until-next-on', label: 'Until ' + earliestNextOnTime + ', when it\'s next due on' });
+            } else {
+                bpDurations.push({ key: 'until-0700', label: 'Until 07:00' });
+            }
+        }
+        doneLine((bpDir === 'on' ? 'Turning heating on' : 'Turning heating off') + ' — ' + bpZLabel + ' — choose duration');
         var bpDurBtns = bpDurations.map(function(d) {
-            return '<button class="chip" data-testid="bp-dur-' + d.key + '" onclick="flowStep({need:\'bp-boost-send\',durationKey:\'' + d.key + '\'})">' + d.label + '</button>';
+            return '<button class="chip" data-testid="bp-dur-' + d.key + '" onclick="flowStep({need:\'bp-boost-send\',durationKey:\'' + d.key + '\'})">' + esc(d.label) + '</button>';
         }).join('');
-        var bpCancelDir = f.data.bpCallDir || 'cold';
+        // Build Say block
+        var bpNextOnClause = '';
+        if (earliestNextOnMs !== null && earliestNextOnDay) {
+            var dayPfx2 = (earliestNextOnDay && earliestNextOnDay !== 'today') ? (earliestNextOnDay + ' ') : '';
+            bpNextOnClause = ', which next comes on at ' + dayPfx2 + earliestNextOnTime;
+        }
+        var bpSayText = bpDir === 'on'
+            ? "I\'ll turn it on now. After that it goes back to its normal timetable" + bpNextOnClause + "."
+            : '';
+        var bpGtkText = (bpDir === 'off' && untilNextOnOk && earliestNextOnTemp != null)
+            ? 'At ' + earliestNextOnTime + ' it heats the pub to ' + earliestNextOnTemp + '°C if the room is cooler than that.'
+            : '';
+        var bpCancelDir3 = f.data.bpCallDir || 'cold';
         return '<div class="reco" data-testid="reco-boost-dur">' +
-            '<b class="hd">' + bpDirLabel + ' — ' + bpZLabel + '</b>' +
-            '<p style="margin:6px 0">How long?</p>' +
-            '<div class="chips">' + bpDurBtns + '</div>' +
-            '<div style="margin-top:10px"><button class="btn small" onclick="flowStep({need:\'' + bpCancelDir + '\'})">Cancel</button></div>' +
+            '<b class="hd">' + esc(bpDirLabel) + ': how long?</b>' +
+            (bpSayText ? '<div class="say" data-testid="say-block"><span class="say-label">🗣 Say to the customer</span>' + esc(bpSayText) + '</div>' : '') +
+            (bpGtkText ? '<div class="gtk" data-testid="gtk-block"><span class="gtk-label">ℹ Good to know (for you, not the customer)</span>' + esc(bpGtkText) + '</div>' : '') +
+            '<div class="chips" style="margin-top:10px">' + bpDurBtns + '</div>' +
+            '<div style="margin-top:10px"><button class="btn" onclick="flowStep({need:\'' + bpCancelDir3 + '\'})">Back</button></div>' +
             '</div>';
     }
 
-    // OOHDASH-141: boost send + result
+    // Boost send + result (§10.3)
     if (need === 'bp-boost-send') {
         var bsDir = f.data.direction || 'on';
-        var bsZone = f.data.zone || 'CHZ1';
+        var bsZones = f.data.zones || [f.data.zone || 'CHZ1'];
         var bsDurKey = f.data.durationKey || '60';
-        var bsKey = 'boost-' + bsDir + '-' + bsZone;
+        var bsKey = 'boost-' + bsDir + '-' + bsZones.join(',');
 
         if (f.data['_out_' + bsKey]) return f.data['_out_' + bsKey];
 
         if (f.data['_err_' + bsKey]) {
             var bsErrMsg = f.data['_err_' + bsKey];
-            return '<div class="alert err">Boost failed: ' + esc(bsErrMsg) +
+            return '<div class="alert err">Could not send: ' + esc(bsErrMsg) +
                 ' <button class="chip" onclick="state.flow.data[\'_err_' + bsKey + '\']=null;state.flow.data[\'_pend_' + bsKey + '\']=null;render()">Try again</button>' +
-                ' <button class="chip" onclick="flowStep({need:\'bp-esc\'})">Capture instead</button></div>';
+                ' <button class="chip" onclick="flowStep({need:\'bp-wrap\',wrapKind:\'capture\'})">Log it for the IoT helpdesk</button></div>';
         }
 
         if (f.data['_pend_' + bsKey]) {
-            return '<div class="alert info">Sending boost…</div>';
+            return '<div class="alert info">Sending…</div>';
         }
 
-        // Warning: zone already has an active override — ask operator to acknowledge
+        // Warning: zone already has an active override — ask to acknowledge
         if (f.data['_warn_' + bsKey]) {
             var bsWarns = f.data['_warn_' + bsKey];
             var bsWarnList = bsWarns.map(function(w) { return '<li>' + esc(w.message || String(w)) + '</li>'; }).join('');
-            return '<div class="alert warn"><b>Active override already present</b><ul style="margin:6px 0 0 16px">' + bsWarnList + '</ul>' +
+            return '<div class="alert warn"><b>The heating already has an active override</b><ul style="margin:6px 0 0 16px">' + bsWarnList + '</ul>' +
                 '<div style="margin-top:10px">' +
                 '<button class="chip" data-testid="bp-boost-ack" onclick="state.flow.data[\'_warn_' + bsKey + '\']=null;state.flow.data.acknowledgedWarnings=true;render()">Acknowledge &amp; proceed</button>' +
-                ' <button class="chip" onclick="flowStep({need:\'bp-esc\'})">Cancel — capture instead</button>' +
+                ' <button class="chip" onclick="flowStep({need:\'bp-wrap\',wrapKind:\'capture\'})">Log it instead</button>' +
                 '</div></div>';
         }
 
         // Fire the boost request
         f.data['_pend_' + bsKey] = 1;
         render();
+        // Find if we already have a ticket from a prior action in this issue
+        var priorActions = f.data.actions || [];
+        var priorTicketHoldId = null;
+        for (var pai = 0; pai < priorActions.length; pai++) {
+            if (priorActions[pai].ticketId && priorActions[pai].holdIds && priorActions[pai].holdIds.length) {
+                priorTicketHoldId = priorActions[pai].holdIds[0];
+                break;
+            }
+        }
         var bsBody = {
             siteNo: ws.site.siteNo,
             confirmToken: state.confirmToken,
             deviceId: panelDevice.deviceId,
-            zones: [bsZone],
+            zones: bsZones,
             direction: bsDir,
             durationKey: bsDurKey,
             callerWords: f.data.freeText || null
         };
         if (f.data.acknowledgedWarnings) bsBody.acknowledgedWarnings = true;
+        if (priorTicketHoldId) bsBody.appendToHoldId = priorTicketHoldId;
         api.post('/api/boiler-boost', bsBody).then(function(res) {
             f.data['_pend_' + bsKey] = null;
             if (res.warnings) {
@@ -1033,18 +1303,79 @@ function boilerPanelHeatingBranch(ws, f, panelDevice, site) {
                 return;
             }
             var act = res.action || {};
-            var bsDirLabel2 = bsDir === 'on' ? 'ON' : 'OFF';
-            var bsZLabel2 = bsZone === 'CHZ1' ? 'zone 1' : 'zone 2';
-            var bsUntil = act.revertAt ? new Date(act.revertAt).toLocaleTimeString('en-GB', {hour:'2-digit',minute:'2-digit'}) : '';
-            var bsClamped = act.clamped ? ' <span class="small">(clamped to 01:00)</span>' : '';
-            var bsCardHtml = '<div class="outcome captured" data-testid="outcome-boost">' +
-                '<h3>Heat ' + bsDirLabel2 + ' — pub ' + bsZLabel2 + '</h3>' +
-                (bsUntil ? '<p>Override active until <b>' + esc(bsUntil) + '</b>' + bsClamped + '</p>' : '') +
-                '<p>Ticket raised — the IoT team will check the panel after the boost expires.</p>' +
-                (act.ticketId ? '<p class="small">Ticket <b>#' + act.ticketId + '</b></p>' : '') +
+            var bsDirLabel2 = bsDir === 'on' ? 'Heating turned on' : 'Heating turned off';
+            var bsResultRows = '';
+            var allZoneOutcomes = act.zones || [];
+            if (allZoneOutcomes.length === 0 && bsZones.length > 0) {
+                // Fallback: no zone outcomes returned
+                allZoneOutcomes = bsZones.map(function(z) { return { zone: z, state: 'CONFIRMED' }; });
+            }
+            allZoneOutcomes.forEach(function(zo) {
+                var zNum = zo.zone === 'CHZ2' ? '2' : '1';
+                var untilMs = act.revertAtMs;
+                var untilStr = untilMs ? fmtTime(untilMs) : '';
+                var fallbackNote = act.fallback === 'until-0700' ? ' (until 07:00, because the timetable couldn\'t be read)' : '';
+                var tktId = act.ticketId;
+                var row = '';
+                if (zo.state === 'CONFIRMED') {
+                    row = '✅ Zone ' + zNum + ': ' + (bsDir === 'on' ? 'on' : 'off') + (untilStr ? ' until ' + untilStr : '') + esc(fallbackNote) +
+                        (act.clamped ? ' (stopped at 01:00, the latest allowed)' : '');
+                } else if (zo.state === 'IN-FLIGHT-TIMEOUT') {
+                    row = '⏳ Zone ' + zNum + ': sent, but the heating controls haven\'t confirmed yet. It will still go back to normal at ' + untilStr + '. If the heating doesn\'t come ' + (bsDir === 'on' ? 'on' : 'off') + ', the IoT helpdesk will see it' + (tktId ? ' on ticket #' + tktId : '') + '.';
+                } else {
+                    row = '❌ Zone ' + zNum + ': we couldn\'t reach the heating controls, so it wasn\'t turned ' + bsDir + '.';
+                }
+                bsResultRows += '<div data-testid="boost-zone-result-' + zo.zone + '">' + esc(row) + '</div>';
+            });
+            // nextOn clause for the Say block
+            var heatingZones1 = (heating && heating.zones) || [];
+            var bsNextOnClause = '';
+            for (var bni = 0; bni < bsZones.length; bni++) {
+                var zData2 = heatingZones1.find(function(z) { return z.zone === bsZones[bni]; });
+                if (zData2 && zData2.timetable && zData2.timetable.everyDay && zData2.timetable.nextOn) {
+                    var nn = zData2.timetable.nextOn;
+                    var dayPfx3 = (nn.dayText && nn.dayText !== 'today') ? (nn.dayText + ' ') : '';
+                    bsNextOnClause = ', which next comes on at ' + dayPfx3 + nn.timeText;
+                    break;
+                }
+            }
+            var bsUntilStr = act.revertAtMs ? fmtTime(act.revertAtMs) : '';
+            var bsSayText;
+            if (bsDir === 'on') {
+                bsSayText = "That\'s done. Your heating will be on until " + bsUntilStr + ", and then it goes back to its normal timetable" + bsNextOnClause + ".";
+            } else {
+                bsSayText = "That\'s done. Your heating will be off until " + bsUntilStr + ", and then it goes back to its normal timetable" + bsNextOnClause + ".";
+            }
+            // Partial failure?
+            var anyFailed = allZoneOutcomes.some(function(zo) { return zo.state === 'NON-DELIVERY'; });
+            if (anyFailed) bsSayText += " I\'ve logged the rest for our team.";
+            // Autolog box
+            var tkt2 = act.ticketId;
+            var autologHtml = '';
+            if (tkt2) {
+                autologHtml = '<div class="autolog" data-testid="autolog-box">📋 We\'ve logged this automatically to the IoT helpdesk as ticket #' + tkt2 + ', because we changed the heating at the pub. Add any notes when you finish.</div>';
+            } else {
+                autologHtml = '<div class="autolog" data-testid="autolog-box">We couldn\'t log this automatically. It will be logged when you finish.</div>';
+            }
+            // Record action for Check and log
+            var holdIds2 = (act.overrideIds || []).map(function(o) { return o.overrideId; });
+            f.data.actions = f.data.actions || [];
+            f.data.actions.push({ kind: bsDir === 'on' ? 'turn-on' : 'turn-off', zones: bsZones, untilMs: act.revertAtMs || null, result: 'ok', holdIds: holdIds2, ticketId: tkt2 || null, atMs: Date.now() });
+            // Set wrap context
+            f.data._wrapSubject = bsDirLabel2;
+            f.data._wrapHeadline = bsDirLabel2 + ' — ' + bsZones.map(function(z) { return z.replace('CHZ', 'zone '); }).join(' and ');
+            f.data._wrapLogSentence = 'Pub heating at time of call: ' + (bsDir === 'on' ? 'turned on' : 'turned off') + ', ' + bsZones.map(function(z) { return z.replace('CHZ', 'zone '); }).join(' and ') + (bsUntilStr ? ', until ' + bsUntilStr : '') + '.';
+            f.data.wrapKind = 'action';
+            var bsCardHtml = '<div class="outcome applied" data-testid="outcome-boost">' +
+                '<h3>' + esc(bsDirLabel2) + '</h3>' +
+                '<div style="margin:6px 0">' + bsResultRows + '</div>' +
+                '<div class="say" data-testid="say-block"><span class="say-label">🗣 Say to the customer</span>' + esc(bsSayText) + '</div>' +
+                autologHtml +
                 '</div>';
-            f.data['_out_' + bsKey] = bsCardHtml + outButtons();
+            f.data['_out_' + bsKey] = bsCardHtml +
+                '<div class="outbtns"><button class="btn primary" data-testid="bp-finish-notes" onclick="flowStep({need:\'bp-wrap\'})">Finish and add notes</button></div>';
             f.data._outcomeHtml = bsCardHtml;
+            refreshWorkspace().catch(function() {});
             render();
         }).catch(function(err) {
             f.data['_pend_' + bsKey] = null;
@@ -1054,25 +1385,50 @@ function boilerPanelHeatingBranch(ws, f, panelDevice, site) {
         return '<div class="alert info">Sending boost…</div>';
     }
 
-    // Stage 2: show outcome card
+    // Stage 2: show outcome card (§8.2)
     if (need === 'cold' || need === 'hot') {
         var wcode = boilerHeatingOutcome(heating, need, nowMs);
         f.data.bpWcode = wcode;
-        f.data.bpCallDir = need; // stored for boost cancel-back navigation
-        var card = bpOutcomeCard(wcode, heating, nowMs, ws.boostAvailable);
+        f.data.bpCallDir = need;
+        var card = bpOutcomeCard(wcode, heating, nowMs, boostAvailable, activeBoostHolds);
         doneLine('Need: <b>' + (need === 'cold' ? 'Too cold / not working' : 'Too hot / wants it off') + '</b>');
-        doneLine('Outcome: <b>' + wcode + '</b>');
+        // Set wrap context from the card
+        f.data._wrapSubject = card.headline;
+        f.data._wrapHeadline = card.headline;
+        f.data.wrapKind = card.wrapKind;
+        // Build ticket/log sentence from wcode
+        var bpLogSegs = [];
+        if (wcode === 'W1') bpLogSegs.push('Heating could not be checked (panel last reported ' + panelAgo(heating && heating.panelLastSeenMs) + ').');
+        else if (wcode === 'W2') bpLogSegs.push('Panel calling for heat, all zones on. Likely boiler or radiator fault; site advised to call their heating engineer.');
+        else if (wcode === 'W3') { var offZ3 = (heating && heating.zones || []).filter(function(z) { return !z.on; }).map(function(z) { return 'zone ' + z.n; }).join(' and '); bpLogSegs.push('Part of pub heating off (' + (offZ3 || 'zone 2') + ').' ); }
+        else if (wcode === 'W4') bpLogSegs.push('Heating in summer mode (off season).');
+        else if (wcode === 'W5') bpLogSegs.push('Heating forced off at panel.');
+        else if (wcode === 'W6') { var nc6 = heating && heating.nextChange; bpLogSegs.push('Heating off on timetable' + (nc6 ? ', next change at ' + nc6 : '') + '.'); }
+        else if (wcode === 'W7') bpLogSegs.push('Heating running on fallback cycle (room sensor not reporting).');
+        else if (wcode === 'W8') { var onZ8 = (heating && heating.zones || []).filter(function(z) { return z.on; }).map(function(z) { return 'zone ' + z.n; }).join(' and '); bpLogSegs.push('Heating on (' + (onZ8 || 'zones') + '). Caller wants it off.'); }
+        else if (wcode === 'W9') bpLogSegs.push('Pub heating already off. Warmth from another source.');
+        f.data._wrapLogSentence = bpLogSegs.join(' ');
+        // Build action buttons
+        var boostBtns = '';
+        var candidates = card.candidateZones || [];
+        var boostDir = card.direction || 'on';
+        if (candidates.length === 1) {
+            // Single candidate — go straight to boost
+            var cZone = candidates[0].zone || ('CHZ' + candidates[0].n);
+            var cLabel = boostDir === 'on' ? 'Turn heating on' : 'Turn heating off';
+            boostBtns = '<button class="btn boost-' + boostDir + '" data-testid="bp-boost-' + boostDir + '-' + cZone + '" onclick="flowStep({need:\'bp-boost\',direction:\'' + boostDir + '\',zones:[\'' + cZone + '\']})">' + cLabel + '</button>';
+        } else if (candidates.length > 1) {
+            // Multiple candidates — zone picker (candidates re-derived in handler from bpWcode)
+            var cLabel2 = boostDir === 'on' ? 'Turn the heating on' : 'Turn the heating off';
+            boostBtns = '<button class="btn boost-' + boostDir + '" data-testid="bp-zones-btn" onclick="flowStep({need:\'bp-zones\',direction:\'' + boostDir + '\'})">' + cLabel2 + '</button>';
+        }
+        var wrapBtn = '<button class="btn primary" data-testid="bp-checklog" onclick="flowStep({need:\'bp-wrap\'})">Check and log</button>';
         return readout +
             '<div class="reco" data-testid="reco-boiler-panel">' +
             '<b class="hd">' + esc(card.headline) + '</b>' +
-            '<div class="k">What to tell the operator</div>' +
-            '<p>' + card.operatorText + '</p>' +
-            (card.forcedOnSentence ? '<p>' + esc(card.forcedOnSentence) + '</p>' : '') +
-            '<div class="k">Say to caller</div>' +
-            '<p class="script">“' + card.scriptText + '”</p>' +
-            '<div class="k">Ticket sentence</div>' +
-            '<p class="tkt">' + card.ticketText + '</p>' +
-            '<div class="outbtns">' + card.buttons + '</div>' +
+            card.sayHtml +
+            card.gtkHtml +
+            '<div class="outbtns">' + boostBtns + wrapBtn + '</div>' +
             '</div>';
     }
 
@@ -1080,6 +1436,38 @@ function boilerPanelHeatingBranch(ws, f, panelDevice, site) {
     f.stage = 1;
     f.data.need = null;
     return boilerPanelHeatingBranch(ws, f, panelDevice, site);
+}
+
+// Zone chip selection helper (single-select)
+var _bpZoneSelected = null;
+function bpZoneSelect(zId) {
+    _bpZoneSelected = zId;
+    // Toggle aria-pressed on chips
+    var chips = document.querySelectorAll('[id^="bpzc-"]');
+    chips.forEach(function(c) { c.setAttribute('aria-pressed', 'false'); c.classList.remove('selected'); });
+    var chosen = document.getElementById('bpzc-' + zId);
+    if (chosen) { chosen.setAttribute('aria-pressed', 'true'); chosen.classList.add('selected'); }
+    var btn = document.getElementById('bpz-continue');
+    if (btn) btn.disabled = false;
+}
+function bpZoneContinue() {
+    if (!_bpZoneSelected || !state.flow) return;
+    var f = state.flow;
+    var ws = state.workspace;
+    var heating2 = ws && ws.boilerControl && ws.boilerControl.heating ? ws.boilerControl.heating : null;
+    var boostAvail2 = (ws && ws.boostAvailable) || { on: false, off: false };
+    var activeHolds2 = (ws && ws.activeBoostHolds) || [];
+    var card2 = bpOutcomeCard(f.data.bpWcode || 'W6', heating2, Date.now(), boostAvail2, activeHolds2);
+    var candidates = card2.candidateZones || [];
+    var dir = f.data.direction || 'on';
+    var zones;
+    if (_bpZoneSelected === 'all') {
+        zones = candidates.map(function(z) { return z.zone || ('CHZ' + z.n); });
+    } else {
+        zones = [_bpZoneSelected];
+    }
+    _bpZoneSelected = null;
+    flowStep({ need: 'bp-boost', direction: dir, zones: zones });
 }
 
 /* ------------------------ flow renderers ------------------------ */
@@ -1145,13 +1533,13 @@ const FLOWR = {
             // bare-salus), it is offline because it does not report, not because the site is unreachable.
             // Say "device not reporting" plainly and offer NO controls, instead of diverting into the
             // generic gateway "not responding" connectivity branch. The outcome (offline, no controls,
-            // captured for the IoT team) is unchanged; only the wording matches James's binding decision.
+            // captured for the IoT team) is unchanged; only the wording matches James\'s binding decision.
             if (set.length > 0 && set.every(isDarkFleet)) {
                 if (f.data.need === 'darkcap') {
                     return outcomeCaptured(f, 'darkcap', {
                         subject: `Heating device not reporting (${areaLabel})`,
                         detail: `The ${areaLabel} heating controller is a Salus unit that is not reporting to Lighthouse (no live data), so it cannot be read or adjusted remotely. Logged for the IoT team to check the device and its connection.`,
-                        script: "That heating controller isn't sending us any data at the moment, so I can't read or change it remotely tonight. I've logged it for the IoT team to look into.",
+                        script: "That heating controller isn\'t sending us any data at the moment, so I can\'t read or change it remotely tonight. I\'ve logged it for the IoT team to look into.",
                         OohCaptureClass: 'dark-fleet-heating'
                     });
                 }
@@ -1205,13 +1593,13 @@ const FLOWR = {
     <button class="chip" data-testid="need-warm" onclick="flowStep({need:'warm'})">Warmer</button>
     <button class="chip" data-testid="need-cool" onclick="flowStep({need:'cool'})">Cooler</button>
     <button class="chip" data-testid="need-off" onclick="flowStep({need:'off'})">Turn it off</button>
-    <button class="chip" data-testid="need-broken" onclick="flowStep({need:'broken'})">It’s not working</button></div>`;
+    <button class="chip" data-testid="need-broken" onclick="flowStep({need:'broken'})">It\'s not working</button></div>`;
         }
         if (f.stage === 2) {
             const need = f.data.need;
             if (need === 'warm' && temp != null && sp != null && temp <= sp - 2) {
                 doneLine('Requested: warmer · system already calling for heat');
-                return `<div class="reco" data-testid="reco-building-heat"><b class="hd">Raising the setpoint won’t help here.</b>The zone is reading <b>${temp}°C against a ${sp}°C setpoint</b> with the device online — the system is already asking for more heat than the building is delivering. That usually means radiators/TRVs or the boiler.<div class="outbtns"><button class="btn primary" onclick="flowStep({buildheat:1})">Give building-heat guidance &amp; log it</button><button class="btn" onclick="flowStep({forceCtl:1})">Adjust the setpoint anyway</button></div></div>`;
+                return `<div class="reco" data-testid="reco-building-heat"><b class="hd">Raising the setpoint won\'t help here.</b>The zone is reading <b>${temp}°C against a ${sp}°C setpoint</b> with the device online — the system is already asking for more heat than the building is delivering. That usually means radiators/TRVs or the boiler.<div class="outbtns"><button class="btn primary" onclick="flowStep({buildheat:1})">Give building-heat guidance &amp; log it</button><button class="btn" onclick="flowStep({forceCtl:1})">Adjust the setpoint anyway</button></div></div>`;
             }
             if (need === 'warm' || need === 'cool') {
                 doneLine('Requested: ' + (need === 'warm' ? 'warmer' : 'cooler'));
@@ -1224,14 +1612,14 @@ const FLOWR = {
                 // from the candidate set and served by the dedicated `aircon` referral flow), so the old
                 // `z.deviceType === 'intesis'` off-held branch here is dead and has been removed. Salus
                 // heat-only units offer the frost-hold below.
-                return `<div class="reco" data-testid="reco-frost"><b class="hd">This thermostat has no “off” switch.</b>It’s a Salus heat-only unit. The closest safe action is a <b>frost-hold</b>: set it to 5°C, so the heating stays off unless the building risks freezing. Normal service resumes when the hold ends.<div class="outbtns"><button class="btn primary" data-testid="frost-recommended" onclick="flowStep({frost:1})">Set frost-hold 5°C (recommended)</button><button class="btn" data-testid="frost-decline" onclick="flowStep({offnoact:1})">End with no action</button></div></div>`;
+                return `<div class="reco" data-testid="reco-frost"><b class="hd">This thermostat has no "off" switch.</b>It\'s a Salus heat-only unit. The closest safe action is a <b>frost-hold</b>: set it to 5°C, so the heating stays off unless the building risks freezing. Normal service resumes when the hold ends.<div class="outbtns"><button class="btn primary" data-testid="frost-recommended" onclick="flowStep({frost:1})">Set frost-hold 5°C (recommended)</button><button class="btn" data-testid="frost-decline" onclick="flowStep({offnoact:1})">End with no action</button></div></div>`;
             }
             if (need === 'broken') {
                 doneLine('Reported: heating not working');
                 if (temp != null && sp != null && temp >= sp - 1) {
-                    return `<div class="reco"><b class="hd">The system is keeping up.</b>This zone is reading <b>${temp}°C at a ${sp}°C setpoint</b>. If the caller still reports cold, it’s likely a radiator/TRV or zoning issue rather than the controls.<div class="outbtns"><button class="btn primary" onclick="flowStep({buildheat:1})">Give guidance &amp; log it</button><button class="btn" onclick="flowStep({forceCtl:1})">Raise the setpoint anyway</button></div></div>`;
+                    return `<div class="reco"><b class="hd">The system is keeping up.</b>This zone is reading <b>${temp}°C at a ${sp}°C setpoint</b>. If the caller still reports cold, it\'s likely a radiator/TRV or zoning issue rather than the controls.<div class="outbtns"><button class="btn primary" onclick="flowStep({buildheat:1})">Give guidance &amp; log it</button><button class="btn" onclick="flowStep({forceCtl:1})">Raise the setpoint anyway</button></div></div>`;
                 }
-                return `<div class="alert warn">Reading ${temp != null ? temp + '°C' : '—'} vs setpoint ${sp != null ? sp + '°C' : '—'} — under target. Try raising the setpoint; if it doesn’t respond, this becomes an escalation.</div><div class="chips"><button class="chip" onclick="flowStep({forceCtl:1})">Raise setpoint</button><button class="chip" onclick="flowStep({buildheat:1})">Capture &amp; escalate instead</button></div>`;
+                return `<div class="alert warn">Reading ${temp != null ? temp + '°C' : '—'} vs setpoint ${sp != null ? sp + '°C' : '—'} — under target. Try raising the setpoint; if it doesn\'t respond, this becomes an escalation.</div><div class="chips"><button class="chip" onclick="flowStep({forceCtl:1})">Raise setpoint</button><button class="chip" onclick="flowStep({buildheat:1})">Capture &amp; escalate instead</button></div>`;
             }
         }
         if (f.stage === 3) {
@@ -1250,7 +1638,7 @@ const FLOWR = {
                 return outcomeScope(f, 'bh', {
                     subject: `Heating complaint — system performing to setpoint (${z.zone})`,
                     evidence: `Zone reading ${temp}°C against a ${sp}°C setpoint with the device online and responding — consistent with a building/TRV/boiler-side limitation, not a Lighthouse control fault.`,
-                    script: `The system here is already asking for full heat — it’s reaching ${temp} degrees against a higher target, which usually means radiator valves or the boiler itself. It’s worth having your maintenance team check the radiators; I’ve logged tonight’s reading either way.`
+                    script: `The system here is already asking for full heat — it\'s reaching ${temp} degrees against a higher target, which usually means radiator valves or the boiler itself. It\'s worth having your maintenance team check the radiators; I\'ve logged tonight\'s reading either way.`
                 });
             }
         }
@@ -1266,7 +1654,7 @@ const FLOWR = {
         return outcomeCaptured(f, 'aircon', {
             subject: `Air conditioning request (${ws.site.siteName})`,
             detail: 'Caller raised an air-conditioning issue. Aircon is not controllable from the dashboard, so it is captured and referred to the IoT team rather than actioned here.',
-            script: 'Air conditioning isn’t something I can adjust from here, so I’ve logged it for the IoT team — they’ll pick it up on the next working day. If it becomes urgent overnight, call back and we can escalate.',
+            script: 'Air conditioning isn\'t something I can adjust from here, so I\'ve logged it for the IoT team — they\'ll pick it up on the next working day. If it becomes urgent overnight, call back and we can escalate.',
             OohCaptureClass: 'aircon-referral'
         });
     },
@@ -1280,7 +1668,7 @@ const FLOWR = {
         if (f.stage === 0) {
             if (hwLevel === 'not-lighthouse') {
                 doneLine('Hot water - not on Lighthouse at this site');
-                return `<div class="alert info" data-testid="hw-not-lighthouse">Hot water at this site isn’t on Lighthouse — it runs on the site’s own boiler or system and isn’t connected here. We can log the details and escalate to the IoT team.</div>
+                return `<div class="alert info" data-testid="hw-not-lighthouse">Hot water at this site isn\'t on Lighthouse — it runs on the site\'s own boiler or system and isn\'t connected here. We can log the details and escalate to the IoT team.</div>
    <div class="chips"><button class="chip" data-testid="hw-nlh-capture" onclick="flowStep({nlh:1})">Log and escalate to IoT team</button></div>`;
             }
             doneLine('Hot water - boiler-side, not controllable from here; captured for the IoT team');
@@ -1291,7 +1679,7 @@ const FLOWR = {
                 var _hwDhwOc = dhwOverrideOutcome(_hwDhwOv, Date.now());
                 if (_hwDhwOc) {
                     var _hwTagColor = {auto:'green','auto-ended':'green','on-until':'blue','on-v1':'blue','off-until':'amber','off-v1':'amber','cant-confirm':'grey'}[_hwDhwOc.state] || 'grey';
-                    var _hwTagText = {auto:'Auto','auto-ended':'Auto','on-until':'Override ON','on-v1':'Override ON','off-until':'Override OFF','off-v1':'Override OFF','cant-confirm':"Can't confirm"}[_hwDhwOc.state] || "Can't confirm";
+                    var _hwTagText = {auto:'Auto','auto-ended':'Auto','on-until':'Override ON','on-v1':'Override ON','off-until':'Override OFF','off-v1':'Override OFF','cant-confirm':"Can\'t confirm"}[_hwDhwOc.state] || "Can\'t confirm";
                     _hwDhwCard = '<div class="reco" data-testid="hw-dhw-override">' +
                         '<b class="hd">' + _hwDhwOc.headline + ' <span class="tag ' + _hwTagColor + '" data-testid="hw-dhw-override-tag">' + _hwTagText + '</span></b>' +
                         '<p>' + _hwDhwOc.explanation + '</p>' +
@@ -1299,7 +1687,7 @@ const FLOWR = {
                         '</div>';
                 }
             }
-            return _hwDhwCard + `<div class="alert info">Hot water here runs on the boiler panel, which this dashboard monitors but can't control - there's no remote boost. We'll capture the details with the site boiler guidance and escalate to the IoT team, so you still have a next step for the caller.</div>
+            return _hwDhwCard + `<div class="alert info">Hot water here runs on the boiler panel, which this dashboard monitors but can\'t control - there\'s no remote boost. We\'ll capture the details with the site boiler guidance and escalate to the IoT team, so you still have a next step for the caller.</div>
    <div class="chips"><button class="chip" data-testid="hw-capture" onclick="flowStep({cap:1})">Log and escalate to IoT team</button><button class="chip" data-testid="hw-scope" onclick="flowStep({sc:1})">Scope guidance (boiler fault?)</button></div>`;
         }
         if (f.stage === 1) {
@@ -1309,7 +1697,7 @@ const FLOWR = {
                 return outcomeCaptured(f, 'nlh', {
                     subject: 'Hot water issue — not on Lighthouse',
                     detail: 'Caller reports hot-water problems. Hot water at this site is not connected to Lighthouse — no remote monitoring or control available. Logged for IoT team follow-up.',
-                    script: "I've logged this for the IoT team. Hot water at this site isn't on Lighthouse so there's no remote view of it — the team will follow up to investigate.",
+                    script: "I\'ve logged this for the IoT team. Hot water at this site isn\'t on Lighthouse so there\'s no remote view of it — the team will follow up to investigate.",
                     OohCaptureClass: 'hot-water'
                 });
             }
@@ -1325,7 +1713,7 @@ const FLOWR = {
                 return outcomeCaptured(f, 'cap', {
                     subject: 'Hot water issue - not resolvable remotely tonight',
                     detail: 'Caller reports hot-water problems. Hot water is boiler-side (monitor-only on Lighthouse) - there is no remote boost. Needs IoT/boiler-side investigation.' + _hwDhwTs1,
-                    script: "I've logged this for the IoT team as a priority for the morning. If it's urgent overnight the boiler's own override panel may help - and if a boiler engineer attends, remember a visit can be chargeable if the fault isn't Lighthouse equipment.",
+                    script: "I\'ve logged this for the IoT team as a priority for the morning. If it\'s urgent overnight the boiler\'s own override panel may help - and if a boiler engineer attends, remember a visit can be chargeable if the fault isn\'t Lighthouse equipment.",
                     OohCaptureClass: 'hot-water'
                 });
             }
@@ -1340,7 +1728,7 @@ const FLOWR = {
                 return outcomeScope(f, 'sc', {
                     subject: 'Hot water — likely boiler fault',
                     evidence: 'Lighthouse monitors demand here; the boiler itself (pressure, PCB, pilot) is not Lighthouse equipment.' + _hwDhwTs2,
-                    script: 'From what you’re describing this looks like the boiler itself rather than the Lighthouse controls — that’s one for your boiler company. I’ll note tonight’s call so there’s a record.'
+                    script: 'From what you\'re describing this looks like the boiler itself rather than the Lighthouse controls — that\'s one for your boiler company. I\'ll note tonight\'s call so there\'s a record.'
                 });
             }
         }
@@ -1587,7 +1975,7 @@ const FLOWR = {
                 for (const pv of VERDICT_PRIORITY) {
                     if (liveKs.some(d => d.tuya?.verdict === pv)) { topVerdict = pv; break; }
                 }
-                // Show the top device's verdict card
+                // Show the top device\'s verdict card
                 const topDevice = liveKs.find(d => d.tuya?.verdict === topVerdict) || liveKs[0];
                 return `<div data-testid="kitchen-all-summary">${lines}</div>${verdictCard(topDevice, false)}`;
             }
@@ -1616,9 +2004,9 @@ const FLOWR = {
             ).join('');
             const anySwitchable = lgs.some(canSwitch);
             return lgSwitches + `<div class="alert info">${anySwitchable ? 'This lighting circuit can be switched on/off directly above — the change only counts once the device confirms.' : `External lighting can\'t be switched remotely from here yet (on the priority list with our platform team).${anyOnline ? '' : ' The lighting controller is also <b>not responding</b>, which often means a tripped fuse board.'}`}</div>
-   <div class="script">“${anyOnline
+   <div class="script">"${anyOnline
    ? 'The outside lights have a sensor that brings them on automatically at dusk — so they should usually look after themselves. If tonight\'s an exception, flip the Lighthouse lighting switch to override and they\'ll come on. That only affects tonight; the sensor picks everything back up automatically from tomorrow, so there\'s nothing to reset.'
-   : 'The outside lights have a sensor that brings them on automatically at dusk, so they should usually look after themselves. The lighting controller isn\'t responding at the moment — it\'s worth checking your fuse board first, as a tripped breaker is the usual cause. If everything looks clear, flip the Lighthouse lighting switch to override — that only covers tonight, and the sensor picks everything back up automatically from tomorrow.'}”</div>
+   : 'The outside lights have a sensor that brings them on automatically at dusk, so they should usually look after themselves. The lighting controller isn\'t responding at the moment — it\'s worth checking your fuse board first, as a tripped breaker is the usual cause. If everything looks clear, flip the Lighthouse lighting switch to override — that only covers tonight, and the sensor picks everything back up automatically from tomorrow.'}"</div>
    <div class="chips"><button class="chip" onclick="flowStep({r:'ok'})">Caller sorted it with the override</button><button class="chip" onclick="flowStep({r:'cap'})">Still not working — capture &amp; escalate</button></div>`;
         }
         if (f.stage === 1) {
@@ -1742,7 +2130,7 @@ const FLOWR = {
             // Anchor OFFLINE → site unreachable → existing plain-English wall-unit outcome (verbatim, unchanged).
             if (!anchor.online) {
                 return `<div class="alert err" data-testid="connectivity-alert"><b>The Lighthouse gateway at this site is offline.</b> The gateway is the wall-mounted Lighthouse unit that connects the site — no remote command can reach the site while it\'s down. This is usually power or internet at the site.</div>
-   <div class="script">“The Lighthouse unit on your wall isn\'t responding, which normally means it\'s lost power or internet. Could you check the fuse board hasn\'t tripped, that the unit has lights on, and the router is up? I\'ll stay on the line.”</div>
+   <div class="script">"The Lighthouse unit on your wall isn\'t responding, which normally means it\'s lost power or internet. Could you check the fuse board hasn\'t tripped, that the unit has lights on, and the router is up? I\'ll stay on the line."</div>
    <div class="stepq">After the caller checks:</div>
    <div class="chips"><button class="chip" onclick="flowStep({ofq:'back'})">It\'s back online / lights on</button><button class="chip" data-testid="connectivity-stilldead" onclick="flowStep({ofq:'cap'})">Still dead — capture &amp; escalate</button></div>`;
             }
@@ -1922,14 +2310,14 @@ const FLOWR = {
     other(ws, f) {
         if (f.stage === 0) {
             return `<div class="stepq">Describe the issue in the caller\'s words</div>
-   <div class="formrow"><textarea id="otxt" data-testid="other-text" rows="2" placeholder="e.g. “the voltage optimiser needs resetting — is that you?”">${esc(f.data.freeText || '')}</textarea></div>
+   <div class="formrow"><textarea id="otxt" data-testid="other-text" rows="2" placeholder="e.g. "the voltage optimiser needs resetting — is that you?"">${esc(f.data.freeText || '')}</textarea></div>
    <div class="chips">
     <button class="chip" data-testid="other-check" onclick="flowStep({q:document.getElementById('otxt').value||'(not specified)',path:'check'})">Check if it\'s Lighthouse-controlled</button>
     <button class="chip" data-testid="other-capture" onclick="flowStep({q:document.getElementById('otxt').value||'(not specified)',qraw:document.getElementById('otxt').value,path:'cap'})">Capture &amp; escalate as described</button>
    </div>`;
         }
         if (f.stage === 1) {
-            if (!f.data._oline) { doneLine('Issue: “' + esc(f.data.q) + '”'); f.data._oline = 1; }
+            if (!f.data._oline) { doneLine('Issue: "' + esc(f.data.q) + '"'); f.data._oline = 1; }
             // OOHDASH-134: Capture now opens a two-button choice (P1 Escalation / normal priority).
             if (f.data.path === 'cap') return otherP1Choice(f);
             return `<div class="stepq">Which of these is it closest to?</div><div class="chips">

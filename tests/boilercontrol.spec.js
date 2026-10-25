@@ -14,6 +14,25 @@
 import { test, expect } from '@playwright/test';
 import { signIn, confirmSite } from './helpers.js';
 
+/**
+ * OOHDASH-144 (section 8.3): the pub heating flow now shows a hold-intercept screen
+ * when an active boost hold exists at the site, before showing direction chips.
+ * Any test that navigates through the Bar/Restaurant chip to need-cold/need-hot must
+ * dismiss the intercept if present.
+ */
+async function reachDirectionStep(page) {
+    const holdCard = page.locator('[data-testid="reco-boost-hold"]');
+    const needCold = page.locator('[data-testid="need-cold"]');
+    await Promise.race([
+        holdCard.waitFor({ timeout: 5000 }),
+        needCold.waitFor({ timeout: 5000 })
+    ]).catch(() => {});
+    if (await holdCard.isVisible().catch(() => false)) {
+        await page.locator('[data-testid="bp-hold-continue"]').click();
+        await expect(needCold).toBeVisible({ timeout: 5000 });
+    }
+}
+
 test.describe('OOHDASH-114-F1 boilerControl controllability', () => {
     test.beforeEach(async ({ page }) => { await signIn(page, 'Test Handler'); });
 
@@ -55,6 +74,8 @@ test.describe('OOHDASH-139 boiler panel heating flow', () => {
         // Bar/Restaurant chip should appear (boiler panel area)
         await expect(page.locator('button.chip', { hasText: 'Bar/Restaurant' })).toBeVisible();
         await page.locator('button.chip', { hasText: 'Bar/Restaurant' }).click();
+        // OOHDASH-144 §8.3: dismiss hold intercept if an active boost hold exists at this site
+        await reachDirectionStep(page);
         // Stage 1: two chips for need (not 4 — boiler panel only has cold/hot)
         await expect(page.locator('[data-testid="need-cold"]')).toBeVisible();
         await expect(page.locator('[data-testid="need-hot"]')).toBeVisible();
@@ -74,6 +95,8 @@ test.describe('OOHDASH-139 boiler panel heating flow', () => {
         await page.locator('[data-testid="tile-heating"]').click();
         await expect(page.locator('button.chip', { hasText: 'Bar/Restaurant' })).toBeVisible();
         await page.locator('button.chip', { hasText: 'Bar/Restaurant' }).click();
+        // OOHDASH-144 §8.3: dismiss hold intercept if an active boost hold exists at this site
+        await reachDirectionStep(page);
         await page.locator('[data-testid="need-cold"]').click();
         // W3: partial (zone 1 on, zone 2 off)
         await expect(page.locator('[data-testid="reco-boiler-panel"]')).toBeVisible();

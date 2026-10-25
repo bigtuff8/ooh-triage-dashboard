@@ -92,6 +92,42 @@ export async function scheduleOverride(action) {
 }
 
 /**
+ * OOHDASH-144: active boiler-panel holds for a specific site (for the workspace banner and
+ * flow intercept). Reads from the in-memory Cosmos store; a read error returns null (fail-soft).
+ *
+ * Maps each doc to { id, deviceId, boilerZone, direction, panelVersion, revertAt, holdLabel,
+ * createdBy, ticketId, ending }, sorted by boilerZone.
+ * `ending` = true when a cancel or revert attempt is already in progress.
+ */
+export async function activeBoostHoldsForSite(siteNo) {
+    try {
+        const col = await collection('OohOverrides');
+        const docs = await col.query(o =>
+            o.status === 'active' &&
+            o.deviceType === 'boiler-panel' &&
+            String(o.siteNo) === String(siteNo)
+        );
+        return docs
+            .sort((a, b) => (a.boilerZone || '').localeCompare(b.boilerZone || ''))
+            .map(o => ({
+                id: o.id,
+                deviceId: o.deviceId,
+                boilerZone: o.boilerZone || null,
+                direction: o.direction || null,
+                panelVersion: o.panelVersion || null,
+                revertAt: o.OohOverrideRevertAt || null,
+                holdLabel: o.holdLabel || null,
+                createdBy: o.createdBy || null,
+                ticketId: o.ticketId || null,
+                ending: !!(o.cancelRequestedBy || o.revertAttempts)
+            }));
+    } catch (err) {
+        console.error(`[OVERRIDES] activeBoostHoldsForSite failed for ${siteNo}: ${err.message}`);
+        return null;
+    }
+}
+
+/**
  * Active holds (Admin table + read-only mirror for the F026 queue).
  */
 export async function activeOverrides() {
@@ -352,6 +388,7 @@ async function revertBoiler(col, doc) {
             doc.status = revertOutcome === 'already-auto' ? 'reverted' : 'reverted';
             if (revertOutcome === 'superseded-by-other') doc.status = 'superseded-by-other';
             if (revertOutcome === 'same-direction-skip') doc.status = 'reverted'; // mark reverted, no write
+            doc.revertOutcome = revertOutcome; // OOHDASH-144: persist for cancel-route result
             doc.revertedAt = new Date().toISOString();
             doc.leaseOwner = null;
             doc.leaseUntil = null;
@@ -397,6 +434,7 @@ async function revertBoiler(col, doc) {
         if (confirmed) {
             const confirmedAtMs = Date.now();
             doc.status = 'reverted';
+            doc.revertOutcome = 'written'; // OOHDASH-144: persisted for cancel-route result
             doc.revertedAt = new Date().toISOString();
             doc.leaseOwner = null;
             doc.leaseUntil = null;
