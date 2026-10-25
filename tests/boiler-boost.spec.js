@@ -306,9 +306,19 @@ test.describe('OOHDASH-144 fix tests — C1 and C2', () => {
         expect([200, 201]).toContain(resp.status());
         const body = await resp.json();
         // Warnings path (zone already forced) is also acceptable — the key was accepted.
+        // In either case, assert the revertAtMs (if present) reflects the timetable (06:30),
+        // not the 07:00 fallback — proving the C1 fixture enrichment propagated to the control path.
         if (!body.warnings) {
             expect(body.action, 'action must be present on success').toBeTruthy();
-            expect(body.action.revertAtMs, 'revertAtMs must be set').toBeTruthy();
+            const revertAtMs = body.action.revertAtMs;
+            expect(revertAtMs, 'revertAtMs must be set').toBeTruthy();
+            // Site 9010 CHZ1/CHZ2 schedule: on at 06:30 every day. The until-next-on key must
+            // resolve to 06:30 London time, NOT the 07:00 fallback.
+            // (C1 fix: fixture mode now enriches zones with timetable before the control path reads them.)
+            const revertTime = new Date(revertAtMs).toLocaleTimeString('en-GB', {
+                hour: '2-digit', minute: '2-digit', timeZone: 'Europe/London'
+            });
+            expect(revertTime, 'revertAtMs must be at 06:30 (timetable nextOn) not 07:00 (fallback)').toBe('06:30');
         }
     });
 

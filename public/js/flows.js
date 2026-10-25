@@ -867,7 +867,8 @@ function bpOutcomeCard(wcode, heating, nowMs, boostAvailable, activeBoostHolds) 
         var oohAddOn = oohOnZones.map(function(z) {
             var h = oohHold(z.zone || ('CHZ' + z.n));
             var until = h && h.revertAt ? new Date(h.revertAt).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }) : '';
-            return 'We turned zone ' + z.n + ' on earlier' + (until ? ', until ' + until : '') + '. I can put that back to normal now.';
+            var holdDir = h && h.direction === 'off' ? 'off' : 'on';
+            return 'We turned zone ' + z.n + ' ' + holdDir + ' earlier' + (until ? ', until ' + until : '') + '. I can put that back to normal now.';
         }).join(' ');
         headline = "The heating is on";
         sayHtml = say("Your heating is on at the controls right now." +
