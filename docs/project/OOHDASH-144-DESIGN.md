@@ -5,11 +5,17 @@ OOHDASH-144 design, third version (2026-10-25), rebuilt around your review of th
 SECTION: Your review points, checked across every flow
 You asked that every point be checked everywhere, not just where you saw it. The code check found the following. The "tell the operator" label plus a separate script appears in every flow. Pub heating has three look-alike blocks, and the other 35 outcomes print the guidance right above an unlabelled script. The word "caller" is on about 77 screen lines and "customer" on none. Technical words are everywhere: override (about 80 lines), panel (about 40), forced, setpoint, back-up cycle, offline, gateway, and internal codes like W3 shown on screen. There are three different ways tickets get made, and a turned-on heating ticket is invisible to the rest of the flow, so logging afterwards makes a second ticket. Notes typed after turning the heating on are silently lost. "Ticket raised" can show with no ticket. Two of my own prototype labels ("Hold heat OFF", "Done, end this issue") do not exist in the app and are dropped. The full table is in section 2 of the design.
 
+SECTION: More of the same, found on the real screens
+Rebuilding the prototype from the real app's screens turned up more instances, now in scope because they sit on the pub heating journey. The site page asks "What is the caller reporting?" and says "type it in the caller's words". The status line above the heating answer says "panel reported just now". The progress lines show "pub boiler panel" and "Outcome: W3". The side panel says Heating is "Monitored only" at sites where the heating can be turned on and off from here, because those heating controls are marked as not controllable. All of these change: customer wording, "heating controls last reported just now", no codes, and Heating shows "Controllable from here" wherever turning it on or off is available.
+
 SECTION: The new screen standard
 Every answer card has the same three parts, in this order. 1. A short headline in plain words saying what is happening. 2. "Say to the customer": the words to read out, in one clearly marked block with a coloured edge and tinted background, so it is impossible to miss. 3. "Good to know" (for the agent only, never read out): shown only when it genuinely helps, for example "check with the customer before turning it back on, someone may have switched it off on purpose". If there is nothing useful to add, the section is left out. The old "ticket sentence" leaves the card; what gets logged is shown once, at the end, in the check-and-log step. Words follow one glossary: customer (never caller or operator); heating controls (never panel); turn heating on / turn heating off; put back to normal; switched off by hand (never forced); target temperature (never setpoint); no internal codes.
 
 SECTION: One way of logging each issue
 Every issue now ends the same way: a "Check and log" step. It lists what the customer said, what we found, and everything we did, with times. It also holds the notes box. One button finishes it. If nothing has been logged yet, the button is "Log for the IoT helpdesk and finish" and it creates the ticket. If we already logged automatically (because we changed the heating), the button is "Add to ticket #48213 and finish" and it adds to that same ticket, never a second one. After finishing, a green banner says "Logged: ticket #48213 is with the IoT helpdesk" and lists what it contains. Then come the existing "Add another issue" and "End call" buttons. "End with no action" is gone. Before anything is done, the choice is "No further action", which still goes through Check and log and still makes a ticket. After an action, Check and log is the only way out.
+
+SECTION: Keeping it to one ticket in the awkward cases
+The design panel asked about three edge cases; each now has an answer. If a different agent finishes the issue, for example after a handover, they can still add to the same ticket as long as they have confirmed the same site on their call; the ticket records who added it. If the agent turns the heating on or off a second time in the same issue, that second change is added to the issue's existing ticket, not logged on a new one. If the automatic ticket failed and the heating already went back to normal before the agent finished, Check and log writes what happened at the switch-back into the new ticket, so nothing is lost.
 
 SECTION: Telling the agent when we logged something automatically
 Changing the heating logs a ticket straight away, so the automatic switch-back later can write its result onto it. The screen now says so plainly, with the number: "We've logged this automatically to the IoT helpdesk as ticket #48213, because we changed the heating at the pub." If the heating controls don't respond, it adds the reason: "there may be a problem with the equipment or its internet connection." If the automatic ticket could not be made, the screen never claims it was. It says "We couldn't log this automatically. It will be logged when you finish," and Check and log then creates it and links it to the timer.
@@ -30,7 +36,7 @@ SECTION: Two live defects fixed separately first
 As agreed, a small v1.5.4 hotfix goes out ahead of this work, built and gated separately. It fixes the three blank heating cards (summer setting, room-sensor timer, already off) and the pub heating "End with no action", which fails on every card today. It changes no wording. This design builds on top of it and then replaces those screens with the new standard.
 
 SECTION: Tests the build must add
-Server tests: putting the heating back to normal works for that site only, refuses another site's timer, handles every result the heating controls can give, and a finished issue adds to the existing ticket instead of creating a second one, only for the agent and site that made it. Also: the zone timetable is read correctly, including zone 2 on newer controls, and is shown only when it is the same every day. The "until next due on" time is worked out on the server and falls back to 07:00. Browser tests walk every heating screen. They check: one script block per card, no internal codes or banned words on screen, the zone question, both directions, "All zones", the result rows including a failed zone, the automatic-ticket message with its number, and Check and log in both forms (new ticket, add to existing). There is a syntax check of every browser script, and the notes box styling.
+Server tests: putting the heating back to normal works for that site only, refuses another site's timer, handles every result the heating controls can give, and a finished issue adds to the existing ticket instead of creating a second one, only for an agent who has confirmed that site on their call; a second change in the same issue goes on the same ticket. Also: the zone timetable is read correctly, including zone 2 on newer controls, and is shown only when it is the same every day. The "until next due on" time is worked out on the server and falls back to 07:00. Browser tests walk every heating screen. They check: one script block per card, no internal codes or banned words on screen, the zone question, both directions, "All zones", the result rows including a failed zone, the automatic-ticket message with its number, and Check and log in both forms (new ticket, add to existing). There is a syntax check of every browser script, and the notes box styling.
 
 SECTION: What does not change
 No timetable or optimum-start settings are ever written. Putting back to normal only ever returns a zone to automatic. The boiler output and output1Override are never written. The kill-switch exemption for switch-backs is unchanged. The other flows keep today's screens until the follow-on ticket. Nothing is released or switched on in production without your go.
@@ -71,7 +77,7 @@ Change list:
 | C | `services/overrides.js` | `revertOutcome` on hold doc; cancel prefix on Zendesk note (§5) |
 | D | `services/tb-device.js`, `services/schedule.js` | read `CHZ2.schedule`; per-zone `timetable` decode (§6) |
 | E | `services/boost-window.js`, `services/control.js` | `until-next-on` duration resolved server-side (§7) |
-| F | `routes/api.js` `POST /outcomes` | append to an existing auto-created ticket (`appendToHoldId`), link new tickets to holds (§9) |
+| F | `routes/api.js` `POST /outcomes` + `POST /boiler-boost`, `services/control.js` | append to the issue’s existing ticket (`appendToHoldId`), link or report holds on new tickets (§9, §9.2a) |
 | G | `public/css/styles.css` | `.say`, `.gtk`, `.autolog`, `.wrapup`, notes-box classes (§8, §11) |
 | H | `public/js/flows.js` | heating cards rebuilt on the standard; `bp-zones`; durations; result; **Check and log** (`wrapUpStep`) (§8–§10) |
 | I | `public/js/views.js` | banner (§10.1) |
@@ -168,6 +174,21 @@ Audit `boiler-boost-cancel`. The Zendesk revert note is prefixed `Put back to no
 
 Removed from cards: "What to tell the operator", "Ticket sentence", and `doneLine('Outcome: W…')`. The ticket wording moves to Check and log (§9) as "What we'll log".
 
+### 8.1a Site page and flow chrome (shared, pub heating journey)
+
+| Where | Today | New |
+|---|---|---|
+| Site page entry title (`views.js:180`) | What is the caller reporting? | What is the customer reporting? |
+| Entry placeholder (`views.js:181`) | Type it in the caller’s words… | Type it in the customer’s words… |
+| "Something else" tile description | Describe it in the caller’s words | Describe it in the customer’s words |
+| Caller-words line in flows (`flows.js:221`) | Caller's words | Customer’s words |
+| Heating scope tag (`api.js:173`, `views.js:160`) | "Monitored only" for boiler-control sites (device `controllable:false`) | "Controllable from here" when `boostAvailable.on` or `.off` and a boiler-control device is present |
+| Status line above heating answers (`flows.js` `buildReadout`) | Pub zone 1 on · Pub zone 2 off · room 18.7°C / — · panel reported just now | Zone 1 on · Zone 2 off · Room 18.7°C · Heating controls last reported just now (a missing temperature is left out, not shown as "—") |
+| Progress lines | Area: Bar/Restaurant (pub boiler panel) · Outcome: W3 | Area: Bar/Restaurant · (the Outcome line is removed) |
+| Flow footer | Operator: [name] · Everything here is recorded to the Zendesk ticket automatically | You: [name] · Each issue is logged to a ticket when you finish it (§11) |
+
+The three site-page strings are shared by every flow and are true for all of them, so they change everywhere in 144. The rest of each other flow waits for the follow-on.
+
 ### 8.2 Card copy (replaces the 2026-10-23 wording; Decision 3)
 
 "With button" applies where Turn heating on or off is offered. Clauses in [brackets] fill from data or are dropped.
@@ -239,11 +260,15 @@ Shown only when more than one zone is a candidate (candidates as v2: W3 = off zo
 ### 9.2 Server (`POST /api/outcomes`)
 
 New optional fields:
-- `appendToHoldId`. The server loads that `OohOverrides` doc and requires all of `doc.siteNo === siteNo`, `doc.createdById === operator.id` and `doc.ticketId`. When they hold, it **appends** an internal comment `[OOH ISSUE SUMMARY]` (subject, actions, the ticket wording, caller words, notes) to `doc.ticketId` via `zendesk.addInternalComment`. It writes an audit entry and returns `{ ticket: { id: doc.ticketId }, appended: true }`. The Cosmos hold doc is the authority (durable), not the in-memory action map. If the checks fail, it returns 409 `append-refused`, and the client then offers `Log for the IoT helpdesk and finish` (a new ticket).
-- `holdIds[]` on the create path. After creating the ticket, it calls `overrides.attachTicketToOverride(holdId, ticketId)` for each hold that has no `ticketId` (the auto-ticket-failed case), so switch-back notes land on it.
+- `appendToHoldId` (+ `confirmToken`). The server loads that `OohOverrides` doc and requires all of: `resolution.isConfirmed(confirmToken, siteNo, operator.id)` (this agent has confirmed this site on their call), `doc.siteNo === siteNo`, `doc.ticketId` set, and `doc.createdAt` within the last 12 h. It does **not** require the same agent who made the change (design-panel finding: handover). The appended comment names the agent adding it. When they hold, it **appends** an internal comment `[OOH ISSUE SUMMARY]` (subject, actions, the ticket wording, caller words, notes) to `doc.ticketId` via `zendesk.addInternalComment`. It writes an audit entry and returns `{ ticket: { id: doc.ticketId }, appended: true }`. The Cosmos hold doc is the authority (durable), not the in-memory action map. If the checks fail, it returns 409 `append-refused`, and the client then offers `Log for the IoT helpdesk and finish` (a new ticket). The new ticket's first comment then cites the earlier ticket number ("Related: #48213").
+- `holdIds[]` on the create path. After creating the ticket, for each hold without a `ticketId` (the auto-ticket-failed case): if it is still `active`, it calls `overrides.attachTicketToOverride(holdId, ticketId)` so the later switch-back note lands on it; if it has already finished (`reverted`, `superseded-by-other`, `revert-failed`), it writes that switch-back result into the new ticket's first comment ("Switch-back at 21:02: back to normal" / the matching §10.1 wording), so the result is never lost (design-panel finding).
 - `actions[]`: text lines included in the `[TRG]` first comment (create path) or the summary comment (append path).
 
 The `no-action` type keeps creating a ticket (today's behaviour, now always with a non-empty `detail`). Tags are unchanged (`ooh`, so the IoT Support Dashboard picks it up).
+
+### 9.2a Second change in the same issue
+
+`POST /api/boiler-boost` accepts optional `appendToHoldId` + `confirmToken`, validated exactly as §9.2. When valid, `dispatchBoilerBoost` does not call `createBoostTicket`. Instead it adds an internal comment `[OOH Boost]` with the same content to `doc.ticketId` (new `zendesk.addBoostActionNote(ticketId, ...)`), and sets that `ticketId` on the new holds. The browser sends it whenever `f.data.actions` already holds a `ticketId`. So one issue always has at most one ticket, and "Add to ticket #N" is unambiguous (design-panel finding). This is the one `control.js` change in 144.
 
 ### 9.3 Telling the agent we logged automatically (`.autolog`)
 
@@ -327,7 +352,9 @@ The header is "Heating turned on" / "Heating turned off". One row per zone (`boo
 | TT-3 | malformed/empty → null; V2 `CHZ2.schedule` is read and decoded for zone 2 |
 | UN-1 | `until-next-on` → `revertAtMs` = earliest `nextOn` of the selected zones; more than 11 h, under 15 min, or no timetable → 07:00 with `fallback` |
 | WR-1 | `/outcomes` with `appendToHoldId` (same site + creator + ticket) → appends, returns the same id, creates no ticket |
-| WR-2 | `appendToHoldId` from another operator or site → 409 `append-refused`, nothing written |
+| WR-2 | `appendToHoldId` for another site, an unconfirmed site, or a hold older than 12 h → 409 `append-refused`, nothing written; a different agent with the site confirmed → appends (handover) |
+| WR-5 | second `/boiler-boost` in one issue with `appendToHoldId` → no new ticket; `[OOH Boost]` comment on the existing ticket; new holds carry its id |
+| WR-6 | create path with a hold that already finished → its switch-back result is written into the new ticket’s first comment |
 | WR-3 | create path with `holdIds` → `attachTicketToOverride` called for holds lacking a ticket |
 | WR-4 | `no-action` always has a non-empty `detail` |
 | NB-1..3 | notes box (as v2) |
@@ -352,6 +379,43 @@ The header is "Heating turned on" / "Heating turned off". One row per zone (`boo
 | BB-E22 | after any action, no "No further action"/"End with no action" is shown |
 | BB-E23 | off duration shows "Until HH:MM, when it's next due on" with an every-day fixture; "Until 07:00" otherwise |
 | BB-E24 | timetable sentence present with an every-day fixture, absent otherwise |
+
+## 13a. Data dictionary (new and changed fields)
+
+| Name | Where | Type | Meaning | Retention / sensitivity |
+|---|---|---|---|---|
+| `workspace.activeBoostHolds[]` | API payload | array or null | OOH heating timers running at this site; null = couldn't read | not stored; no personal data except `createdBy` (agent name) |
+| `activeBoostHolds[].ticketId` | API payload | string or null | The ticket the timer is logged on | as Zendesk |
+| `heating.zones[].zone` | API payload | `CHZ1`/`CHZ2` | Internal zone id (never shown) | none |
+| `heating.zones[].timetable` | API payload | object or null | `{ everyDay, currentTempC, nextOn: { atMs, timeText, dayText, tempC } }` from the zone's stored timetable | not stored |
+| `OohOverrides.revertOutcome` | Cosmos | string | How the switch-back resolved: `written`, `already-auto`, `superseded-by-other`, `same-direction-skip` | as OohOverrides (existing) |
+| `OohOverrides.cancelRequestedBy` | Cosmos | string | Agent who put it back to normal early (existing field) | agent name |
+| `boiler-boost.durationKey = 'until-next-on'` | API request | enum value | Turn off until the earliest next-on time of the chosen zones | n/a |
+| `boiler-boost.appendToHoldId` | API request | string | Add this change to the issue's existing ticket (§9.2a) | n/a |
+| `boiler-boost` response `fallback` | API response | `'until-0700'` or absent | The dynamic time couldn't be used | n/a |
+| `outcomes.appendToHoldId` | API request | string | Finish by adding to the existing ticket | n/a |
+| `outcomes.holdIds[]` | API request | string[] | Timers made in this issue (link or report on the new ticket) | n/a |
+| `outcomes.actions[]` | API request | string[] | Plain-English lines of what was done | goes into the ticket |
+| `flow.data.actions[]` | browser state | array | `{ kind, zones, untilMs, result, holdIds, ticketId, atMs }` for this issue | browser memory only |
+| `flow.data.wrapKind` | browser state | `capture`/`advice`/`no-action`/`action` | How the issue is finishing | browser memory only |
+
+## 13b. Test data and scripts for the test gate
+
+**Fixture changes** (`data/fixtures/bridge-devices.json` + TB fixture):
+- 9010 (V2): `CHZ1.schedule` and `CHZ2.schedule` every-day (21°C 06:30, 15°C 23:00).
+- 9011 (V1): `output2Schedule` every-day and `output3Schedule` with a weekday-only entry (so it exercises the not-every-day fallback).
+- Seeded holds for the banner and intercept: one on (zone 1, with a ticket) and one off (zone 2, with no ticket, to exercise auto-ticket-failed).
+- The fixture Zendesk has a switch to fail `createBoostTicket` once.
+- The fixture site names stay "Test Boiler Panel V1/V2" for automated tests. The prototype uses a realistic name.
+
+**Manual test script** (test gate, fixture mode, any agent):
+1. 9010: cold → Turn heating on → zone question → All zones → 1 hour → result shows ticket #N → Finish and add notes → button reads "Add to ticket #N and finish" → logged banner #N; "This call so far" lists it.
+2. Same issue: put zone 1 back to normal from the banner → "Noted on ticket #N".
+3. 9010: hot → Turn heating off → Zone 2 only → "Until 06:30, when it's next due on" → result end time 06:30.
+4. 9011: hot → Turn heating off → the option reads "Until 07:00" (timetable not every day).
+5. With the boost-ticket failure switch on: turn on → "We couldn't log this automatically" → Check and log → "Log for the IoT helpdesk and finish" → new ticket; the hold has that ticket id.
+6. Every card W1–W9 via fixture variants: one "Say to the customer" block, no banned words (LEX-1 list), no "End with no action".
+7. Site page: "What is the customer reporting?", Heating tag "Controllable from here" on 9010.
 
 ## 14. Rollout
 

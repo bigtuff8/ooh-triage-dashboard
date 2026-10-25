@@ -1,5 +1,9 @@
 <!doctype html>
-<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>OOHDASH-144 prototype</title>
+<html lang="en-GB"><head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>OOH Dashboard — Lighthouse out-of-hours support</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%F0%9F%8C%99%3C/text%3E%3C/svg%3E">
 <style>
 /* OOH Dashboard — design-spec §1 (Airedale IoT family palette, Ant Design patterns) */
 :root{
@@ -182,8 +186,6 @@ table.tbl tr.rowoff td{background:var(--danger-light)}
   .modal{width:100%;max-height:100vh;border-radius:0}
 }
 
-</style></head><body>
-<style>
 :root{--notes-accent:#C7D2FE}
 .mk-wrap{max-width:1180px;margin:0 auto;padding:16px}
 .mk-nav{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 10px}
@@ -221,31 +223,75 @@ table.tbl tr.rowoff td{background:var(--danger-light)}
 .callsofar{font-size:12.5px;color:var(--text-secondary);margin:0 0 10px}
 button[disabled]{opacity:.45;cursor:not-allowed}
 @media (max-width:760px){.wsgrid{grid-template-columns:1fr!important}.notes-input{font-size:16px}.mk-cmp{grid-template-columns:1fr}}
+body{padding-top:var(--proto-h,0px)}
+.topbar{top:var(--proto-h,0px)}
+@media(min-width:901px){.sidebar{top:var(--proto-h,0px)}}
+#proto.min .mk-nav,#proto.min .mk-switch,#proto.min .pdesc{display:none}
+#proto .ptog{float:right;background:#334155;color:#fff;border:0;border-radius:6px;padding:3px 10px;cursor:pointer;font:inherit;font-size:12px}
+
+#proto{position:fixed;top:0;left:0;right:0;z-index:60;max-height:45vh;overflow:auto;background:#0F172A;color:#E2E8F0;padding:8px 12px;font-size:12.5px}#proto .mk-nav button{background:#1E293B;color:#E2E8F0;border-color:#334155}#proto .mk-nav button.on{background:var(--primary);border-color:var(--primary)}#proto .mk-switch{color:#CBD5E1;margin:4px 0 0}#proto b{color:#fff}
 </style>
-<div class="mk-wrap">
- <h2 style="margin:0 0 4px">OOHDASH-144 prototype: pub heating on the new agent-screen standard</h2>
- <p class="mk-note">Clickable prototype using the live app’s styles. Site: <b>Black Bull, Corbridge (7639)</b>, two heating zones. Pick a scenario and click through. Nothing here talks to a server; ticket numbers are examples.</p>
- <div class="mk-nav" id="nav"></div>
- <div class="mk-switch">
-  <label><input type="checkbox" id="sw-tt" checked onchange="S.tt=this.checked;render()"> Timetable readable (same every day: 21°C from 06:30, 15°C from 23:00)</label>
-  <label><input type="checkbox" id="sw-at" checked onchange="S.autoOk=this.checked;render()"> Automatic ticket succeeded</label>
+</head>
+<body><div id="proto"><button class="ptog" onclick="var p=document.getElementById('proto');p.classList.toggle('min');this.textContent=p.classList.contains('min')?'Show scenarios':'Hide';protoH()">Hide</button><b>OOHDASH-144 prototype</b><span class="pdesc"> — the real OOH Dashboard screens (captured from the app) with the new pub heating design inside. Example data; ticket numbers are examples; nothing talks to a server.</span><div class="mk-nav" id="proto-nav" style="margin-top:6px"></div><div class="mk-switch"><label><input type="checkbox" id="sw-tt" checked onchange="S.tt=this.checked;render()"> Timetable readable (same every day: 21°C from 06:30, 15°C from 23:00)</label><label><input type="checkbox" id="sw-at" checked onchange="S.autoOk=this.checked;render()"> Automatic ticket succeeded</label></div></div>
+<div id="app">
+ <div class="sidebar">
+  <div class="brand">OOH Dashboard<small>Lighthouse out-of-hours support</small></div>
+  <div class="nav">
+   <button data-testid="nav-home" class="active" onclick="go('home')">📞 New Call</button>
+   <button data-testid="nav-callback" class="" onclick="go('callback')">↩️ Callback Lookup</button>
+   <button data-testid="nav-tonight" class="" onclick="go('tonight')">🌙 Tonight</button>
+   
+  </div>
+  <div class="foot">
+   <div class="opchip"><div class="avatar">SO</div>
+    <div><div class="nm" data-testid="operator-name">Sam Okafor</div><div class="rl">OOH Handler · signed in via SSO</div></div></div>
+   <button class="btn link" style="padding:2px 0" onclick="signOut()">Sign out</button>
+  </div>
  </div>
- <div class="wsgrid" style="display:grid;grid-template-columns:2fr 1fr;gap:14px">
+ <div class="main">
+  <div class="topbar">
+   <span class="ctx">Black Bull · <span class="mono">7639</span></span>
+   <span class="ver">Prototype · OOHDASH-144</span>
+  </div>
+  
+  
+  
+  <div id="view"><div class="content"><div class="wsgrid">
   <div>
-   <div class="card" style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;padding:14px 18px;margin-bottom:10px">
-    <div><h2 style="display:inline">Black Bull</h2> <span class="mono">7639</span> <span class="small">Corbridge</span></div>
-    <button class="btn link" style="margin-left:auto">End call</button>
+   <div class="card" style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;padding:14px 18px">
+    <div><h2 style="display:inline">Black Bull</h2> <span class="mono">7639</span><div class="sub">Catering &amp; Bars · Front Street, Corbridge</div></div>
+    
+    <button class="btn link" style="margin-left:auto" onclick="endCall()">End call</button>
    </div>
-   <div id="callsofar"></div>
-   <div id="banner"></div>
-   <div id="flow"></div>
+   
+   
+   
+   
+   <div class="card">
+   
+   <h3>What is the caller reporting?</h3>
+   <input class="issueinput" id="iq" data-testid="smart-entry" placeholder="Type it in the caller’s words — e.g. “pub is freezing”, “no power in the kitchen”…" autocomplete="off" oninput="issueSearch(this.value)">
+   <div class="sugg" id="isugg"></div>
+   <div class="tiles" data-testid="category-tiles"><div class="tile" data-testid="tile-heating" onclick="startTileFlow('heating')"><div class="tt">🌡️ Heating</div><div class="td">Too cold, too hot, turn it off, not working</div></div><div class="tile" data-testid="tile-hotwater" onclick="startTileFlow('hotwater')"><div class="tt">🚿 Hot water</div><div class="td">None, not enough, too hot</div></div><div class="tile" data-testid="tile-kitchen" onclick="startTileFlow('kitchen')"><div class="tt">🍳 Kitchen equipment</div><div class="td">Fryers, grills, glasswashers off / turning off</div></div><div class="tile" data-testid="tile-lighting" onclick="startTileFlow('lighting')"><div class="tt">💡 External lighting</div><div class="td">Outside / car park lights</div></div><div class="tile" data-testid="tile-fan" onclick="startTileFlow('fan')"><div class="tt">🌀 Extractor fans</div><div class="td">Fans on/off or wrong times</div></div><div class="tile" data-testid="tile-fridge" onclick="startTileFlow('fridge')"><div class="tt">🧊 Fridges &amp; freezers</div><div class="td">Temperature alarms, not cooling</div></div><div class="tile" data-testid="tile-contractor" onclick="startTileFlow('contractor')"><div class="tt">🧰 Contractor on site</div><div class="td">Engineer needs Lighthouse info now</div></div><div class="tile" data-testid="tile-other" onclick="startTileFlow('other')"><div class="tt">✍️ Something else / not sure</div><div class="td">Describe it in the caller’s words</div></div></div></div>
   </div>
   <div>
-   <div class="card tight"><h3>What Lighthouse controls at this site</h3>
-    <ul class="scopelist"><li><span>Heating</span><span class="tag green">Controlled</span></li><li><span>Hot water</span><span class="tag blue">Monitored</span></li><li><span>Kitchen</span><span class="tag green">Controlled</span></li><li><span>Lighting</span><span class="tag green">Controlled</span></li><li><span>Fans</span><span class="tag grey">Not on Lighthouse</span></li></ul></div>
-  </div>
- </div>
-</div>
+   <div class="card tight"><h3>What Lighthouse controls at this site</h3><ul class="scopelist" data-testid="scope-list">
+    <li><span>Heating</span><span class="tag grey">Monitored only</span></li><li><span style="color:var(--text-disabled)">Hot water</span><span class="tag grey">Not controllable here</span></li><li><span style="color:var(--text-disabled)">Kitchen equipment</span><span class="tag grey">Not on Lighthouse here</span></li><li><span style="color:var(--text-disabled)">External lighting</span><span class="tag grey">Not on Lighthouse here</span></li><li><span style="color:var(--text-disabled)">Extractor fans</span><span class="tag grey">Not on Lighthouse here</span></li>
+   </ul><p class="small" style="margin-top:6px">Live from the device inventory — use it to answer “isn’t that you?”</p></div>
+   <div class="card tight"><h3>Open tickets for this site</h3><p class="small">No tickets in the last 90 days.</p></div>
+  </div></div></div></div>
+ </div></div>
+<div id="toasts"></div>
+<div id="modalroot"></div>
+<!-- Cache-busting querystring MUST be bumped with the version on every deploy -->
+
+
+
+
+
+
+
+
 <script>
 var S = {};
 var TKT = 48213, TKT_NEW = 48219;
@@ -270,8 +316,8 @@ function nextOnShort(){return S.tt?' and next comes on at 06:30':'';}
 
 function reset(k){
  S = {scen:k, tt:S.tt!==false, autoOk:S.autoOk!==false, holds:[], pb:{}, step:'stage1', sel:null, dir:'on', actions:[], issues:[], card:'W6', variant:'btn', logged:null, holdAck:false};
- if (k==='site'||k==='pb-ended'||k==='pb-pending'||k==='pb-hand'){S.holds=[{id:'h1',zone:'CHZ1',dir:'on',until:'21:30',by:'Kelly',tkt:TKT},{id:'h2',zone:'CHZ2',dir:'off',until:'23:00',by:'Tony',tkt:TKT-4}];S.step='idle';}
- if (k==='intercept'){S.holds=[{id:'h1',zone:'CHZ1',dir:'on',until:'21:30',by:'Kelly',tkt:TKT}];S.step='stage1';}
+ if (k==='site'||k==='pb-ended'||k==='pb-pending'||k==='pb-hand'){S.holds=[{id:'h1',zone:'CHZ1',dir:'on',until:'21:30',by:'Jordan',tkt:TKT},{id:'h2',zone:'CHZ2',dir:'off',until:'23:00',by:'Priya',tkt:TKT-4}];S.step='idle';}
+ if (k==='intercept'){S.holds=[{id:'h1',zone:'CHZ1',dir:'on',until:'21:30',by:'Jordan',tkt:TKT}];S.step='stage1';}
  if (k==='cold'){S.step='card';S.card='W6';S.dir='on';}
  if (k==='hot'){S.step='card';S.card='W8';S.dir='off';}
  if (k==='partial'){S.step='result';S.dir='on';S.sel=['CHZ1','CHZ2'];S.partial=true;S.actions=[{t:'20:02',txt:'Turned the heating on, zones 1 and 2, until 21:30',tkt:TKT}];}
@@ -347,11 +393,11 @@ function cardDef(k, btn){
  case 'W3': return {h:'Part of the pub heating is off', s: btn?'Part of your heating is switched off at the controls right now. I can turn it on from here for a set time, and then it goes back to its normal timetable'+tt+'. I’ll log it for our team to look at properly.':'Part of your heating is switched off at the controls. I can’t change that from here, so I’ll log it for our team to sort.', g:'If the customer says the cold area is the part that’s already heating, it’s more likely the boiler or radiators, so advise their heating engineer instead.', dir:'on', cand:['CHZ2'], log:'Pub heating at time of call: zone 1 on, zone 2 off.'};
  case 'W4': return {h:'The heating is switched off for the summer', s:'Your heating controls are still on their summer setting, which keeps the heating off. I can’t change that from here, but I’ll log it so our team can switch it back for you.', log:'Pub heating at time of call: off, controls on their summer setting. Customer needs heating.'};
  case 'W5': return {h:'Someone has switched the heating off at the controls', s: btn?'Part of your heating has been switched off by hand at the controls until 06:00. I can turn it back on from here for a set time. I’ll log it so our team can check why it was switched off.':'Part of your heating has been switched off by hand at the controls. I can’t change it from here, but I’ll log that you need it back on so our team can sort it.', g: btn?'Someone at the pub or an engineer may have done this on purpose, so check with the customer before turning it back on.':'', dir:'on', cand:['CHZ2'], log:'Pub heating at time of call: zone 2 switched off by hand at the controls until 06:00. Customer needs heat.'};
- case 'W5H': return {h:'We turned this heating off earlier', s:'We turned that part of your heating off earlier, until 23:00. I can put it back to normal now, so it follows its usual timetable again.', hold:{id:'c2',zone:'CHZ2',dir:'off',until:'23:00',by:'Tony',tkt:TKT-4}, log:'Pub heating at time of call: zone 2 turned off by OOH until 23:00.'};
+ case 'W5H': return {h:'We turned this heating off earlier', s:'We turned that part of your heating off earlier, until 23:00. I can put it back to normal now, so it follows its usual timetable again.', hold:{id:'c2',zone:'CHZ2',dir:'off',until:'23:00',by:'Priya',tkt:TKT-4}, log:'Pub heating at time of call: zone 2 turned off by OOH until 23:00.'};
  case 'W6': return {h:'The heating is off on its timetable', s: btn?'Your heating is off on its normal timetable right now'+(S.tt?' and is next due on at 06:30':'')+'. I can turn it on from here for a set time if you need it. I’ll log the call.':'Your heating is off on its normal timetable right now'+(S.tt?' and is next due on at 06:30':'')+'. I can’t turn it on from here, so I’ll log it for our team.', g: S.tt?'At 06:30 it heats the pub to 21°C, and only comes on if the room is cooler than that.':'', dir:'on', cand:['CHZ1','CHZ2'], log:'Pub heating at time of call: off on its timetable'+(S.tt?' (next on 06:30, 21°C)':'')+'. Customer cold.'};
  case 'W7': return {h:'The heating is running on a simple timer', s:'Your heating is running, but on a simple timer because one of the room temperature sensors isn’t working, so it may feel cooler than normal. I’ll log it for our team to fix the sensor.', log:'Pub heating at time of call: zone 1 on a simple timer, room temperature sensor not reporting.'};
  case 'W8': return {h:'The heating is on', s: btn?'Your heating is on at the controls right now. I can turn it off from here for a set time, and then it goes back to its normal timetable'+tt+'. I’ll log the call.':'Your heating is on at the controls and I can’t change it from here tonight. Turning the radiators down will help in the meantime. I’ll log it for our team.', dir:'off', cand:['CHZ1','CHZ2'], log:'Pub heating at time of call: on (zones 1 and 2). Customer too warm.'};
- case 'W8H': return {h:'The heating is on', s:'Your heating is on at the controls right now. We turned zone 1 on earlier, until 21:30, and I can put that back to normal now. I can also turn zone 2 off from here for a set time. I’ll log the call.', hold:{id:'c1',zone:'CHZ1',dir:'on',until:'21:30',by:'Kelly',tkt:TKT}, dir:'off', cand:['CHZ2'], log:'Pub heating at time of call: on (zones 1 and 2; zone 1 turned on by OOH until 21:30). Customer too warm.'};
+ case 'W8H': return {h:'The heating is on', s:'Your heating is on at the controls right now. We turned zone 1 on earlier, until 21:30, and I can put that back to normal now. I can also turn zone 2 off from here for a set time. I’ll log the call.', hold:{id:'c1',zone:'CHZ1',dir:'on',until:'21:30',by:'Jordan',tkt:TKT}, dir:'off', cand:['CHZ2'], log:'Pub heating at time of call: on (zones 1 and 2; zone 1 turned on by OOH until 21:30). Customer too warm.'};
  case 'W9': return {h:'The pub heating is already off', s:'Our controls show your pub heating is off right now, so the warmth is coming from somewhere else, perhaps a radiator turned up by hand or another heater. I’ll log the call.', g:'Ask whether a portable heater or the rooms upstairs have heating on.', log:'Pub heating at time of call: off. Customer too warm; heat is not from the pub heating.'};
  }
 }
@@ -457,6 +503,7 @@ function flowBody(){
  var s=S.step;
  if(s==='idle') return null;
  if(s==='notes') return notesCompare();
+ if(s==='area') return '<div class="stepq">Which area is the customer talking about?</div><div class="chips"><button class="chip" onclick="S.step=\'stage1\';render()">Bar/Restaurant</button><button class="chip">Accommodation</button></div>';
  if(s==='cards') return cardsView();
  if(s==='stage1'){
   if(S.holds.length && !S.holdAck) return interceptHtml();
@@ -472,18 +519,39 @@ function flowBody(){
  if(s==='logged') return loggedHtml();
  return '';
 }
+var ENTRY='';
+function startHeating(){S.step='area';S.holdAck=false;render();}
 function render(){
- document.getElementById('nav').innerHTML=SCEN.map(function(x){return '<button class="'+(S.scen===x[0]?'on':'')+'" onclick="reset(\''+x[0]+'\')">'+x[1]+'</button>'}).join('');
+ document.getElementById('proto-nav').innerHTML=SCEN.map(function(x){return '<button class="'+(S.scen===x[0]?'on':'')+'" onclick="reset(\''+x[0]+'\')">'+x[1]+'</button>'}).join('');
  document.getElementById('banner').innerHTML=banner();
  document.getElementById('callsofar').innerHTML=S.issues.length?'<div class="callsofar"><b>This call so far:</b> '+S.issues.map(function(i){return '<span class="tag blue">'+i.label+'</span> <span class="small">#'+i.tkt+'</span>'}).join(' ')+'</div>':'';
  var body=flowBody(), el=document.getElementById('flow');
- if(body===null){el.innerHTML='<div class="card"><h3 style="margin-top:0">What is the customer reporting?</h3><p class="small">Normal site page. The banner above shows before any question is asked. Use “Put back to normal now” on a row.</p><button class="btn" onclick="S.step=\'stage1\';render()">Start the heating questions →</button></div>';return;}
+ if(body===null){el.innerHTML=ENTRY;return;}
  if(S.step==='notes'){el.innerHTML=body;return;}
  var showNotes=['wrap','logged','logging','sending','cards'].indexOf(S.step)<0;
- el.innerHTML='<div class="mk-flow"><div class="mk-flowhead"><span style="font-size:18px">🔥</span><b>Heating</b><span class="small" style="margin-left:6px">guided flow</span><button class="btn link" style="margin-left:auto">Cancel issue</button></div><div class="mk-flowbody">'+
-  '<div class="stepdone"><span>💬</span>Customer’s words: “The bar is freezing”</div>'+body+(showNotes?notesBox():'')+'</div><div class="mk-flowfoot"><span>You: <b>Kelly</b></span><span style="margin-left:auto">Each issue is logged to a ticket when you finish it</span></div></div>';
+ var done='<div class="stepdone"><span>💬</span>Customer’s words: “The bar is freezing”</div>';
+ if(S.step!=='area') done+='<div class="stepdone"><span class="tick">✓</span>Area: <b>Bar/Restaurant</b></div>';
+ if(['card','zones','dur','sending','result','wrap','logging','logged'].indexOf(S.step)>=0) done+='<div class="stepdone"><span class="tick">✓</span>Need: <b>'+((S.card||'').indexOf('W8')===0||S.card==='W9'?'Too hot / wants it off':'Too cold / not working')+'</b></div>';
+ var status=(['stage1','card','cards'].indexOf(S.step)>=0)?'<div class="zoneread"><span class="small">Zone 1 <b class="ok">on</b> · Zone 2 <b class="warn">off</b> · Room 18.7°C · Heating controls last reported just now</span></div>':'';
+ el.innerHTML='<div class="flowpanel" data-testid="flow-panel"><div class="flowhead"><span style="font-size:18px">🌡️</span><b>Heating</b><span class="small" style="margin-left:6px">guided flow</span><button class="btn link" style="margin-left:auto" onclick="reset(\'site\')">Cancel issue</button></div><div class="flowbody">'+
+  done+status+body+(showNotes?notesBox():'')+'</div><div class="flowfoot"><span>You: <b>Sam Okafor</b></span><span style="margin-left:auto">Each issue is logged to a ticket when you finish it</span></div></div>';
 }
-reset('site');
-</script>
+(function boot(){
+ var left=document.querySelector('.wsgrid > div');
+ var entry=left.querySelectorAll('.card')[1];
+ entry.querySelector('h3').textContent='What is the customer reporting?';
+ var iq=entry.querySelector('#iq'); iq.setAttribute('placeholder','Type it in the customer’s words — e.g. “pub is freezing”, “no power in the kitchen”…'); iq.removeAttribute('oninput');
+ entry.querySelectorAll('.tile').forEach(function(t){t.removeAttribute('onclick'); var d=t.querySelector('.td'); if(d) d.textContent=d.textContent.replace('caller’s','customer’s');});
+ entry.querySelector('[data-testid=tile-heating]').setAttribute('onclick','startHeating()');
+ ENTRY=entry.outerHTML; entry.remove();
+ var mk=function(id){var d=document.createElement('div');d.id=id;left.appendChild(d);return d;};
+ mk('callsofar'); mk('banner'); mk('flow');
+ document.querySelectorAll('.scopelist li').forEach(function(li){ if(/Heating/.test(li.textContent)){ li.querySelector('.tag').className='tag green'; li.querySelector('.tag').textContent='Controllable from here'; }});
+ document.querySelectorAll('[onclick]').forEach(function(e){ if(!e.closest('#flow')&&!e.closest('#proto')&&!e.closest('#banner')&&e.getAttribute('onclick').indexOf('startHeating')<0) e.removeAttribute('onclick'); });
+ reset('site');
+ protoH(); window.addEventListener('resize',protoH);
+})();
+function protoH(){document.documentElement.style.setProperty('--proto-h',document.getElementById('proto').offsetHeight+'px');}
 
+</script>
 </body></html>
