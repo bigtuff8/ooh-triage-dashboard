@@ -795,7 +795,7 @@ function bpOutcomeCard(wcode, heating, nowMs, boostAvailable) {
                   '<button class="btn primary" data-testid="bp-capture" onclick="flowStep({need:\'bp-esc\'})">Capture &amp; escalate for the IoT team</button>' +
                   '<button class="btn" data-testid="bp-advice" onclick="flowStep({need:\'bp-advice\'})">Advise heating engineer &amp; log it</button>' +
                   '<button class="btn" data-testid="bp-noact" onclick="flowStep({need:\'bp-noact\'})">End with no action</button>';
-    } else if (wcode === 'W4') {} else if (wcode === 'W4') {
+    } else if (wcode === 'W4') {
         headline = "Pub heating is in summer mode";
         operatorText = "The panel has switched the pub heating off for the summer season. It isn’t a fault, but we can’t change it from here. If the site needs heating, log it for the IoT team.";
         scriptText = "The heating controls are still set to summer mode, which is why the heating isn’t coming on. I can’t change that from here, but I’ve logged it so the team can switch it back for you.";
@@ -841,7 +841,7 @@ function bpOutcomeCard(wcode, heating, nowMs, boostAvailable) {
         buttons = boostBtnsW6 +
                   '<button class="btn primary" data-testid="bp-capture" onclick="flowStep({need:\'bp-esc\'})">Capture &amp; escalate for the IoT team</button>' +
                   '<button class="btn" data-testid="bp-noact" onclick="flowStep({need:\'bp-noact\'})">End with no action</button>';
-    } else if (wcode === 'W7') {} else if (wcode === 'W7') {
+    } else if (wcode === 'W7') {
         var fallbackZone = zones.find(function(z) { return z.fallback; }) || zones[0] || { n: 1 };
         headline = "Heating is running on a back-up cycle";
         operatorText = "The panel has lost the room temperature reading for pub zone " + fallbackZone.n + ", so it’s heating that zone on a timed on/off cycle instead. Rooms can feel cooler than normal. The IoT team needs to check the room sensor.";
@@ -870,7 +870,7 @@ function bpOutcomeCard(wcode, heating, nowMs, boostAvailable) {
         buttons = boostBtnsW8 +
                   '<button class="btn primary" data-testid="bp-capture" onclick="flowStep({need:\'bp-esc\'})">Capture &amp; escalate for the IoT team</button>' +
                   '<button class="btn" data-testid="bp-noact" onclick="flowStep({need:\'bp-noact\'})">End with no action</button>';
-    } else if (wcode === 'W9') {} else if (wcode === 'W9') {
+    } else if (wcode === 'W9') {
         headline = "Pub heating is already off";
         operatorText = "The panel isn’t heating any pub zone right now, so the warmth isn’t coming from the pub heating controls. Ask whether another heater, or the accommodation heating, is on.";
         scriptText = "Our controls show the pub heating is off right now, so the warmth is coming from somewhere else, perhaps a radiator on manual or another heater. I’ve noted the call.";
@@ -955,7 +955,8 @@ function boilerPanelHeatingBranch(ws, f, panelDevice, site) {
         return outcomeCaptured(f, 'bp-advice', { subject: card2.headline, detail: card2.operatorText, script: card2.scriptText, OohCaptureClass: 'boiler-panel-advice' });
     }
     if (need === 'bp-noact') {
-        return outcomeNoAction(f, 'bp-noact', { subject: 'Pub heating query — no action', detail: '', script: '' });
+        var cardN = bpOutcomeCard(f.data.bpWcode || 'W1', heating, nowMs);
+        return outcomeNoAction(f, 'bp-noact', { subject: 'Pub heating query — no action', detail: cardN.ticketText, script: '' });
     }
 
     // OOHDASH-141: boost duration picker
