@@ -1,0 +1,566 @@
+<!doctype html>
+<html lang="en-GB"><head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>OOH Dashboard — Lighthouse out-of-hours support</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%F0%9F%8C%99%3C/text%3E%3C/svg%3E">
+<style>
+/* OOH Dashboard — design-spec §1 (Airedale IoT family palette, Ant Design patterns) */
+:root{
+  --primary:#594AE2;--primary-dark:#4338CA;--primary-light:#EEF2FF;
+  --success:#10B981;--success-light:#D1FAE5;
+  --warning:#F59E0B;--warning-light:#FEF3C7;
+  --danger:#EF4444;--danger-light:#FEE2E2;
+  --info:#3B82F6;--info-light:#DBEAFE;
+  --surface:#FFFFFF;--surface-variant:#F8FAFC;--background:#F1F5F9;
+  --sidebar-bg:#1E293B;--sidebar-text:#94A3B8;--sidebar-active:#334155;
+  --text-primary:#1E293B;--text-secondary:#64748B;--text-disabled:#94A3B8;
+  --border:#E2E8F0;
+  --urgency-critical:#DC2626;--urgency-critical-bg:#FEF2F2;
+  --radius-sm:6px;--radius-md:8px;--radius-lg:12px;
+  --shadow-sm:0 1px 2px rgba(0,0,0,.05);--shadow-md:0 4px 6px -1px rgba(0,0,0,.1);--shadow-lg:0 10px 15px -3px rgba(0,0,0,.1);
+  --mono:ui-monospace,Consolas,'Cascadia Mono',monospace;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:Inter,system-ui,-apple-system,'Segoe UI',sans-serif;font-size:14px;line-height:22px;color:var(--text-primary);background:var(--background)}
+button{font:inherit;cursor:pointer}
+input,select,textarea{font:inherit}
+.mono{font-family:var(--mono);font-size:12.5px;font-weight:500}
+#app{display:flex;min-height:100vh}
+.sidebar{width:240px;background:var(--sidebar-bg);color:var(--sidebar-text);display:flex;flex-direction:column;position:fixed;top:0;bottom:0;left:0;z-index:20}
+.sidebar .brand{padding:20px 20px 16px;color:#fff;font-weight:700;font-size:16px;letter-spacing:.2px;border-bottom:1px solid #33415555}
+.sidebar .brand small{display:block;font-weight:400;font-size:11.5px;color:var(--sidebar-text);margin-top:2px}
+.nav{padding:12px 8px;flex:1}
+.nav button{display:flex;align-items:center;gap:10px;width:100%;text-align:left;background:none;border:0;color:var(--sidebar-text);padding:10px 12px;border-radius:var(--radius-md);font-size:14px;margin-bottom:2px}
+.nav button:hover{background:var(--sidebar-active);color:#fff}
+.nav button.active{background:var(--sidebar-active);color:#fff;font-weight:600}
+.sidebar .foot{padding:14px 16px;border-top:1px solid #33415555;font-size:12.5px}
+.opchip{display:flex;align-items:center;gap:10px;margin-bottom:10px}
+.opchip .avatar{width:32px;height:32px;border-radius:50%;background:var(--primary);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:600;font-size:13px}
+.opchip .nm{color:#fff;font-weight:600;line-height:16px}
+.opchip .rl{font-size:11.5px;line-height:14px}
+.main{margin-left:240px;flex:1;display:flex;flex-direction:column;min-width:0}
+.topbar{height:52px;background:var(--surface);border-bottom:1px solid var(--border);display:flex;align-items:center;gap:16px;padding:0 24px;position:sticky;top:0;z-index:10}
+.topbar .ctx{font-weight:600}
+.topbar .ver{margin-left:auto;color:var(--text-disabled);font-size:12px}
+.banner{padding:8px 24px;font-size:13.5px;font-weight:500;display:flex;align-items:center;gap:10px}
+.banner.kill{background:var(--danger-light);color:#991B1B;border-bottom:1px solid #FECACA}
+/* R8/S10: control-is-live signal — an ENABLED state (green), deliberately distinct from the red .kill block. */
+.banner.live{background:var(--success-light);color:#065F46;border-bottom:1px solid #A7F3D0}
+.banner.notice{background:var(--info-light);color:#1E40AF;border-bottom:1px solid #BFDBFE}
+.content{padding:18px 24px;max-width:1240px;width:100%;margin:0 auto}
+.content.narrow{max-width:760px}
+.card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-md);box-shadow:var(--shadow-sm);padding:18px;margin-bottom:12px}
+.card.tight{padding:12px 14px;margin-bottom:10px}
+.card h2{font-size:18px;line-height:26px;font-weight:600;margin-bottom:4px}
+.card h3{font-size:14.5px;line-height:20px;font-weight:600;margin-bottom:6px}
+.sub{color:var(--text-secondary);font-size:13px}
+.small{font-size:12.5px;line-height:17px;color:var(--text-secondary)}
+.btn{border:1px solid var(--border);background:var(--surface);color:var(--text-primary);border-radius:var(--radius-md);padding:8px 16px;font-weight:500;font-size:14px}
+.btn:hover{border-color:var(--primary);color:var(--primary)}
+.btn.primary{background:var(--primary);border-color:var(--primary);color:#fff}
+.btn.primary:hover{background:var(--primary-dark);color:#fff}
+.btn.big{padding:12px 22px;font-size:15px}
+.btn.link{border:none;background:none;color:var(--primary);padding:4px 6px}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+.tag{display:inline-flex;align-items:center;gap:5px;font-size:11.5px;font-weight:600;border-radius:var(--radius-sm);padding:1px 7px;line-height:17px;white-space:nowrap}
+.tag.green{background:var(--success-light);color:#065F46}
+.tag.amber{background:var(--warning-light);color:#92400E}
+.tag.red{background:var(--danger-light);color:#991B1B}
+.tag.blue{background:var(--info-light);color:#1E40AF}
+.tag.grey{background:#F1F5F9;color:var(--text-secondary)}
+.tag.violet{background:var(--primary-light);color:var(--primary-dark)}
+.dot{width:7px;height:7px;border-radius:50%;display:inline-block}
+.alert{border-radius:var(--radius-md);padding:11px 14px;font-size:13.5px;margin:10px 0;line-height:20px}
+.alert.warn{background:var(--warning-light);color:#92400E}
+.alert.err{background:var(--danger-light);color:#991B1B}
+.alert.info{background:var(--info-light);color:#1E40AF}
+.alert.ok{background:var(--success-light);color:#065F46}
+table.tbl{width:100%;border-collapse:collapse;font-size:13px}
+table.tbl th{text-align:left;color:var(--text-secondary);font-size:11px;text-transform:uppercase;letter-spacing:.4px;font-weight:600;padding:5px 8px;border-bottom:1px solid var(--border)}
+table.tbl td{padding:6px 8px;border-bottom:1px solid var(--surface-variant);vertical-align:middle}
+table.tbl tr:last-child td{border-bottom:none}
+table.tbl tr.rowoff td{background:var(--danger-light)}
+.searchwrap{position:relative}
+.searchwrap input{width:100%;height:46px;border:1.5px solid var(--border);border-radius:var(--radius-md);padding:0 16px;font-size:15px;outline:none}
+.searchwrap input:focus{border-color:var(--primary);box-shadow:0 0 0 3px var(--primary-light)}
+.sresults{position:absolute;top:50px;left:0;right:0;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-md);box-shadow:var(--shadow-lg);z-index:15;overflow:hidden}
+.sresults .ri{display:flex;align-items:center;gap:12px;padding:10px 14px;cursor:pointer;border-bottom:1px solid var(--surface-variant)}
+.sresults .ri:hover,.sresults .ri.sel{background:var(--primary-light)}
+.sresults .empty{padding:14px;color:var(--text-secondary);font-size:13.5px}
+.tiles{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}
+.tile{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-md);padding:10px 12px;cursor:pointer;transition:all .15s ease-out}
+.tile:hover{border-color:var(--primary);box-shadow:var(--shadow-md)}
+.tile .tt{font-weight:600;font-size:13.5px;line-height:18px}
+.tile .td{font-size:11.5px;color:var(--text-secondary);line-height:15px;margin-top:2px}
+.issueinput{width:100%;height:44px;border:1.5px solid var(--border);border-radius:var(--radius-md);padding:0 14px;font-size:14.5px;outline:none;margin-bottom:10px}
+.issueinput:focus{border-color:var(--primary);box-shadow:0 0 0 3px var(--primary-light)}
+.sugg{margin:-2px 0 10px;display:flex;gap:8px;flex-wrap:wrap;align-items:center;font-size:13px;color:var(--text-secondary)}
+.wsgrid{display:grid;grid-template-columns:minmax(0,7fr) minmax(0,5fr);gap:12px;align-items:start}
+@media(max-width:1100px){.wsgrid{grid-template-columns:minmax(0,1fr)}.tiles{grid-template-columns:repeat(2,1fr)}}
+.flowpanel{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);box-shadow:var(--shadow-md);overflow:hidden}
+.flowhead{padding:12px 18px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px;background:var(--surface-variant)}
+.flowbody{padding:18px}
+.flowfoot{padding:8px 18px;border-top:1px solid var(--border);display:flex;align-items:center;gap:12px;font-size:12px;color:var(--text-secondary)}
+.stepdone{display:flex;gap:8px;align-items:center;color:var(--text-secondary);font-size:13px;padding:5px 0;border-bottom:1px dashed var(--surface-variant)}
+.stepdone .tick{color:var(--success);font-weight:700}
+.stepq{font-size:15px;font-weight:600;margin:14px 0 10px}
+.chips{display:flex;flex-wrap:wrap;gap:8px}
+.chip{border:1.5px solid var(--border);background:var(--surface);border-radius:var(--radius-md);padding:9px 16px;font-size:14px;font-weight:500;cursor:pointer;min-height:40px}
+.chip:hover{border-color:var(--primary);color:var(--primary)}
+.chip.sel{border-color:var(--primary);background:var(--primary-light);color:var(--primary-dark);font-weight:600}
+.chip.p1{border-color:var(--danger);color:#991B1B;background:var(--surface);font-weight:600}
+.chip.p1:hover{background:var(--danger-light);border-color:var(--danger);color:#991B1B}
+.chip:disabled,.chip:disabled:hover{opacity:.5;cursor:not-allowed;border-color:var(--border);color:inherit;background:var(--surface)}
+.p1-explainer{font-size:13px;line-height:19px;color:var(--text-secondary);border-left:3px solid var(--danger);padding:6px 12px;margin:12px 0 4px}
+.p1-explainer p{margin:0 0 4px}
+.p1-blocked-note{color:#991B1B;margin:4px 0 8px}
+.zoneread{border:1px solid var(--border);border-radius:var(--radius-md);padding:10px 14px;margin:8px 0;display:flex;align-items:center;gap:14px;flex-wrap:wrap}
+.zoneread .t{font-size:20px;font-weight:700}
+.script{background:var(--surface-variant);border-left:3px solid var(--primary);border-radius:0 var(--radius-md) var(--radius-md) 0;padding:11px 14px;font-size:14px;font-style:italic;margin:10px 0;line-height:21px}
+.reco{border:1.5px solid var(--border);border-radius:var(--radius-lg);padding:16px;margin:12px 0;background:var(--surface-variant)}
+.reco b.hd{display:block;font-size:15px;margin-bottom:6px}
+.outcome{border-radius:var(--radius-lg);padding:16px;margin-top:14px}
+.outcome.applied{background:var(--success-light)}
+.outcome.captured{background:var(--info-light)}
+.outcome.p1{background:var(--urgency-critical-bg);border:1px solid #FECACA}
+.outcome.scope{background:#F1F5F9}
+.outcome.noaction{background:#F1F5F9;border:1px dashed var(--border)}
+.outcome h3{margin-bottom:6px;font-size:15px}
+.outbtns{display:flex;gap:10px;margin-top:12px;flex-wrap:wrap}
+.callsofar{background:var(--surface-variant);border-radius:var(--radius-md);padding:8px 12px;margin-bottom:10px;font-size:13px}
+.overlay{position:fixed;inset:0;background:rgba(15,23,42,.45);z-index:40;display:flex;align-items:center;justify-content:center;padding:20px}
+.modal{background:var(--surface);border-radius:var(--radius-lg);box-shadow:var(--shadow-lg);width:520px;max-width:100%;max-height:92vh;overflow:auto}
+.modal .mh{padding:16px 20px;border-bottom:1px solid var(--border);font-weight:600;font-size:16px;display:flex;justify-content:space-between;align-items:center}
+.modal .mb{padding:20px}
+.modal .mf{padding:14px 20px;border-top:1px solid var(--border);display:flex;justify-content:flex-end;gap:10px}
+.target{background:var(--surface-variant);border:1px solid var(--border);border-radius:var(--radius-md);padding:10px 14px;margin-bottom:16px;font-size:13.5px}
+/* B0/R0 · C9 — site identity is the most prominent element of the confirm target */
+.target-identity .target-name,.target .target-name{font-size:22px;font-weight:700;line-height:1.2;display:block}
+.target-tech{font-size:12.5px;color:var(--text-disabled);margin-top:4px}
+.target-identity.unverified .target-name{font-size:15px;font-weight:600}
+.muted{color:var(--text-disabled)}
+.stepper{display:flex;align-items:center;gap:14px;justify-content:center;margin:14px 0 6px}
+.stepper button{width:48px;height:48px;border-radius:var(--radius-md);border:1.5px solid var(--border);background:var(--surface);font-size:22px;font-weight:700;color:var(--primary)}
+.stepper button:hover{border-color:var(--primary)}
+.stepper button:disabled{color:var(--text-disabled)}
+.stepper .val{font-size:34px;font-weight:700;min-width:110px;text-align:center}
+.guard{text-align:center;font-size:12.5px;color:var(--text-secondary)}
+.syncsteps{display:flex;align-items:center;gap:8px;margin:16px 0}
+.ss{flex:1;text-align:center;padding:10px 6px;border-radius:var(--radius-md);background:var(--surface-variant);font-size:12.5px;font-weight:600;color:var(--text-disabled)}
+.ss.on{background:var(--primary-light);color:var(--primary-dark)}
+.ss.ok{background:var(--success-light);color:#065F46}
+.ss.bad{background:var(--danger-light);color:#991B1B}
+.ss.wait{animation:pulse 1.2s ease-in-out infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.55}}
+.drawer{position:fixed;top:0;right:0;bottom:0;width:480px;max-width:95vw;background:var(--surface);box-shadow:var(--shadow-lg);z-index:45;display:flex;flex-direction:column}
+.drawer .dh{padding:16px 20px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;font-weight:600}
+.drawer .db{padding:20px;overflow:auto;flex:1}
+.timeline{border-left:2px solid var(--border);margin-left:6px;padding-left:16px}
+.tlitem{position:relative;padding-bottom:14px}
+.tlitem:before{content:'';position:absolute;left:-21px;top:5px;width:8px;height:8px;border-radius:50%;background:var(--primary)}
+.tlitem .tw{font-size:11.5px;color:var(--text-disabled)}
+#toasts{position:fixed;top:16px;right:16px;z-index:60;display:flex;flex-direction:column;gap:8px}
+.toast{background:var(--surface);border:1px solid var(--border);border-left:4px solid var(--success);border-radius:var(--radius-md);box-shadow:var(--shadow-lg);padding:12px 16px;font-size:13.5px;min-width:280px;animation:slidein .2s ease-out}
+@keyframes slidein{from{transform:translateX(30px);opacity:0}to{transform:none;opacity:1}}
+.tabs{display:flex;gap:4px;border-bottom:1px solid var(--border);margin-bottom:14px}
+.tabs button{border:none;background:none;padding:9px 14px;font-size:14px;font-weight:500;color:var(--text-secondary);border-bottom:2px solid transparent}
+.tabs button.on{color:var(--primary);border-bottom-color:var(--primary);font-weight:600}
+.tabs .cnt{background:var(--surface-variant);border-radius:9px;padding:0 6px;font-size:11.5px;margin-left:5px}
+.sw{position:relative;width:40px;height:22px;border-radius:11px;background:#CBD5E1;border:none;transition:background .15s}
+.sw.on{background:var(--success)}
+.sw.off{background:var(--danger)}
+.sw:after{content:'';position:absolute;top:2px;left:2px;width:18px;height:18px;border-radius:50%;background:#fff;transition:left .15s}
+.sw.on:after{left:20px}
+.formrow{margin-bottom:12px}
+.formrow label{display:block;font-size:12.5px;font-weight:600;margin-bottom:4px;color:var(--text-secondary)}
+.formrow input,.formrow textarea,.formrow select{width:100%;border:1.5px solid var(--border);border-radius:var(--radius-sm);padding:8px 10px;outline:none}
+.formrow input:focus,.formrow textarea:focus{border-color:var(--primary)}
+.scopelist li{list-style:none;display:flex;justify-content:space-between;align-items:center;padding:4px 0;border-bottom:1px solid var(--surface-variant);font-size:13px}
+@media(max-width:900px){
+  .sidebar{width:100%;height:56px;bottom:0;top:auto;flex-direction:row;align-items:center}
+  .sidebar .brand,.sidebar .foot{display:none}
+  .nav{display:flex;padding:6px;flex:1}
+  .main{margin-left:0;padding-bottom:64px}
+  .wsgrid{grid-template-columns:minmax(0,1fr)}
+  .modal{width:100%;max-height:100vh;border-radius:0}
+}
+
+:root{--notes-accent:#C7D2FE}
+.mk-wrap{max-width:1180px;margin:0 auto;padding:16px}
+.mk-nav{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 10px}
+.mk-nav button{border:1px solid var(--border);background:var(--surface);border-radius:999px;padding:5px 12px;cursor:pointer;font:inherit;font-size:13px}
+.mk-nav button.on{background:var(--primary);color:#fff;border-color:var(--primary)}
+.mk-note{font-size:12.5px;color:var(--text-secondary);margin:4px 0 12px}
+.mk-switch{display:flex;gap:14px;flex-wrap:wrap;align-items:center;font-size:13px;margin:0 0 12px;color:var(--text-secondary)}
+.mk-switch label{display:flex;gap:6px;align-items:center;cursor:pointer}
+.mk-flow{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);overflow:hidden}
+.mk-flowhead{display:flex;align-items:center;gap:8px;padding:10px 18px;border-bottom:1px solid var(--border);background:var(--surface-variant)}
+.mk-flowbody{padding:18px}
+.mk-flowfoot{padding:8px 18px;border-top:1px solid var(--border);font-size:12px;color:var(--text-secondary);display:flex}
+.say{background:var(--primary-light);border-left:4px solid var(--primary);border-radius:var(--radius-sm);padding:10px 12px;margin:10px 0;color:var(--text-primary)}
+.say .lbl{display:block;font-size:12.5px;font-weight:600;color:var(--primary-dark);margin-bottom:4px}
+.gtk{margin:10px 0;color:var(--text-secondary)}
+.gtk .lbl{display:block;font-size:12.5px;font-weight:600;margin-bottom:2px}
+.autolog{background:#F1F5F9;border:1px solid var(--border);border-radius:var(--radius-sm);padding:8px 12px;margin:10px 0}
+.hb{display:flex;flex-direction:column;gap:6px;margin:0 0 10px}
+.hb .row{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.hb .row .txt{flex:1;min-width:220px}
+.zrow{padding:6px 0;border-bottom:1px solid var(--border)}
+.zrow:last-child{border-bottom:0}
+.wrapup dl{margin:0}
+.wrapup dt{font-size:12.5px;font-weight:600;color:var(--text-secondary);margin-top:10px}
+.wrapup dd{margin:2px 0 0}
+.wrapup ul{margin:2px 0 0 18px;padding:0}
+.notes-group{background:var(--surface-variant);border:1px solid var(--border);border-left:3px solid var(--notes-accent);border-radius:var(--radius-md);padding:10px 12px;margin-top:12px}
+.notes-label{display:block;font-size:12.5px;font-weight:600;color:var(--text-secondary);margin-bottom:6px}
+.notes-input{width:100%;box-sizing:border-box;font-size:14px;line-height:22px;padding:8px 10px;border:1.5px solid var(--border);border-radius:var(--radius-sm);background:var(--surface);resize:vertical;outline:none}
+.notes-input::placeholder{color:var(--text-disabled)}
+.notes-input:focus{border-color:var(--primary);box-shadow:0 0 0 3px var(--primary-light)}
+.notes-meta{display:flex;justify-content:space-between;align-items:center;margin-top:4px}
+.mk-cmp{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.mk-cmp h4{margin:0 0 6px;font-size:13px;color:var(--text-secondary)}
+.callsofar{font-size:12.5px;color:var(--text-secondary);margin:0 0 10px}
+button[disabled]{opacity:.45;cursor:not-allowed}
+@media (max-width:760px){.wsgrid{grid-template-columns:1fr!important}.notes-input{font-size:16px}.mk-cmp{grid-template-columns:1fr}}
+body{padding-top:var(--proto-h,0px)}
+.topbar{top:var(--proto-h,0px)}
+@media(min-width:901px){.sidebar{top:var(--proto-h,0px)}}
+#proto.min .mk-nav,#proto.min .mk-switch,#proto.min .pdesc{display:none}
+#proto .ptog{float:right;background:#334155;color:#fff;border:0;border-radius:6px;padding:3px 10px;cursor:pointer;font:inherit;font-size:12px}
+
+#proto{position:fixed;top:0;left:0;right:0;z-index:60;max-height:45vh;overflow:auto;background:#0F172A;color:#E2E8F0;padding:8px 12px;font-size:12.5px}#proto .mk-nav button{background:#1E293B;color:#E2E8F0;border-color:#334155}#proto .mk-nav button.on{background:var(--primary);border-color:var(--primary)}#proto .mk-switch{color:#CBD5E1;margin:4px 0 0}#proto b{color:#fff}
+</style>
+</head>
+<body><div id="proto"><button class="ptog" onclick="var p=document.getElementById('proto');p.classList.toggle('min');this.textContent=p.classList.contains('min')?'Show scenarios':'Hide';protoH()">Hide</button><b>OOHDASH-144 prototype</b><span class="pdesc"> — the real OOH Dashboard screens (captured from the app) with the new pub heating design inside. Example data; ticket numbers are examples; nothing talks to a server.</span><div class="mk-nav" id="proto-nav" style="margin-top:6px"></div><div class="mk-switch"><label><input type="checkbox" id="sw-tt" checked onchange="S.tt=this.checked;render()"> Timetable readable (same every day: 21°C from 06:30, 15°C from 23:00)</label><label><input type="checkbox" id="sw-at" checked onchange="S.autoOk=this.checked;render()"> Automatic ticket succeeded</label></div></div>
+<div id="app">
+ <div class="sidebar">
+  <div class="brand">OOH Dashboard<small>Lighthouse out-of-hours support</small></div>
+  <div class="nav">
+   <button data-testid="nav-home" class="active" onclick="go('home')">📞 New Call</button>
+   <button data-testid="nav-callback" class="" onclick="go('callback')">↩️ Callback Lookup</button>
+   <button data-testid="nav-tonight" class="" onclick="go('tonight')">🌙 Tonight</button>
+   
+  </div>
+  <div class="foot">
+   <div class="opchip"><div class="avatar">SO</div>
+    <div><div class="nm" data-testid="operator-name">Sam Okafor</div><div class="rl">OOH Handler · signed in via SSO</div></div></div>
+   <button class="btn link" style="padding:2px 0" onclick="signOut()">Sign out</button>
+  </div>
+ </div>
+ <div class="main">
+  <div class="topbar">
+   <span class="ctx">Black Bull · <span class="mono">7639</span></span>
+   <span class="ver">Prototype · OOHDASH-144</span>
+  </div>
+  
+  
+  
+  <div id="view"><div class="content"><div class="wsgrid">
+  <div>
+   <div class="card" style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;padding:14px 18px">
+    <div><h2 style="display:inline">Black Bull</h2> <span class="mono">7639</span><div class="sub">Catering &amp; Bars · Front Street, Corbridge</div></div>
+    
+    <button class="btn link" style="margin-left:auto" onclick="endCall()">End call</button>
+   </div>
+   
+   
+   
+   
+   <div class="card">
+   
+   <h3>What is the caller reporting?</h3>
+   <input class="issueinput" id="iq" data-testid="smart-entry" placeholder="Type it in the caller’s words — e.g. “pub is freezing”, “no power in the kitchen”…" autocomplete="off" oninput="issueSearch(this.value)">
+   <div class="sugg" id="isugg"></div>
+   <div class="tiles" data-testid="category-tiles"><div class="tile" data-testid="tile-heating" onclick="startTileFlow('heating')"><div class="tt">🌡️ Heating</div><div class="td">Too cold, too hot, turn it off, not working</div></div><div class="tile" data-testid="tile-hotwater" onclick="startTileFlow('hotwater')"><div class="tt">🚿 Hot water</div><div class="td">None, not enough, too hot</div></div><div class="tile" data-testid="tile-kitchen" onclick="startTileFlow('kitchen')"><div class="tt">🍳 Kitchen equipment</div><div class="td">Fryers, grills, glasswashers off / turning off</div></div><div class="tile" data-testid="tile-lighting" onclick="startTileFlow('lighting')"><div class="tt">💡 External lighting</div><div class="td">Outside / car park lights</div></div><div class="tile" data-testid="tile-fan" onclick="startTileFlow('fan')"><div class="tt">🌀 Extractor fans</div><div class="td">Fans on/off or wrong times</div></div><div class="tile" data-testid="tile-fridge" onclick="startTileFlow('fridge')"><div class="tt">🧊 Fridges &amp; freezers</div><div class="td">Temperature alarms, not cooling</div></div><div class="tile" data-testid="tile-contractor" onclick="startTileFlow('contractor')"><div class="tt">🧰 Contractor on site</div><div class="td">Engineer needs Lighthouse info now</div></div><div class="tile" data-testid="tile-other" onclick="startTileFlow('other')"><div class="tt">✍️ Something else / not sure</div><div class="td">Describe it in the caller’s words</div></div></div></div>
+  </div>
+  <div>
+   <div class="card tight"><h3>What Lighthouse controls at this site</h3><ul class="scopelist" data-testid="scope-list">
+    <li><span>Heating</span><span class="tag grey">Monitored only</span></li><li><span style="color:var(--text-disabled)">Hot water</span><span class="tag grey">Not controllable here</span></li><li><span style="color:var(--text-disabled)">Kitchen equipment</span><span class="tag grey">Not on Lighthouse here</span></li><li><span style="color:var(--text-disabled)">External lighting</span><span class="tag grey">Not on Lighthouse here</span></li><li><span style="color:var(--text-disabled)">Extractor fans</span><span class="tag grey">Not on Lighthouse here</span></li>
+   </ul><p class="small" style="margin-top:6px">Live from the device inventory — use it to answer “isn’t that you?”</p></div>
+   <div class="card tight"><h3>Open tickets for this site</h3><p class="small">No tickets in the last 90 days.</p></div>
+  </div></div></div></div>
+ </div></div>
+<div id="toasts"></div>
+<div id="modalroot"></div>
+<!-- Cache-busting querystring MUST be bumped with the version on every deploy -->
+
+
+
+
+
+
+
+
+<script>
+var S = {};
+var TKT = 48213, TKT_NEW = 48219;
+var SCEN = [
+ ['site','1. Site page: we changed the heating earlier'],
+ ['intercept','2. Heating questions: heating already changed'],
+ ['cold','3. Too cold: turn heating on (2 zones)'],
+ ['hot','4. Too hot: turn heating off (until next due on)'],
+ ['partial','5. Turn on: one zone didn’t respond'],
+ ['pb-ended','6. Put back: already finished'],
+ ['pb-pending','7. Put back: controls not confirmed yet'],
+ ['pb-hand','8. Put back: changed by hand since'],
+ ['cards','9. Every heating answer card'],
+ ['noaction','10. No further action: Check and log'],
+ ['notes','11. Notes box: before and after'],
+ ['refresh','12. Check and log after a page refresh']
+];
+function hhmm(h){return h;}
+function zl(z){return 'zone '+(z==='CHZ1'?'1':'2');}
+function Zl(z){return 'Zone '+(z==='CHZ1'?'1':'2');}
+function nextOnClause(){return S.tt?', which next comes on at 06:30':'';}
+function nextOnShort(){return S.tt?' and next comes on at 06:30':'';}
+
+function reset(k){
+ S = {scen:k, tt:S.tt!==false, autoOk:S.autoOk!==false, holds:[], pb:{}, step:'stage1', sel:null, dir:'on', actions:[], issues:[], card:'W6', variant:'btn', logged:null, holdAck:false};
+ if (k==='site'||k==='pb-ended'||k==='pb-pending'||k==='pb-hand'){S.holds=[{id:'h1',zone:'CHZ1',dir:'on',until:'21:30',by:'Jordan',tkt:TKT},{id:'h2',zone:'CHZ2',dir:'off',until:'23:00',by:'Priya',tkt:TKT-4}];S.step='idle';}
+ if (k==='intercept'){S.holds=[{id:'h1',zone:'CHZ1',dir:'on',until:'21:30',by:'Jordan',tkt:TKT}];S.step='stage1';}
+ if (k==='cold'){S.step='card';S.card='W6';S.dir='on';}
+ if (k==='hot'){S.step='card';S.card='W8';S.dir='off';}
+ if (k==='partial'){S.step='result';S.dir='on';S.sel=['CHZ1','CHZ2'];S.partial=true;S.actions=[{t:'20:02',txt:'Turned the heating on, zones 1 and 2, until 21:30',tkt:TKT}];}
+ if (k==='cards'){S.step='cards';}
+ if (k==='noaction'){S.step='card';S.card='W2';}
+ if (k==='notes'){S.step='notes';}
+ if (k==='refresh'){S.holds=[{id:'h1',zone:'CHZ1',dir:'on',until:'21:30',by:'Sam Okafor',tkt:TKT}];S.step='wrap';S.wrapCard='W6';S.wrapKind='capture';S.reconcile=true;S.holdAck=true;}
+ document.getElementById('sw-tt').checked=S.tt; document.getElementById('sw-at').checked=S.autoOk;
+ render();
+}
+
+/* ---------- shared pieces ---------- */
+function say(t){return '<div class="say"><span class="lbl">🗣 Say to the customer</span>“'+t+'”</div>';}
+function gtk(t){return t?'<div class="gtk"><span class="lbl">ℹ Good to know (for you, not the customer)</span>'+t+'</div>':'';}
+function autolog(kind){
+ if(!S.autoOk && kind!=='banner') return '<div class="autolog">📋 We couldn’t log this automatically. It will be logged when you finish.</div>';
+ if(kind==='fail') return '<div class="autolog">📋 We’ve logged this automatically to the IoT helpdesk as ticket <b>#'+TKT+'</b>. The heating controls didn’t respond, so there may be a problem with the equipment or its internet connection.</div>';
+ return '<div class="autolog">📋 We’ve logged this automatically to the IoT helpdesk as ticket <b>#'+TKT+'</b>, because we changed the heating at the pub. Add any notes when you finish.</div>';
+}
+function notesBox(){
+ return '<div class="notes-group"><label class="notes-label" for="mk-notes">📝 Additional notes for the IoT team (optional)</label>'+
+ '<textarea id="mk-notes" class="notes-input" rows="2" maxlength="1000" placeholder="Anything the customer told you that isn’t captured above, e.g. engineer due at 7am" oninput="S.notes=this.value;document.getElementById(\'mk-cnt\').textContent=this.value.length+\' / 1000\'">'+(S.notes||'')+'</textarea>'+
+ '<div class="notes-meta"><span class="small">For the ticket and the IoT team’s morning review. Not sent in urgent P1 texts. Keep it factual, no personal details.</span><span class="small" id="mk-cnt" style="white-space:nowrap;margin-left:8px">'+((S.notes||'').length)+' / 1000</span></div></div>';
+}
+function holdRowText(h){return h.dir==='on'
+ ? '🔥 Pub '+zl(h.zone)+': heating turned <b>on</b> until <b>'+h.until+'</b>, by '+h.by
+ : '❄ Pub '+zl(h.zone)+': heating turned <b>off</b> until <b>'+h.until+'</b>, by '+h.by;}
+
+/* ---------- put back to normal ---------- */
+function pbUi(h){
+ var c=S.pb[h.id];
+ if(!c) return '<button class="btn" data-testid="pb-'+h.zone+'" onclick="S.pb[\''+h.id+'\']=\'confirm\';render()">Put back to normal now</button>';
+ if(c==='confirm') return '<span>Put pub '+zl(h.zone)+' back to its normal timetable now?</span> <button class="btn primary" onclick="doPb(\''+h.id+'\')">Yes, put it back</button> <button class="btn" onclick="delete S.pb[\''+h.id+'\'];render()">Keep it</button>';
+ if(c==='working') return '<span class="small">Putting it back… this can take up to 30 seconds.</span>';
+ return '';
+}
+function doPb(id){
+ S.pb[id]='working';render();
+ setTimeout(function(){
+  var r=S.scen==='pb-ended'?'ended':S.scen==='pb-pending'?'pending':S.scen==='pb-hand'?'hand':'done';
+  S.pb[id]=r;
+  var h=S.holds.filter(function(x){return x.id===id})[0];
+  if(S.step!=='idle' && r!=='ended') S.actions.push({t:'20:14',txt:'Put '+zl(h.zone)+' back to normal',tkt:h.tkt});
+  render();
+  if(r==='ended') setTimeout(function(){S.holds=S.holds.filter(function(x){return x.id!==id});delete S.pb[id];render();},1500);
+ },1000);
+}
+function pbResult(h){
+ var c=S.pb[h.id], dismiss=' <button class="btn" onclick="S.holds=S.holds.filter(function(x){return x.id!==\''+h.id+'\'});delete S.pb[\''+h.id+'\'];render()">Dismiss</button>';
+ if(c==='done') return '<div class="alert ok" style="margin:0">✅ Pub '+zl(h.zone)+' is back to normal'+nextOnShort()+'. Noted on ticket <b>#'+h.tkt+'</b>.'+say('That’s done. Your heating is back on its normal timetable.')+dismiss+'</div>';
+ if(c==='pending') return '<div class="alert info" style="margin:0">⏳ We’ve asked the heating to go back to normal, but the controls haven’t confirmed yet. We’ll keep trying. If the heating doesn’t '+(h.dir==='on'?'switch off':'come back on')+' in the next few minutes, the IoT helpdesk is alerted automatically on ticket <b>#'+h.tkt+'</b>.'+say('I’ve asked the heating to go back to normal. It can take a few minutes.')+'</div>';
+ if(c==='hand') return '<div class="alert warn" style="margin:0">⚠ Someone has changed pub '+zl(h.zone)+' at the heating controls since we did, so we’ve left it as it is. Logged on ticket <b>#'+h.tkt+'</b> for the IoT helpdesk to check.'+dismiss+'</div>';
+ if(c==='ended') return '<div class="alert info" style="margin:0">This had already finished. Refreshing…</div>';
+ return null;
+}
+function banner(){
+ if(!S.holds.length) return '';
+ return '<div class="alert info hb" data-testid="boost-hold-banner"><b>We’ve changed the heating at this site</b>'+S.holds.map(function(h){
+  var r=pbResult(h); if(r) return '<div>'+r+'</div>';
+  return '<div class="row"><span class="txt">'+holdRowText(h)+'</span>'+pbUi(h)+'</div>';
+ }).join('')+'</div>';
+}
+
+/* ---------- heating cards ---------- */
+var CARDS = [
+ ['W1','Can’t see the heating'],['W2','Asking the boiler for heat'],['W3','Part of the pub off'],['W4','Summer setting'],['W5','Switched off by hand'],
+ ['W5H','We turned it off earlier'],['W6','Off on its timetable'],['W7','Room sensor not working'],['W8','Heating on (too hot)'],['W8H','We turned it on earlier (too hot)'],['W9','Already off (too hot)']
+];
+function cardDef(k, btn){
+ var tt=nextOnClause();
+ switch(k){
+ case 'W1': return {h:'We can’t see the pub heating right now', s:'I can’t see your heating controls from here at the moment, so I’ll log it for our team to check first thing.', g:'The heating controls last reported 3 hours ago. Don’t tell the customer whether the heating is on or off.', log:'Pub heating at time of call: couldn’t be checked (heating controls last reported 3 hours ago).'};
+ case 'W2': return {h:'The heating controls are asking the boiler for heat', s:'Our controls are asking your boiler for heat right now, so they’re doing their job. The problem is most likely the boiler itself or the radiators, so please call your heating engineer. I’ll log tonight’s call.', advice:true, log:'Pub heating at time of call: controls asking for heat, all zones on. Likely a boiler or radiator fault; customer advised to call their heating engineer.'};
+ case 'W3': return {h:'Part of the pub heating is off', s: btn?'Part of your heating is switched off at the controls right now. I can turn it on from here for a set time, and then it goes back to its normal timetable'+tt+'. I’ll log it for our team to look at properly.':'Part of your heating is switched off at the controls. I can’t change that from here, so I’ll log it for our team to sort.', g:'If the customer says the cold area is the part that’s already heating, it’s more likely the boiler or radiators, so advise their heating engineer instead.', dir:'on', cand:['CHZ2'], log:'Pub heating at time of call: zone 1 on, zone 2 off.'};
+ case 'W4': return {h:'The heating is switched off for the summer', s:'Your heating controls are still on their summer setting, which keeps the heating off. I can’t change that from here, but I’ll log it so our team can switch it back for you.', log:'Pub heating at time of call: off, controls on their summer setting. Customer needs heating.'};
+ case 'W5': return {h:'Someone has switched the heating off at the controls', s: btn?'Part of your heating has been switched off by hand at the controls until 06:00. I can turn it back on from here for a set time. I’ll log it so our team can check why it was switched off.':'Part of your heating has been switched off by hand at the controls. I can’t change it from here, but I’ll log that you need it back on so our team can sort it.', g: btn?'Someone at the pub or an engineer may have done this on purpose, so check with the customer before turning it back on.':'', dir:'on', cand:['CHZ2'], log:'Pub heating at time of call: zone 2 switched off by hand at the controls until 06:00. Customer needs heat.'};
+ case 'W5H': return {h:'We turned this heating off earlier', s:'We turned that part of your heating off earlier, until 23:00. I can put it back to normal now, so it follows its usual timetable again.', hold:{id:'c2',zone:'CHZ2',dir:'off',until:'23:00',by:'Priya',tkt:TKT-4}, log:'Pub heating at time of call: zone 2 turned off by OOH until 23:00.'};
+ case 'W6': return {h:'The heating is off on its timetable', s: btn?'Your heating is off on its normal timetable right now'+(S.tt?' and is next due on at 06:30':'')+'. I can turn it on from here for a set time if you need it. I’ll log the call.':'Your heating is off on its normal timetable right now'+(S.tt?' and is next due on at 06:30':'')+'. I can’t turn it on from here, so I’ll log it for our team.', g: S.tt?'At 06:30 it heats the pub to 21°C, and only comes on if the room is cooler than that.':'', dir:'on', cand:['CHZ1','CHZ2'], log:'Pub heating at time of call: off on its timetable'+(S.tt?' (next on 06:30, 21°C)':'')+'. Customer cold.'};
+ case 'W7': return {h:'The heating is running on a simple timer', s:'Your heating is running, but on a simple timer because one of the room temperature sensors isn’t working, so it may feel cooler than normal. I’ll log it for our team to fix the sensor.', log:'Pub heating at time of call: zone 1 on a simple timer, room temperature sensor not reporting.'};
+ case 'W8': return {h:'The heating is on', s: btn?'Your heating is on at the controls right now. I can turn it off from here for a set time, and then it goes back to its normal timetable'+tt+'. I’ll log the call.':'Your heating is on at the controls and I can’t change it from here tonight. Turning the radiators down will help in the meantime. I’ll log it for our team.', dir:'off', cand:['CHZ1','CHZ2'], log:'Pub heating at time of call: on (zones 1 and 2). Customer too warm.'};
+ case 'W8H': return {h:'The heating is on', s:'Your heating is on at the controls right now. We turned zone 1 on earlier, until 21:30, and I can put that back to normal now. I can also turn zone 2 off from here for a set time. I’ll log the call.', hold:{id:'c1',zone:'CHZ1',dir:'on',until:'21:30',by:'Jordan',tkt:TKT}, dir:'off', cand:['CHZ2'], log:'Pub heating at time of call: on (zones 1 and 2; zone 1 turned on by OOH until 21:30). Customer too warm.'};
+ case 'W9': return {h:'The pub heating is already off', s:'Our controls show your pub heating is off right now, so the warmth is coming from somewhere else, perhaps a radiator turned up by hand or another heater. I’ll log the call.', g:'Ask whether a portable heater or the rooms upstairs have heating on.', log:'Pub heating at time of call: off. Customer too warm; heat is not from the pub heating.'};
+ }
+}
+function cardHtml(k, btn){
+ var c=cardDef(k, btn), b='';
+ if(c.hold){var r=pbResult(c.hold); b+= r? '<div style="margin:8px 0">'+r+'</div>' : pbUi(c.hold);}
+ if(c.dir && btn) b+= c.dir==='on'?'<button class="btn primary" data-testid="bp-turn-on" onclick="startTurn(\'on\',\''+c.cand.join(',')+'\')">Turn heating on</button>':'<button class="btn primary" data-testid="bp-turn-off" onclick="startTurn(\'off\',\''+c.cand.join(',')+'\')">Turn heating off</button>';
+ if(S.actions.length) b+='<button class="btn" onclick="S.step=\'stage1\';S.holdAck=true;render()">The customer needs something else</button><button class="btn primary" onclick="goWrap(\''+k+'\',\'action\')">Finish and add notes</button>';
+ else {
+  if(c.advice) b+='<button class="btn'+(c.dir&&btn?'':' primary')+'" onclick="goWrap(\''+k+'\',\'advice\')">Customer will call their heating engineer</button>';
+  b+='<button class="btn'+((c.dir&&btn)||c.advice||c.hold?'':' primary')+'" data-testid="bp-log" onclick="goWrap(\''+k+'\',\'capture\')">Log it for the IoT helpdesk</button><button class="btn" data-testid="bp-nfa" onclick="goWrap(\''+k+'\',\'no-action\')">No further action</button>';
+ }
+ return '<div class="reco" data-testid="reco-boiler-panel"><b class="hd">'+c.h+'</b>'+say(c.s)+gtk(c.g)+'<div class="outbtns">'+b+'</div></div>';
+}
+function startTurn(dir, cand){
+ S.dir=dir; S.cand=cand.split(','); S.sel=null;
+ if(S.cand.length===1){S.sel=S.cand.slice();S.step='dur';} else S.step='zones';
+ render();
+}
+
+/* ---------- steps ---------- */
+function zonesHtml(){
+ var on=S.dir==='on', all=S.sel&&S.sel.length===2;
+ function chip(z){var p=S.sel&&S.sel.length===1&&S.sel[0]===z;return '<button class="chip'+(p?' sel':'')+'" aria-pressed="'+p+'" data-testid="bp-zone-'+z+'" onclick="S.sel=[\''+z+'\'];render()">'+Zl(z)+' only</button>';}
+ return '<div class="reco" data-testid="reco-boost-zones"><b class="hd">Which part of the pub?</b>'+
+ say('Your heating is split into sections, called zones, which were set up with the original pipework. Our system can’t see which rooms each zone covers. Do you know which part of the pub each one heats? If you’re not sure, I’ll turn '+(on?'on':'off')+' all of them.')+
+ '<div class="chips">'+chip('CHZ1')+chip('CHZ2')+'<button class="chip'+(all?' sel':'')+'" aria-pressed="'+all+'" data-testid="bp-zone-all" onclick="S.sel=[\'CHZ1\',\'CHZ2\'];render()">All zones (not sure)</button></div>'+
+ '<div class="outbtns" style="margin-top:12px"><button class="btn primary" data-testid="bp-zones-continue" '+(S.sel?'':'disabled')+' onclick="S.step=\'dur\';render()">Continue</button><button class="btn" onclick="S.step=\'card\';render()">Back</button></div></div>';
+}
+function durHtml(){
+ var on=S.dir==='on', opts;
+ if(on) opts=[['30 minutes','20:32'],['1 hour','21:02'],['2 hours','22:02']];
+ else opts=[['1 hour','21:02'],['2 hours','22:02'], S.tt?['Until 06:30, when it’s next due on','06:30']:['Until 07:00','07:00']];
+ var zs=S.sel.map(zl).join(' and ');
+ return '<div class="reco" data-testid="reco-boost-dur"><b class="hd">Turn the heating '+(on?'on':'off')+' ('+zs+'): how long?</b>'+
+ say(on?'I’ll turn it on now. After that it goes back to its normal timetable'+nextOnClause()+'.':'I’ll turn it off now. After that it goes back to its normal timetable'+nextOnClause()+'.')+
+ (!on&&S.tt?gtk('At 06:30 it heats the pub to 21°C if the room is cooler than that.'):'')+
+ '<div class="chips">'+opts.map(function(o){return '<button class="chip" onclick="send(\''+o[1]+'\')">'+o[0]+'</button>'}).join('')+'</div>'+
+ '<div class="outbtns" style="margin-top:10px"><button class="btn" onclick="S.step=\'card\';render()">Back</button></div></div>';
+}
+function send(until){
+ S.until=until; S.step='sending'; render();
+ setTimeout(function(){
+  S.step='result';
+  S.actions.push({t:'20:02',txt:'Turned the heating '+(S.dir==='on'?'on':'off')+', '+S.sel.map(zl).join(' and ')+', until '+until,tkt:S.autoOk?TKT:null});
+  S.sel.forEach(function(z,i){ if(!(S.partial&&i===1)) S.holds.push({id:'n'+i,zone:z,dir:S.dir,until:until,by:'You',tkt:S.autoOk?TKT:null}); });
+  render();
+ },900);
+}
+function resultHtml(){
+ var on=S.dir==='on', until=S.until||'21:30', rows=S.sel.map(function(z,i){
+  if(S.partial&&i===1) return '<div class="zrow" data-testid="boost-zone-result-'+z+'">❌ '+Zl(z)+': we couldn’t reach the heating controls, so it wasn’t turned '+(on?'on':'off')+'.</div>';
+  return '<div class="zrow" data-testid="boost-zone-result-'+z+'">✅ '+Zl(z)+': '+(on?'on':'off')+' until <b>'+until+'</b></div>';
+ }).join('');
+ if(S.partial && !S.holds.length) S.holds.push({id:'n0',zone:'CHZ1',dir:'on',until:until,by:'You',tkt:S.autoOk?TKT:null});
+ var sayT = S.partial ? 'I’ve turned zone 1 on until '+until+'. I couldn’t reach zone 2, so I’ve logged that for our team.' : 'That’s done. Your heating will be '+(on?'on':'off')+' until '+until+', and then it goes back to its normal timetable'+(S.tt&&until!=='06:30'?nextOnClause():'')+'.';
+ return '<div class="outcome captured" data-testid="outcome-boost"><h3>Heating turned '+(on?'on':'off')+'</h3>'+rows+say(sayT)+autolog(S.partial?'fail':'ok')+
+ '<div class="outbtns"><button class="btn primary" data-testid="bp-finish" onclick="goWrap(\''+(on?'W6':'W8')+'\',\'action\')">Finish and add notes</button></div></div>';
+}
+
+/* ---------- Check and log ---------- */
+function goWrap(card, kind){S.wrapCard=card;S.wrapKind=kind;S.step='wrap';render();}
+function reconcileAdd(){S.reconcile=false;S.actions.push({t:'20:02',txt:'Turned the heating on, zone 1, until 21:30',tkt:TKT});render();}
+function wrapHtml(){
+ var c=cardDef(S.wrapCard, true), existing=null;
+ if(S.reconcile && !S.actions.length){
+  return '<div class="reco wrapup" data-testid="wrap-reconcile"><b class="hd">Check and log</b>'+
+  '<p>We turned the heating on at this site at 20:02 and logged it as ticket <b>#'+TKT+'</b>. Is this the same issue?</p>'+
+  gtk('This page was refreshed, so we can’t tell for sure whether it’s the same issue. If the customer is still talking about the same heating problem, add to the existing ticket.')+
+  '<div class="outbtns"><button class="btn primary" onclick="reconcileAdd()">Add to ticket #'+TKT+' (heating turned on at 20:02)</button><button class="btn" onclick="S.reconcile=false;render()">Log as a new ticket</button></div></div>';
+ }
+ S.actions.forEach(function(a){ if(a.tkt) existing=a.tkt; });
+ var did = S.actions.length ? '<ul>'+S.actions.map(function(a){return '<li>'+a.t+' '+a.txt+(a.tkt?' (logged automatically, ticket #'+a.tkt+')':'')+'</li>'}).join('')+'</ul>' : 'Nothing changed at the pub.';
+ var kindTxt = S.wrapKind==='no-action'?'No further action needed.':S.wrapKind==='advice'?'Customer will call their heating engineer.':S.wrapKind==='capture'?'For the IoT helpdesk to look at on the next working day.':'';
+ var btn = existing ? 'Add to ticket #'+existing+' and finish' : 'Log for the IoT helpdesk and finish';
+ return '<div class="reco wrapup" data-testid="wrap-up"><b class="hd">Check and log</b>'+
+ '<dl><dt>What the customer said</dt><dd>“The bar is freezing”</dd>'+
+ '<dt>What we found</dt><dd>'+c.h+'</dd>'+
+ '<dt>What we did</dt><dd>'+did+'</dd>'+
+ '<dt>What we’ll log</dt><dd>'+c.log+(kindTxt?' '+kindTxt:'')+'</dd></dl>'+
+ notesBox()+
+ '<div class="outbtns" style="margin-top:12px"><button class="btn primary" data-testid="wrap-submit" onclick="S.step=\'logging\';render();setTimeout(function(){S.logged='+(existing||TKT_NEW)+';S.issues.push({label:\''+c.h.replace(/’/g,'')+'\',tkt:S.logged});S.step=\'logged\';render()},900)">'+btn+'</button><button class="btn" onclick="S.step=\'card\';render()">Back</button></div></div>';
+}
+function loggedHtml(){
+ var items=[]; S.actions.forEach(function(a){items.push(a.txt)}); items.push('What the customer said and what we found'); if((S.notes||'').trim()) items.push('Your notes');
+ return '<div class="outcome applied" data-testid="logged"><h3>✅ Logged: ticket #'+S.logged+' is with the IoT helpdesk</h3><p>It contains:</p><ul style="margin:4px 0 0 18px">'+items.map(function(i){return '<li>'+i+'</li>'}).join('')+'</ul></div>'+
+ '<div class="outbtns" style="margin-top:10px"><button class="btn" onclick="reset(\'cold\')">➕ Add another issue</button><button class="btn primary">✔ End call</button></div>';
+}
+
+/* ---------- views ---------- */
+function interceptHtml(){
+ var rows=S.holds.map(function(h){var r=pbResult(h);return '<div class="zrow">'+(r||holdRowText(h)+' &nbsp;'+pbUi(h))+'</div>';}).join('');
+ var h0=S.holds[0];
+ return '<div class="reco" data-testid="reco-boost-hold"><b class="hd">We’ve already changed the heating here</b>'+rows+
+ say('We’ve already turned your heating '+(h0.dir==='on'?'on':'off')+' until '+h0.until+'. After that it goes back to its normal timetable'+nextOnClause()+'.')+
+ '<div class="outbtns">'+(S.actions.length?'<button class="btn" onclick="S.holdAck=true;render()">The customer needs something else</button><button class="btn primary" onclick="goWrap(\'W8\',\'action\')">Finish and add notes</button>':'<button class="btn primary" data-testid="bp-hold-continue" onclick="S.holdAck=true;render()">The customer needs something else</button><button class="btn" onclick="goWrap(\'W6\',\'no-action\')">No further action</button>')+'</div></div>';
+}
+function cardsView(){
+ var k=S.card, c=cardDef(k,true), hasBtn=!!c.dir;
+ var pick='<div class="chips" style="margin-bottom:8px">'+CARDS.map(function(x){return '<button class="chip'+(k===x[0]?' sel':'')+'" onclick="S.card=\''+x[0]+'\';S.variant=\'btn\';S.pb={};render()">'+x[1]+'</button>'}).join('')+'</div>';
+ var vt=(hasBtn&&k!=='W8H')?'<div class="chips" style="margin-bottom:10px"><button class="chip'+(S.variant==='btn'?' sel':'')+'" onclick="S.variant=\'btn\';render()">Turning on/off available</button><button class="chip'+(S.variant==='plain'?' sel':'')+'" onclick="S.variant=\'plain\';render()">Not available at this site</button></div>':'';
+ return pick+vt+cardHtml(k, S.variant==='btn');
+}
+function notesCompare(){
+ var step='<div class="stepq">What does the customer need?</div><div class="chips"><button class="chip">Too cold / not working</button><button class="chip">Too hot / wants it off</button></div>';
+ var old='<div style="margin-top:10px"><label style="display:block;font-size:0.85em;font-weight:600;margin-bottom:4px">Additional notes for the IoT team (optional)</label><textarea rows="2" style="width:100%;box-sizing:border-box;font-size:16px;padding:6px 8px;border:1px solid var(--border,#ccc);border-radius:6px;resize:vertical" placeholder="Anything the caller or site told you that isn’t captured above, e.g. engineer due at 7am"></textarea><div class="small" style="margin-top:3px;color:#666">For the ticket and the IoT team’s morning review. Not sent in urgent P1 texts. Keep it factual, no personal details.</div></div>';
+ return '<p class="mk-note">Same step, notes box as it is today (left) and as designed (right). Click into each to see the focus state. On phone-width screens the new box keeps 16px text so iPhones don’t zoom.</p><div class="mk-cmp"><div><h4>Today</h4><div class="mk-flow"><div class="mk-flowbody">'+step+old+'</div></div></div><div><h4>New</h4><div class="mk-flow"><div class="mk-flowbody">'+step+notesBox()+'</div></div></div></div>';
+}
+function flowBody(){
+ var s=S.step;
+ if(s==='idle') return null;
+ if(s==='notes') return notesCompare();
+ if(s==='area') return '<div class="stepq">Which area is the customer talking about?</div><div class="chips"><button class="chip" onclick="S.step=\'stage1\';render()">Bar/Restaurant</button><button class="chip">Accommodation</button></div>';
+ if(s==='cards') return cardsView();
+ if(s==='stage1'){
+  if(S.holds.length && !S.holdAck) return interceptHtml();
+  return '<div class="stepq">What does the customer need?</div><div class="chips"><button class="chip" onclick="S.step=\'card\';S.card=\'W6\';render()">Too cold / not working</button><button class="chip" onclick="S.step=\'card\';S.card=\'W8H\';render()">Too hot / wants it off</button></div>';
+ }
+ if(s==='card') return cardHtml(S.card, true);
+ if(s==='zones') return zonesHtml();
+ if(s==='dur') return durHtml();
+ if(s==='sending') return '<div class="alert info">Turning the heating '+(S.dir==='on'?'on':'off')+'… this can take up to a minute while the heating controls confirm.</div>';
+ if(s==='result') return resultHtml();
+ if(s==='wrap') return wrapHtml();
+ if(s==='logging') return '<div class="alert info">Logging…</div>';
+ if(s==='logged') return loggedHtml();
+ return '';
+}
+var ENTRY='';
+function startHeating(){S.step='area';S.holdAck=false;render();}
+function render(){
+ document.getElementById('proto-nav').innerHTML=SCEN.map(function(x){return '<button class="'+(S.scen===x[0]?'on':'')+'" onclick="reset(\''+x[0]+'\')">'+x[1]+'</button>'}).join('');
+ document.getElementById('banner').innerHTML=banner();
+ document.getElementById('callsofar').innerHTML=S.issues.length?'<div class="callsofar"><b>This call so far:</b> '+S.issues.map(function(i){return '<span class="tag blue">'+i.label+'</span> <span class="small">#'+i.tkt+'</span>'}).join(' ')+'</div>':'';
+ var body=flowBody(), el=document.getElementById('flow');
+ if(body===null){el.innerHTML=ENTRY;return;}
+ if(S.step==='notes'){el.innerHTML=body;return;}
+ var showNotes=['wrap','logged','logging','sending','cards'].indexOf(S.step)<0;
+ var done='<div class="stepdone"><span>💬</span>Customer’s words: “The bar is freezing”</div>';
+ if(S.step!=='area') done+='<div class="stepdone"><span class="tick">✓</span>Area: <b>Bar/Restaurant</b></div>';
+ if(['card','zones','dur','sending','result','wrap','logging','logged'].indexOf(S.step)>=0) done+='<div class="stepdone"><span class="tick">✓</span>Need: <b>'+((S.card||'').indexOf('W8')===0||S.card==='W9'?'Too hot / wants it off':'Too cold / not working')+'</b></div>';
+ var status=(['stage1','card','cards'].indexOf(S.step)>=0)?'<div class="zoneread"><span class="small">Zone 1 <b class="ok">on</b> · Zone 2 <b class="warn">off</b> · Room 18.7°C · Heating controls last reported just now</span></div>':'';
+ el.innerHTML='<div class="flowpanel" data-testid="flow-panel"><div class="flowhead"><span style="font-size:18px">🌡️</span><b>Heating</b><span class="small" style="margin-left:6px">guided flow</span><button class="btn link" style="margin-left:auto" onclick="reset(\'site\')">Cancel issue</button></div><div class="flowbody">'+
+  done+status+body+(showNotes?notesBox():'')+'</div><div class="flowfoot"><span>You: <b>Sam Okafor</b></span><span style="margin-left:auto">Each issue is logged to a ticket when you finish it</span></div></div>';
+}
+(function boot(){
+ var left=document.querySelector('.wsgrid > div');
+ var entry=left.querySelectorAll('.card')[1];
+ entry.querySelector('h3').textContent='What is the customer reporting?';
+ var iq=entry.querySelector('#iq'); iq.setAttribute('placeholder','Type it in the customer’s words — e.g. “pub is freezing”, “no power in the kitchen”…'); iq.removeAttribute('oninput');
+ entry.querySelectorAll('.tile').forEach(function(t){t.removeAttribute('onclick'); var d=t.querySelector('.td'); if(d) d.textContent=d.textContent.replace('caller’s','customer’s');});
+ entry.querySelector('[data-testid=tile-heating]').setAttribute('onclick','startHeating()');
+ ENTRY=entry.outerHTML; entry.remove();
+ var mk=function(id){var d=document.createElement('div');d.id=id;left.appendChild(d);return d;};
+ mk('callsofar'); mk('banner'); mk('flow');
+ document.querySelectorAll('.scopelist li').forEach(function(li){ if(/Heating/.test(li.textContent)){ li.querySelector('.tag').className='tag green'; li.querySelector('.tag').textContent='Controllable from here'; }});
+ document.querySelectorAll('[onclick]').forEach(function(e){ if(!e.closest('#flow')&&!e.closest('#proto')&&!e.closest('#banner')&&e.getAttribute('onclick').indexOf('startHeating')<0) e.removeAttribute('onclick'); });
+ reset('site');
+ protoH(); window.addEventListener('resize',protoH);
+})();
+function protoH(){document.documentElement.style.setProperty('--proto-h',document.getElementById('proto').offsetHeight+'px');}
+
+</script>
+</body></html>
