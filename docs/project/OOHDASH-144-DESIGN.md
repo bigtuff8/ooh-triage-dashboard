@@ -17,6 +17,9 @@ Every issue now ends the same way: a "Check and log" step. It lists what the cus
 SECTION: Keeping it to one ticket in the awkward cases
 The design panel asked about three edge cases; each now has an answer. If a different agent finishes the issue, for example after a handover, they can still add to the same ticket as long as they have confirmed the same site on their call; the ticket records who added it. If the agent turns the heating on or off a second time in the same issue, that second change is added to the issue's existing ticket, not logged on a new one. If the automatic ticket failed and the heating already went back to normal before the agent finished, Check and log writes what happened at the switch-back into the new ticket, so nothing is lost.
 
+SECTION: If the page is refreshed mid-issue
+The one-ticket rule must not depend on the browser remembering things. Three safeguards. First, the list of what was done in the issue is saved in the browser tab the same way the notes draft already is, so a refresh keeps it. Second, if it is lost anyway (a new tab or a sign-out) and the agent finishes an issue while a timer we started in the last hour is still running at that site, Check and log asks plainly: "Add to ticket #48213 (heating turned on at 20:02)" or "Log as a new ticket". The agent chooses; nothing is merged silently. Third, the server refuses to create a new ticket for a timer that already has one, and adds to that ticket instead.
+
 SECTION: Telling the agent when we logged something automatically
 Changing the heating logs a ticket straight away, so the automatic switch-back later can write its result onto it. The screen now says so plainly, with the number: "We've logged this automatically to the IoT helpdesk as ticket #48213, because we changed the heating at the pub." If the heating controls don't respond, it adds the reason: "there may be a problem with the equipment or its internet connection." If the automatic ticket could not be made, the screen never claims it was. It says "We couldn't log this automatically. It will be logged when you finish," and Check and log then creates it and links it to the timer.
 
@@ -270,6 +273,17 @@ The `no-action` type keeps creating a ticket (today's behaviour, now always with
 
 `POST /api/boiler-boost` accepts optional `appendToHoldId` + `confirmToken`, validated exactly as §9.2. When valid, `dispatchBoilerBoost` does not call `createBoostTicket`. Instead it adds an internal comment `[OOH Boost]` with the same content to `doc.ticketId` (new `zendesk.addBoostActionNote(ticketId, ...)`), and sets that `ticketId` on the new holds. The browser sends it whenever `f.data.actions` already holds a `ticketId`. So one issue always has at most one ticket, and "Add to ticket #N" is unambiguous (design-panel finding). This is the one `control.js` change in 144.
 
+### 9.2b Resilience and accepted risks (design-panel round 3)
+
+| Risk | Answer |
+|---|---|
+| Refresh or re-entry loses `f.data.actions` and breaks one-ticket-per-issue | (1) `f.data.actions` and `f.data.wrapKind` persist to `sessionStorage` under the existing notes-draft key family (`notesDraft*` pattern, cleared on successful log or End call). (2) **Reconcile on Check and log:** if the issue has no `ticketId` and `ws.activeBoostHolds` has a timer at this site with a `ticketId`, `createdBy === me`, created within the last 60 min, show a two-button choice: `Add to ticket #N (heating turned on at HH:MM)` / `Log as a new ticket`. (3) **Server backstop:** on the create path, any `holdIds[]` entry whose hold already has a `ticketId` switches the request to append on that ticket (response `appended: true`). Test WR-7, BB-E25 (refresh mid-issue). |
+| Notes typed before finishing are only in the browser | They persist in `sessionStorage` (OOHDASH-119 autosave, unchanged) and are always sent at Check and log. Before 144, notes after a turn-on had no route at all; now they always do. A browser crash before finishing loses them, as with every flow today (accepted). |
+| Concurrent appends to one ticket | Zendesk comments are additive, so no data is lost. The client's existing `_pend_` guard stops double-clicks. The server dedupes the same `(holdId, issue key)` within 60 s (idempotency key from the client). |
+| Handover append could merge two separate same-site issues into one ticket | **Accepted bet.** Only reachable when the second agent's own issue carries `appendToHoldId`, or the agent explicitly picks "Add to ticket #N" in the reconcile choice. The appended comment starts "Added by [agent] at HH:MM", visible in Zendesk and the IoT Support Dashboard. |
+| Free text (customer words, notes) rendered or stored | Rendered via the existing `esc()` on every sink in Check and log and the logged banner. Zendesk comments are sent as plain text (`comment.body`, not `html_body`). Retention follows the existing Zendesk policy (no new category or destination). Deletion path: out of scope, noted for compliance. |
+| ACR `latest` still holds the broken v1.5.3 | The v1.5.4 hotfix release step **retags `latest`** to the released image, and the release gate checklist requires the deployed tag to equal the release tag (never `latest`). Until then it is an explicitly accepted risk, recorded here and in the hotfix release gate. |
+
 ### 9.3 Telling the agent we logged automatically (`.autolog`)
 
 A blue-grey box with "📋" appears on the result card and in Check and log:
@@ -354,6 +368,7 @@ The header is "Heating turned on" / "Heating turned off". One row per zone (`boo
 | WR-1 | `/outcomes` with `appendToHoldId` (same site + creator + ticket) → appends, returns the same id, creates no ticket |
 | WR-2 | `appendToHoldId` for another site, an unconfirmed site, or a hold older than 12 h → 409 `append-refused`, nothing written; a different agent with the site confirmed → appends (handover) |
 | WR-5 | second `/boiler-boost` in one issue with `appendToHoldId` → no new ticket; `[OOH Boost]` comment on the existing ticket; new holds carry its id |
+| WR-7 | create path with a `holdIds[]` entry that already has a `ticketId` → appends to it, no new ticket |
 | WR-6 | create path with a hold that already finished → its switch-back result is written into the new ticket’s first comment |
 | WR-3 | create path with `holdIds` → `attachTicketToOverride` called for holds lacking a ticket |
 | WR-4 | `no-action` always has a non-empty `detail` |
@@ -378,6 +393,7 @@ The header is "Heating turned on" / "Heating turned off". One row per zone (`boo
 | BB-E21 | Check and log with no action → `Log for the IoT helpdesk and finish` → new ticket number shown |
 | BB-E22 | after any action, no "No further action"/"End with no action" is shown |
 | BB-E23 | off duration shows "Until HH:MM, when it's next due on" with an every-day fixture; "Until 07:00" otherwise |
+| BB-E25 | refresh mid-issue after turning heating on → Check and log still shows `Add to ticket #N and finish`; with `sessionStorage` cleared → reconcile choice is shown |
 | BB-E24 | timetable sentence present with an every-day fixture, absent otherwise |
 
 ## 13a. Data dictionary (new and changed fields)

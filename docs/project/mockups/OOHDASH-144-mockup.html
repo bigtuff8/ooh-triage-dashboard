@@ -306,7 +306,8 @@ var SCEN = [
  ['pb-hand','8. Put back: changed by hand since'],
  ['cards','9. Every heating answer card'],
  ['noaction','10. No further action: Check and log'],
- ['notes','11. Notes box: before and after']
+ ['notes','11. Notes box: before and after'],
+ ['refresh','12. Check and log after a page refresh']
 ];
 function hhmm(h){return h;}
 function zl(z){return 'zone '+(z==='CHZ1'?'1':'2');}
@@ -324,6 +325,7 @@ function reset(k){
  if (k==='cards'){S.step='cards';}
  if (k==='noaction'){S.step='card';S.card='W2';}
  if (k==='notes'){S.step='notes';}
+ if (k==='refresh'){S.holds=[{id:'h1',zone:'CHZ1',dir:'on',until:'21:30',by:'Sam Okafor',tkt:TKT}];S.step='wrap';S.wrapCard='W6';S.wrapKind='capture';S.reconcile=true;S.holdAck=true;}
  document.getElementById('sw-tt').checked=S.tt; document.getElementById('sw-at').checked=S.autoOk;
  render();
 }
@@ -460,8 +462,15 @@ function resultHtml(){
 
 /* ---------- Check and log ---------- */
 function goWrap(card, kind){S.wrapCard=card;S.wrapKind=kind;S.step='wrap';render();}
+function reconcileAdd(){S.reconcile=false;S.actions.push({t:'20:02',txt:'Turned the heating on, zone 1, until 21:30',tkt:TKT});render();}
 function wrapHtml(){
  var c=cardDef(S.wrapCard, true), existing=null;
+ if(S.reconcile && !S.actions.length){
+  return '<div class="reco wrapup" data-testid="wrap-reconcile"><b class="hd">Check and log</b>'+
+  '<p>We turned the heating on at this site at 20:02 and logged it as ticket <b>#'+TKT+'</b>. Is this the same issue?</p>'+
+  gtk('This page was refreshed, so we can’t tell for sure whether it’s the same issue. If the customer is still talking about the same heating problem, add to the existing ticket.')+
+  '<div class="outbtns"><button class="btn primary" onclick="reconcileAdd()">Add to ticket #'+TKT+' (heating turned on at 20:02)</button><button class="btn" onclick="S.reconcile=false;render()">Log as a new ticket</button></div></div>';
+ }
  S.actions.forEach(function(a){ if(a.tkt) existing=a.tkt; });
  var did = S.actions.length ? '<ul>'+S.actions.map(function(a){return '<li>'+a.t+' '+a.txt+(a.tkt?' (logged automatically, ticket #'+a.tkt+')':'')+'</li>'}).join('')+'</ul>' : 'Nothing changed at the pub.';
  var kindTxt = S.wrapKind==='no-action'?'No further action needed.':S.wrapKind==='advice'?'Customer will call their heating engineer.':S.wrapKind==='capture'?'For the IoT helpdesk to look at on the next working day.':'';
