@@ -1,0 +1,21 @@
+{
+  "run": "selfgate-ooh-triage-dashboard-preflight-v154-test",
+  "phase": "test",
+  "pr": 155,
+  "approvedBy": [
+    "bigtuff8"
+  ],
+  "reviewComments": [
+    "bigtuff8: - Approve this hotfix for release?: Approve — release to production\n\n(submitted via the interactive gate review)\n\n<!-- gate:selected [{\"question\":\"Approve this hotfix for release?\",\"answer\":\"Approve — release to production\"}] -->"
+  ],
+  "mergeCommit": "e507379bc1f2ce7454e71ad0063ccef89145f65c",
+  "phaseBranch": "preflight/v154-test",
+  "releaseBranch": "main",
+  "stamp": 1792935424651,
+  "selectedOptions": [
+    {
+      "question": "Approve this hotfix for release?",
+      "answer": "Approve — release to production"
+    }
+  ]
+}
