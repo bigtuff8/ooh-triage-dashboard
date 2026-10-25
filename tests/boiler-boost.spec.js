@@ -267,6 +267,41 @@ test.describe('OOHDASH-141 boiler boost e2e', () => {
  *
  * BB-C3: after page refresh, the wrapup still offers "Add to ticket" and completes (handover-safe).
  */
+/**
+ * Compute the expected revertAt time string (HH:MM London) for a boost-off until-next-on
+ * on site 9010 (CHZ1 schedule: on at 06:30 every day, loops=1111111).
+ *
+ * Replicates the clampBoostWindow 15-min / 11-h rule deterministically so the assertion
+ * is correct at any time of day. London is UTC+0 (GMT) or UTC+1 (BST), so 06:30 London
+ * falls at UTC hours 05:30 (BST) or 06:30 (GMT).
+ *
+ * Returns '06:30' when next-06:30 London is within [15 min, 11 h] of nowMs,
+ * otherwise '07:00' (valid clamp fallback for out-of-range nextOnMs).
+ */
+function expectedUntilNextOnTime(nowMs) {
+    const MIN_MS = 15 * 60 * 1000;      // 15 minutes (UNTIL_NEXT_ON minimum)
+    const MAX_MS = 11 * 60 * 60 * 1000; // 11 hours  (UNTIL_NEXT_ON_MAX_MS)
+    const tz = 'Europe/London';
+    // Check today + next 2 days to find the first London 06:30 after nowMs.
+    // London offset is at most +1h from UTC, so probing UTC hours 5, 6, 7 with :30 covers both BST and GMT.
+    for (let daysAhead = 0; daysAhead <= 2; daysAhead++) {
+        const probe = new Date(nowMs + daysAhead * 86400000);
+        const dateStr = probe.toLocaleDateString('en-CA', { timeZone: tz }); // 'YYYY-MM-DD'
+        for (const utcHour of [5, 6, 7]) {
+            const candidate = new Date(`${dateStr}T${String(utcHour).padStart(2, '0')}:30:00Z`).getTime();
+            if (candidate <= nowMs) continue;
+            const localTime = new Date(candidate).toLocaleTimeString('en-GB', {
+                timeZone: tz, hour: '2-digit', minute: '2-digit'
+            });
+            if (localTime === '06:30') {
+                const diff = candidate - nowMs;
+                return (diff >= MIN_MS && diff <= MAX_MS) ? '06:30' : '07:00';
+            }
+        }
+    }
+    return '07:00'; // safety: should never reach here
+}
+
 test.describe('OOHDASH-144 fix tests — C1 and C2', () => {
     test.beforeEach(async ({ page, request }) => {
         for (const site of FIXTURE_SITES) {
@@ -288,9 +323,11 @@ test.describe('OOHDASH-144 fix tests — C1 and C2', () => {
         const { confirmToken } = await confirmResp.json();
         expect(confirmToken, 'confirmToken must be returned by confirm endpoint').toBeTruthy();
 
+        // Snapshot nowMs before the request so expectedUntilNextOnTime uses the same window
+        // as the server (both will be in the same 15-min/11-h window — requests take < 1 s).
+        const nowMs = Date.now();
+
         // POST to /api/boiler-boost with durationKey 'until-next-on'.
-        // Expected: 200 with action.revertAtMs set.
-        // Before C1 fix: 422 "durationKey until-next-on not in off menu".
         const resp = await page.request.post('/api/boiler-boost', {
             data: {
                 siteNo: '9010',
@@ -301,25 +338,25 @@ test.describe('OOHDASH-144 fix tests — C1 and C2', () => {
                 durationKey: 'until-next-on'
             }
         });
-        // The server must accept it (not 422).
         expect(resp.status(), 'until-next-on must be accepted (not 422 off-menu rejection)').not.toBe(422);
         expect([200, 201]).toContain(resp.status());
         const body = await resp.json();
-        // Warnings path (zone already forced) is also acceptable — the key was accepted.
-        // In either case, assert the revertAtMs (if present) reflects the timetable (06:30),
-        // not the 07:00 fallback — proving the C1 fixture enrichment propagated to the control path.
-        if (!body.warnings) {
-            expect(body.action, 'action must be present on success').toBeTruthy();
-            const revertAtMs = body.action.revertAtMs;
-            expect(revertAtMs, 'revertAtMs must be set').toBeTruthy();
-            // Site 9010 CHZ1/CHZ2 schedule: on at 06:30 every day. The until-next-on key must
-            // resolve to 06:30 London time, NOT the 07:00 fallback.
-            // (C1 fix: fixture mode now enriches zones with timetable before the control path reads them.)
-            const revertTime = new Date(revertAtMs).toLocaleTimeString('en-GB', {
-                hour: '2-digit', minute: '2-digit', timeZone: 'Europe/London'
-            });
-            expect(revertTime, 'revertAtMs must be at 06:30 (timetable nextOn) not 07:00 (fallback)').toBe('06:30');
-        }
+        // beforeEach cancels all active holds, so the warnings path must not trigger.
+        expect(body.warnings, 'beforeEach reset holds — warnings path must not trigger').toBeFalsy();
+        expect(body.action, 'action must be present on success').toBeTruthy();
+        const revertAtMs = body.action.revertAtMs;
+        expect(revertAtMs, 'revertAtMs must be set').toBeTruthy();
+
+        // Deterministic assertion: compute what the server SHOULD return based on current London
+        // time and the same 15-min/11-h window rule as clampBoostWindow.
+        // Site 9010 CHZ1 schedule: on at 06:30 every day.
+        //   '06:30' → nextOn in range → C1 fix works (fixture zones now carry timetable)
+        //   '07:00' → nextOn out of range → valid fallback; C1 fix still proven (no 422)
+        const expected = expectedUntilNextOnTime(nowMs);
+        const revertTime = new Date(revertAtMs).toLocaleTimeString('en-GB', {
+            hour: '2-digit', minute: '2-digit', timeZone: 'Europe/London'
+        });
+        expect(revertTime, `revertAtMs must be ${expected} (06:30=timetable nextOn in range, 07:00=valid fallback)`).toBe(expected);
     });
 
     /* ── BB-C2: boost → outcome card → Check and log → Add to existing ticket ── */
