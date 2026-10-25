@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>OOHDASH-144 mockup</title>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>OOHDASH-144 prototype</title>
 <style>
 /* OOH Dashboard — design-spec §1 (Airedale IoT family palette, Ant Design patterns) */
 :root{
@@ -184,19 +184,32 @@ table.tbl tr.rowoff td{background:var(--danger-light)}
 
 </style></head><body>
 <style>
-.mk-wrap{max-width:1100px;margin:0 auto;padding:16px}
-.mk-nav{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 14px}
+:root{--notes-accent:#C7D2FE}
+.mk-wrap{max-width:1180px;margin:0 auto;padding:16px}
+.mk-nav{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 10px}
 .mk-nav button{border:1px solid var(--border);background:var(--surface);border-radius:999px;padding:5px 12px;cursor:pointer;font:inherit;font-size:13px}
 .mk-nav button.on{background:var(--primary);color:#fff;border-color:var(--primary)}
-.mk-note{font-size:12px;color:var(--text-secondary);margin:4px 0 12px}
+.mk-note{font-size:12.5px;color:var(--text-secondary);margin:4px 0 12px}
+.mk-switch{display:flex;gap:14px;flex-wrap:wrap;align-items:center;font-size:13px;margin:0 0 12px;color:var(--text-secondary)}
+.mk-switch label{display:flex;gap:6px;align-items:center;cursor:pointer}
+.mk-flow{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);overflow:hidden}
+.mk-flowhead{display:flex;align-items:center;gap:8px;padding:10px 18px;border-bottom:1px solid var(--border);background:var(--surface-variant)}
+.mk-flowbody{padding:18px}
+.mk-flowfoot{padding:8px 18px;border-top:1px solid var(--border);font-size:12px;color:var(--text-secondary);display:flex}
+.say{background:var(--primary-light);border-left:4px solid var(--primary);border-radius:var(--radius-sm);padding:10px 12px;margin:10px 0;color:var(--text-primary)}
+.say .lbl{display:block;font-size:12.5px;font-weight:600;color:var(--primary-dark);margin-bottom:4px}
+.gtk{margin:10px 0;color:var(--text-secondary)}
+.gtk .lbl{display:block;font-size:12.5px;font-weight:600;margin-bottom:2px}
+.autolog{background:#F1F5F9;border:1px solid var(--border);border-radius:var(--radius-sm);padding:8px 12px;margin:10px 0}
 .hb{display:flex;flex-direction:column;gap:6px;margin:0 0 10px}
 .hb .row{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
 .hb .row .txt{flex:1;min-width:220px}
-.mk-flow{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);padding:18px}
 .zrow{padding:6px 0;border-bottom:1px solid var(--border)}
 .zrow:last-child{border-bottom:0}
-button[disabled]{opacity:.45;cursor:not-allowed}
-:root{--notes-accent:#C7D2FE}
+.wrapup dl{margin:0}
+.wrapup dt{font-size:12.5px;font-weight:600;color:var(--text-secondary);margin-top:10px}
+.wrapup dd{margin:2px 0 0}
+.wrapup ul{margin:2px 0 0 18px;padding:0}
 .notes-group{background:var(--surface-variant);border:1px solid var(--border);border-left:3px solid var(--notes-accent);border-radius:var(--radius-md);padding:10px 12px;margin-top:12px}
 .notes-label{display:block;font-size:12.5px;font-weight:600;color:var(--text-secondary);margin-bottom:6px}
 .notes-input{width:100%;box-sizing:border-box;font-size:14px;line-height:22px;padding:8px 10px;border:1.5px solid var(--border);border-radius:var(--radius-sm);background:var(--surface);resize:vertical;outline:none}
@@ -205,20 +218,27 @@ button[disabled]{opacity:.45;cursor:not-allowed}
 .notes-meta{display:flex;justify-content:space-between;align-items:center;margin-top:4px}
 .mk-cmp{display:grid;grid-template-columns:1fr 1fr;gap:14px}
 .mk-cmp h4{margin:0 0 6px;font-size:13px;color:var(--text-secondary)}
-@media (max-width:700px){.wsgrid{grid-template-columns:1fr!important}.notes-input{font-size:16px}.mk-cmp{grid-template-columns:1fr}}
+.callsofar{font-size:12.5px;color:var(--text-secondary);margin:0 0 10px}
+button[disabled]{opacity:.45;cursor:not-allowed}
+@media (max-width:760px){.wsgrid{grid-template-columns:1fr!important}.notes-input{font-size:16px}.mk-cmp{grid-template-columns:1fr}}
 </style>
 <div class="mk-wrap">
- <h2 style="margin:0 0 4px">OOHDASH-144 mockup: cancel a running boost, pick zones, consistent heating cards, notes box</h2>
- <p class="mk-note">Clickable mockup using the live app's styles. Site: <b>Black Bull, Corbridge (7639)</b>, V2 panel, two pub zones. Pick a scenario, then click through. Nothing here talks to a server.</p>
+ <h2 style="margin:0 0 4px">OOHDASH-144 prototype: pub heating on the new agent-screen standard</h2>
+ <p class="mk-note">Clickable prototype using the live app’s styles. Site: <b>Black Bull, Corbridge (7639)</b>, two heating zones. Pick a scenario and click through. Nothing here talks to a server; ticket numbers are examples.</p>
  <div class="mk-nav" id="nav"></div>
+ <div class="mk-switch">
+  <label><input type="checkbox" id="sw-tt" checked onchange="S.tt=this.checked;render()"> Timetable readable (same every day: 21°C from 06:30, 15°C from 23:00)</label>
+  <label><input type="checkbox" id="sw-at" checked onchange="S.autoOk=this.checked;render()"> Automatic ticket succeeded</label>
+ </div>
  <div class="wsgrid" style="display:grid;grid-template-columns:2fr 1fr;gap:14px">
   <div>
    <div class="card" style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;padding:14px 18px;margin-bottom:10px">
     <div><h2 style="display:inline">Black Bull</h2> <span class="mono">7639</span> <span class="small">Corbridge</span></div>
     <button class="btn link" style="margin-left:auto">End call</button>
    </div>
+   <div id="callsofar"></div>
    <div id="banner"></div>
-   <div class="mk-flow" id="flow"></div>
+   <div id="flow"></div>
   </div>
   <div>
    <div class="card tight"><h3>What Lighthouse controls at this site</h3>
@@ -228,193 +248,242 @@ button[disabled]{opacity:.45;cursor:not-allowed}
 </div>
 <script>
 var S = {};
+var TKT = 48213, TKT_NEW = 48219;
 var SCEN = [
- ['banner','1. Banner: boost running'],
- ['intercept','2. Heating questions: boost running'],
- ['zones-on','3. Too cold: pick zones'],
- ['zones-off','4. Too hot: pick zones'],
- ['result-partial','5. Result: one zone failed'],
- ['stale','6. Cancel: already ended'],
- ['pending','7. Cancel: panel not confirmed yet'],
- ['superseded','8. Cancel: someone else changed it'],
- ['cards','9. Heating answer cards (wording)'],
- ['notes','10. Notes box: before and after']
+ ['site','1. Site page: we changed the heating earlier'],
+ ['intercept','2. Heating questions: heating already changed'],
+ ['cold','3. Too cold: turn heating on (2 zones)'],
+ ['hot','4. Too hot: turn heating off (until next due on)'],
+ ['partial','5. Turn on: one zone didn’t respond'],
+ ['pb-ended','6. Put back: already finished'],
+ ['pb-pending','7. Put back: controls not confirmed yet'],
+ ['pb-hand','8. Put back: changed by hand since'],
+ ['cards','9. Every heating answer card'],
+ ['noaction','10. No further action: Check and log'],
+ ['notes','11. Notes box: before and after']
 ];
-var NOTE_PH='Anything the caller or site told you that isn’t captured above, e.g. engineer due at 7am';
-var NOTE_HELP='For the ticket and the IoT team’s morning review. Not sent in urgent P1 texts. Keep it factual, no personal details.';
-function notesNew(){
- return '<div class="notes-group" data-testid="addnotes-group"><label class="notes-label" for="mk-notes">📝 Additional notes for the IoT team (optional)</label>'+
- '<textarea id="mk-notes" class="notes-input" rows="2" maxlength="1000" placeholder="'+NOTE_PH+'" oninput="document.getElementById(\'mk-cnt\').textContent=this.value.length+\' / 1000\'"></textarea>'+
- '<div class="notes-meta"><span class="small">'+NOTE_HELP+'</span><span class="small" id="mk-cnt" style="white-space:nowrap;margin-left:8px">0 / 1000</span></div></div>';
-}
-function notesOld(){
- return '<div style="margin-top:10px"><label style="display:block;font-size:0.85em;font-weight:600;margin-bottom:4px">Additional notes for the IoT team (optional)</label>'+
- '<textarea rows="2" style="width:100%;box-sizing:border-box;font-size:16px;padding:6px 8px;border:1px solid var(--border,#ccc);border-radius:6px;resize:vertical" placeholder="'+NOTE_PH+'"></textarea>'+
- '<div style="display:flex;justify-content:space-between;align-items:center;margin-top:3px"><span class="small" style="color:#666">'+NOTE_HELP+'</span><span class="small" style="white-space:nowrap;margin-left:8px;color:#666">0 / 1000</span></div></div>';
-}
-function notesCompare(){
- var step='<div class="stepq">What does the caller need?</div><div class="chips"><button class="chip">Too cold / not working</button><button class="chip">Too hot / wants it off</button></div>';
- return '<p class="mk-note">Same flow step, notes box as it is today (left) and as designed (right). Click into each box to see the focus state. On a phone-width screen the new box keeps 16px text so iPhones do not zoom.</p>'+
- '<div class="mk-cmp"><div><h4>Today</h4><div class="mk-flow">'+step+notesOld()+'</div></div><div><h4>New</h4><div class="mk-flow">'+step+notesNew()+'</div></div></div>';
-}
-var CARDS = [
- ['W3','Too cold: part of the pub off'],['W5','Too cold: switched off on purpose'],['W6','Too cold: off on its timetable'],['W8','Too hot: heating on'],
- ['W5H','Too cold: OOH hold running'],['W8B','Too hot: OOH boost running'],['W4','Summer mode (was blank)'],['W7','Back-up cycle (was blank)'],['W9','Too hot: already off (was blank)']
-];
-var COPY = {
- W3:{h:'Part of the pub heating is off',
-  plain:{o:'Pub zone 1 is on, but pub zone 2 is off right now. The panel doesn’t tell us why from here, and we can’t switch zones remotely. Log it for the IoT team. If the caller says the cold area is the part that’s heating, treat it as a boiler or radiator problem and advise their heating engineer.',s:'Part of the heating is on, but one area is switched off at the controls. I can’t change that from here, so I’ve logged it for the team.'},
-  boost:{o:'Pub zone 1 is on, but pub zone 2 is off right now. The panel doesn’t tell us why from here. You can switch pub zone 2 on for a set time with Boost heat ON. It goes back to its normal timetable afterwards, and it’s logged for the IoT team either way. If the caller says the cold area is the part that’s heating, treat it as a boiler or radiator problem and advise their heating engineer.',s:'Part of the heating is switched off at the controls. I can put it on for a set time from here, and I’ve logged it for the team to look at properly.'},
-  t:'Pub heating at time of call: pub zone 1 on, pub zone 2 off. Captured for the IoT team.',btn:'on'},
- W5:{h:'Pub heating has been switched off on purpose',
-  plain:{o:'Pub zone 2 has been deliberately switched off at the boiler panel (until 06:00). That’s the likely reason it’s cold. We can’t change it from here, so log it for the IoT team if the site needs the heating back on.',s:'That part of the heating has been switched off on purpose at the controls. I can’t change it from here, but I’ve logged that you need it back on so the team can sort it.'},
-  boost:{o:'Pub zone 2 has been deliberately switched off at the boiler panel (until 06:00). That’s the likely reason it’s cold. You can switch it back on for a set time with Boost heat ON. Someone may have switched it off for a reason, so it’s logged for the IoT team to check.',s:'That part of the heating has been switched off on purpose at the controls. I can put it back on for a set time from here, and I’ve logged it so the team can check why it was switched off.'},
-  t:'Pub heating at time of call: pub zone 2 forced OFF at the panel (until 06:00). Site needs heat; captured for the IoT team.',btn:'on'},
- W6:{h:'Pub heating is off at the controls right now',
-  plain:{o:'The panel isn’t asking the boiler for heat. It isn’t in summer mode and nobody has switched it off on purpose, so it’s most likely outside its heating times. Based on the panel’s stored timetable, the next change is 06:30. We can’t switch it on from here.',s:'The heating is off on its timetable at the moment and is due back on at 06:30. I can’t turn it on from here, so I’ve logged it for the team.'},
-  boost:{o:'The panel isn’t asking the boiler for heat. It isn’t in summer mode and nobody has switched it off on purpose, so it’s most likely outside its heating times. Based on the panel’s stored timetable, the next change is 06:30. You can switch it on for a set time with Boost heat ON. It goes back to its normal timetable afterwards.',s:'The heating is off on its timetable at the moment and is due back on at 06:30. I can put it on for a set time from here, and I’ve logged it for the team so they can check the timetable.'},
-  t:'Pub heating at time of call: off at the panel (no summer mode, not forced off; next scheduled change 06:30). Captured for the IoT team.',btn:'on'},
- W8:{h:'Pub heating is on',hPlain:'Pub heating is on, and we can’t switch it off from here',
-  plain:{o:'The panel is heating pub zone 1 and pub zone 2. Pub heating on this panel can’t be changed remotely. Log it for the IoT team. In the meantime the site can turn the radiator valves down.',s:'The heating is on at the controls and I can’t change it from here tonight. Turning the radiator valves down will help in the meantime. I’ve logged it for the team.'},
-  boost:{o:'The panel is heating pub zone 1 and pub zone 2. You can switch it off for a set time with Hold heat OFF. It goes back to its normal timetable afterwards, and it’s logged for the IoT team.',s:'The heating is on at the controls. I can switch it off for a set time from here, and I’ve logged it for the team.'},
-  t:'Pub heating at time of call: on (pub zone 1 and pub zone 2). Caller wants it lower/off; captured for the IoT team.',btn:'off'},
- W5H:{h:'Pub heating is on a timed OOH hold',only:true,
-  boost:{o:'Pub zone 2 was switched off from OOH until 07:00 (started by Tony). That’s the likely reason it’s cold. You can cancel the hold now and the zone goes back to its normal timetable.',s:'We switched that part of the heating off earlier for a set time. I can cancel that now so it goes back to its normal timetable.'},
-  t:'Pub heating at time of call: pub zone 2 on a timed OOH hold OFF until 07:00. Captured for the IoT team.',hold:{id:'c2',zone:'CHZ2',dir:'off',until:'07:00',by:'Tony'}},
- W8B:{h:'Pub heating is on',only:true,
-  boost:{o:'The panel is heating pub zone 1 and pub zone 2. Pub zone 1 is on a timed OOH boost until 21:30. Cancelling it puts the zone back on its normal timetable. You can switch pub zone 2 off for a set time with Hold heat OFF. It goes back to its normal timetable afterwards, and it’s logged for the IoT team.',s:'The heating is on at the controls. I can switch it off for a set time from here, and I’ve logged it for the team.'},
-  t:'Pub heating at time of call: on (pub zone 1 and pub zone 2). Caller wants it lower/off; captured for the IoT team.',btn:'off',hold:{id:'c1',zone:'CHZ1',dir:'on',until:'21:30',by:'Kelly'}},
- W4:{h:'Pub heating is in summer mode',only:true,
-  boost:{o:'The panel has switched the pub heating off for the summer season. It isn’t a fault, but we can’t change it from here. If the site needs heating, log it for the IoT team.',s:'The heating controls are still set to summer mode, which is why the heating isn’t coming on. I can’t change that from here, but I’ve logged it so the team can switch it back for you.'},
-  t:'Pub heating at time of call: off, panel in summer mode. Site needs heating; captured for the IoT team.'},
- W7:{h:'Heating is running on a back-up cycle',only:true,
-  boost:{o:'The panel has lost the room temperature reading for pub zone 1, so it’s heating that zone on a timed on/off cycle instead. Rooms can feel cooler than normal. The IoT team needs to check the room sensor.',s:'The heating is running, but on a back-up setting because a temperature sensor isn’t reporting. I’ve logged it for the team to fix the sensor.'},
-  t:'Pub heating at time of call: pub zone 1 on back-up (fallback) cycle, room sensor not reporting. Captured for the IoT team.'},
- W9:{h:'Pub heating is already off',only:true,
-  boost:{o:'The panel isn’t heating any pub zone right now, so the warmth isn’t coming from the pub heating controls. Ask whether another heater, or the accommodation heating, is on.',s:'Our controls show the pub heating is off right now, so the warmth is coming from somewhere else, perhaps a radiator on manual or another heater. I’ve noted the call.'},
-  t:'Pub heating at time of call: off at the panel. Caller reports too warm; heat source is not the pub heating controls.',noact:'Log it &amp; end'}
-};
-function cardsView(){
- var k=S.card||'W3', v=S.variant||'boost', c=COPY[k];
- var pick='<div class="chips" style="margin-bottom:8px">'+CARDS.map(function(x){return '<button class="chip'+(k===x[0]?' sel':'')+'" onclick="S.card=\''+x[0]+'\';S.variant=\'boost\';delete S.cancel.c1;delete S.cancel.c2;render()">'+x[1]+'</button>'}).join('')+'</div>';
- var vt=c.only?'':'<div class="chips" style="margin-bottom:10px"><button class="chip'+(v==='boost'?' sel':'')+'" onclick="S.variant=\'boost\';render()">Button offered (new wording)</button><button class="chip'+(v==='plain'?' sel':'')+'" onclick="S.variant=\'plain\';render()">No button (approved wording, unchanged)</button></div>';
- var w=c[c.only?'boost':v], head=(v==='plain'&&c.hPlain)?c.hPlain:c.h, btns='';
- if(c.hold){ var h=c.hold; var r=resultRow(h); btns+= r? r : (cancelUi(h).replace('Cancel early','Cancel early ('+zl(h.zone).toLowerCase()+')')); }
- if(c.btn&&(v==='boost'||c.only)) btns+=c.btn==='on'?'<button class="btn boost-on" data-testid="bp-boost-on">Boost heat ON</button>':'<button class="btn boost-off" data-testid="bp-boost-off">Hold heat OFF</button>';
- btns+=c.noact?'<button class="btn">'+c.noact+'</button><button class="btn primary">Capture &amp; escalate for the IoT team</button>':'<button class="btn primary">Capture &amp; escalate for the IoT team</button><button class="btn">End with no action</button>';
- return pick+vt+'<div class="reco" data-testid="reco-boiler-panel"><b class="hd">'+head+'</b><div class="k">What to tell the operator</div><p>'+w.o+'</p><div class="k">Say to caller</div><p class="script">“'+w.s+'”</p><div class="k">Ticket sentence</div><p class="tkt">'+c.t+'</p><div class="outbtns">'+btns+'</div></div>'+
- '<p class="mk-note" style="margin-top:8px">'+(c.only?'':'Toggle above to compare with the approved 2026-10-23 wording. ')+'Logging the call instead of boosting puts the ticket sentence (not the operator text) on the ticket.</p>';
-}
+function hhmm(h){return h;}
+function zl(z){return 'zone '+(z==='CHZ1'?'1':'2');}
+function Zl(z){return 'Zone '+(z==='CHZ1'?'1':'2');}
+function nextOnClause(){return S.tt?', which next comes on at 06:30':'';}
+function nextOnShort(){return S.tt?' and next comes on at 06:30':'';}
+
 function reset(k){
- S = {card:'W3',variant:'boost',scen:k, holds:[{id:'h1',zone:'CHZ1',dir:'on',until:'21:30',by:'Kelly'}], cancel:{}, step:'stage1', sel:[], holdAck:false, dir:'on'};
- if (k==='zones-on'){S.holds=[];S.step='w6';S.dir='on';}
- if (k==='zones-off'){S.holds=[];S.step='w8';S.dir='off';}
- if (k==='result-partial'){S.holds=[];S.step='result';S.dir='on';S.sel=['CHZ1','CHZ2'];}
- if (k==='banner'){S.holds.push({id:'h2',zone:'CHZ2',dir:'off',until:'07:00',by:'Tony'});S.step='idle';}
- if (k==='stale'||k==='pending'||k==='superseded'){S.step='idle';}
- if(k==='cards'){S.holds=[];S.step='cards';}
- if(k==='notes'){S.holds=[];S.step='notes';}
+ S = {scen:k, tt:S.tt!==false, autoOk:S.autoOk!==false, holds:[], pb:{}, step:'stage1', sel:null, dir:'on', actions:[], issues:[], card:'W6', variant:'btn', logged:null, holdAck:false};
+ if (k==='site'||k==='pb-ended'||k==='pb-pending'||k==='pb-hand'){S.holds=[{id:'h1',zone:'CHZ1',dir:'on',until:'21:30',by:'Kelly',tkt:TKT},{id:'h2',zone:'CHZ2',dir:'off',until:'23:00',by:'Tony',tkt:TKT-4}];S.step='idle';}
+ if (k==='intercept'){S.holds=[{id:'h1',zone:'CHZ1',dir:'on',until:'21:30',by:'Kelly',tkt:TKT}];S.step='stage1';}
+ if (k==='cold'){S.step='card';S.card='W6';S.dir='on';}
+ if (k==='hot'){S.step='card';S.card='W8';S.dir='off';}
+ if (k==='partial'){S.step='result';S.dir='on';S.sel=['CHZ1','CHZ2'];S.partial=true;S.actions=[{t:'20:02',txt:'Turned the heating on, zones 1 and 2, until 21:30',tkt:TKT}];}
+ if (k==='cards'){S.step='cards';}
+ if (k==='noaction'){S.step='card';S.card='W2';}
+ if (k==='notes'){S.step='notes';}
+ document.getElementById('sw-tt').checked=S.tt; document.getElementById('sw-at').checked=S.autoOk;
  render();
 }
-function zl(z){return 'Pub zone '+(z==='CHZ1'?'1':'2');}
-function holdLine(h){return h.dir==='on'
- ? '🔥 '+zl(h.zone)+': heat <b>ON</b> boost until <b>'+h.until+'</b> · started by '+h.by
- : '❄ '+zl(h.zone)+': heat held <b>OFF</b> until <b>'+h.until+'</b> · started by '+h.by;}
-function cancelUi(h){
- var c=S.cancel[h.id];
- if(!c) return '<button class="btn" data-testid="boost-cancel-'+h.zone+'" onclick="S.cancel[\''+h.id+'\']=\'confirm\';render()">Cancel early</button>';
- if(c==='confirm') return '<span>Cancel the '+(h.dir==='on'?'boost':'hold')+' for '+zl(h.zone).toLowerCase()+' now? It goes back to its normal timetable.</span> <button class="btn primary" onclick="doCancel(\''+h.id+'\')">Yes, cancel</button> <button class="btn" onclick="delete S.cancel[\''+h.id+'\'];render()">Keep it</button>';
- if(c==='cancelling') return '<span class="small">Cancelling… this can take up to 30 seconds while the panel confirms.</span>';
+
+/* ---------- shared pieces ---------- */
+function say(t){return '<div class="say"><span class="lbl">🗣 Say to the customer</span>“'+t+'”</div>';}
+function gtk(t){return t?'<div class="gtk"><span class="lbl">ℹ Good to know (for you, not the customer)</span>'+t+'</div>':'';}
+function autolog(kind){
+ if(!S.autoOk && kind!=='banner') return '<div class="autolog">📋 We couldn’t log this automatically. It will be logged when you finish.</div>';
+ if(kind==='fail') return '<div class="autolog">📋 We’ve logged this automatically to the IoT helpdesk as ticket <b>#'+TKT+'</b>. The heating controls didn’t respond, so there may be a problem with the equipment or its internet connection.</div>';
+ return '<div class="autolog">📋 We’ve logged this automatically to the IoT helpdesk as ticket <b>#'+TKT+'</b>, because we changed the heating at the pub. Add any notes when you finish.</div>';
+}
+function notesBox(){
+ return '<div class="notes-group"><label class="notes-label" for="mk-notes">📝 Additional notes for the IoT team (optional)</label>'+
+ '<textarea id="mk-notes" class="notes-input" rows="2" maxlength="1000" placeholder="Anything the customer told you that isn’t captured above, e.g. engineer due at 7am" oninput="S.notes=this.value;document.getElementById(\'mk-cnt\').textContent=this.value.length+\' / 1000\'">'+(S.notes||'')+'</textarea>'+
+ '<div class="notes-meta"><span class="small">For the ticket and the IoT team’s morning review. Not sent in urgent P1 texts. Keep it factual, no personal details.</span><span class="small" id="mk-cnt" style="white-space:nowrap;margin-left:8px">'+((S.notes||'').length)+' / 1000</span></div></div>';
+}
+function holdRowText(h){return h.dir==='on'
+ ? '🔥 Pub '+zl(h.zone)+': heating turned <b>on</b> until <b>'+h.until+'</b>, by '+h.by
+ : '❄ Pub '+zl(h.zone)+': heating turned <b>off</b> until <b>'+h.until+'</b>, by '+h.by;}
+
+/* ---------- put back to normal ---------- */
+function pbUi(h){
+ var c=S.pb[h.id];
+ if(!c) return '<button class="btn" data-testid="pb-'+h.zone+'" onclick="S.pb[\''+h.id+'\']=\'confirm\';render()">Put back to normal now</button>';
+ if(c==='confirm') return '<span>Put pub '+zl(h.zone)+' back to its normal timetable now?</span> <button class="btn primary" onclick="doPb(\''+h.id+'\')">Yes, put it back</button> <button class="btn" onclick="delete S.pb[\''+h.id+'\'];render()">Keep it</button>';
+ if(c==='working') return '<span class="small">Putting it back… this can take up to 30 seconds.</span>';
  return '';
 }
-function doCancel(id){
- S.cancel[id]='cancelling';render();
+function doPb(id){
+ S.pb[id]='working';render();
  setTimeout(function(){
-  var r = S.scen==='stale'?'stale':S.scen==='pending'?'pending':S.scen==='superseded'?'superseded':'reverted';
-  S.cancel[id]=r; render();
-  if(r==='stale') setTimeout(function(){S.holds=S.holds.filter(function(h){return h.id!==id});delete S.cancel[id];render();},1500);
- },1200);
+  var r=S.scen==='pb-ended'?'ended':S.scen==='pb-pending'?'pending':S.scen==='pb-hand'?'hand':'done';
+  S.pb[id]=r;
+  var h=S.holds.filter(function(x){return x.id===id})[0];
+  if(S.step!=='idle' && r!=='ended') S.actions.push({t:'20:14',txt:'Put '+zl(h.zone)+' back to normal',tkt:h.tkt});
+  render();
+  if(r==='ended') setTimeout(function(){S.holds=S.holds.filter(function(x){return x.id!==id});delete S.pb[id];render();},1500);
+ },1000);
 }
-function resultRow(h){
- var c=S.cancel[h.id];
- if(c==='reverted') return '<div class="alert ok" style="margin:0"><b>✅ '+zl(h.zone)+' '+(h.dir==='on'?'boost':'hold')+' cancelled. The zone is back on its normal timetable.</b><div class="small" style="margin-top:4px">Say to caller: “I’ve cancelled that; the heating’s back on its normal timetable.”</div> <button class="btn" style="margin-top:6px" onclick="S.holds=S.holds.filter(function(x){return x.id!==\''+h.id+'\'});delete S.cancel[\''+h.id+'\'];render()">Dismiss</button></div>';
- if(c==='superseded') return '<div class="alert warn" style="margin:0">⚠ Someone else has changed '+zl(h.zone).toLowerCase()+' since the boost, so we left it alone. Logged for the IoT team. <button class="btn" onclick="S.holds=S.holds.filter(function(x){return x.id!==\''+h.id+'\'});delete S.cancel[\''+h.id+'\'];render()">Dismiss</button></div>';
- if(c==='pending') return '<div class="alert info" style="margin:0">⏳ '+zl(h.zone)+': cancel sent; the panel hasn’t confirmed yet. We’ll keep trying, and the IoT team is alerted if it doesn’t take.</div>';
- if(c==='stale') return '<div class="alert info" style="margin:0">This has already ended. Refreshing…</div>';
+function pbResult(h){
+ var c=S.pb[h.id], dismiss=' <button class="btn" onclick="S.holds=S.holds.filter(function(x){return x.id!==\''+h.id+'\'});delete S.pb[\''+h.id+'\'];render()">Dismiss</button>';
+ if(c==='done') return '<div class="alert ok" style="margin:0">✅ Pub '+zl(h.zone)+' is back to normal'+nextOnShort()+'. Noted on ticket <b>#'+h.tkt+'</b>.'+say('That’s done. Your heating is back on its normal timetable.')+dismiss+'</div>';
+ if(c==='pending') return '<div class="alert info" style="margin:0">⏳ We’ve asked the heating to go back to normal, but the controls haven’t confirmed yet. We’ll keep trying. If the heating doesn’t '+(h.dir==='on'?'switch off':'come back on')+' in the next few minutes, the IoT helpdesk is alerted automatically on ticket <b>#'+h.tkt+'</b>.'+say('I’ve asked the heating to go back to normal. It can take a few minutes.')+'</div>';
+ if(c==='hand') return '<div class="alert warn" style="margin:0">⚠ Someone has changed pub '+zl(h.zone)+' at the heating controls since we did, so we’ve left it as it is. Logged on ticket <b>#'+h.tkt+'</b> for the IoT helpdesk to check.'+dismiss+'</div>';
+ if(c==='ended') return '<div class="alert info" style="margin:0">This had already finished. Refreshing…</div>';
  return null;
 }
 function banner(){
  if(!S.holds.length) return '';
- var rows=S.holds.map(function(h){
-  var r=resultRow(h); if(r) return '<div data-testid="boost-hold-row-'+h.zone+'">'+r+'</div>';
-  return '<div class="row" data-testid="boost-hold-row-'+h.zone+'"><span class="txt">'+holdLine(h)+'</span>'+cancelUi(h)+'</div>';
- }).join('');
- return '<div class="alert info hb" data-testid="boost-hold-banner"><b>OOH heating timer running at this site</b>'+rows+'</div>';
+ return '<div class="alert info hb" data-testid="boost-hold-banner"><b>We’ve changed the heating at this site</b>'+S.holds.map(function(h){
+  var r=pbResult(h); if(r) return '<div>'+r+'</div>';
+  return '<div class="row"><span class="txt">'+holdRowText(h)+'</span>'+pbUi(h)+'</div>';
+ }).join('')+'</div>';
 }
-function flow(){
+
+/* ---------- heating cards ---------- */
+var CARDS = [
+ ['W1','Can’t see the heating'],['W2','Asking the boiler for heat'],['W3','Part of the pub off'],['W4','Summer setting'],['W5','Switched off by hand'],
+ ['W5H','We turned it off earlier'],['W6','Off on its timetable'],['W7','Room sensor not working'],['W8','Heating on (too hot)'],['W8H','We turned it on earlier (too hot)'],['W9','Already off (too hot)']
+];
+function cardDef(k, btn){
+ var tt=nextOnClause();
+ switch(k){
+ case 'W1': return {h:'We can’t see the pub heating right now', s:'I can’t see your heating controls from here at the moment, so I’ll log it for our team to check first thing.', g:'The heating controls last reported 3 hours ago. Don’t tell the customer whether the heating is on or off.', log:'Pub heating at time of call: couldn’t be checked (heating controls last reported 3 hours ago).'};
+ case 'W2': return {h:'The heating controls are asking the boiler for heat', s:'Our controls are asking your boiler for heat right now, so they’re doing their job. The problem is most likely the boiler itself or the radiators, so please call your heating engineer. I’ll log tonight’s call.', advice:true, log:'Pub heating at time of call: controls asking for heat, all zones on. Likely a boiler or radiator fault; customer advised to call their heating engineer.'};
+ case 'W3': return {h:'Part of the pub heating is off', s: btn?'Part of your heating is switched off at the controls right now. I can turn it on from here for a set time, and then it goes back to its normal timetable'+tt+'. I’ll log it for our team to look at properly.':'Part of your heating is switched off at the controls. I can’t change that from here, so I’ll log it for our team to sort.', g:'If the customer says the cold area is the part that’s already heating, it’s more likely the boiler or radiators, so advise their heating engineer instead.', dir:'on', cand:['CHZ2'], log:'Pub heating at time of call: zone 1 on, zone 2 off.'};
+ case 'W4': return {h:'The heating is switched off for the summer', s:'Your heating controls are still on their summer setting, which keeps the heating off. I can’t change that from here, but I’ll log it so our team can switch it back for you.', log:'Pub heating at time of call: off, controls on their summer setting. Customer needs heating.'};
+ case 'W5': return {h:'Someone has switched the heating off at the controls', s: btn?'Part of your heating has been switched off by hand at the controls until 06:00. I can turn it back on from here for a set time. I’ll log it so our team can check why it was switched off.':'Part of your heating has been switched off by hand at the controls. I can’t change it from here, but I’ll log that you need it back on so our team can sort it.', g: btn?'Someone at the pub or an engineer may have done this on purpose, so check with the customer before turning it back on.':'', dir:'on', cand:['CHZ2'], log:'Pub heating at time of call: zone 2 switched off by hand at the controls until 06:00. Customer needs heat.'};
+ case 'W5H': return {h:'We turned this heating off earlier', s:'We turned that part of your heating off earlier, until 23:00. I can put it back to normal now, so it follows its usual timetable again.', hold:{id:'c2',zone:'CHZ2',dir:'off',until:'23:00',by:'Tony',tkt:TKT-4}, log:'Pub heating at time of call: zone 2 turned off by OOH until 23:00.'};
+ case 'W6': return {h:'The heating is off on its timetable', s: btn?'Your heating is off on its normal timetable right now'+(S.tt?' and is next due on at 06:30':'')+'. I can turn it on from here for a set time if you need it. I’ll log the call.':'Your heating is off on its normal timetable right now'+(S.tt?' and is next due on at 06:30':'')+'. I can’t turn it on from here, so I’ll log it for our team.', g: S.tt?'At 06:30 it heats the pub to 21°C, and only comes on if the room is cooler than that.':'', dir:'on', cand:['CHZ1','CHZ2'], log:'Pub heating at time of call: off on its timetable'+(S.tt?' (next on 06:30, 21°C)':'')+'. Customer cold.'};
+ case 'W7': return {h:'The heating is running on a simple timer', s:'Your heating is running, but on a simple timer because one of the room temperature sensors isn’t working, so it may feel cooler than normal. I’ll log it for our team to fix the sensor.', log:'Pub heating at time of call: zone 1 on a simple timer, room temperature sensor not reporting.'};
+ case 'W8': return {h:'The heating is on', s: btn?'Your heating is on at the controls right now. I can turn it off from here for a set time, and then it goes back to its normal timetable'+tt+'. I’ll log the call.':'Your heating is on at the controls and I can’t change it from here tonight. Turning the radiators down will help in the meantime. I’ll log it for our team.', dir:'off', cand:['CHZ1','CHZ2'], log:'Pub heating at time of call: on (zones 1 and 2). Customer too warm.'};
+ case 'W8H': return {h:'The heating is on', s:'Your heating is on at the controls right now. We turned zone 1 on earlier, until 21:30, and I can put that back to normal now. I can also turn zone 2 off from here for a set time. I’ll log the call.', hold:{id:'c1',zone:'CHZ1',dir:'on',until:'21:30',by:'Kelly',tkt:TKT}, dir:'off', cand:['CHZ2'], log:'Pub heating at time of call: on (zones 1 and 2; zone 1 turned on by OOH until 21:30). Customer too warm.'};
+ case 'W9': return {h:'The pub heating is already off', s:'Our controls show your pub heating is off right now, so the warmth is coming from somewhere else, perhaps a radiator turned up by hand or another heater. I’ll log the call.', g:'Ask whether a portable heater or the rooms upstairs have heating on.', log:'Pub heating at time of call: off. Customer too warm; heat is not from the pub heating.'};
+ }
+}
+function cardHtml(k, btn){
+ var c=cardDef(k, btn), b='';
+ if(c.hold){var r=pbResult(c.hold); b+= r? '<div style="margin:8px 0">'+r+'</div>' : pbUi(c.hold);}
+ if(c.dir && btn) b+= c.dir==='on'?'<button class="btn primary" data-testid="bp-turn-on" onclick="startTurn(\'on\',\''+c.cand.join(',')+'\')">Turn heating on</button>':'<button class="btn primary" data-testid="bp-turn-off" onclick="startTurn(\'off\',\''+c.cand.join(',')+'\')">Turn heating off</button>';
+ if(S.actions.length) b+='<button class="btn" onclick="S.step=\'stage1\';S.holdAck=true;render()">The customer needs something else</button><button class="btn primary" onclick="goWrap(\''+k+'\',\'action\')">Finish and add notes</button>';
+ else {
+  if(c.advice) b+='<button class="btn'+(c.dir&&btn?'':' primary')+'" onclick="goWrap(\''+k+'\',\'advice\')">Customer will call their heating engineer</button>';
+  b+='<button class="btn'+((c.dir&&btn)||c.advice||c.hold?'':' primary')+'" data-testid="bp-log" onclick="goWrap(\''+k+'\',\'capture\')">Log it for the IoT helpdesk</button><button class="btn" data-testid="bp-nfa" onclick="goWrap(\''+k+'\',\'no-action\')">No further action</button>';
+ }
+ return '<div class="reco" data-testid="reco-boiler-panel"><b class="hd">'+c.h+'</b>'+say(c.s)+gtk(c.g)+'<div class="outbtns">'+b+'</div></div>';
+}
+function startTurn(dir, cand){
+ S.dir=dir; S.cand=cand.split(','); S.sel=null;
+ if(S.cand.length===1){S.sel=S.cand.slice();S.step='dur';} else S.step='zones';
+ render();
+}
+
+/* ---------- steps ---------- */
+function zonesHtml(){
+ var on=S.dir==='on', all=S.sel&&S.sel.length===2;
+ function chip(z){var p=S.sel&&S.sel.length===1&&S.sel[0]===z;return '<button class="chip'+(p?' sel':'')+'" aria-pressed="'+p+'" data-testid="bp-zone-'+z+'" onclick="S.sel=[\''+z+'\'];render()">'+Zl(z)+' only</button>';}
+ return '<div class="reco" data-testid="reco-boost-zones"><b class="hd">Which part of the pub?</b>'+
+ say('Your heating is split into sections, called zones, which were set up with the original pipework. Our system can’t see which rooms each zone covers. Do you know which part of the pub each one heats? If you’re not sure, I’ll turn '+(on?'on':'off')+' all of them.')+
+ '<div class="chips">'+chip('CHZ1')+chip('CHZ2')+'<button class="chip'+(all?' sel':'')+'" aria-pressed="'+all+'" data-testid="bp-zone-all" onclick="S.sel=[\'CHZ1\',\'CHZ2\'];render()">All zones (not sure)</button></div>'+
+ '<div class="outbtns" style="margin-top:12px"><button class="btn primary" data-testid="bp-zones-continue" '+(S.sel?'':'disabled')+' onclick="S.step=\'dur\';render()">Continue</button><button class="btn" onclick="S.step=\'card\';render()">Back</button></div></div>';
+}
+function durHtml(){
+ var on=S.dir==='on', opts;
+ if(on) opts=[['30 minutes','20:32'],['1 hour','21:02'],['2 hours','22:02']];
+ else opts=[['1 hour','21:02'],['2 hours','22:02'], S.tt?['Until 06:30, when it’s next due on','06:30']:['Until 07:00','07:00']];
+ var zs=S.sel.map(zl).join(' and ');
+ return '<div class="reco" data-testid="reco-boost-dur"><b class="hd">Turn the heating '+(on?'on':'off')+' ('+zs+'): how long?</b>'+
+ say(on?'I’ll turn it on now. After that it goes back to its normal timetable'+nextOnClause()+'.':'I’ll turn it off now. After that it goes back to its normal timetable'+nextOnClause()+'.')+
+ (!on&&S.tt?gtk('At 06:30 it heats the pub to 21°C if the room is cooler than that.'):'')+
+ '<div class="chips">'+opts.map(function(o){return '<button class="chip" onclick="send(\''+o[1]+'\')">'+o[0]+'</button>'}).join('')+'</div>'+
+ '<div class="outbtns" style="margin-top:10px"><button class="btn" onclick="S.step=\'card\';render()">Back</button></div></div>';
+}
+function send(until){
+ S.until=until; S.step='sending'; render();
+ setTimeout(function(){
+  S.step='result';
+  S.actions.push({t:'20:02',txt:'Turned the heating '+(S.dir==='on'?'on':'off')+', '+S.sel.map(zl).join(' and ')+', until '+until,tkt:S.autoOk?TKT:null});
+  S.sel.forEach(function(z,i){ if(!(S.partial&&i===1)) S.holds.push({id:'n'+i,zone:z,dir:S.dir,until:until,by:'You',tkt:S.autoOk?TKT:null}); });
+  render();
+ },900);
+}
+function resultHtml(){
+ var on=S.dir==='on', until=S.until||'21:30', rows=S.sel.map(function(z,i){
+  if(S.partial&&i===1) return '<div class="zrow" data-testid="boost-zone-result-'+z+'">❌ '+Zl(z)+': we couldn’t reach the heating controls, so it wasn’t turned '+(on?'on':'off')+'.</div>';
+  return '<div class="zrow" data-testid="boost-zone-result-'+z+'">✅ '+Zl(z)+': '+(on?'on':'off')+' until <b>'+until+'</b></div>';
+ }).join('');
+ if(S.partial && !S.holds.length) S.holds.push({id:'n0',zone:'CHZ1',dir:'on',until:until,by:'You',tkt:S.autoOk?TKT:null});
+ var sayT = S.partial ? 'I’ve turned zone 1 on until '+until+'. I couldn’t reach zone 2, so I’ve logged that for our team.' : 'That’s done. Your heating will be '+(on?'on':'off')+' until '+until+', and then it goes back to its normal timetable'+(S.tt&&until!=='06:30'?nextOnClause():'')+'.';
+ return '<div class="outcome captured" data-testid="outcome-boost"><h3>Heating turned '+(on?'on':'off')+'</h3>'+rows+say(sayT)+autolog(S.partial?'fail':'ok')+
+ '<div class="outbtns"><button class="btn primary" data-testid="bp-finish" onclick="goWrap(\''+(on?'W6':'W8')+'\',\'action\')">Finish and add notes</button></div></div>';
+}
+
+/* ---------- Check and log ---------- */
+function goWrap(card, kind){S.wrapCard=card;S.wrapKind=kind;S.step='wrap';render();}
+function wrapHtml(){
+ var c=cardDef(S.wrapCard, true), existing=null;
+ S.actions.forEach(function(a){ if(a.tkt) existing=a.tkt; });
+ var did = S.actions.length ? '<ul>'+S.actions.map(function(a){return '<li>'+a.t+' '+a.txt+(a.tkt?' (logged automatically, ticket #'+a.tkt+')':'')+'</li>'}).join('')+'</ul>' : 'Nothing changed at the pub.';
+ var kindTxt = S.wrapKind==='no-action'?'No further action needed.':S.wrapKind==='advice'?'Customer will call their heating engineer.':S.wrapKind==='capture'?'For the IoT helpdesk to look at on the next working day.':'';
+ var btn = existing ? 'Add to ticket #'+existing+' and finish' : 'Log for the IoT helpdesk and finish';
+ return '<div class="reco wrapup" data-testid="wrap-up"><b class="hd">Check and log</b>'+
+ '<dl><dt>What the customer said</dt><dd>“The bar is freezing”</dd>'+
+ '<dt>What we found</dt><dd>'+c.h+'</dd>'+
+ '<dt>What we did</dt><dd>'+did+'</dd>'+
+ '<dt>What we’ll log</dt><dd>'+c.log+(kindTxt?' '+kindTxt:'')+'</dd></dl>'+
+ notesBox()+
+ '<div class="outbtns" style="margin-top:12px"><button class="btn primary" data-testid="wrap-submit" onclick="S.step=\'logging\';render();setTimeout(function(){S.logged='+(existing||TKT_NEW)+';S.issues.push({label:\''+c.h.replace(/’/g,'')+'\',tkt:S.logged});S.step=\'logged\';render()},900)">'+btn+'</button><button class="btn" onclick="S.step=\'card\';render()">Back</button></div></div>';
+}
+function loggedHtml(){
+ var items=[]; S.actions.forEach(function(a){items.push(a.txt)}); items.push('What the customer said and what we found'); if((S.notes||'').trim()) items.push('Your notes');
+ return '<div class="outcome applied" data-testid="logged"><h3>✅ Logged: ticket #'+S.logged+' is with the IoT helpdesk</h3><p>It contains:</p><ul style="margin:4px 0 0 18px">'+items.map(function(i){return '<li>'+i+'</li>'}).join('')+'</ul></div>'+
+ '<div class="outbtns" style="margin-top:10px"><button class="btn" onclick="reset(\'cold\')">➕ Add another issue</button><button class="btn primary">✔ End call</button></div>';
+}
+
+/* ---------- views ---------- */
+function interceptHtml(){
+ var rows=S.holds.map(function(h){var r=pbResult(h);return '<div class="zrow">'+(r||holdRowText(h)+' &nbsp;'+pbUi(h))+'</div>';}).join('');
+ var h0=S.holds[0];
+ return '<div class="reco" data-testid="reco-boost-hold"><b class="hd">We’ve already changed the heating here</b>'+rows+
+ say('We’ve already turned your heating '+(h0.dir==='on'?'on':'off')+' until '+h0.until+'. After that it goes back to its normal timetable'+nextOnClause()+'.')+
+ '<div class="outbtns">'+(S.actions.length?'<button class="btn" onclick="S.holdAck=true;render()">The customer needs something else</button><button class="btn primary" onclick="goWrap(\'W8\',\'action\')">Finish and add notes</button>':'<button class="btn primary" data-testid="bp-hold-continue" onclick="S.holdAck=true;render()">The customer needs something else</button><button class="btn" onclick="goWrap(\'W6\',\'no-action\')">No further action</button>')+'</div></div>';
+}
+function cardsView(){
+ var k=S.card, c=cardDef(k,true), hasBtn=!!c.dir;
+ var pick='<div class="chips" style="margin-bottom:8px">'+CARDS.map(function(x){return '<button class="chip'+(k===x[0]?' sel':'')+'" onclick="S.card=\''+x[0]+'\';S.variant=\'btn\';S.pb={};render()">'+x[1]+'</button>'}).join('')+'</div>';
+ var vt=(hasBtn&&k!=='W8H')?'<div class="chips" style="margin-bottom:10px"><button class="chip'+(S.variant==='btn'?' sel':'')+'" onclick="S.variant=\'btn\';render()">Turning on/off available</button><button class="chip'+(S.variant==='plain'?' sel':'')+'" onclick="S.variant=\'plain\';render()">Not available at this site</button></div>':'';
+ return pick+vt+cardHtml(k, S.variant==='btn');
+}
+function notesCompare(){
+ var step='<div class="stepq">What does the customer need?</div><div class="chips"><button class="chip">Too cold / not working</button><button class="chip">Too hot / wants it off</button></div>';
+ var old='<div style="margin-top:10px"><label style="display:block;font-size:0.85em;font-weight:600;margin-bottom:4px">Additional notes for the IoT team (optional)</label><textarea rows="2" style="width:100%;box-sizing:border-box;font-size:16px;padding:6px 8px;border:1px solid var(--border,#ccc);border-radius:6px;resize:vertical" placeholder="Anything the caller or site told you that isn’t captured above, e.g. engineer due at 7am"></textarea><div class="small" style="margin-top:3px;color:#666">For the ticket and the IoT team’s morning review. Not sent in urgent P1 texts. Keep it factual, no personal details.</div></div>';
+ return '<p class="mk-note">Same step, notes box as it is today (left) and as designed (right). Click into each to see the focus state. On phone-width screens the new box keeps 16px text so iPhones don’t zoom.</p><div class="mk-cmp"><div><h4>Today</h4><div class="mk-flow"><div class="mk-flowbody">'+step+old+'</div></div></div><div><h4>New</h4><div class="mk-flow"><div class="mk-flowbody">'+step+notesBox()+'</div></div></div></div>';
+}
+function flowBody(){
  var s=S.step;
- if(s==='cards') return cardsView();
+ if(s==='idle') return null;
  if(s==='notes') return notesCompare();
- if(s==='idle') return '<h3 style="margin-top:0">What is the caller reporting?</h3><p class="small">(Normal site page. The banner above is visible before any question is asked.)</p><button class="btn primary" onclick="S.step=\'stage1\';render()">Start heating questions →</button>';
+ if(s==='cards') return cardsView();
  if(s==='stage1'){
-  if(S.holds.length && !S.holdAck){
-   var lines=S.holds.map(function(h){var r=resultRow(h);return '<div class="zrow">'+(r||holdLine(h)+' &nbsp;'+cancelUi(h))+'</div>';}).join('');
-   var h0=S.holds[0];
-   return '<div class="zoneread"><span class="small">Pub zone 1 <b class="ok">on</b> · Pub zone 2 <b class="warn">off</b> · panel reported just now</span></div>'+
-   '<div class="reco" data-testid="reco-boost-hold"><b class="hd">OOH already has the pub heating on a timer</b>'+lines+
-   '<div class="k">Say to caller</div><p class="script">“We’ve already got the heating on a timed boost. It runs until '+h0.until+', then goes back to its normal timetable.”</p>'+
-   '<div class="outbtns"><button class="btn primary" data-testid="bp-hold-continue" onclick="S.holdAck=true;render()">The caller needs something else</button><button class="btn" onclick="S.step=\'noact\';render()">End with no action</button></div></div>';
-  }
-  return '<div class="stepq">What does the caller need?</div><div class="chips"><button class="chip" onclick="S.step=\'w6\';S.dir=\'on\';render()">Too cold / not working</button><button class="chip" onclick="S.step=\'w8\';S.dir=\'off\';render()">Too hot / wants it off</button></div>';
+  if(S.holds.length && !S.holdAck) return interceptHtml();
+  return '<div class="stepq">What does the customer need?</div><div class="chips"><button class="chip" onclick="S.step=\'card\';S.card=\'W6\';render()">Too cold / not working</button><button class="chip" onclick="S.step=\'card\';S.card=\'W8H\';render()">Too hot / wants it off</button></div>';
  }
- if(s==='noact') return '<div class="outcome noaction"><h3>Pub heating query: no action</h3></div>';
- if(s==='w6'||s==='w8'){
-  var on=s==='w6';
-  return '<div class="reco" data-testid="reco-boiler-panel"><b class="hd">'+(on?COPY.W6.h:COPY.W8.h)+'</b>'+
-  '<div class="k">What to tell the operator</div><p>'+(on?COPY.W6.boost.o:COPY.W8.boost.o)+'</p><div class="k">Say to caller</div><p class="script">“'+(on?COPY.W6.boost.s:COPY.W8.boost.s)+'”'+'</p>'+
-  '<div class="outbtns">'+(on?'<button class="btn boost-on" data-testid="bp-boost-on" onclick="S.step=\'zones\';S.sel=[];render()">Boost heat ON</button>':'<button class="btn boost-off" data-testid="bp-boost-off" onclick="S.step=\'zones\';S.sel=[];render()">Hold heat OFF</button>')+
-  '<button class="btn primary">Capture &amp; escalate for the IoT team</button><button class="btn">End with no action</button></div>'+
-  '<p class="mk-note" style="margin-top:8px">Was: one button per zone (“Heat ON (zone 1)”, “Heat ON (zone 2)”) that fired straight away.</p></div>';
- }
- if(s==='zones'){
-  var on2=S.dir==='on';
-  function chip(z){var p=S.sel.indexOf(z)>=0;return '<button class="chip'+(p?' sel':'')+'" aria-pressed="'+p+'" data-testid="bp-zone-'+z+'" onclick="toggleZone(\''+z+'\')">'+zl(z)+'</button>';}
-  return '<div class="reco" data-testid="reco-boost-zones"><b class="hd">'+(on2?'Boost heat ON':'Hold heat OFF')+': which area?</b>'+
-  '<div class="k">Say to caller</div><p class="script">“'+(on2?'Is it one part of the pub that’s cold, or the whole pub?':'Is it too warm in one part of the pub, or everywhere?')+'”</p>'+
-  '<p class="small">If they can say which area, pick that zone. If they’re not sure, pick All zones.</p>'+
-  '<div class="chips">'+chip('CHZ1')+chip('CHZ2')+'<button class="chip'+(S.sel.length===2?' sel':'')+'" data-testid="bp-zone-all" onclick="S.sel=[\'CHZ1\',\'CHZ2\'];render()">All zones / not sure</button></div>'+
-  '<div style="margin-top:12px;display:flex;gap:8px"><button class="btn primary" data-testid="bp-zones-continue" '+(S.sel.length?'':'disabled')+' onclick="S.step=\'dur\';render()">Continue</button><button class="btn" onclick="S.step=\''+(on2?'w6':'w8')+'\';render()">Back</button></div></div>';
- }
- if(s==='dur'){
-  var d=S.dir==='on'?[['30','30 minutes'],['60','1 hour'],['120','2 hours']]:[['60','1 hour'],['120','2 hours'],['until-0700','Until 07:00']];
-  return '<div class="reco" data-testid="reco-boost-dur"><b class="hd">Heat '+(S.dir==='on'?'ON':'OFF')+': '+S.sel.map(function(z){return zl(z).toLowerCase()}).join(' + ')+'</b><p style="margin:6px 0">How long?</p><div class="chips">'+
-  d.map(function(x){return '<button class="chip" onclick="S.step=\'sending\';render();setTimeout(function(){S.step=\'result\';render()},1000)">'+x[1]+'</button>'}).join('')+'</div></div>';
- }
- if(s==='sending') return '<div class="alert info">Sending boost…</div>';
- if(s==='result'){
-  var partial=S.scen==='result-partial';
-  var until=S.dir==='on'?'21:30':'07:00';
-  var rows=S.sel.map(function(z,i){
-   if(partial&&i===1) return '<div class="zrow" data-testid="boost-zone-result-'+z+'">❌ '+zl(z)+': couldn’t reach the panel, <b>not boosted</b>.</div>';
-   return '<div class="zrow" data-testid="boost-zone-result-'+z+'">✅ '+zl(z)+': heat '+(S.dir==='on'?'ON':'OFF')+' until <b>'+until+'</b></div>';
-  }).join('');
-  if(!S._added && !partial){S._added=1;S.sel.forEach(function(z,i){S.holds.push({id:'n'+i,zone:z,dir:S.dir,until:until,by:'You'})});setTimeout(render,0);}
-  if(!S._added && partial){S._added=1;S.holds.push({id:'n0',zone:'CHZ1',dir:'on',until:until,by:'You'});setTimeout(render,0);}
-  return '<div class="outcome captured" data-testid="outcome-boost"><h3>Heat '+(S.dir==='on'?'ON':'OFF')+': pub heating</h3>'+rows+
-  '<p style="margin-top:8px">Ticket #48213 raised. The IoT team will check the panel after the boost ends.</p></div>'+
-  '<div class="outbtns" style="margin-top:10px">'+(partial?'<button class="btn primary" data-testid="bp-capture">Capture for the IoT team</button>':'')+'<button class="btn">Done, end this issue</button></div>'+
-  '<p class="mk-note" style="margin-top:8px">The site page refreshes after a boost, so the banner above now shows the new hold with “Cancel early”.</p>';
- }
+ if(s==='card') return cardHtml(S.card, true);
+ if(s==='zones') return zonesHtml();
+ if(s==='dur') return durHtml();
+ if(s==='sending') return '<div class="alert info">Turning the heating '+(S.dir==='on'?'on':'off')+'… this can take up to a minute while the heating controls confirm.</div>';
+ if(s==='result') return resultHtml();
+ if(s==='wrap') return wrapHtml();
+ if(s==='logging') return '<div class="alert info">Logging…</div>';
+ if(s==='logged') return loggedHtml();
  return '';
 }
-function toggleZone(z){var i=S.sel.indexOf(z);if(i>=0)S.sel.splice(i,1);else S.sel.push(z);render();}
 function render(){
  document.getElementById('nav').innerHTML=SCEN.map(function(x){return '<button class="'+(S.scen===x[0]?'on':'')+'" onclick="reset(\''+x[0]+'\')">'+x[1]+'</button>'}).join('');
  document.getElementById('banner').innerHTML=banner();
- var fh=flow(); var showNotes=['idle','notes','sending'].indexOf(S.step)<0;
- document.getElementById('flow').innerHTML=fh+(showNotes?notesNew():'');
+ document.getElementById('callsofar').innerHTML=S.issues.length?'<div class="callsofar"><b>This call so far:</b> '+S.issues.map(function(i){return '<span class="tag blue">'+i.label+'</span> <span class="small">#'+i.tkt+'</span>'}).join(' ')+'</div>':'';
+ var body=flowBody(), el=document.getElementById('flow');
+ if(body===null){el.innerHTML='<div class="card"><h3 style="margin-top:0">What is the customer reporting?</h3><p class="small">Normal site page. The banner above shows before any question is asked. Use “Put back to normal now” on a row.</p><button class="btn" onclick="S.step=\'stage1\';render()">Start the heating questions →</button></div>';return;}
+ if(S.step==='notes'){el.innerHTML=body;return;}
+ var showNotes=['wrap','logged','logging','sending','cards'].indexOf(S.step)<0;
+ el.innerHTML='<div class="mk-flow"><div class="mk-flowhead"><span style="font-size:18px">🔥</span><b>Heating</b><span class="small" style="margin-left:6px">guided flow</span><button class="btn link" style="margin-left:auto">Cancel issue</button></div><div class="mk-flowbody">'+
+  '<div class="stepdone"><span>💬</span>Customer’s words: “The bar is freezing”</div>'+body+(showNotes?notesBox():'')+'</div><div class="mk-flowfoot"><span>You: <b>Kelly</b></span><span style="margin-left:auto">Each issue is logged to a ticket when you finish it</span></div></div>';
 }
-reset('banner');
+reset('site');
 </script>
 
 </body></html>

@@ -1,359 +1,379 @@
 <!-- gate:contract
 SECTION: What we are building
-OOHDASH-144 design, revised 2026-10-25 to take in what the v1.5.3 release was trying to do. Four things for the pub heating boost shipped in OOHDASH-141. 1. An operator can end a boost early. 2. An operator can boost more than one pub zone in one go. 3. The heating answer cards match the buttons they show, so a card never says "we can't change it from here" next to a button that does. 4. The three cards that have been blank since v1.5.0 are fixed. 5. The operator's notes box, which appears on every flow, gets text the same size as everything around it and its own subtle, distinct panel. Your discovery choices are built in: cancel appears in both places, and multi-zone ships in this ticket. Cancel uses the existing revert. It sets the zone back to automatic, exactly like a boost that ran out of time. No new kind of write to the panel, no schedule changes. A clickable mockup of every new and changed screen is attached.
+OOHDASH-144 design, third version (2026-10-25), rebuilt around your review of the prototype. It does two jobs. First, it finishes the pub heating work: an agent can turn the heating on or off for a set time across one or more zones, put it back to normal early, and see clearly what the heating will do afterwards. Second, it sets a new standard for every screen an agent uses: plain words, one unmistakable script to read to the customer, and one clear way of logging each issue with the ticket number always shown. This ticket applies the standard fully to pub heating. A follow-on ticket rolls it out to every other flow (hot water, kitchen, lighting, fans, fridge, contractor, connectivity, other), using the inventory already gathered. Nothing changes the heating timetable itself, and nothing goes live without your go.
 
-SECTION: What changed since discovery: the v1.5.3 release
-v1.5.3 (released and rolled back on 2026-10-25) changed this same code. Its goals are now part of this ticket and are redone properly here; it does not ship separately. It did two things. First, it removed broken empty branches that have made three answer cards (summer mode, back-up cycle, already off) show a blank card with no buttons since v1.5.0. That was a real defect, and it is still live on v1.5.2 today. Second, it changed the too-hot card so it no longer says "we can't switch it off" when the Heat OFF button is showing. That was the right idea, but the edit used curly quote marks in the code, which stopped every triage flow loading. That is why it was rolled back. It also fixed only one of the four cards with this problem. The fix is needed and is kept in this design; the method is redone. Main still holds the broken v1.5.3 code, so the build starts from main and replaces it.
+SECTION: Your review points, checked across every flow
+You asked that every point be checked everywhere, not just where you saw it. The code check found the following. The "tell the operator" label plus a separate script appears in every flow. Pub heating has three look-alike blocks, and the other 35 outcomes print the guidance right above an unlabelled script. The word "caller" is on about 77 screen lines and "customer" on none. Technical words are everywhere: override (about 80 lines), panel (about 40), forced, setpoint, back-up cycle, offline, gateway, and internal codes like W3 shown on screen. There are three different ways tickets get made, and a turned-on heating ticket is invisible to the rest of the flow, so logging afterwards makes a second ticket. Notes typed after turning the heating on are silently lost. "Ticket raised" can show with no ticket. Two of my own prototype labels ("Hold heat OFF", "Done, end this issue") do not exist in the app and are dropped. The full table is in section 2 of the design.
 
-SECTION: Discovery re-check: what still holds and what is new
-All eight discovery answers (Q1 to Q8) still hold; v1.5.3 touched none of them. The five-part fix plan still holds. The re-check found three new things, now in scope. A. Four cards contradict their own buttons (too cold: part off, switched off on purpose, off on its timetable; too hot: on). The wording you approved on 2026-10-23 was written before boost existed, and OOHDASH-141 added the buttons without changing the words. B. The cards blame the panel for OOH's own boost. If an OOH heat-OFF hold is running and the caller is cold, the card says the zone was "deliberately switched off at the boiler panel" and offers a Heat ON on top. The right answer is "OOH has this on a timed hold; cancel it". C. When the operator logs a call instead of boosting, the ticket copies the screen wording, which tells the operator what to do. Tickets will now use the plain ticket sentence each card already has.
+SECTION: The new screen standard
+Every answer card has the same three parts, in this order. 1. A short headline in plain words saying what is happening. 2. "Say to the customer": the words to read out, in one clearly marked block with a coloured edge and tinted background, so it is impossible to miss. 3. "Good to know" (for the agent only, never read out): shown only when it genuinely helps, for example "check with the customer before turning it back on, someone may have switched it off on purpose". If there is nothing useful to add, the section is left out. The old "ticket sentence" leaves the card; what gets logged is shown once, at the end, in the check-and-log step. Words follow one glossary: customer (never caller or operator); heating controls (never panel); turn heating on / turn heating off; put back to normal; switched off by hand (never forced); target temperature (never setpoint); no internal codes.
 
-SECTION: Two corrections to discovery, found in the code
-1. Who can cancel. Discovery said to lock the new cancel route to the IoT-team role. That would block the OOH handlers, who are the people taking the calls. The boost route itself is open to anyone signed in (handler or IoT team). The existing admin cancel is already IoT-team only, which is the real reason handlers cannot cancel today. This design lets anyone who can start a boost also cancel one, at that site only. Decision 1 below asks you to confirm.
-2. The boost result card never shows its end time. The card reads a field called revertAt but the server sends revertAtMs, so the "Override active until" line is silently missing today. The new result card fixes this.
+SECTION: One way of logging each issue
+Every issue now ends the same way: a "Check and log" step. It lists what the customer said, what we found, and everything we did, with times. It also holds the notes box. One button finishes it. If nothing has been logged yet, the button is "Log for the IoT helpdesk and finish" and it creates the ticket. If we already logged automatically (because we changed the heating), the button is "Add to ticket #48213 and finish" and it adds to that same ticket, never a second one. After finishing, a green banner says "Logged: ticket #48213 is with the IoT helpdesk" and lists what it contains. Then come the existing "Add another issue" and "End call" buttons. "End with no action" is gone. Before anything is done, the choice is "No further action", which still goes through Check and log and still makes a ticket. After an action, Check and log is the only way out.
 
-SECTION: How cancel works
-The site page asks the server for any boost still running at that site. The server now lists them (zone, ON or OFF, end time, who started it). If there are any, a banner shows above the questions with a "Cancel early" button per zone. A second tap confirms ("Yes, cancel"); there are no pop-up dialogs. The server checks three things before it acts: the site is confirmed for this call, the hold belongs to THAT site, and the hold is still running. Then it runs the same revert a timed boost uses. That revert takes up to about 20 seconds because it waits for the panel to confirm, so the button says "Cancelling, this can take up to 30 seconds".
+SECTION: Telling the agent when we logged something automatically
+Changing the heating logs a ticket straight away, so the automatic switch-back later can write its result onto it. The screen now says so plainly, with the number: "We've logged this automatically to the IoT helpdesk as ticket #48213, because we changed the heating at the pub." If the heating controls don't respond, it adds the reason: "there may be a problem with the equipment or its internet connection." If the automatic ticket could not be made, the screen never claims it was. It says "We couldn't log this automatically. It will be logged when you finish," and Check and log then creates it and links it to the timer.
 
-SECTION: What the operator is told after a cancel
-The message depends on what actually happened at the panel, never just on the click. Back to automatic: "Pub zone 1 boost (or hold) cancelled. The zone is back on its normal timetable." The panel was already back on automatic: same message. Someone else changed the zone the other way: "Someone else has changed pub zone 1 since the boost, so we left it alone. Logged for the IoT team." The panel has not confirmed yet: "Cancel sent. The panel has not confirmed yet; we will keep trying for the next few minutes and the IoT team is alerted if it does not take." The hold had already ended: "This has already ended. Refreshing." In every case the boost ticket gets a note saying who cancelled it and when.
+SECTION: Explaining zones to the customer
+When the pub has more than one heating zone, the agent reads: "Your heating is split into sections, called zones, which were set up with the original pipework. Our system can't see which rooms each zone covers. Do you know which part of the pub each one heats? If you're not sure, I'll turn on all of them." (or "turn off"). The choices are "Zone 1 only", "Zone 2 only" and "All zones (not sure)". Nothing is pre-selected. With only one zone, the question is skipped.
 
-SECTION: Heating questions when a boost is running
-When the operator picks Bar/Restaurant heating and a boost is still running there, the first screen shows a short card before the usual Too cold / Too hot question. The card says what is running, under the headline "OOH already has the pub heating on a timer", for example "Pub zone 1: heat ON boost until 21:30, started by Kelly", plus "Cancel early" and "The caller needs something else". The card is built from OOH's own boost record, not from the panel reading. So it is right even if the panel reading is wrong, which keeps it clear of the OOHDASH-143 reading bug (fixed in v1.5.2, but this does not depend on that fix).
+SECTION: Saying what "normal" means
+Where the timetable can be read, the screens now say what happens next, instead of just "back to its normal timetable". For example: "then it goes back to its normal timetable, which next comes on at 06:30 and heats the pub to 21°C." The timetable is read from the heating controls for each zone. One fact is still unconfirmed with Spencer: which weekday the stored timetable starts on (question SQ-13). So the time is only shown where that zone's timetable is the same every day, which makes the weekday irrelevant. Otherwise the sentence stays "back to its normal timetable".
 
-SECTION: Picking zones for a boost
-Today each zone has its own "Heat ON (zone 1)" button that fires straight away. That changes to one button: "Boost heat ON" for too cold, "Hold heat OFF" for too hot. If only one zone is eligible, it goes straight to "How long?" as today. If two zones are eligible, a new step asks the caller which area. It shows a chip for each zone and "All zones / not sure". Continue stays greyed out until at least one zone is picked. The zones are called "Pub zone 1" and "Pub zone 2", because ThingsBoard holds no room names. Script for too cold: "Is it one part of the pub that's cold, or the whole pub?" Script for too hot: "Is it too warm in one part of the pub, or everywhere?"
+SECTION: Turning the heating off until it's next due on
+The fixed "Until 07:00" choice becomes "Until 06:30, when it's next due on". Good to know adds: "it heats to 21°C if the room is cooler than that." The server works out the time itself from the timetable, never trusting the screen. It uses the earliest next-on time of the chosen zones, so no zone stays off past its on time. Where the time can't be worked out safely (the timetable isn't the same every day, can't be read, or is more than 11 hours away), the choice falls back to "Until 07:00", as you decided in OOHDASH-141. The 11-hour limit keeps every switch-back inside the system's 12-hour retry window.
 
-SECTION: Heating answer cards: one wording rule
-Each card now has two versions. The plain version is used when the button is not offered, and is your approved wording unchanged. The boost version is used when the button is offered: it says the operator can switch the heating on (or off) for a set time, that it goes back to its normal timetable afterwards, and that it is logged for the IoT team either way. It never promises the result before it happens; v1.5.3's "I'll do that now" is dropped, because the operator still has to pick the zone and how long. Headlines state the situation only (for example "Pub heating is on"), so they read correctly in the ticket too. Where a zone is under an OOH boost, the card says so ("Pub zone 1 is on a timed OOH boost until 21:30") and offers "Cancel early" instead of a button pushing the opposite way. The same words are used everywhere: heat ON for a set time is a "boost", heat OFF for a set time is a "hold", and every cancel button says "Cancel early". The three blank cards get your approved wording back, unchanged. Every new sentence is in the mockup for you to read.
+SECTION: Putting the heating back to normal early
+A banner at the top of the site page shows anything we've changed ("Pub zone 1: heating turned on until 21:30, by Kelly") with "Put back to normal now". The same appears at the start of the heating questions. A second tap confirms. The result is in plain words: "Pub zone 1 is back to normal. Noted on ticket #48213." If the controls haven't confirmed yet: "We've asked the heating to go back to normal. If the heating doesn't switch off in the next few minutes, the IoT helpdesk is alerted automatically on ticket #48213." If someone changed it by hand since: "we've left it as it is, and logged it on ticket #48213 for the IoT helpdesk to check." The server checks the site is confirmed for this call and that the timer belongs to that site.
 
-SECTION: Operator notes box: same size, clearly its own area
-Added to scope on 2026-10-25 at your request. The "Additional notes for the IoT team" box appears on every flow, on the ambiguous-site screen, on the Tonight query and after a ticket is made. Today its text and example text are 16px, larger than the 14px used everywhere else. That size was chosen in OOHDASH-119 to stop iPhones zooming in when you tap the box, but it was applied on every screen, not just phones. The box also looks like any other part of the page. The new design: text and example text at 14px like the rest of the page, kept at 16px on phone-width screens only so the no-zoom behaviour stays. The box sits in its own light panel: a pale grey-blue background, a thin border, and a soft violet stripe down the left edge, with a small 📝 label. When you click into it, the edge highlights the same way the search boxes do. It stays visually secondary: no bold colour, no extra size. The label, example text, helper line and the 1000-character counter are unchanged. The same style is used for the "Add a note to ticket" box after a ticket is made. The mockup shows it before and after.
-
-SECTION: Boost result card
-The result lists each zone separately, using what the panel reported back, not just what was picked. Confirmed: "Pub zone 1: heat ON until 21:30." Sent but not yet confirmed: "Pub zone 2: sent, the panel has not confirmed yet. It will still switch back at 21:30." Could not reach the panel: "Pub zone 2: could not reach the panel, NOT boosted." That last case adds a "Capture for the IoT team" button. After any boost the site page refreshes, so the cancel banner shows straight away. If the operator picked the wrong zone, they can undo it at once.
+SECTION: Two live defects fixed separately first
+As agreed, a small v1.5.4 hotfix goes out ahead of this work, built and gated separately. It fixes the three blank heating cards (summer setting, room-sensor timer, already off) and the pub heating "End with no action", which fails on every card today. It changes no wording. This design builds on top of it and then replaces those screens with the new standard.
 
 SECTION: Tests the build must add
-Server: a cancel works for a running hold; a hold from another site gets a not-found; a hold that has ended gets a not-found; a non-boiler hold gets a not-found; an unconfirmed site is refused; each panel outcome gives the right result; and the workspace lists only running boiler holds for that site. Browser (Playwright): banner shows and cancel works; the second-tap confirm; the stale hold refresh; the hold card at the start of the questions; the zone picker with one zone, two zones and All zones; Continue greyed out with nothing picked; and a two-zone result where one zone fails. The existing BB-E1 to BB-E7 tests are updated for the new single entry button. New card tests: all nine heating cards render a headline and buttons (this guards against the blank-card bug coming back); the plain and boost versions of the four changed cards; and the OOH-hold versions. A syntax check of every browser script runs in the unit tests, so a typo like v1.5.3's fails at once. Notes box tests: text is the same size as the page on desktop and stays 16px on phones; the panel and focus highlight are present.
+Server tests: putting the heating back to normal works for that site only, refuses another site's timer, handles every result the heating controls can give, and a finished issue adds to the existing ticket instead of creating a second one, only for the agent and site that made it. Also: the zone timetable is read correctly, including zone 2 on newer controls, and is shown only when it is the same every day. The "until next due on" time is worked out on the server and falls back to 07:00. Browser tests walk every heating screen. They check: one script block per card, no internal codes or banned words on screen, the zone question, both directions, "All zones", the result rows including a failed zone, the automatic-ticket message with its number, and Check and log in both forms (new ticket, add to existing). There is a syntax check of every browser script, and the notes box styling.
 
 SECTION: What does not change
-No schedule or optimum-start keys are written. Cancel only ever sets a zone to automatic (0). The boiler output and output1Override are never written. The kill-switch exemption for reverts applies to cancel unchanged. The backend already accepts several zones in one boost, so no new write path is added. Nothing is released or switched on in production without your go.
+No timetable or optimum-start settings are ever written. Putting back to normal only ever returns a zone to automatic. The boiler output and output1Override are never written. The kill-switch exemption for switch-backs is unchanged. The other flows keep today's screens until the follow-on ticket. Nothing is released or switched on in production without your go.
 
-DECISION: Who can cancel a running boost | Anyone who can start a boost, handler or IoT team, at that site only (recommended) | IoT team only
-DETAIL: Discovery said IoT team only, but handlers take the calls and can already start a boost. IoT-team-only would leave the handler who boosted the wrong zone unable to undo it. Either way the server checks the hold belongs to the confirmed site.
+DECISION: Who can put the heating back to normal early | Anyone who can change the heating, handler or IoT team, at that site only (recommended) | IoT team only
+DETAIL: Handlers take the calls and can already turn the heating on or off. Limiting it to the IoT team would leave a handler who picked the wrong zone unable to undo it. Either way the server checks the timer belongs to the confirmed site.
 
-DECISION: All zones / not sure when the caller is too hot | Allow it for Heat OFF as well as Heat ON (recommended) | Heat ON only; Heat OFF needs a zone picked
-DETAIL: All zones OFF turns off all pub heating for the chosen time. It is safe to allow because cancel now exists, the hold always switches back to the timetable, and the OFF time choices are the existing ones (1 hour, 2 hours, until 07:00). Restricting it means the operator must guess a zone when the caller is unsure.
+DECISION: "All zones (not sure)" when the customer is too hot | Allow it for turning off as well as on (recommended) | Turning on only; turning off needs a zone picked
+DETAIL: All zones off turns off all the pub heating for the chosen time. It is safe to allow because it can be put back to normal at once, and the off time never runs past the next on time or 07:00. Nothing is pre-selected either way.
 
-DECISION: New boost wording for the four heating cards that offer a button | Approve the wording in the mockup (recommended) | Approve with changes noted in your review
-DETAIL: This replaces v1.5.3's one-card change with a consistent set across all four cards (part off, switched off on purpose, off on its timetable, and on). Your approved 2026-10-23 wording stays exactly as it is whenever no button is shown, and on the five cards that never offer one. The mockup's "Heating answer cards" scenarios show each card with and without the button, and with an OOH boost running.
+DECISION: The new screen standard and wording for pub heating | Approve as shown in the prototype (recommended) | Approve with changes noted in your review
+DETAIL: This covers the three-part card (headline, Say to the customer, optional Good to know), the glossary, and every pub heating screen's wording. It replaces the 2026-10-23 wording, which predates turning the heating on or off from here. The prototype shows every card. The same standard then goes to the follow-on ticket for the other flows.
+
+DECISION: How each issue is logged | One ticket per issue: anything logged automatically is added to at Check and log (recommended) | A separate ticket for each action and for the final log
+DETAIL: One ticket per issue means the IoT helpdesk sees the full story in one place: what the customer said, what we changed, the automatic switch-back result, and the agent's notes. The alternative is today's behaviour, which gives two tickets whenever the agent changes the heating and then logs the call.
 -->
 
-# OOHDASH-144 Design: cancel a running pub heating boost + multi-zone boost + consistent heating cards
+# OOHDASH-144 Design (v3): pub heating on/off for a set time, put back to normal, and the new agent-screen standard
 
-Date: 2026-10-25 (revised the same day to absorb v1.5.3) · Discovery: PR #146 (merged; D1 = C both surfaces, D2 = bundle) · Base: main `9e9957f` (v1.5.3 in git; **prod rolled back to v1.5.2** image `v1.5.2`)
+Date: 2026-10-25 · Discovery: PR #146 (merged; D1 = C both surfaces, D2 = bundle) · Revised after James's prototype review (2026-10-25) · Base: main `7a55e7f` (v1.5.3 code reverted; prod on image `v1.5.2`) · Depends on: v1.5.4 hotfix (blank W4/W7/W9 cards, pub heating no-action 400)
 
-**Clickable mockup:** [OOHDASH-144 mockup](mockups/OOHDASH-144-mockup.html)
+**Clickable prototype (UI only):** [OOHDASH-144 prototype](mockups/OOHDASH-144-mockup.html)
 
-## 1. Summary
+## 1. Scope (James, 2026-10-25)
 
-Five changes, all on top of the OOHDASH-141 boost machinery:
+| Decision | Choice |
+|---|---|
+| Scope | 144 **sets** the standard (card layout, glossary, ticket model) and applies it fully to the pub heating (boiler-panel) flow. A follow-on ticket applies it to every other flow. |
+| Live defects | Separate v1.5.4 hotfix first: W4/W7/W9 blank cards and `bp-noact` 400. No wording change. |
+| "Off until" | Dynamic next-on time where safe (that zone's timetable is the same every day); else 07:00 |
+
+Change list:
 
 | # | Where | Change |
-|---|-------|--------|
-| A | `routes/api.js` `workspacePayload()` | add `activeBoostHolds` |
-| B | `routes/api.js` | new `POST /api/sites/:siteNo/booster-holds/:id/cancel` |
-| C | `services/overrides.js` | record `revertOutcome` on the hold doc; cancel note on Zendesk |
-| D | `public/js/views.js` | boost-hold banner (site page, above the flow) |
-| E | `public/js/flows.js` | hold-active intercept, single boost entry, `bp-zones` step, per-zone result card |
-| F | `public/js/flows.js` `bpOutcomeCard` | absorbs v1.5.3: replaces the broken W8 block, keeps the W4/W7/W9 branch fix, adds boost-aware and OOH-hold-aware wording for W3/W5/W6/W8 (§7.5–7.7) |
-| G | `test/browser-js-syntax.test.js` (new) | every `public/js/*.js` must compile (guards against a repeat of v1.5.3) |
-| H | `public/js/notes.js` + `public/css/styles.css` | notes box: inline styles move to classes; 14px text (16px on phones); distinct secondary panel (§7.9) |
-
-No change to `services/control.js` `dispatchBoilerBoost()` (already takes `zones: [...]`), `tb-client.js`, `registry.js`, `boost-window.js`, or config/flags.
-
-## 2. Corrections to discovery (code-verified)
-
-1. **Route role.** Discovery specified `requireRole('iot')`. In code `requireRole` is exact-match and handlers carry role `handler` (`services/auth.js:219`). The admin router is already `requireRole('iot')` (`routes/api.js:565`), which is why handlers cannot cancel today. `POST /api/boiler-boost` (`routes/api.js:275`) has no role gate, so any signed-in OOH user can start a boost. Design: the cancel route has the **same** gate as boost (signed-in, any OOH role) plus the site checks in §4. Decision 1 asks James to confirm.
-2. **Result card end time is broken today.** `flows.js:1037` reads `act.revertAt`; the action returned by `dispatchBoilerBoost` carries `revertAtMs` (`control.js` action object). The "Override active until" line never renders. Fixed in the new result card (§7.4).
-3. **Workspace query is polled.** Discovery said the holds read is "not a standing background poll". `scheduleWorkspaceRefresh()` (`views.js:143`) re-fetches the workspace every 30 s while the site page is idle. The extra read is the same in-process partition filter `activeOverrides()` already uses (hundreds of docs). It is acceptable but noted, and it fails soft (§3).
-4. **Zendesk note needs no new parameter.** `cancelOverride()` already writes `doc.cancelRequestedBy`; `addBoostRevertNote(ticketId, doc, result)` receives the doc. The note reads it from there, so no `cancelledBy` parameter is added.
-5. **A cancel can come back "not yet".** If the revert is not confirmed in 20 s, `revertBoiler()` puts the hold back to `status:'active'` with `OohOverrideRevertAt = now + 5 min` and retries for up to 12 h (`overrides.js:415-428`). The cancel response and the banner handle this "ending" state (§4.3, §6).
-
-6. **v1.5.3 is in main but not in production.** Commit `3cd2e99` (released as v1.5.3, image `9e9957f`) did two things in `bpOutcomeCard`. (a) It removed the empty duplicate `else if (wcode === 'W4') {}` / `'W7'` / `'W9'` branches added by OOHDASH-141 (`f0f8369`, in every release from v1.5.0). Those branches leave `headline`, `operatorText`, `scriptText`, `ticketText` and `buttons` undefined, so summer mode, back-up cycle and too-hot-but-off show a blank card reading "undefined" with **no buttons**. This is live on v1.5.2 today. (b) It made W8 wording conditional on the Heat OFF button. But the W8 block was retyped with curly quotes (‘ ’) as JS string delimiters, so `flows.js` failed to parse (CI red on both commits; deployed anyway; rolled back to image `v1.5.2` on 2026-10-25). The build starts from main and must leave **no** curly-quote delimiters (§7.5, test SYN-1).
-7. **Approved wording predates boost.** The W1–W9 wording was approved on 2026-10-23 (OOHDASH-139 D1). OOHDASH-141 added Heat ON/OFF buttons to W3, W5, W6 and W8 on 2026-10-24 without changing the words. So each of those cards says "can't change it from here" next to a button that can. v1.5.3 fixed W8 only, and its new script ("I'll do that now") promises a result before the operator has picked zone or duration.
-8. **Cards misattribute OOH's own holds.** `boilerHeatingOutcome()` sees an OOH OFF hold as `forced:'off'`, so a cold call returns W5: "deliberately switched off at the boiler panel", with Heat ON offered on top. An OOH ON boost shows the forced-on sentence "switched on at the panel". If the operator passes the intercept (§7.1), the card blames the panel or an engineer for OOH's action. It also offers a button that stacks an opposite override instead of cancelling the existing one.
-9. **Captures copy the operator instructions into the ticket.** `bp-esc` / `bp-advice` call `bpOutcomeCard(wcode, heating, nowMs)` without `boostAvailable` and send `card.operatorText` as the capture detail. That text is written to the operator ("Log it for the IoT team…"), not for the ticket.
-
-10. **Per-zone dispatch return shape (verified; answers the design-panel block of 2026-10-25).** `dispatchBoilerBoost()` already loops zones and returns per-zone results, so no `control.js` change is needed. Each zone pushes `{ zone, outcome, dispatchError, panelVersion }` to `zoneOutcomes` (`services/control.js:693`), where `outcome` is `CONFIRMED`, `IN-FLIGHT-TIMEOUT` or `NON-DELIVERY`. Each zone whose hold persists pushes `{ zone, overrideId }` to `overrideIds` (`control.js:725`). The returned action carries `zones: zoneOutcomes` (`control.js:780`), `clamped` (`:785`), `revertAtMs` (`:786`) and `overrideIds` (`:788`). One `revertAtMs` applies to all zones, because one clamp is computed per request. Guardrail validation runs for every zone before any write (`control.js` zone-validation loop), so a bad zone rejects the whole request rather than leaving half of it done.
-
-## 3. Workspace extension: `activeBoostHolds`
-
-In `workspacePayload(site)`, after `boostAvailable`, call a new `overrides.activeBoostHoldsForSite(site.siteNo)` inside a try/catch. On error, log `[API] Boost holds unavailable: <message>` and set `activeBoostHolds = null`. Add `activeBoostHolds` to the returned payload.
-
-New export `activeBoostHoldsForSite(siteNo)` in `services/overrides.js`. It uses `collection('OohOverrides').query(...)` with the predicate `status === 'active' && deviceType === 'boiler-panel' && String(siteNo) === String(siteNo arg)`. It sorts by `boilerZone` and maps each doc to the fields in the table below. `revertAt` comes from `OohOverrideRevertAt`, and `ending` is `!!(cancelRequestedBy || revertAttempts)`.
-
-Payload field: `activeBoostHolds: Array<Hold> | null`. `null` means the read failed. The client then shows no banner and no intercept, which is today's behaviour. `[]` means none running.
-
-| Field | Type | Notes |
 |---|---|---|
-| `id` | string | hold doc id, used by the cancel route |
-| `deviceId` | string | boiler panel |
-| `boilerZone` | `"CHZ1"`/`"CHZ2"` | shown as "Pub zone 1/2" |
-| `direction` | `"on"`/`"off"` | |
-| `panelVersion` | `"v1"`/`"v2"` | not shown; kept for tests/logs |
-| `revertAt` | ISO string | end time, shown HH:MM en-GB |
-| `holdLabel` | string or null | not shown (internal wording) |
-| `createdBy` | string or null | operator name |
-| `ending` | bool | true when a cancel or revert retry is already in flight: show "Returning to timetable…", no Cancel button |
+| A | `routes/api.js` `workspacePayload()` | `activeBoostHolds` (§4) |
+| B | `routes/api.js` | `POST /api/sites/:siteNo/booster-holds/:id/cancel` (§5) |
+| C | `services/overrides.js` | `revertOutcome` on hold doc; cancel prefix on Zendesk note (§5) |
+| D | `services/tb-device.js`, `services/schedule.js` | read `CHZ2.schedule`; per-zone `timetable` decode (§6) |
+| E | `services/boost-window.js`, `services/control.js` | `until-next-on` duration resolved server-side (§7) |
+| F | `routes/api.js` `POST /outcomes` | append to an existing auto-created ticket (`appendToHoldId`), link new tickets to holds (§9) |
+| G | `public/css/styles.css` | `.say`, `.gtk`, `.autolog`, `.wrapup`, notes-box classes (§8, §11) |
+| H | `public/js/flows.js` | heating cards rebuilt on the standard; `bp-zones`; durations; result; **Check and log** (`wrapUpStep`) (§8–§10) |
+| I | `public/js/views.js` | banner (§10.1) |
+| J | `public/js/notes.js` | notes-box restyle (§11) |
+| K | tests | §13 |
 
-`status:'reverting'` (lease held mid-revert) and `revert-failed` are not listed. During the up-to-12-hour retry window a hold that did not confirm stays `active` with `revertAttempts > 0`, so it remains in the banner as "ending" (no Cancel button). It drops off only once it is finally marked `revert-failed`, at which point the IoT alert, the ticket note and the Admin overrides table carry it (design-panel advisory: accepted as is). Those are IoT-team matters already alerted and noted on the ticket. (`holdLabel`, `createdBy` and `siteNo` are the persisted names, verified in `scheduleOverride()`.)
+## 2. Review findings, cross-referenced across every flow (code-verified)
 
-## 4. Cancel route
+| James's point | Where it occurs | Evidence | Fixed in |
+|---|---|---|---|
+| "Tell the operator" label plus a separate script: two look-alike blocks | All flows | Heating: 3 labelled blocks (`flows.js:1065-1074`). The other 35 outcomes print guidance as a plain paragraph above an unlabelled `.script` (`outcomeCaptured/P1/Scope/NoAction`, `flows.js:328-421`; `control.js:285-412`). The confirm step repeats the guidance (`flows.js:263-273`). `.script` has the same background as `.reco` (`styles.css:113-114`). `.k` and `.tkt` have no CSS. | 144: heating. Follow-on: all others. |
+| "Caller" instead of "customer" | All flows | About 77 on-screen lines; "customer" is used 0 times | 144: heating. Follow-on. |
+| Technical wording | All flows | override (~80 lines), panel (~40), forced (14), setpoint (16), back-up/fallback (11), offline (17), gateway (12), revert, Salus, "W3" shown via `doneLine('Outcome: W3')` (`flows.js:1063`), raw device ids (`flows.js:1198`) | 144: heating. Follow-on. |
+| "End with no action" after an action | Heating | It sits beside the turn-on/off buttons (`flows.js:795-872`). It reappears for a 2nd heating issue on the same call. **It fails on every pub heating card** (empty `detail` → 400, `flows.js:958` vs `api.js:376`). | Hotfix (400). 144 (model). |
+| Auto vs manual tickets; ticket evidence | All outcomes | 3 models: chip then Record (`/outcomes`); automatic on boost dispatch (`control.js:737`); at control "Done" (`control.js:330`). The boost ticket is never registered in the flow (`flows.js:1045`), so a later capture is a 2nd ticket. Notes after a boost are lost (the `%%NOTESPOST%%` path is not used). "Ticket raised" shows even if the ticket failed (`flows.js:1042`). A silent late-sync ticket (`control.js:394, 420`). | 144: heating + model. Follow-on: control, others. |
+| "Normal timetable" not explained; 07:00 fixed | Heating | `nextChange` is one panel-wide string, possibly from a DHW key (`tb-device.js:1307`). `CHZ2.schedule` is never read (`:1380`). 07:00 = OOHDASH-141 James-2. | 144 (§6, §7) |
+| Zones not explained | Heating | No zone explanation exists today | 144 (§8.4) |
+| Prototype-only labels | Mockup | "Hold heat OFF" and "Done, end this issue" don't exist in code; live is "Heat OFF (zone N)" and "Add another issue" / "End call" | Dropped |
 
-### 4.1 Contract
+IoT Support Dashboard: every OOH ticket is visible (search `tags:ooh`, `ooh-review.js:199`). Its outcome-chip map has no `boiler-boost` code, so boost tickets show a raw chip. That's out of scope here (other repo), noted for the follow-on.
 
-`POST /api/sites/:siteNo/booster-holds/:id/cancel`. It is on the main `router`, behind `requireAuth` and the same-origin guard like every route. There is no `requireRole` (Decision 1). If James picks "IoT team only", add `requireRole('iot')`.
+## 3. Corrections carried from earlier versions (code-verified)
 
-Request body: `{ "confirmToken": "<token from site confirm>" }`
+1. Cancel route role: same gate as boost (any signed-in OOH role), not `requireRole('iot')` (`auth.js:219`; `api.js:275`, `:565`). See Decision 1.
+2. The result card end time is broken today (`act.revertAt` vs `revertAtMs`). Fixed in §10.3.
+3. The workspace holds read is polled every 30 s (`views.js:143`). It is cheap and fails soft (§4).
+4. A cancel can come back "not yet" (retry up to 12 h, `overrides.js:415-428`). Handled in §10.1.
+5. Per-zone dispatch return shape is verified: `zoneOutcomes` (`control.js:693`), `overrideIds` (`:725`), action `zones/clamped/revertAtMs/overrideIds` (`:780-788`).
+6. Cards misattribute OOH's own timers to "the panel". Handled by §8.3.
 
-Checks, in order:
+## 4. Workspace: `activeBoostHolds`
 
-| # | Check | Fail → |
-|---|---|---|
-| 1 | `resolution.isConfirmed(confirmToken, siteNo, operator.id)` (non-consuming, same as the workspace route) | 409 `{ error: 'Site not confirmed', code: 'not-confirmed' }` |
-| 2 | `doc = OohOverrides.get(id)` exists, `doc.deviceType === 'boiler-panel'`, `String(doc.siteNo) === String(req.params.siteNo)` | 404 `{ error: 'Hold not found', code: 'hold-not-found' }`. The same 404 for another site's id, so existence is not leaked |
-| 3 | `doc.status === 'active'` | 404 `{ error: 'This boost has already ended', code: 'hold-ended' }` |
-| 4 | `overrides.cancelOverride(id, operator)` | its own 404 → `hold-ended`; `ConcurrencyError` (worker grabbed it) → 409 `{ code: 'hold-changed' }` |
+As v2. `overrides.activeBoostHoldsForSite(siteNo)` filters `status === 'active' && deviceType === 'boiler-panel' && String(siteNo)` match, sorted by `boilerZone`. It maps to `{ id, deviceId, boilerZone, direction, panelVersion, revertAt, holdLabel, createdBy, ticketId, ending }`. **`ticketId`** is new in v3 so screens can show evidence. `ending = !!(cancelRequestedBy || revertAttempts)`. On a store error the field is `null` and the client shows no banner or intercept. `reverting` and `revert-failed` are not listed. A hold retrying for up to 12 h stays listed as `ending`.
 
-`cancelOverride` itself accepts `revert-failed` too. The operator route deliberately does not (check 3); that stays an admin action.
+## 5. Put back to normal (cancel) route
 
-Response 200 has two fields. `result` is one of `reverted`, `already-auto`, `superseded`, `left-forced` or `pending`. `hold` is `{ id, boilerZone, direction, status }` from the post-cancel doc.
+`POST /api/sites/:siteNo/booster-holds/:id/cancel`, body `{ confirmToken }`. Same router and gates as `/boiler-boost` (Decision 1). The checks run in order:
+1. `resolution.isConfirmed` → otherwise 409 `not-confirmed`.
+2. The doc exists, is `boiler-panel`, and has the same `siteNo`. Otherwise 404 `hold-not-found`, the same for a foreign site.
+3. `status === 'active'` → otherwise 404 `hold-ended`.
+4. `overrides.cancelOverride(id, operator)`. A `ConcurrencyError` → 409 `hold-changed`.
 
-### 4.2 Audit
+Response: `{ result, hold: { id, boilerZone, direction, status, ticketId } }`.
 
-After the cancel call: `audit.logAction({ actionType: 'boiler-boost-cancel', operator, siteNo, siteName: doc.siteName, deviceId: doc.deviceId, zone: doc.zone, detail: 'Cancelled early: <zone> <dir> (was due <HH:MM>) → <result>', outcome: result, ticketId: doc.ticketId })`.
-
-### 4.3 Result mapping
-
-`revertBoiler()` gains one line per branch: `doc.revertOutcome = …`. Values: `'written'` on a confirmed write; the existing `revertOutcome` on non-write branches (`already-auto`, `superseded-by-other`, `same-direction-skip`). The route maps the post-cancel doc:
+`revertBoiler()` records `doc.revertOutcome` on every branch. The mapping is:
 
 | Post-cancel doc | `result` |
 |---|---|
-| `status:'reverted'`, `revertOutcome:'written'` | `reverted` |
-| `status:'reverted'`, `revertOutcome:'already-auto'` | `already-auto` |
-| `status:'superseded-by-other'` | `superseded` |
-| `status:'reverted'`, `revertOutcome:'same-direction-skip'` | `left-forced` |
-| `status:'active'` or `'reverting'` (not confirmed in 20 s, retry scheduled; or lease held by another replica; or kill-switch bounce when not exempt) | `pending` |
+| `reverted` + `written` | `reverted` |
+| `reverted` + `already-auto` | `already-auto` |
+| `superseded-by-other` | `superseded` |
+| `reverted` + `same-direction-skip` | `left-forced` |
+| `active` or `reverting` | `pending` |
 
-`revertOutcome` is a new optional field. Old docs without it fall back to `reverted` when `status:'reverted'`.
+Audit `boiler-boost-cancel`. The Zendesk revert note is prefixed `Put back to normal early by <name> at <HH:MM> (was due <HH:MM>).`. The kill-switch exemption is unchanged. The only write is zone → automatic (0).
 
-### 4.4 Kill-switch and invariants
+## 6. Per-zone timetable (read only)
 
-Cancel runs `revertBoiler()`, so `BOILER_BOOST_REVERT_EXEMPT` (default `all`) applies unchanged. When not exempt and writes are blocked, the hold bounces to `active` and the route returns `pending`. The only TB write is `tb.revertBoilerZoneToAuto` (zone → 0). There are no schedule, OptimumStartStop, `boiler` or `output1Override` writes.
+- **Read:** add `CHZ2.schedule` to the SHARED_SCOPE key list (`tb-device.js:1380`). It is already in the fetched set's family, and adds no new round trip.
+- **Source key per zone:**
 
-### 4.5 Zendesk note
-
-In `addBoostRevertNote`, when `doc.cancelRequestedBy` is set, prefix the body with `Cancelled early by <name> at <HH:MM> (due <HH:MM>).`. This applies to every result, so a cancel that later reverts on retry still says who cancelled. The existing result wording is unchanged.
-
-## 5. Client state helpers (`app.js` / `views.js`)
-
-- `refreshWorkspace()`: the body of the 30 s refresh pulled into a function, called after a successful boost and after every cancel response. It ignores the `state.flow` guard; it is explicit.
-- `cancelBoostHold(holdId, surface)`: two-tap. The first tap sets `state.boostCancel[holdId] = 'confirm'`. The second tap posts, sets `'cancelling'`, then `{result}` or `{error}`. It renders after each step. Stored per hold id so the banner and the intercept card share state.
-
-## 6. Banner (`renderBoostHoldBanner(ws)`, `views.js`)
-
-Rendered directly under `renderP1Banner(ws)` (above the flow), only when `Array.isArray(ws.activeBoostHolds)` and it is non-empty, or when a cancel result for this site is still being shown. One row per hold. `data-testid="boost-hold-banner"`, rows `boost-hold-row-<zone>`.
-
-| State | Row content | Buttons |
+| Version | Zone 1 | Zone 2 |
 |---|---|---|
-| active | "🔥 Pub zone 1: heat **ON** boost until **21:30** · started by Kelly" (OFF: "❄ Pub zone 2: heat held **OFF** until 07:00") | `Cancel early` (`boost-cancel-<zone>`) |
-| confirm | "Cancel the [boost or hold] for pub zone 1 now? It goes back to its normal timetable." | `Yes, cancel` (`boost-cancel-yes-<zone>`) · `Keep it` |
-| cancelling | "Cancelling… this can take up to 30 seconds while the panel confirms." | none (disabled) |
-| ending (`hold.ending` or result `pending`) | "Pub zone 1: cancel sent; the panel hasn't confirmed yet. We'll keep trying, and the IoT team is alerted if it doesn't take." | none |
-| done: reverted / already-auto | ✅ "Pub zone 1 boost (or hold) cancelled. The zone is back on its normal timetable." + script line: *"I've cancelled that; the heating's back on its normal timetable."* | `Dismiss` |
-| done: superseded / left-forced | ⚠ "Someone else has changed pub zone 1 since the boost, so we left it alone. Logged for the IoT team." | `Dismiss` |
-| stale (404 `hold-ended`/`hold-not-found`, 409 `hold-changed`) | "This boost has already ended. Refreshing…" → `refreshWorkspace()` | none |
-| error (other) | "Couldn't cancel: <message>." | `Try again` |
+| V1 | `output2Schedule` | `output3Schedule` |
+| V2 | `CHZ1.schedule` | `CHZ2.schedule` |
 
-Colour: info-blue alert for active/ending; success-green for done; warn-amber for superseded/left-forced. End time is `new Date(revertAt).toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'})`. The banner reads nothing from `boilerControl.heating`.
+- **New pure function** `zoneTimetable(raw, nowMs, tz)` in `services/schedule.js`. It reuses `parseInput`, the DST-safe local-time helpers and the entry shape `{ value, time, loops }`. It returns `{ everyDay, currentTempC, nextOn: { atMs, timeText, dayText, tempC } }` or `null`.
+  - `everyDay` is true only when every entry has `loops === '1111111'`. Only then are `currentTempC` and `nextOn` computed, so the unconfirmed weekday order (SQ-13) cannot make them wrong.
+  - `currentTempC` is the value of the latest entry at or before now (walking back across midnight).
+  - `nextOn` is the first future entry, within 24 h, whose `value` is greater than the entry in force just before it (a step up = "comes on").
+  - It returns null on any parse failure or empty schedule.
+- **Payload:** each `heating.zones[]` gains `zone` (`CHZ1`/`CHZ2`) and `timetable` (above, or null). The panel-wide `nextChange` string stays for compatibility but is no longer shown on heating cards.
+- **Wording rule:** say "comes on at HH:MM and heats the pub to N°C" only from `nextOn`. Say "Good to know: it only comes on if the room is cooler than N°C" where it helps. With no `nextOn`, use "goes back to its normal timetable" alone.
+- **Day text:** today: "at 06:30"; tomorrow: "tomorrow at 06:30".
 
-## 7. Flow changes (`flows.js`)
+## 7. "Turn off until it's next due on"
 
-### 7.1 Hold-active intercept (stage 1 of `boilerPanelHeatingBranch`)
+- New `durationKey: 'until-next-on'` (OFF only). The browser shows it only when every selected zone has `timetable.nextOn` and the earliest `nextOn.atMs` is at least 15 min and at most 11 h away. Otherwise it shows the existing `until-0700`.
+- `dispatchBoilerBoost` resolves it **server-side**. It re-reads the zone timetables (same decode) and sets `revertAtMs = min(nextOn.atMs over selected zones)`. If unavailable, it falls back to the `until-0700` boundary and returns `fallback: 'until-0700'`, so the result card says so honestly.
+- **11 h cap reason:** the revert retry window is 12 h from creation (`overrides.js:415`). The existing 01:00/07:00 refusal rules are unchanged.
+- **Label:** "Until 06:30, when it's next due on" (or "tomorrow at 11:00"). Good to know: "At 06:30 it heats the pub to 21°C if the room is cooler than that."
+- ON durations are unchanged (30 min, 1 hour, 2 hours; 01:00 ceiling).
 
-Before the stage-1 chips: if `f.stage === 1 && !f.data.holdAck && Array.isArray(ws.activeBoostHolds) && ws.activeBoostHolds.length`, render `data-testid="reco-boost-hold"`:
+## 8. Pub heating screens on the new standard
 
-- Headline: "OOH already has the pub heating on a timer"
-- One line per hold (same text as the banner active row) with its own `Cancel early` → shared `cancelBoostHold(id, 'flow')`; the result shows inline using §6 wording.
-- Say to caller: *"We've already got the heating on a timed boost. It runs until 21:30, then goes back to its normal timetable."* (OFF: *"…held off until 07:00…"*)
-- Buttons: `The caller needs something else` (`bp-hold-continue`) sets `f.data.holdAck = true` and shows the usual Too cold / Too hot chips. `End with no action` → `bp-noact`.
+### 8.1 Card anatomy (applies to every screen in §8–§10)
 
-Source: `ws.activeBoostHolds` only. No `tbBool`, `decodeBoilerHeating` or zone `on/forced` field is read, so OOHDASH-143-class decode faults cannot change this card.
-
-### 7.2 Single boost entry on W-code cards (`bpOutcomeCard`)
-
-Each card computes its **candidate zones**, exactly as today's per-zone buttons do:
-
-| W-code | Direction | Candidates (unchanged from 141) |
+| Part | Class | Rule |
 |---|---|---|
-| W3 | on | zones currently off |
-| W5 | on | the forced-off zone |
-| W6 | on | all zones (fallback `['CHZ1']`) |
-| W8 | off | zones currently on (fallback `['CHZ1']`) |
+| Headline | `.reco b.hd` | Plain words, situation only |
+| Say to the customer | `.say` (new) | Label "🗣 Say to the customer". Exactly one per card. Background `--primary-light`, 4px `--primary` left border, 14px, not italic, dark text |
+| Good to know | `.gtk` (new) | Label "ℹ Good to know (for you, not the customer)". 14px, `--text-secondary`, no box. **Omitted when empty** |
+| Buttons | `.outbtns` | The action first, then "Log it for the IoT helpdesk", then "No further action" |
 
-It replaces the per-zone buttons with one button. `Boost heat ON` (`data-testid="bp-boost-on"`, class `boost-on`), or `Hold heat OFF` (`bp-boost-off`). It calls `flowStep({need:'bp-zones', direction, candidates:'CHZ1,CHZ2'})`. Zones under a running OOH hold are removed from the candidates and get a cancel button instead (§7.6). If no candidates remain, no boost button renders and the card uses its plain wording. The server's existing "already forced" warning + acknowledge step still covers zones forced at the panel or by an engineer.
+Removed from cards: "What to tell the operator", "Ticket sentence", and `doneLine('Outcome: W…')`. The ticket wording moves to Check and log (§9) as "What we'll log".
 
-### 7.3 New step `need === 'bp-zones'`
+### 8.2 Card copy (replaces the 2026-10-23 wording; Decision 3)
 
-- Parse `f.data.candidates`. If exactly one, set `f.data.selectedZones = [that]` and fall straight through to `bp-boost` (no question, same as today).
-- Otherwise render `data-testid="reco-boost-zones"`:
-  - doneLine `Boost: Heat ON — choose zones`
-  - Say to caller: ON *"Is it one part of the pub that's cold, or the whole pub?"* · OFF *"Is it too warm in one part of the pub, or everywhere?"*
-  - Operator hint (small): "If they can say which area, pick that zone. If they're not sure, pick All zones."
-  - Toggle chips `Pub zone 1` (`bp-zone-CHZ1`), `Pub zone 2` (`bp-zone-CHZ2`) with `aria-pressed` and the `sel` class when picked; `All zones / not sure` (`bp-zone-all`) selects every candidate. Tapping a picked zone un-picks it.
-  - `Continue` (`bp-zones-continue`) is `disabled` while `selectedZones` is empty → `flowStep({need:'bp-boost'})`. `Back` → `flowStep({need: f.data.bpCallDir})`.
-- Helpers on the page: `toggleZone(id)` and `selectAllZones(ids)`. Each mutates `state.flow.data.selectedZones` and calls `render()`. There are no API calls.
-- Nothing is pre-selected in either direction; `All zones / not sure` is a deliberate tap, never a default (design-panel advisory on Decision 2).
-- `All zones` applies to OFF as well, subject to Decision 2. If James picks "Heat ON only", the `bp-zone-all` chip is omitted when `direction === 'off'`.
+"With button" applies where Turn heating on or off is offered. Clauses in [brackets] fill from data or are dropped.
 
-### 7.4 Duration + send (`bp-boost`, `bp-boost-send`)
+| Card | Headline | Say to the customer | Good to know |
+|---|---|---|---|
+| W1 can't see | We can't see the pub heating right now | I can't see your heating controls from here at the moment, so I'll log it for our team to check first thing. | The heating controls last reported [ago]. Don't tell the customer whether the heating is on or off. |
+| W2 asking for heat | The heating controls are asking the boiler for heat | Our controls are asking your boiler for heat right now, so they're doing their job. The problem is most likely the boiler itself or the radiators, so please call your heating engineer. I'll log tonight's call. | none |
+| W3 part off, with button | Part of the pub heating is off | Part of your heating is switched off at the controls right now. I can turn it on from here for a set time, and then it goes back to its normal timetable[, which next comes on at 06:30]. I'll log it for our team to look at properly. | If the customer says the cold area is the part that's already heating, it's more likely the boiler or radiators, so advise their heating engineer instead. |
+| W3 without | (same) | Part of your heating is switched off at the controls. I can't change that from here, so I'll log it for our team to sort. | (same) |
+| W4 summer setting | The heating is switched off for the summer | Your heating controls are still on their summer setting, which keeps the heating off. I can't change that from here, but I'll log it so our team can switch it back for you. | none |
+| W5 switched off by hand, with button | Someone has switched the heating off at the controls | Part of your heating has been switched off by hand at the controls[ until 06:00]. I can turn it back on from here for a set time. I'll log it so our team can check why it was switched off. | Someone at the pub or an engineer may have done this on purpose, so check with the customer before turning it back on. |
+| W5 without | (same) | Part of your heating has been switched off by hand at the controls. I can't change it from here, but I'll log that you need it back on so our team can sort it. | none |
+| W6 off on timetable, with button | The heating is off on its timetable | Your heating is off on its normal timetable right now[ and is next due on at 06:30]. I can turn it on from here for a set time if you need it. I'll log the call. | [At 06:30 it heats the pub to 21°C, and only comes on if the room is cooler than that.] |
+| W6 without | (same) | Your heating is off on its normal timetable right now[ and is next due on at 06:30]. I can't turn it on from here, so I'll log it for our team. | (same) |
+| W7 room sensor | The heating is running on a simple timer | Your heating is running, but on a simple timer because one of the room temperature sensors isn't working, so it may feel cooler than normal. I'll log it for our team to fix the sensor. | none |
+| W8 on, with button | The heating is on | Your heating is on at the controls right now. I can turn it off from here for a set time, and then it goes back to its normal timetable[, which next comes on at 06:30]. I'll log the call. | none |
+| W8 without | (same) | Your heating is on at the controls and I can't change it from here tonight. Turning the radiators down will help in the meantime. I'll log it for our team. | none |
+| W9 already off | The pub heating is already off | Our controls show your pub heating is off right now, so the warmth is coming from somewhere else, perhaps a radiator turned up by hand or another heater. I'll log the call. | Ask whether a portable heater or the rooms upstairs have heating on. |
 
-- `bp-boost` title: "Heat ON: pub zone 1 + pub zone 2" (built from `selectedZones`). The durations are unchanged.
-- `bp-boost-send`: `zones: f.data.selectedZones`; state key `'boost-' + dir + '-' + selectedZones.join('+')`. The warnings + acknowledge path is unchanged (it lists one line per zone).
-- On success: build the result card from `act.zones` (per-zone `outcome`) and `act.overrideIds`. Then `refreshWorkspace()` so the banner shows the new holds.
+Typographic apostrophes (’) are used inside strings. Every JS string delimiter is straight (test SYN-1).
 
-Result card `data-testid="outcome-boost"`. Header "Heat ON: pub heating" / "Heat OFF: pub heating". Then one row per zone, `boost-zone-result-<zone>`:
+### 8.3 When OOH changed the heating earlier (timer running)
+
+Hold facts come only from `activeBoostHolds`, never from the TB decode.
+
+| Situation | Card |
+|---|---|
+| Stage 1, any timer running (intercept, `reco-boost-hold`) | Headline "We've already changed the heating here". One row per timer: "Pub zone 1: heating turned on until 21:30, by Kelly" with `Put back to normal now`. Say: "We've already turned your heating on until 21:30. After that it goes back to its normal timetable[, which next comes on at 06:30]." (Off: "turned your heating off until 06:30 …"). Buttons: `The customer needs something else` (`bp-hold-continue`), `No further action` (→ Check and log). |
+| Cold, and the off zone is OOH's off-timer (was W5) | Headline "We turned this heating off earlier". Say: "We turned that part of your heating off earlier, until [time]. I can put it back to normal now, so it follows its usual timetable again." Button `Put back to normal now`. No Turn heating on for that zone. |
+| Hot, and an on zone is OOH's on-timer (W8) | Adds to Say: "We turned pub zone 1 on earlier, until 21:30. I can put that back to normal now." Button `Put back to normal now`. That zone is removed from the Turn heating off choices. |
+| Any card showing the "switched on by hand" sentence for an OOH timer | Replaced by "Pub zone 1 is on because we turned it on earlier, until 21:30." |
+
+### 8.4 Zone question (`bp-zones`)
+
+Shown only when more than one zone is a candidate (candidates as v2: W3 = off zones, W5 = the off zone, W6 = all, W8 = on zones; minus zones under an OOH timer).
+- Headline: "Which part of the pub?"
+- Say: "Your heating is split into sections, called zones, which were set up with the original pipework. Our system can't see which rooms each zone covers. Do you know which part of the pub each one heats? If you're not sure, I'll turn on all of them." (Off: "turn off all of them".)
+- Chips: `Zone 1 only` (`bp-zone-CHZ1`), `Zone 2 only` (`bp-zone-CHZ2`), `All zones (not sure)` (`bp-zone-all`). Single-select with `aria-pressed`, nothing pre-selected. `Continue` is disabled until one is chosen; `Back` is also offered.
+- No Good to know (the script carries it).
+
+### 8.5 How long (`bp-boost`)
+
+- Headline: "Turn the heating on: how long?" (or "off").
+- On: 30 minutes, 1 hour, 2 hours. Off: 1 hour, 2 hours, and either "Until 06:30, when it's next due on" (§7) or "Until 07:00".
+- Say (on): "I'll turn it on now. After that it goes back to its normal timetable[, which next comes on at 06:30]."
+- Good to know (off, dynamic option only): "At 06:30 it heats the pub to 21°C if the room is cooler than that."
+
+## 9. One way of logging each issue: Check and log (`wrapUpStep`)
+
+### 9.1 Behaviour
+
+- **Entry points (heating):** `Log it for the IoT helpdesk`, `Customer will call their heating engineer` (W2), `No further action` on any card, the intercept, or the result card. Each sets `f.data.wrapKind` (`capture`, `advice`, `no-action`) and goes to `need: 'bp-wrap'`. After an action exists in the issue (`f.data.actions.length > 0`), the result card offers only `Finish and add notes` (→ Check and log).
+- **`f.data.actions[]`** records each change in this issue: `{ kind: 'turn-on'|'turn-off'|'put-back', zones, untilMs, result, holdIds, ticketId, atMs }`. A boost success pushes one entry, with `ticketId` from the action. Put back to normal, from the intercept or a card, pushes one.
+- **Screen** (`data-testid="wrap-up"`), titled "Check and log":
+
+| Section | Content |
+|---|---|
+| What the customer said | `freeText` (if any) |
+| What we found | The card headline |
+| What we did | One line per action, e.g. "20:02 Turned the heating on, zones 1 and 2, until 21:30 (logged automatically, ticket #48213)"; "20:14 Put zone 1 back to normal". Or "Nothing changed". |
+| What we'll log | The plain ticket wording for this outcome (replaces the old card "Ticket sentence") |
+| Your notes | The notes box (§11), live |
+
+- **Button**: if any action has a `ticketId`, it is `Add to ticket #48213 and finish` (`wrap-submit`); otherwise `Log for the IoT helpdesk and finish`. One click. A double-click is guarded by the existing `_pend_` pattern.
+- **After success**: a green `.outcome` "✅ Logged: ticket #48213 is with the IoT helpdesk", followed by a bullet list of what it contains (what we did, plus "your notes"). Then `registerIssue(…, ticketId)` (so "This call so far" lists it), `stage = 99`, and the existing `outButtons()` ("Add another issue", "End call").
+- **Failure**: "We couldn't log this: [message]" with `Try again`. Nothing is claimed.
+
+### 9.2 Server (`POST /api/outcomes`)
+
+New optional fields:
+- `appendToHoldId`. The server loads that `OohOverrides` doc and requires all of `doc.siteNo === siteNo`, `doc.createdById === operator.id` and `doc.ticketId`. When they hold, it **appends** an internal comment `[OOH ISSUE SUMMARY]` (subject, actions, the ticket wording, caller words, notes) to `doc.ticketId` via `zendesk.addInternalComment`. It writes an audit entry and returns `{ ticket: { id: doc.ticketId }, appended: true }`. The Cosmos hold doc is the authority (durable), not the in-memory action map. If the checks fail, it returns 409 `append-refused`, and the client then offers `Log for the IoT helpdesk and finish` (a new ticket).
+- `holdIds[]` on the create path. After creating the ticket, it calls `overrides.attachTicketToOverride(holdId, ticketId)` for each hold that has no `ticketId` (the auto-ticket-failed case), so switch-back notes land on it.
+- `actions[]`: text lines included in the `[TRG]` first comment (create path) or the summary comment (append path).
+
+The `no-action` type keeps creating a ticket (today's behaviour, now always with a non-empty `detail`). Tags are unchanged (`ooh`, so the IoT Support Dashboard picks it up).
+
+### 9.3 Telling the agent we logged automatically (`.autolog`)
+
+A blue-grey box with "📋" appears on the result card and in Check and log:
+
+| Case | Text |
+|---|---|
+| Turn on or off succeeded | We've logged this automatically to the IoT helpdesk as ticket #48213, because we changed the heating at the pub. Add any notes when you finish. |
+| A zone didn't respond, or not confirmed | We've logged this automatically to the IoT helpdesk as ticket #48213. The heating controls didn't respond, so there may be a problem with the equipment or its internet connection. |
+| Auto ticket failed (`ticketId` null) | We couldn't log this automatically. It will be logged when you finish. |
+| Put back to normal from the banner (no flow) | Noted on ticket #48213. |
+
+## 10. Results and put-back-to-normal states
+
+### 10.1 Banner (`renderBoostHoldBanner`, `views.js`)
+
+The title is "We've changed the heating at this site". One row per timer.
+
+| State | Row |
+|---|---|
+| active | 🔥 "Pub zone 1: heating turned on until 21:30, by Kelly" (off: ❄ "heating turned off until 06:30") · `Put back to normal now` |
+| confirm | "Put pub zone 1 back to its normal timetable now?" · `Yes, put it back` · `Keep it` |
+| working | "Putting it back… this can take up to 30 seconds." |
+| done | ✅ "Pub zone 1 is back to normal[ and next comes on at 06:30]. Noted on ticket #48213." Say: "That's done. Your heating is back on its normal timetable." · `Dismiss` |
+| pending | ⏳ "We've asked the heating to go back to normal, but the controls haven't confirmed yet. We'll keep trying. If the heating doesn't switch off in the next few minutes (off-timer: doesn't come back on), the IoT helpdesk is alerted automatically on ticket #48213." |
+| changed by hand | ⚠ "Someone has changed pub zone 1 at the heating controls since we did, so we've left it as it is. Logged on ticket #48213 for the IoT helpdesk to check." · `Dismiss` |
+| already finished | "This had already finished. Refreshing…" |
+| error | "Couldn't put it back: [message]." · `Try again` |
+
+### 10.2 Inside a flow
+
+The same states render inline on the intercept or card. The action is pushed to `f.data.actions`. The card's buttons then become `The customer needs something else` and `Finish and add notes` (no "No further action"/"End with no action" after an action).
+
+### 10.3 Turn on/off result (`outcome-boost`)
+
+The header is "Heating turned on" / "Heating turned off". One row per zone (`boost-zone-result-<zone>`):
 
 | Zone outcome | Row |
 |---|---|
-| `CONFIRMED` + has overrideId | ✅ "Pub zone 1: heat ON until **21:30**" (+ "(stopped at 01:00)" if `act.clamped`) |
-| `IN-FLIGHT-TIMEOUT` + has overrideId | ⏳ "Pub zone 2: sent, the panel hasn't confirmed yet. It will still switch back at 21:30." |
-| `NON-DELIVERY` | ❌ "Pub zone 2: couldn't reach the panel, **not boosted**." |
-| any outcome, no overrideId (hold save failed) | ⚠ "Pub zone 2: sent, but the switch-back wasn't recorded. The IoT team must check it." |
+| CONFIRMED with hold | ✅ "Zone 1: on until 21:30[ (stopped at 01:00, the latest allowed)]" |
+| IN-FLIGHT-TIMEOUT with hold | ⏳ "Zone 2: sent, but the heating controls haven't confirmed yet. It will still go back to normal at 21:30. If the heating doesn't come on, the IoT helpdesk will see it on ticket #48213." |
+| NON-DELIVERY | ❌ "Zone 2: we couldn't reach the heating controls, so it wasn't turned on." |
+| no hold saved | ⚠ "Zone 2: sent, but we couldn't set the automatic switch-back. The IoT helpdesk must check it on ticket #48213." |
 
-End time is `act.revertAtMs` (fixes §2.2). Footer: "Ticket #N raised — the IoT team will check the panel after the boost ends." When any row is ❌ or ⚠, add `Capture for the IoT team` (`bp-capture`) above the usual end buttons.
+- The end time comes from `act.revertAtMs`. With `act.fallback === 'until-0700'`: "(until 07:00, because the timetable couldn't be read)".
+- Say: "That's done. Your heating will be on until 21:30, and then it goes back to its normal timetable[, which next comes on at 06:30]." For partial failure, say only the zones that worked plus "I've logged the rest for our team."
+- Then the §9.3 auto-log box, then the button `Finish and add notes` → Check and log. Then `refreshWorkspace()` so the banner shows the timer.
 
-### 7.5 Heating card wording: plain vs boost versions (absorbs v1.5.3)
+## 11. Notes box (FLOW-BOX and POST-LINK), as v2
 
-Rule: a card uses the **boost version** when it renders a boost entry button for at least one candidate zone, and otherwise the **plain version**. The plain version is the 2026-10-23 approved text, verbatim. Headlines state the situation only, so they also read correctly as a ticket subject. UI text keeps the existing typographic apostrophes (’) **inside** strings; every JS string delimiter is a straight single or double quote.
+`.notes-group`: `--surface-variant` background, 1px border, 3px `--notes-accent` (#C7D2FE) left border, radius, padding. `.notes-label` gets 📝. `.notes-input` is 14px / 22px, with a 1.5px border and a primary focus ring. At `max-width: 700px` it is 16px (keeps the OOHDASH-119 iOS no-zoom and E13). All the inline styles in `notes.js` move to classes, and `--text-muted` becomes `--text-secondary`. The counter and autosave are unchanged. The placeholder becomes "Anything the customer told you that isn't captured above, e.g. engineer due at 7am" (glossary). In Check and log the box sits under "What we'll log".
 
-| Card | Plain version (approved, unchanged) | Boost version (new, Decision 3) |
-|---|---|---|
-| W3 headline | Part of the pub heating is off | (same) |
-| W3 operator | …is on, but … is off right now. The panel doesn’t tell us why from here, and we can’t switch zones remotely. Log it for the IoT team. If the caller says the cold area is the part that’s heating, treat it as a boiler or radiator problem and advise their heating engineer. | [On list] is on, but [off list] is off right now. The panel doesn’t tell us why from here. You can switch [off list] on for a set time with Boost heat ON. It goes back to its normal timetable afterwards, and it’s logged for the IoT team either way. If the caller says the cold area is the part that’s heating, treat it as a boiler or radiator problem and advise their heating engineer. |
-| W3 script | Part of the heating is on, but one area is switched off at the controls. I can’t change that from here, so I’ve logged it for the team. | Part of the heating is switched off at the controls. I can put it on for a set time from here, and I’ve logged it for the team to look at properly. |
-| W5 headline | Pub heating has been switched off on purpose | (same) |
-| W5 operator | Pub zone [N] has been deliberately switched off at the boiler panel ([until]). That’s the likely reason it’s cold. We can’t change it from here, so log it for the IoT team if the site needs the heating back on. | Pub zone [N] has been deliberately switched off at the boiler panel ([until]). That’s the likely reason it’s cold. You can switch it back on for a set time with Boost heat ON. Someone may have switched it off for a reason, so it’s logged for the IoT team to check. |
-| W5 script | That part of the heating has been switched off on purpose at the controls. I can’t change it from here, but I’ve logged that you need it back on so the team can sort it. | That part of the heating has been switched off on purpose at the controls. I can put it back on for a set time from here, and I’ve logged it so the team can check why it was switched off. |
-| W6 headline | Pub heating is off at the controls right now | (same) |
-| W6 operator | …so it’s most likely outside its heating times. [Next change.] We can’t switch it on from here. | …so it’s most likely outside its heating times. [Next change.] You can switch it on for a set time with Boost heat ON. It goes back to its normal timetable afterwards. |
-| W6 script | The heating is off on its timetable at the moment[ and is due back on at X]. I can’t turn it on from here, so I’ve logged it for the team. | The heating is off on its timetable at the moment[ and is due back on at X]. I can put it on for a set time from here, and I’ve logged it for the team so they can check the timetable. |
-| W8 headline | Pub heating is on, and we can’t switch it off from here | Pub heating is on |
-| W8 operator | The panel is heating [on list]. Pub heating on this panel can’t be changed remotely. Log it for the IoT team. In the meantime the site can turn the radiator valves down. | The panel is heating [on list]. You can switch it off for a set time with Hold heat OFF. It goes back to its normal timetable afterwards, and it’s logged for the IoT team. |
-| W8 script | The heating is on at the controls and I can’t change it from here tonight. Turning the radiator valves down will help in the meantime. I’ve logged it for the team. | The heating is on at the controls. I can switch it off for a set time from here, and I’ve logged it for the team. |
+**Flow footer** (`renderFlow`, `flows.js:222`, shared by all flows): "Operator: [name] · Everything here is recorded to the Zendesk ticket automatically" becomes "You: [name] · Each issue is logged to a ticket when you finish it". The old sentence is untrue today, because nothing is recorded until an outcome is logged. The new one is true for every flow, so it changes everywhere in 144.
 
-Ticket sentences are unchanged for every card. W1, W2, W4, W7 and W9 never offer a button and keep their approved text. For W4, W7 and W9 that means the text returns after the blank-card defect. v1.5.3's W8 strings ("Pub heating is on — you can switch it off", "I’ll do that now…") are replaced by the boost version above.
+## 12. Glossary (all new and changed strings)
 
-### 7.6 OOH-hold-aware cards
-
-`bpOutcomeCard` gains a 5th argument, `holds` (= `ws.activeBoostHolds || []`, excluding `ending`). `holdFor(zoneId)` returns the running OOH hold for that zone, or null. The W-code classification (`boilerHeatingOutcome`) is unchanged; only the card text and buttons react.
-
-| Situation | Card behaviour |
+| Use | Never |
 |---|---|
-| Zone with OOH **ON** boost, any card that shows the forced-on sentence | The sentence becomes "Pub zone [N] is on a timed OOH boost until [HH:MM] (started by [name])." instead of "switched on at the panel" |
-| W5 where the forced-off zone has an OOH **OFF** hold | Headline "Pub heating is on a timed OOH hold". Operator: "Pub zone [N] was switched off from OOH until [HH:MM] (started by [name]). That’s the likely reason it’s cold. You can cancel the hold now and the zone goes back to its normal timetable." Script: "We switched that part of the heating off earlier for a set time. I can cancel that now so it goes back to its normal timetable." Button `Cancel early` (`bp-hold-cancel-<zone>`) → `cancelBoostHold`. No Boost heat ON for that zone. |
-| W8 where an on-zone has an OOH **ON** boost | Adds "Pub zone [N] is on a timed OOH boost until [HH:MM]. Cancelling it puts the zone back on its normal timetable." Button `Cancel early` (`bp-hold-cancel-<zone>`). That zone is removed from the Hold heat OFF candidates. |
-| W3 / W6 candidate zones | Zones already under an OOH hold in either direction are removed from the Boost heat ON candidates |
+| customer | caller, operator (on screen) |
+| heating controls | panel, boiler panel |
+| turn the heating on / off (for a set time) | boost, hold, Heat ON/OFF, override, force |
+| put back to normal | cancel, revert, undo |
+| normal timetable | schedule, auto, automatic mode |
+| switched on/off by hand | forced, override |
+| target temperature, "heats to N°C" | setpoint |
+| summer setting | summer mode |
+| simple timer (room sensor not working) | back-up cycle, fallback |
+| IoT helpdesk | IoT team queue, TRG |
+| zone 1 / zone 2 (explained on first use, §8.4) | CHZ1, output2, W-codes |
+| if the heating doesn't switch off / come back on | if it doesn't take |
 
-The cancel result shows inline on the card using the §6 wording. Hold facts come only from `activeBoostHolds` (Cosmos), never from TB decode.
+## 13. Tests the build must add
 
-### 7.7 Capture and advice outcomes
-
-`bp-esc` and `bp-advice` now call `bpOutcomeCard(wcode, heating, nowMs, ws.boostAvailable, holds)`, so the subject matches what the operator saw. The capture `detail` changes from `card.operatorText` to `card.ticketText`. The ticket gets each card's existing plain, operator-neutral state sentence, not instructions written to the operator. The capture subject is the situation-only headline.
-
-### 7.9 Operator notes box (FLOW-BOX and POST-LINK)
-
-Today `notesField()` (`public/js/notes.js:41-58`) and the post-submit box (`notes.js:168-200`) use inline styles: the textarea is `font-size:16px` (OOHDASH-119 design §mobile: "16px to stop iOS zooming on focus", applied at all widths), with a 1px plain border and no container styling. It also references an undefined `--text-muted` token. Body text is 14px (`styles.css:18`), `.small` is 12.5px, and the other inputs (`.issueinput`, `.formrow`) use 14–15px with a 1.5px border and a violet focus ring.
-
-New classes in `styles.css`; all inline styles in `notes.js` are replaced by them:
-
-| Element | Style |
-|---|---|
-| `.notes-group` (container) | `background: var(--surface-variant)`; `border: 1px solid var(--border)`; `border-left: 3px solid var(--notes-accent)`; `border-radius: var(--radius-md)`; `padding: 10px 12px`; `margin-top: 12px`. New token `--notes-accent: #C7D2FE` (pale violet from the primary family) |
-| `.notes-label` | text unchanged, prefixed with 📝; 12.5px, weight 600, `color: var(--text-secondary)` |
-| `.notes-input` (textarea) | `font-size: 14px; line-height: 22px` (same as body); `padding: 8px 10px`; `border: 1.5px solid var(--border)`; `border-radius: var(--radius-sm)`; `background: var(--surface)`; `resize: vertical` |
-| `.notes-input::placeholder` | `color: var(--text-disabled)`; inherits 14px |
-| `.notes-input:focus` | `border-color: var(--primary); box-shadow: 0 0 0 3px var(--primary-light); outline: none` (same as `.issueinput:focus`) |
-| helper + counter | existing `.small`; `--text-muted` replaced by `--text-secondary` |
-| phone (`@media (max-width: 700px)`) | `.notes-input { font-size: 16px }`. This keeps the OOHDASH-119 iOS no-zoom behaviour and its test E13 |
-
-Unchanged: label text, placeholder text, helper text, `maxlength`/counter logic, autosave, focus-restore (`app.js:133`), position (below the step choices, above `.flowfoot`) and the `addnotes-echo` line. The notes box keeps lower visual weight than the step question and outcome card: there is no bold colour and no shadow, and the stripe is the pale violet, not `--primary`.
-
-### 7.8 Wording glossary (applies to every new and changed string)
-
-| Term | Use | Never |
-|---|---|---|
-| boost | heat ON for a set time | "override", "force" |
-| hold | heat OFF for a set time | "boost OFF" |
-| OOH heating timer | a boost or hold, generically (banner title, intercept headline) | "override" |
-| Cancel early | every cancel button | "Undo", "Stop" |
-| Pub zone 1 / pub zone 2 | sentence start / mid-sentence | "CHZ1", "zone 1" alone |
-| normal timetable | where the zone goes after a boost/hold | "schedule", "auto" |
-| for a set time | how boost/hold is described to callers | promises like "I'll do that now" |
-
-Apostrophes inside UI text stay typographic (’), matching the approved 139 wording. They never sit in a JS delimiter position (SYN-1).
-
-## 8. Tests the build must add
-
-**Unit (`node --test`)**: new `test/boost-hold-cancel.test.js`, plus extensions:
+**Unit**
 
 | ID | Case |
 |---|---|
-| BHC-1 | `activeBoostHoldsForSite` returns only `active` + `boiler-panel` + matching site, sorted by zone, `ending` set when `cancelRequestedBy`/`revertAttempts` |
-| BHC-2 | workspace returns `activeBoostHolds: null` when the store query throws; workspace still 200 |
-| BHC-3 | cancel route: happy path → 200 `reverted`, audit `boiler-boost-cancel` logged |
-| BHC-4 | hold id from another site → 404 `hold-not-found` (and no revert attempted) |
-| BHC-5 | non-boiler hold id → 404 |
-| BHC-6 | `status:'reverted'` hold → 404 `hold-ended` |
-| BHC-7 | missing/foreign confirmToken → 409 `not-confirmed` |
-| BHC-8 | result mapping: already-auto, superseded-by-other, same-direction-skip, not-confirmed (retry → `pending`) |
-| BHC-9 | handler-role operator can cancel (or 403 if Decision 1 = IoT only) |
-| BHC-10 | `addBoostRevertNote` prefixes "Cancelled early by …" when `cancelRequestedBy` set; unchanged otherwise |
-| BHC-11 | `revertOutcome` written on every `revertBoiler` branch (extends `boiler-overrides.test.js`) |
-| NB-1 | notes textarea computed font-size equals body font-size (14px) at 1280px width, and is at least 16px at 390px (keeps OOHDASH-119 E13) |
-| NB-2 | `.notes-group` has a left border colour of `--notes-accent` and a background of `--surface-variant`; textarea focus shows the primary ring |
-| NB-3 | `notes.js` contains no inline `font-size:16px` and no `--text-muted` reference |
-| SYN-1 | new `test/browser-js-syntax.test.js`: each `public/js/*.js` compiles with `new vm.Script(source)`, and no curly quote sits in a JS delimiter position (e.g. `=== ‘`, `(‘`, `‘)`) |
+| BHC-1..11 | as v2 (holds read, cancel route checks and mapping, roles per Decision 1, Zendesk prefix, `revertOutcome`) |
+| TT-1 | `zoneTimetable`: every-day schedule → `currentTempC`, `nextOn` (step-up only), midnight walk-back, DST day |
+| TT-2 | any entry not `1111111` → `everyDay:false`, no `nextOn` |
+| TT-3 | malformed/empty → null; V2 `CHZ2.schedule` is read and decoded for zone 2 |
+| UN-1 | `until-next-on` → `revertAtMs` = earliest `nextOn` of the selected zones; more than 11 h, under 15 min, or no timetable → 07:00 with `fallback` |
+| WR-1 | `/outcomes` with `appendToHoldId` (same site + creator + ticket) → appends, returns the same id, creates no ticket |
+| WR-2 | `appendToHoldId` from another operator or site → 409 `append-refused`, nothing written |
+| WR-3 | create path with `holdIds` → `attachTicketToOverride` called for holds lacking a ticket |
+| WR-4 | `no-action` always has a non-empty `detail` |
+| NB-1..3 | notes box (as v2) |
+| SYN-1 | every `public/js/*.js` compiles; no curly-quote delimiters |
+| LEX-1 | the rendered heating screens (fixture) contain none of: caller, operator, panel, override, setpoint, forced, revert, fallback, W1–W9, CHZ |
 
-**Playwright** (`tests/boiler-boost.spec.js`; fixture sites 9010 V2 / 9011 V1; seed holds through the existing test-only routes or fixture store):
+**Playwright** (`tests/boiler-boost.spec.js`, fixtures 9010 V2 / 9011 V1)
 
 | ID | Case |
 |---|---|
-| BB-E1..E7 | updated: single `bp-boost-on` / `bp-boost-off` entry; W3 single-candidate goes straight to durations |
-| BB-E8 | W6 two zones → `reco-boost-zones` shown, `bp-zones-continue` disabled until a chip is picked |
-| BB-E9 | `bp-zone-all` selects both → dispatch body `zones:['CHZ1','CHZ2']` → two `boost-zone-result-*` rows |
-| BB-E10 | toggling a picked zone un-picks it; Continue disables again |
-| BB-E11 | after boost success the `boost-hold-banner` appears without leaving the page |
-| BB-E12 | banner `Cancel early` → `Keep it` returns to active; → `Yes, cancel` → success wording, banner row cleared after Dismiss |
-| BB-E13 | stale: hold ended server-side between load and click → "already ended" + refresh |
-| BB-E14 | intercept: active hold → `reco-boost-hold` before need chips; `bp-hold-continue` reveals Too cold / Too hot |
-| BB-E15 | intercept renders from `activeBoostHolds` with `boilerControl.heating` zones set to `on:null` (OOHDASH-143 guard) |
-| BB-E16 | partial failure fixture (zone 2 `NON-DELIVERY`) → ❌ row + `bp-capture` shown |
-| BB-E17 | result card shows the end time (regression for `revertAtMs`) |
-| BB-E18 | Heat OFF + Decision 2 behaviour (All chip present or absent) |
-| BB-E19 | W4, W7 and W9 each render a non-empty headline, operator text and at least one button (blank-card regression) |
-| BB-E20 | W3/W5/W6/W8 with `boostAvailable` on → boost version text (§7.5); with it off → plain approved text |
-| BB-E21 | cold call with an OOH OFF hold on the forced-off zone → "timed OOH hold" card with `bp-hold-cancel-<zone>`, no `bp-boost-on` for that zone |
-| BB-E22 | hot call with an OOH ON boost → `bp-hold-cancel-<zone>` (Cancel early) shown, zone excluded from Hold heat OFF |
-| BB-E23 | capture from W8 with boost available → ticket detail is the ticket sentence, subject "Pub heating is on" |
+| BB-E1..E7 | updated to `Turn heating on/off` entry and the new copy |
+| BB-E8..E10 | zone question: shown for 2 zones, skipped for 1, Continue disabled until chosen, single-select |
+| BB-E11 | after turn-on, the banner appears with `Put back to normal now` |
+| BB-E12..E13 | banner confirm, Keep it, done (with ticket number), already finished |
+| BB-E14..E15 | intercept from `activeBoostHolds`, unaffected by `heating.zones[].on = null` |
+| BB-E16 | partial failure row + auto-log reason text + ticket number |
+| BB-E17 | end time is shown (`revertAtMs`) |
+| BB-E18 | Decision 2 (All zones for off) |
+| BB-E19 | every heating card: exactly one `.say`, `.gtk` only where listed in §8.2, no "End with no action" |
+| BB-E20 | Check and log after turn-on → button `Add to ticket #N and finish` → append call → green banner with the same #N; "This call so far" lists it |
+| BB-E21 | Check and log with no action → `Log for the IoT helpdesk and finish` → new ticket number shown |
+| BB-E22 | after any action, no "No further action"/"End with no action" is shown |
+| BB-E23 | off duration shows "Until HH:MM, when it's next due on" with an every-day fixture; "Until 07:00" otherwise |
+| BB-E24 | timetable sentence present with an every-day fixture, absent otherwise |
 
-## 9. Rollout
+## 14. Rollout
 
-This release supersedes v1.5.3. It is cut from main (which carries `3cd2e99`), and the release gate must show CI green on the exact released sha before any deploy. Production stays on image `v1.5.2` until then. The ACR `latest` tag still points at the broken v1.5.3 and must not be deployed. No new flag. The feature is live wherever boost is live (`boostAvailable`), and holds only exist where boost ran. The banner and intercept are read-only until the operator taps Cancel. The build, test and release gates follow as normal. No deploy without James's go.
+- The v1.5.4 hotfix ships first, with its own gates.
+- 144 then builds on main, and the release gate requires CI green on the exact sha.
+- Production stays on image `v1.5.2` until the hotfix. The ACR `latest` tag is the broken v1.5.3: never deploy it.
+- No new flag. No deploy without James's go.
 
-## 10. Out of scope
+## 15. Follow-on ticket (to be raised after this gate)
 
-- Room names for zones (none in TB; needs a site survey data source).
-- Cancelling `revert-failed` holds from the operator screen (stays admin).
-- DHW (OOHDASH-136) override cancel: different hold type, not touched.
+"Apply the OOH agent-screen standard to all flows." It covers:
+- the card anatomy and glossary for hot water, kitchen, lighting, fans, fridge, contractor, connectivity, other, Salus heating, and the callback/Tonight/ambiguous screens;
+- Check and log for every outcome, including generic device control "Done" and the silent late-sync ticket;
+- "customer" everywhere;
+- the IoT Support Dashboard chip label for `boiler-boost`.
+
+The inventory in §2 is its starting list.
+
+## 16. Out of scope
+
+- Room names for zones (not in TB).
+- Putting `revert-failed` timers back to normal from the agent screen (stays admin).
+- DHW (OOHDASH-136) timers.
+- Writing any timetable.
+- Confirming SQ-13 weekday order: needed only to extend §6 and §7 to timetables that vary by day. A question draft for Spencer is available on request.
