@@ -553,7 +553,7 @@ export async function dispatchBoilerBoost({ operator, confirmToken, siteNo, devi
     // without the token being spent on the read. The window between isConfirmed and
     // consumeConfirmation is single-event-loop-tick risk only (Node.js), which is acceptable.
     if (!resolution.isConfirmed(confirmToken, siteNo, operator.id)) {
-        throw Object.assign(new Error('Site has not been confirmed for this call — confirm the site before sending any change'), { status: 409 });
+        throw Object.assign(new Error("Confirm the site before changing the heating."), { status: 409 });
     }
 
     // F016 — kill-switch (standard; revert uses the exempt path)
@@ -562,27 +562,27 @@ export async function dispatchBoilerBoost({ operator, confirmToken, siteNo, devi
 
     // Feature flags
     if (!config.boilerBoost.enabled || config.boilerBoost.sitesDeny.includes(String(siteNo))) {
-        throw Object.assign(new Error('Pub heating boost is not available for this site (flag or deny list)'), { status: 423 });
+        throw Object.assign(new Error("Turning the pub heating on or off isn't available for this site."), { status: 423 });
     }
     if (direction === 'on' && !config.boilerBoost.onEnabled) {
-        throw Object.assign(new Error('Pub heating boost ON is not currently enabled'), { status: 423 });
+        throw Object.assign(new Error('Turning the pub heating on is not currently enabled.'), { status: 423 });
     }
 
     // Resolve site and device
     const sites = await bridge.getSitesByNumber(siteNo);
-    if (sites.length !== 1) throw Object.assign(new Error('Site is no longer uniquely resolvable'), { status: 409 });
+    if (sites.length !== 1) throw Object.assign(new Error("We couldn't match this site. Confirm the site again."), { status: 409 });
     const site = sites[0];
     const device = site.devices.find(d => d.deviceId === deviceId);
-    if (!device) throw Object.assign(new Error('Device not found at this site'), { status: 404 });
+    if (!device) throw Object.assign(new Error("We couldn't find the heating controls at this site."), { status: 404 });
     if (device.deviceType !== 'boiler-panel') {
-        throw Object.assign(new Error('Device is not a boiler-panel'), { status: 409 });
+        throw Object.assign(new Error("This isn't the pub heating controls."), { status: 409 });
     }
-    if (!device.online) throw Object.assign(new Error('Device is offline — no command can reach it'), { status: 409 });
+    if (!device.online) throw Object.assign(new Error("The heating controls aren't connected right now, so we can't change them from here."), { status: 409 });
     if (!await tb.hasPublishedState(device)) {
-        throw Object.assign(new Error('Device has not registered with the platform yet'), { status: 409, registration: true });
+        throw Object.assign(new Error("The heating controls aren't set up to be changed from here yet."), { status: 409, registration: true });
     }
     if (device.heating?.stale === true) {
-        throw Object.assign(new Error('Boiler panel data is stale — confirmation would be unreliable. Try again when the panel reports.'), { status: 409 });
+        throw Object.assign(new Error("The heating controls haven't reported recently, so we can't safely change them. Try again in a few minutes."), { status: 409 });
     }
 
     // Determine panel version from site-level boilerControl (populated by decodeBoilerHeating).
@@ -626,14 +626,14 @@ export async function dispatchBoilerBoost({ operator, confirmToken, siteNo, devi
     const warnings = preStates.filter(z => z.dir !== 0 && !acknowledgedWarnings).map(z => ({
         zone: z.zone,
         currentDir: z.dir > 0 ? 'on' : 'off',
-        message: `Pub zone ${z.zone === 'CHZ1' ? '1' : '2'} is already forced ${z.dir > 0 ? 'ON' : 'OFF'} (set at the panel or by an engineer)`
+        message: `Pub zone ${z.zone === 'CHZ1' ? '1' : '2'} has already been switched ${z.dir > 0 ? 'on' : 'off'} by hand at the heating controls, perhaps by someone at the pub or an engineer.`
     }));
     if (warnings.length) return { _warnings: warnings };
 
     // F004 — consume the confirmation token exactly once, only when we are about to write.
     // This allows the warnings-only path to leave the token intact for a subsequent acknowledged request.
     if (!resolution.consumeConfirmation(confirmToken, siteNo, operator.id)) {
-        throw Object.assign(new Error('Confirmation token has expired or was already used — re-confirm the site'), { status: 409 });
+        throw Object.assign(new Error("The site confirmation has run out. Confirm the site again."), { status: 409 });
     }
 
     const contract = config.control.classes['boiler-panel'];
