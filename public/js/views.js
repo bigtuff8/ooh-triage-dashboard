@@ -237,10 +237,18 @@ function renderP1Banner(ws) {
 // State machine: idle → confirm → working → done/pending/changed/error.
 var _holdBannerConfirm = {}; // { [holdId]: 'confirm'|'working'|'done'|'pending'|'changed'|'error' }
 var _holdBannerResult = {};  // { [holdId]: { result, hold } }
+// Timers put back to normal stay on the banner with their result until dismissed (§10.1),
+// even though they have left activeBoostHolds (so the flow intercept clears).
+var _holdBannerFinished = {}; // { [holdId]: { hold, siteNo } }
 
 function renderBoostHoldBanner(ws) {
-    var holds = ws.activeBoostHolds;
-    if (!holds || !holds.length) return '';
+    var siteNo = ws && ws.site ? String(ws.site.siteNo) : '';
+    var active = ws.activeBoostHolds || [];
+    var finished = Object.keys(_holdBannerFinished).map(function(id) { return _holdBannerFinished[id]; })
+        .filter(function(f) { return f.siteNo === siteNo && !active.some(function(h) { return h.id === f.hold.id; }); })
+        .map(function(f) { return f.hold; });
+    var holds = active.concat(finished);
+    if (!holds.length) return '';
 
     function fmtTime(isoOrMs) {
         if (!isoOrMs) return '';
@@ -283,8 +291,10 @@ function renderBoostHoldBanner(ws) {
             var tkt3 = ((_holdBannerResult[h.id] || {}).hold || {}).ticketId;
             var tktStr3 = tkt3 ? ' Logged on ticket #' + tkt3 + ' for the IoT helpdesk to check.' : '';
             stateHtml = '<div class="hb-row alert warn" style="margin:0"><span class="hb-state">⚠ Someone has changed ' + zLabel + ' at the heating controls since we did, so we\'ve left it as it is.' + esc(tktStr3) + '</span><button class="btn" onclick="holdBannerDismiss(\'' + h.id + '\')">Dismiss</button></div>';
+        } else if (phase === 'finished') {
+            stateHtml = '<div class="hb-row"><span class="hb-state">This had already finished. Refreshing…</span></div>';
         } else if (phase === 'error') {
-            stateHtml = '<div class="hb-row alert err" style="margin:0"><span class="hb-state">Couldn\'t put it back: ' + esc((_holdBannerResult[h.id] || {}).error || 'unknown error') + '</span>' +
+            stateHtml = '<div class="hb-row alert err" style="margin:0"><span class="hb-state">Couldn\'t put it back: ' + esc((_holdBannerResult[h.id] || {}).error || 'try again') + '.</span>' +
                 '<button class="btn" onclick="holdBannerCancel(\'' + h.id + '\')">Try again</button></div>';
         }
         return stateHtml;
@@ -307,6 +317,7 @@ function holdBannerKeep(id) {
 function holdBannerDismiss(id) {
     delete _holdBannerConfirm[id];
     delete _holdBannerResult[id];
+    delete _holdBannerFinished[id];
     // Remove from workspace holds so banner disappears.
     if (state.workspace && state.workspace.activeBoostHolds) {
         state.workspace.activeBoostHolds = state.workspace.activeBoostHolds.filter(function(h) { return h.id !== id; });
@@ -329,7 +340,9 @@ function holdBannerConfirmYes(id, zone) {
         } else {
             _holdBannerConfirm[id] = 'done';
         }
-        // Remove from active holds so flow intercept clears.
+        // Remove from active holds so flow intercept clears; keep the row on the banner with its result.
+        var finishedHold = (state.workspace && state.workspace.activeBoostHolds || []).find(function(h) { return h.id === id; });
+        if (finishedHold) _holdBannerFinished[id] = { hold: finishedHold, siteNo: String(state.workspace.site.siteNo) };
         if (state.workspace && state.workspace.activeBoostHolds) {
             state.workspace.activeBoostHolds = state.workspace.activeBoostHolds.filter(function(h) { return h.id !== id; });
         }
@@ -340,7 +353,16 @@ function holdBannerConfirmYes(id, zone) {
         }
         render();
     }).catch(function(err) {
-        _holdBannerResult[id] = { error: err.message || 'unknown error' };
+        var code = err.message || '';
+        // §10.1: a timer that already ended shows "already finished" and refreshes; other codes get plain words.
+        if (code === 'hold-ended' || code === 'hold-not-found') {
+            _holdBannerConfirm[id] = 'finished';
+            render();
+            setTimeout(function() { refreshWorkspace(); }, 1500);
+            return;
+        }
+        var plain = { 'not-confirmed': 'confirm the site first, then try again', 'hold-changed': 'it was changed at the same moment, so try again' }[code];
+        _holdBannerResult[id] = { error: plain || 'the heating controls didn\'t accept the change, so try again' };
         _holdBannerConfirm[id] = 'error';
         render();
     });

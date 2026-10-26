@@ -77,7 +77,7 @@ export function clampBoostWindow(nowMs, direction, durationKey, tz = 'Europe/Lon
         return {
             ok: false,
             code: 'refused-window',
-            message: "Heating boosts can't start between 01:00 and 07:00. The IoT team will pick this up in the morning."
+            message: "The heating can't be turned on or off from here between 01:00 and 07:00. Log it and the IoT helpdesk will pick it up in the morning."
         };
     }
 
@@ -95,7 +95,7 @@ export function clampBoostWindow(nowMs, direction, durationKey, tz = 'Europe/Lon
             return {
                 ok: false,
                 code: 'too-close',
-                message: `Only ${leftMin} minute${leftMin !== 1 ? 's' : ''} left before the 01:00 cut-off — boost not sent.`
+                message: `Only ${leftMin} minute${leftMin !== 1 ? 's' : ''} left before the 01:00 cut-off, so the heating wasn't changed.`
             };
         }
 
