@@ -77,7 +77,7 @@ const REGISTRY = {
     'boiler-panel': {
         label: 'Pub boiler panel',
         commands: ['boost-on', 'boost-off'],
-        boostMenu: { on: ['30', '60', '120'], off: ['60', '120', 'until-0700'] }
+        boostMenu: { on: ['30', '60', '120'], off: ['60', '120', 'until-0700', 'until-next-on'] }
     },
     'tb-rulechain': { label: 'TB rule-chain (lighting/fans)', commands: [] },
     'gateway': { label: 'Lighthouse gateway', commands: [] }

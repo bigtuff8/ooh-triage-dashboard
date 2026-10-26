@@ -1731,6 +1731,25 @@ export async function getSitesByNumber(siteNo) {
                     }
                 }
             }
+            // OOHDASH-144 C1 fix: enrich fixture boilerControl zones with timetable so the
+            // control path (dispatchBoilerBoost until-next-on) sees the same shape as the live
+            // path (decodeBoilerHeating already calls zoneTimetable and attaches timetable on
+            // each zone). Fixture schedules are stored under boilerControl.heating.schedules[zoneId].
+            for (const site of sites) {
+                const bc = site.boilerControl;
+                if (bc?.heating?.zones && bc.heating.schedules) {
+                    const tz = config.control?.schedule?.tz ?? 'Europe/London';
+                    const now = Date.now();
+                    const schedules = bc.heating.schedules;
+                    const enrichedZones = bc.heating.zones.map(z => {
+                        if (z.timetable != null) return z; // already set
+                        const sched = z.zone ? schedules[z.zone] : null;
+                        const timetable = sched ? (zoneTimetable(sched, now, tz) ?? null) : null;
+                        return { ...z, timetable };
+                    });
+                    site.boilerControl = { ...bc, heating: { ...bc.heating, zones: enrichedZones } };
+                }
+            }
         }
         lastReadOk = true;
         lastReadError = null;

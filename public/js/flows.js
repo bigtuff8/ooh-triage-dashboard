@@ -867,7 +867,8 @@ function bpOutcomeCard(wcode, heating, nowMs, boostAvailable, activeBoostHolds) 
         var oohAddOn = oohOnZones.map(function(z) {
             var h = oohHold(z.zone || ('CHZ' + z.n));
             var until = h && h.revertAt ? new Date(h.revertAt).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }) : '';
-            return 'We turned zone ' + z.n + ' on earlier' + (until ? ', until ' + until : '') + '. I can put that back to normal now.';
+            var holdDir = h && h.direction === 'off' ? 'off' : 'on';
+            return 'We turned zone ' + z.n + ' ' + holdDir + ' earlier' + (until ? ', until ' + until : '') + '. I can put that back to normal now.';
         }).join(' ');
         headline = "The heating is on";
         sayHtml = say("Your heating is on at the controls right now." +
@@ -922,8 +923,19 @@ function wrapUpStep(ws, f, heating) {
     }
 
     if (f.data['_wrap_err']) {
-        return '<div class="alert err" data-testid="wrap-error">We couldn\'t log this: ' + esc(f.data['_wrap_err']) +
-            ' <button class="btn" onclick="state.flow.data[\'_wrap_err\']=null;state.flow.data[\'_wrap_pend\']=null;render()">Try again</button></div>';
+        // §9.2: append-refused and hold-not-found are not transient — offer a new-ticket button
+        // instead of "Try again" (which would just fail again). The earlier ticket ID is shown
+        // as evidence so the agent knows what they were trying to add to.
+        var errCode = f.data['_wrap_err_code'] || '';
+        var isAppendFail = (errCode === 'append-refused' || errCode === 'hold-not-found');
+        var errTicket = f.data['_wrap_err_ticket'];
+        var evidenceHtml = (isAppendFail && errTicket)
+            ? '<div class="small" style="margin-top:4px">Earlier ticket: #' + esc(String(errTicket)) + '</div>'
+            : '';
+        var actionBtn = isAppendFail
+            ? '<button class="btn primary" data-testid="wrap-new-ticket" onclick="wrapUpForceNew()" style="margin-top:8px">Log for the IoT helpdesk and finish</button>'
+            : '<button class="btn" onclick="state.flow.data[\'_wrap_err\']=null;state.flow.data[\'_wrap_pend\']=null;render()">Try again</button>';
+        return '<div class="alert err" data-testid="wrap-error">' + esc(f.data['_wrap_err']) + evidenceHtml + ' ' + actionBtn + '</div>';
     }
 
     if (f.data['_wrap_pend']) {
@@ -1000,6 +1012,9 @@ function wrapUpSubmit() {
     var detail = f.data._wrapHeadline || subject;
     var logSentence = f.data._wrapLogSentence || detail;
 
+    // §9.2: if the agent is re-submitting after append-refused, bypass the append path.
+    var forceNew = !!f.data['_wrap_force_new'];
+
     var body = {
         type: f.data.wrapKind === 'no-action' ? 'no-action' : 'capture',
         siteNo: ws.site.siteNo,
@@ -1010,9 +1025,11 @@ function wrapUpSubmit() {
         additionalNotes: f.data.additionalNotes || null,
         OohCaptureClass: 'boiler-panel-heating',
         actions: actionLines,
-        holdIds: holdIds
+        holdIds: holdIds,
+        // Cite the earlier ticket when re-submitting after append-refused (§9.2 Related: #N).
+        relatedToTicketId: forceNew ? (f.data['_wrap_related_ticket'] || null) : null
     };
-    if (appendToHoldId && existingTicketId) {
+    if (appendToHoldId && existingTicketId && !forceNew) {
         body.appendToHoldId = appendToHoldId;
         body.confirmToken = state.confirmToken;
     }
@@ -1023,14 +1040,49 @@ function wrapUpSubmit() {
         f.data['_wrap_done'] = true;
         f.data['_wrap_ticket'] = tkt;
         f.data['_wrap_subject'] = subject;
+        f.data['_wrap_force_new'] = null;
+        f.data['_wrap_related_ticket'] = null;
         // Refresh workspace so banner clears if we put something back
         refreshWorkspace().catch(function() {});
         render();
     }).catch(function(err) {
         f.data['_wrap_pend'] = null;
-        f.data['_wrap_err'] = err.message || 'unknown error';
+        // Map raw error codes to plain English (design section 12 glossary).
+        // Never show raw codes on screen.
+        var rawCode = err.message || 'unknown error';
+        var mappedMsg = rawCode;
+        if (rawCode === 'append-refused') mappedMsg = "Couldn't add to the existing ticket. Use the button below to log as a new ticket instead.";
+        else if (rawCode === 'expired-token') mappedMsg = "The site confirmation has expired. Re-confirm the site and try again.";
+        else if (rawCode === 'site-mismatch') mappedMsg = "The confirmed site doesn't match this hold. Re-confirm the site and try again.";
+        else if (rawCode === 'hold-not-found') mappedMsg = "Couldn't find the original hold record. Use the button below to log as a new ticket instead.";
+        // Store the raw code so wrapUpStep can pick the right recovery action (§9.2).
+        f.data['_wrap_err_code'] = rawCode;
+        // Store the ticket we were trying to append to — shown as evidence and used as Related: #N.
+        if (rawCode === 'append-refused' || rawCode === 'hold-not-found') {
+            f.data['_wrap_err_ticket'] = existingTicketId;
+        }
+        f.data['_wrap_err'] = mappedMsg;
         render();
     });
+}
+
+/**
+ * wrapUpForceNew — §9.2 fallback when append-refused / hold-not-found.
+ * Clears the error state and re-submits as a brand-new ticket, passing the
+ * earlier ticket id so the server can cite "Related: #N" in the first comment.
+ */
+function wrapUpForceNew() {
+    if (!state.flow || !state.flow.data) return;
+    var f = state.flow;
+    var relatedTicket = f.data['_wrap_err_ticket'] || null;
+    // Clear error flags
+    f.data['_wrap_err'] = null;
+    f.data['_wrap_err_code'] = null;
+    f.data['_wrap_err_ticket'] = null;
+    // Signal that this submit must bypass the append path and cite the earlier ticket
+    f.data['_wrap_force_new'] = true;
+    f.data['_wrap_related_ticket'] = relatedTicket;
+    wrapUpSubmit();
 }
 
 /**
@@ -1063,7 +1115,7 @@ function boilerPanelHeatingBranch(ws, f, panelDevice, site) {
     // Build readout line (§8.1a)
     function buildReadout() {
         if (!heating || !heating.visible) {
-            return '<div class="zoneread"><span class="small">Pub boiler panel — no reading</span></div>';
+            return '<div class="zoneread"><span class="small">Pub heating controls — no reading</span></div>';
         }
         var zones = heating.zones || [];
         var zoneParts = zones.map(function(z) {
@@ -1375,6 +1427,10 @@ function boilerPanelHeatingBranch(ws, f, panelDevice, site) {
             f.data['_out_' + bsKey] = bsCardHtml +
                 '<div class="outbtns"><button class="btn primary" data-testid="bp-finish-notes" onclick="flowStep({need:\'bp-wrap\'})">Finish and add notes</button></div>';
             f.data._outcomeHtml = bsCardHtml;
+            // C2 fix: the boost consumed the original confirmToken; the server returns a
+            // fresh one so wrapUpSubmit's append check (hasSiteConfirmation) finds a valid
+            // confirmation for this session. Store it immediately.
+            if (res.confirmToken) state.confirmToken = res.confirmToken;
             refreshWorkspace().catch(function() {});
             render();
         }).catch(function(err) {
@@ -1398,14 +1454,14 @@ function boilerPanelHeatingBranch(ws, f, panelDevice, site) {
         f.data.wrapKind = card.wrapKind;
         // Build ticket/log sentence from wcode
         var bpLogSegs = [];
-        if (wcode === 'W1') bpLogSegs.push('Heating could not be checked (panel last reported ' + panelAgo(heating && heating.panelLastSeenMs) + ').');
-        else if (wcode === 'W2') bpLogSegs.push('Panel calling for heat, all zones on. Likely boiler or radiator fault; site advised to call their heating engineer.');
+        if (wcode === 'W1') bpLogSegs.push('Heating could not be checked (heating controls last updated ' + panelAgo(heating && heating.panelLastSeenMs) + ').');
+        else if (wcode === 'W2') bpLogSegs.push('All zones on, heating calling. Likely a boiler or radiator fault; site advised to call their heating engineer.');
         else if (wcode === 'W3') { var offZ3 = (heating && heating.zones || []).filter(function(z) { return !z.on; }).map(function(z) { return 'zone ' + z.n; }).join(' and '); bpLogSegs.push('Part of pub heating off (' + (offZ3 || 'zone 2') + ').' ); }
         else if (wcode === 'W4') bpLogSegs.push('Heating in summer mode (off season).');
-        else if (wcode === 'W5') bpLogSegs.push('Heating forced off at panel.');
+        else if (wcode === 'W5') bpLogSegs.push('Heating switched off by hand.');
         else if (wcode === 'W6') { var nc6 = heating && heating.nextChange; bpLogSegs.push('Heating off on timetable' + (nc6 ? ', next change at ' + nc6 : '') + '.'); }
-        else if (wcode === 'W7') bpLogSegs.push('Heating running on fallback cycle (room sensor not reporting).');
-        else if (wcode === 'W8') { var onZ8 = (heating && heating.zones || []).filter(function(z) { return z.on; }).map(function(z) { return 'zone ' + z.n; }).join(' and '); bpLogSegs.push('Heating on (' + (onZ8 || 'zones') + '). Caller wants it off.'); }
+        else if (wcode === 'W7') bpLogSegs.push('Heating running on a timed back-up (room sensor not reporting).');
+        else if (wcode === 'W8') { var onZ8 = (heating && heating.zones || []).filter(function(z) { return z.on; }).map(function(z) { return 'zone ' + z.n; }).join(' and '); bpLogSegs.push('Heating on (' + (onZ8 || 'zones') + '). Customer wants it off.'); }
         else if (wcode === 'W9') bpLogSegs.push('Pub heating already off. Warmth from another source.');
         f.data._wrapLogSentence = bpLogSegs.join(' ');
         // Build action buttons
@@ -1511,7 +1567,7 @@ const FLOWR = {
             const airconChip = siteHasAircon()
                 ? `<div class="chips" style="margin-top:8px"><button class="chip" data-testid="aircon-shortcut" onclick="startFlow('aircon', state.flow.data.freeText||'', {carryNotes:true})">❄️ Air conditioning (handled by the IoT team)</button></div>`
                 : '';
-            return `<div class="stepq">Which area is the caller talking about?</div><div class="chips">${areaChips}${fallbackChip}</div>${airconChip}` + unplacedNoteHtml;
+            return `<div class="stepq">Which area is the customer talking about?</div><div class="chips">${areaChips}${fallbackChip}</div>${airconChip}` + unplacedNoteHtml;
         }
         // Resolve the chosen area (by name) to its device SET, then to the coldest-online representative.
         const chosenArea = f.data.area === '__unmapped__' ? null : f.data.area;

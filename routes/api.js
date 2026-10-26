@@ -314,7 +314,13 @@ router.post('/boiler-boost', wrap(async (req, res) => {
     const action = await control.dispatchBoilerBoost({ operator: op, confirmToken, siteNo, deviceId, zones, direction, durationKey, acknowledgedWarnings, callerWords, appendToHoldId: appendToHoldId || null });
     // Return warnings as 200 so the api helper doesn't throw; frontend checks res.warnings.
     if (action._warnings) return res.json({ warnings: action._warnings });
-    res.json({ action });
+    // C2 fix (OOHDASH-144 §9 handover-safe append): the boost consumed the confirmation token,
+    // so issue a fresh one for the same site. The browser stores it and uses it in the wrapup
+    // append check (hasSiteConfirmation). The consumed token is permanently gone — cannot be
+    // replayed for another boost (it no longer exists). The fresh token authorises only this
+    // session's subsequent non-control reads/appends, not a new control write.
+    const refreshed = await resolution.confirmSite(siteNo, op);
+    res.json({ action, confirmToken: refreshed.token });
 }));
 
 /* OOHDASH-144 §5 — put back to normal early (any signed-in OOH role, same gate as boiler-boost). */
@@ -473,7 +479,7 @@ export function buildOutcomeTranscript({ action, type, siteNo, siteName, detail,
 
 router.post('/outcomes', wrap(async (req, res) => {
     const op = req.session.operator;
-    const { type, siteNo, siteName, subject, detail, callerWords, OohCaptureClass, actionId, holdText, p1Summary, additionalNotes, appendToHoldId, holdIds, actions: actionLines } = req.body;
+    const { type, siteNo, siteName, subject, detail, callerWords, OohCaptureClass, actionId, holdText, p1Summary, additionalNotes, appendToHoldId, holdIds, actions: actionLines, relatedToTicketId } = req.body;
     if (!type || !siteNo || !subject || !detail) {
         return res.status(400).json({ error: 'type, siteNo, subject and detail are required' });
     }
@@ -484,12 +490,19 @@ router.post('/outcomes', wrap(async (req, res) => {
         const col = await collection('OohOverrides');
         const holdDoc = await col.get(appendToHoldId);
 
+        // Authority check (OOHDASH-144 §9 handover-safe append):
+        // Use hasSiteConfirmation rather than isConfirmed(token): the boost already consumed the
+        // original token via consumeConfirmation, so isConfirmed would always return false.
+        // hasSiteConfirmation checks that this operator has ANY active confirmation for siteNo
+        // (their current call confirmed this site). This allows the original agent OR a handover
+        // agent who re-confirmed the same site to append — matching the design panel ruling.
+        // The check is non-consuming so it doesn't affect any subsequent operation.
         const canAppend = holdDoc &&
             holdDoc.ticketId &&
             String(holdDoc.siteNo) === String(siteNo) &&
             holdDoc.deviceType === 'boiler-panel' &&
             (Date.now() - new Date(holdDoc.createdAt).getTime()) < 12 * 60 * 60 * 1000 &&
-            resolution.isConfirmed(req.body.confirmToken, siteNo, op.id);
+            resolution.hasSiteConfirmation(siteNo, op.id);
 
         if (!canAppend) {
             return res.status(409).json({ error: 'append-refused', message: 'Cannot append to that hold: site not confirmed, hold not found, or older than 12 h' });
@@ -524,6 +537,17 @@ router.post('/outcomes', wrap(async (req, res) => {
         // OOHDASH-119: additional notes ride alongside but are NOT written to the P1 SMS or audit log.
         additionalNotes: additionalNotes || null
     });
+
+    // §9.2: if the client re-submitted after an append-refused, cite the earlier ticket in an
+    // internal comment so the IoT helpdesk can link the two records.
+    if (relatedToTicketId) {
+        try {
+            await zendesk.addIssueSummaryComment(ticket.id, `[OOH] Related: #${relatedToTicketId}`);
+        } catch (err) {
+            console.error(`[API] Failed to add Related comment to ticket #${ticket.id}: ${err.message}`);
+            // Non-fatal: the new ticket is still created and logged.
+        }
+    }
 
     let p1 = null;
     if (isP1) {
