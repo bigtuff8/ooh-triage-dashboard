@@ -19,7 +19,7 @@ test('next change later today returns ok:true with dayText today', () => {
   const schedule = {
     schedule: [{ value: 22, time: '15:00', loops: '0010000', timer_id: 't1' }]
   };
-  const result = decodeNextChange(schedule, NOW, { tz: TZ });
+  const result = decodeNextChange(schedule, NOW, { tz: TZ, dayOrder: 'mon-first' });
   assert.equal(result.ok, true);
   assert.equal(result.timeText, '15:00');
   assert.equal(result.value, 22);
@@ -34,7 +34,7 @@ test('next change tomorrow when only Thursday entry exists', () => {
   const schedule = {
     schedule: [{ value: 18, time: '10:00', loops: '0001000', timer_id: 't2' }]
   };
-  const result = decodeNextChange(schedule, NOW, { tz: TZ });
+  const result = decodeNextChange(schedule, NOW, { tz: TZ, dayOrder: 'mon-first' });
   assert.equal(result.ok, true);
   assert.equal(result.dayText, 'tomorrow');
   assert.equal(result.timeText, '10:00');
@@ -62,14 +62,14 @@ test('same loops string resolves to different day under mon-first vs sun-first',
 
 /* ---- SD-4: multiple entries in a day -> soonest upcoming chosen ---- */
 test('multiple active entries on same day: soonest after now is chosen', () => {
-  // Both entries active on Wednesday (loops index 2 = '1'), both after 14:30
+  // Both entries active on Wednesday (mon-first loops index 2 = '1'), both after 14:30
   const schedule = {
     schedule: [
       { value: 22, time: '17:00', loops: '0010000', timer_id: 'ta' },
       { value: 18, time: '15:00', loops: '0010000', timer_id: 'tb' }
     ]
   };
-  const result = decodeNextChange(schedule, NOW, { tz: TZ });
+  const result = decodeNextChange(schedule, NOW, { tz: TZ, dayOrder: 'mon-first' });
   assert.equal(result.ok, true);
   assert.equal(result.timeText, '15:00', 'must pick earlier of the two');
   assert.equal(result.value, 18);
@@ -106,4 +106,46 @@ test('malformed JSON string returns ok:false reason:unsafe without throwing', ()
   // describeNextChange must also return null and not throw
   assert.doesNotThrow(() => describeNextChange('{broken}', NOW, { tz: TZ }));
   assert.equal(describeNextChange('{broken}', NOW, { tz: TZ }), null);
+});
+
+// NOW = Wednesday 14:30 Europe/London (jsDay=3).
+// sun-first: position 0=Sun, 1=Mon, 2=Tue, 3=Wed, 4=Thu, 5=Fri, 6=Sat.
+
+/* ---- SD-7: sun-first default — Monday maps to position 1 ---- */
+test('sun-first default: Monday (jsDay=1) maps to loops position 1', () => {
+  // loops '0100000': position 1 = Monday active (sun-first)
+  // Next Monday from Wednesday = 5 days ahead
+  const schedule = {
+    schedule: [{ value: 20, time: '09:00', loops: '0100000', timer_id: 'sd7' }]
+  };
+  const result = decodeNextChange(schedule, NOW, { tz: TZ });
+  assert.equal(result.ok, true);
+  assert.equal(result.dayText, 'Monday', 'sun-first: position 1 = Monday');
+  assert.equal(result.timeText, '09:00');
+});
+
+/* ---- SD-8: sun-first default — Friday maps to position 5 ---- */
+test('sun-first default: Friday (jsDay=5) maps to loops position 5', () => {
+  // loops '0000010': position 5 = Friday active (sun-first)
+  // Next Friday from Wednesday = 2 days ahead
+  const schedule = {
+    schedule: [{ value: 20, time: '09:00', loops: '0000010', timer_id: 'sd8' }]
+  };
+  const result = decodeNextChange(schedule, NOW, { tz: TZ });
+  assert.equal(result.ok, true);
+  assert.equal(result.dayText, 'Friday', 'sun-first: position 5 = Friday');
+  assert.equal(result.timeText, '09:00');
+});
+
+/* ---- SD-9: sun-first default — Sunday maps to position 0 ---- */
+test('sun-first default: Sunday (jsDay=0) maps to loops position 0', () => {
+  // loops '1000000': position 0 = Sunday active (sun-first)
+  // Next Sunday from Wednesday = 4 days ahead
+  const schedule = {
+    schedule: [{ value: 20, time: '09:00', loops: '1000000', timer_id: 'sd9' }]
+  };
+  const result = decodeNextChange(schedule, NOW, { tz: TZ });
+  assert.equal(result.ok, true);
+  assert.equal(result.dayText, 'Sunday', 'sun-first: position 0 = Sunday');
+  assert.equal(result.timeText, '09:00');
 });
