@@ -1263,14 +1263,14 @@ function _decodeBoilerHeatingInner(sharedScope, clientScope, panelLastSeenMs, te
             const on = tbBool(t.output2State);
             const fallback = tbBool(t.output2FallbackEnabled);
             const { forced, forcedUntilMs, held } = parseOverride(t.output2Override ?? null, on, 'V1', now);
-            const timetable = zoneTimetable(sc.output2Schedule ?? null, now, config.control?.schedule?.tz ?? 'Europe/London');
+            const timetable = zoneTimetable(sc.output2Schedule ?? null, now, config.control?.schedule?.tz ?? 'Europe/London', true);
             zones.push({ n: 1, zone: 'CHZ1', on, fallback, forced, forcedUntilMs, held, roomTemp: safeTemp(t.roomSensor1Temp), timetable: timetable ?? null });
         }
         if (z2Configured) {
             const on = tbBool(t.output3State);
             const fallback = tbBool(t.output3FallbackEnabled);
             const { forced, forcedUntilMs, held } = parseOverride(t.output3Override ?? null, on, 'V1', now);
-            const timetable = zoneTimetable(sc.output3Schedule ?? null, now, config.control?.schedule?.tz ?? 'Europe/London');
+            const timetable = zoneTimetable(sc.output3Schedule ?? null, now, config.control?.schedule?.tz ?? 'Europe/London', true);
             zones.push({ n: 2, zone: 'CHZ2', on, fallback, forced, forcedUntilMs, held, roomTemp: safeTemp(t.roomSensor2Temp), timetable: timetable ?? null });
         }
     } else {
