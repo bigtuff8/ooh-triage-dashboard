@@ -140,7 +140,7 @@ export const config = {
         // OOHDASH-123 / DD-SCHED-DISPLAY (James override: decoded display ON by default). dayOrder + tz
         // are single invertible constants so an SQ-13 correction is a config change, not a rebuild.
         schedule: {
-            dayOrder: env('OOH_SCHED_DAY_ORDER', 'mon-first'),   // 'mon-first' | 'sun-first'
+            dayOrder: env('OOH_SCHED_DAY_ORDER', 'sun-first'),   // 'mon-first' | 'sun-first' — OOHDASH-152
             tz: env('OOH_SCHED_TZ', 'Europe/London'),
             decoded: env('OOH_SCHED_DECODED', 'on') !== 'off'
         },
