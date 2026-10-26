@@ -20,8 +20,14 @@ The standard release script runs from main. It bumps the version to 1.6.0, tags 
 SECTION: If something goes wrong
 Rollback is one command, back to the 1.5.4 image running now. It takes about a minute. I would only do it with your go, or if the health page shows the app down. Tickets created automatically in the meantime stay in Zendesk.
 
+SECTION: Timed changes survive a rollback
+If heating is mid-change when we roll back, it still goes back to normal on time. The switch-back is not tied to the running version. Each timed change is saved in the shared database, and a background worker puts it back when it's due. Version 1.5.4 runs that same worker (added in OOHDASH-141, file services/overrides.js), and 1.6.0 doesn't change how timers are saved. So a 1.5.4 pod picks up any timer 1.6.0 set and switches it back on time.
+
+SECTION: The three skipped tests
+None of them touches pub heating or anything that sends changes to the heating. The unit test skipped checks refrigeration profiles, and needs a cellar-profile file that isn't in this repository. The two browser tests skipped are the notes box on the general device controls (TF-18 and TF-19). The demo site has no device control tile, so they skip; they were already skipped before this work. My earlier gate documents called the unit skip "U13". That was wrong, and this is the correct one.
+
 SECTION: A note for the agents
-Agents will see new screens, a new "Check and log" step and new messages on the next pub heating call. The draft note below is for you to send, or not. I won't send it.
+Agents will see new screens, a new "Check and log" step and new messages on the next pub heating call. I recommend sending the draft note below when the release deploys, so nobody meets the new screens cold during a live call. It's for you to send; I won't send it.
 
 SECTION: Checks done
 Every gate is approved and merged. CI passed both required checks on main for the exact commit being released (250f7ab). Unit tests 840 of 841 pass and browser tests 202 of 204 pass, with none failing. All nine cards match the design wording, word for word. A failed or unconfirmed change never says "That's done". Nothing writes a timetable or the boiler.
