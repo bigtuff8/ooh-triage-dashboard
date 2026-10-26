@@ -86,6 +86,7 @@ test.describe('OOHDASH-144 §10.3 result card', () => {
         const card = page.locator('[data-testid="outcome-boost"]');
         await expect(card).toBeVisible({ timeout: 15000 });
         await expect(card.locator('h3')).toHaveText("We couldn't change the heating");
+        await expect(card).not.toHaveClass(/applied/); // never the green success style
         await expect(card.locator('[data-testid^="boost-zone-result-"]').first()).toContainText('❌');
         const say = card.locator('[data-testid="say-block"]');
         await expect(say).not.toContainText("That's done");
@@ -207,5 +208,7 @@ test.describe('OOHDASH-144 §10.3 result card', () => {
         await expect(banner).toContainText(/Noted on ticket #\d+/);
         await expect(banner).toContainText("That's done. Your heating is back on its normal timetable.");
         await expect(page.locator('[data-testid="bp-hold-noact"]')).toHaveCount(0);
+        // The step trail shows the area once, however many times the screen redraws.
+        await expect(page.locator('[data-testid="flow-panel"]').getByText('Bar/Restaurant', { exact: true })).toHaveCount(1);
     });
 });

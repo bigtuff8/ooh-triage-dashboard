@@ -106,7 +106,8 @@ function flowStep(patch) {
     render();
 }
 
-function doneLine(txt) { state.flow.done.push(txt); }
+// Re-renders re-run a step, so ignore an exact repeat of a line already in the trail.
+function doneLine(txt) { if (state.flow.done.indexOf(txt) === -1) state.flow.done.push(txt); }
 
 /* ------------------------ heating area model (OOHDASH-82, design §7) ------------------------ */
 
@@ -1464,7 +1465,9 @@ function boilerPanelHeatingBranch(ws, f, panelDevice, site) {
             if (failedZones.length) logParts.push('tried to turn ' + bsDir + ' ' + zoneWords(failedZones) + ' but the heating controls could not be reached');
             f.data._wrapLogSentence = 'Pub heating at time of call: ' + logParts.join('; ') + '.';
             f.data.wrapKind = 'action';
-            var bsCardHtml = '<div class="outcome applied" data-testid="outcome-boost">' +
+            // Green only when every zone is confirmed; a failed, partial or unconfirmed change uses the neutral logged style.
+            var bsCardClass = (failedZones.length === 0 && confirmedZones.length === okZones.length) ? 'applied' : 'captured';
+            var bsCardHtml = '<div class="outcome ' + bsCardClass + '" data-testid="outcome-boost">' +
                 '<h3>' + esc(bsDirLabel2) + '</h3>' +
                 '<div style="margin:6px 0">' + bsResultRows + '</div>' +
                 '<div class="say" data-testid="say-block"><span class="say-label">🗣 Say to the customer</span>' + esc(bsSayText) + '</div>' +
