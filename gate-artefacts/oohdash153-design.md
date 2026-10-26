@@ -12,6 +12,8 @@ SECTION: Change 3 - correct the seven operator scripts
 Seven P1 scripts in public/js/flows.js claim "a text has gone" or "I've sent an urgent text". Each false claim is replaced with the agreed D2 sentence: "I've raised an urgent P1 ticket for this site and someone will call you back shortly." Five of the seven scripts also carry safety advice after the claim (override switch is safe, electrician procedure, appliance repair route, ask the engineer to hold on). This design keeps that advice and swaps only the false part. See the decision below.
 DECISION: Scope of the script fix | Swap only the false text claim and keep each script's safety advice (recommended) | Replace each whole script with the D2 sentence only
 DETAIL: The brief said "replace all seven with D2". Taken literally that deletes safety advice operators read to callers (for example "the on-site override switch is safe to use" and "ask the engineer to hold on"). Keeping the advice is the smaller, safer change. The exact before and after for all seven is in section 5 of the document.
+SECTION: Panel questions answered
+The IoT Support Dashboard pages the manager by SMS. The OOH-to-IoT contract (docs/project/HANDOFF_OOH-to-IoT-Support_p1-sms-contract.md) says it fires its own SMS notifier on ooh_p1 tickets, the same one that has sent real escalation texts since April 2026. So the two lines that say the IoT team sends a text (flows.js 309 and 381) are true and stay. The P1 SLA metric and the new Admin card never read the dropped fields: the metric reads only dispatchedAt and OohP1AckAt. If the log write fails, the Zendesk ticket with the ooh_p1 tag already exists and the page still happens. Only the Admin row is lost, and a new p1-log-write-failed alert makes that visible. Details are in section 6a.
 SECTION: Decisions already settled
 D1: remove addP1DispatchNote entirely with no replacement. D2: script wording "I've raised an urgent P1 ticket for this site and someone will call you back shortly." D3: keep the Admin P1 log card, fed by positive entries instead of SMS dispatch records. D4: Approach B is confirmed live end to end (the manager was paged for ticket 51137). No third-party blocker remains.
 DECISION: Approve design and proceed to build? | Approve - proceed to build | Block - needs changes
@@ -50,7 +52,7 @@ The real mechanism is Approach B: OOH tags the ticket `ooh_p1`, and the IoT Supp
 
 | Function | Behaviour |
 |---|---|
-| `recordP1Raised({ operator, siteNo, siteName, ticketId, summary })` | Upserts one entry to the existing `OohSmsLog` collection and returns it. Fail-safe: a store error is logged and never blocks the outcome. |
+| `recordP1Raised({ operator, siteNo, siteName, ticketId, summary })` | Upserts one entry to the existing `OohSmsLog` collection and returns it. Fail-safe: a store error is logged, raises a `p1-log-write-failed` alert, and never blocks the outcome. |
 | `p1Log(limit = 50)` | Same as today's `smsLog`: newest first. |
 | `acknowledgeP1(id, actorName)` | Unchanged behaviour (moved as-is). |
 | `buildEscalationLink(ticketId)` | Moved as-is (`config.iotDashBaseUrl` + `/?ticket=`). |
@@ -123,6 +125,34 @@ Notes:
 - `flows.js:341`: the P1 outcome card already says "logged as ticket #N in the IoT Support dashboard, which pages the on-duty manager". This is true under Approach B.
 - `flows.js:381`: the "Something else" P1 explainer says "will send a text to the escalation manager on the IoT Support team". The IoT team's system does send that text, so the line is accurate.
 - `flows.js:309`: "(not in the urgent text)" in the notes echo refers to the IoT team's page. Unchanged, and asserted by two e2e specs.
+
+## 6a. Panel questions answered (round 1)
+
+**Is the IoT page really a text (SMS)?** Yes. The evidence is in the repo, not assumed:
+- `docs/project/HANDOFF_OOH-to-IoT-Support_p1-sms-contract.md` line 17 says the IoT Support Dashboard "fires its own already-built SMS notifier (the same one that has sent real escalation texts since ~April 2026)".
+- Lines 43–44 and 48 say that on an `ooh_p1` ticket it invokes the existing SMS notifier, once per ticket.
+- Line 73 sets the acceptance test: the on-duty manager's device receives one SMS within 60 s.
+
+So `flows.js:381` ("will send a text to the escalation manager on the IoT Support team") and `flows.js:309` ("not in the urgent text") describe the IoT team's text truthfully and stay unchanged. The seven scripts were false for a different reason: they said *the operator* had sent a text.
+
+**Does anything branch on the dropped fields?** No.
+- `services/metrics.js` lines 101–112 read only `dispatchedAt` and `OohP1AckAt` from `OohSmsLog`. `p1Escalations` counts audit entries (`OohActionType === 'escalate-p1'`, line 92), not the log.
+- The only reader of `dispatchOk` and `sentTo` is the Admin card row (`views.js:624`), and section 3.4 replaces that row.
+- Nothing else in `routes/`, `services/` or `public/` reads `dispatchOk`, `provider` or `sentTo` (checked with grep). The build's source-guard test adds a check that `dispatchOk` no longer appears in `public/js/views.js`.
+
+**What if `recordP1Raised` fails to write?** This is an accepted compromise, and here is what happens:
+- By the time the write runs, the Zendesk ticket with the `ooh_p1` tag already exists. That ticket is what triggers the page, so the manager is still paged and what the caller was told is still true.
+- What is lost is that P1's row in the Admin log, plus its ack SLA sample.
+- To make this visible, `recordP1Raised` raises a `p1-log-write-failed` alert (same `raiseAlert` pattern as today) alongside the console error.
+- The outcome is never blocked, which is today's behaviour.
+
+**Was the page for #51137 automatic?** This is settled by James (D4, discovery gate PR #169): Approach B was verified end to end live, and the manager was paged for #51137. This design does not depend on that one incident. The Approach B contract and acceptance test above are the standing basis, and removing the false note cannot stop a page, because the watcher keys on the `ooh_p1` tag, which is unchanged.
+
+**Follow-ups noted (not in this build):**
+- Naming debt: `OohSmsLog`, `dispatchedAt` and `/api/admin/sms-log` still say SMS. Raise a cleanup ticket.
+- `SMS_PROVIDER` in `k8s/deployment.yaml` and the `release.sh` grep: queue for removal at the next manifest change.
+- Check whether any `TWILIO_*` values exist in the Spencer-managed secret. If they do, ask for their removal and revocation (needs James's go to contact Spencer).
+- Legacy `OohSmsLog` rows hold no phone numbers. `sentToNumber` was only ever the text "(configured)" or "(not configured)" (`escalation.js:76`), so no retention action is needed.
 
 ## 6. Tests (build must deliver)
 
