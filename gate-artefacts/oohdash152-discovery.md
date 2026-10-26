@@ -1,3 +1,19 @@
+<!-- gate:contract
+SECTION: What this discovery found
+All seven schedule key types decoded by decodeDeviceSchedule() were surveyed against live ThingsBoard data. Every key that produces a result in production uses sun-first day ordering — either PROVEN (CHZ1.schedule, confirmed by SQ-13) or DEDUCED by firmware identity and loop-pattern coherence (DHW.schedule, output2Schedule, output3Schedule, output4Schedule). The two remaining keys — output1Schedule and PowerPause schedules — are MOOT (absent or empty in every production device checked).
+
+SECTION: What is currently wrong
+config.js line 143 defaults OOH_SCHED_DAY_ORDER to 'mon-first'. Every day-varying schedule entry found on the live estate uses sun-first ordering. This means the "next change at..." text shown to operators during the W6 heating triage call (flows.js line 1511) is wrong for any site with non-uniform daily schedules — the operator reads the wrong time aloud to the customer.
+
+SECTION: The fix
+One line in config.js line 143: change the default from 'mon-first' to 'sun-first'. No other code changes needed beyond existing schedule-decode unit tests. Should be applied after OOHDASH-149 PR #164 merges (that PR fixes the related zoneTimetable path).
+
+SECTION: Confidence in the verdict
+CHZ1.schedule: PROVEN sun-first by live telemetry cross-reference (SQ-13). DHW.schedule: DEDUCED — loop patterns are byte-for-byte identical to CHZ1.schedule on the same physical device. output2/3/4Schedule: DEDUCED — same firmware lineage as V2 (PROVEN), and day-varying patterns are only coherent under sun-first. No key type was found to use mon-first ordering.
+
+DECISION: Approve this discovery and proceed to the config.js build? | Approve — proceed to one-line config change after PR #164 merges | Amend — change the scope or ask for more evidence | Decline — do not proceed
+-->
+
 # OOHDASH-152 Day-Order Survey Finding
 **Date:** 2026-10-26  
 **Author:** Claude Code (discovery spike)  
