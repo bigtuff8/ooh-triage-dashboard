@@ -18,10 +18,10 @@ SECTION: How it is released
 The standard release script runs from main. It bumps the version to 1.6.0, tags it, builds the image, and points the registry's "latest" image at it. It then rolls out the new image by its commit, never by "latest". It swaps only the image. Afterwards I check that the live health page reports 1.6.0 with every part healthy, and that the deployed image is the new commit.
 
 SECTION: If something goes wrong
-Rollback is one command, back to the 1.5.4 image running now. It takes about a minute. I would only do it with your go, or if the health page shows the app down. Tickets created automatically in the meantime stay in Zendesk.
+Rollback is one command, back to the exact 1.5.4 image running now, named by its fixed image fingerprint rather than a tag, so it can't drift. It takes about a minute. Nothing pulls the "latest" image: the deployment names a fixed version, and any extra copies use the same setting. I would only do it with your go, or if the health page shows the app down. Tickets created automatically in the meantime stay in Zendesk.
 
 SECTION: Timed changes survive a rollback
-If heating is mid-change when we roll back, it still goes back to normal on time. The switch-back is not tied to the running version. Each timed change is saved in the shared database, and a background worker puts it back when it's due. Version 1.5.4 runs that same worker (added in OOHDASH-141, file services/overrides.js), and 1.6.0 doesn't change how timers are saved. So a 1.5.4 pod picks up any timer 1.6.0 set and switches it back on time.
+If heating is mid-change when we roll back, it still goes back to normal on time. The switch-back is not tied to the running version. Each timed change is saved in the shared database, and a background worker puts it back when it's due. Version 1.5.4 runs that same worker (added in OOHDASH-141, file services/overrides.js), and 1.6.0 doesn't change how timers are saved. So a 1.5.4 pod picks up any timer 1.6.0 set and switches it back on time. I proved this with a test that runs both versions. Version 1.6.0 code set three timers: both zones off on one demo site, and one zone on at the other. Version 1.5.4 code, reading the same store, then switched all three back to automatic on time.
 
 SECTION: The three skipped tests
 None of them touches pub heating or anything that sends changes to the heating. The unit test skipped checks refrigeration profiles, and needs a cellar-profile file that isn't in this repository. The two browser tests skipped are the notes box on the general device controls (TF-18 and TF-19). The demo site has no device control tile, so they skip; they were already skipped before this work. My earlier gate documents called the unit skip "U13". That was wrong, and this is the correct one.
@@ -47,7 +47,9 @@ DETAIL: Approving with Go is your explicit go to deploy. I will run the release 
 | Settings | none new; turning heating on or off is enabled by default (no BOILER_BOOST_* env set in production) |
 | Script note | The script warns that writes are not disabled. That is expected: writes have been enabled since 2026-09-24. |
 | Verify | `/healthz` version 1.6.0, subsystems healthy; deployed image is `<sha>` |
-| Rollback | `kubectl -n iot-services set image deployment/ooh-dashboard ooh-dashboard=apitechhub.azurecr.io/ooh-dashboard:v1.5.4` |
+| Rollback | `kubectl -n iot-services set image deployment/ooh-dashboard ooh-dashboard=apitechhub.azurecr.io/ooh-dashboard@sha256:06012d2fd1ec5655bd371f9872b7ebe0df175e1eb0f34bc96bb044bffa88a365` (the running pod's digest; tags `v1.5.4`, `72baa82` and the current `latest` all resolve to it today) |
+| Rollback proven | a cross-version test: v1.6.0 code set timers for 9010 (both zones off) and 9011 (zone 1 on); the v1.5.4 revert worker, on the same store, reverted all three to automatic (0) |
+| latest | not used by the deployment (pinned to `72baa82`, 1 replica); `latest` is re-pointed to v1.6.0 by the release script |
 | Gates | design #151, build #157, fixes #158 and #159, test #160, release (this PR) |
 
 ## Draft note for the agents (for James to send, or not)
