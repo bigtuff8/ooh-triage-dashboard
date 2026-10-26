@@ -1370,13 +1370,18 @@ function boilerPanelHeatingBranch(ws, f, panelDevice, site) {
             var bsDirLabel2 = bsDir === 'on' ? 'Heating turned on' : 'Heating turned off';
             var bsResultRows = '';
             // The server reports each zone as { zone, outcome }; read `outcome` (older payloads used `state`).
+            // Server contract (services/control.js dispatchBoilerBoost): action.zones[] = { zone, outcome, dispatchError, panelVersion },
+            // outcome ∈ CONFIRMED | IN-FLIGHT-TIMEOUT | NON-DELIVERY. Anything else is treated as failed (fail closed).
             var allZoneOutcomes = (act.zones || []).map(function(zo) {
-                return { zone: zo.zone, state: zo.outcome || zo.state };
+                var st = zo.outcome;
+                if (st !== 'CONFIRMED' && st !== 'IN-FLIGHT-TIMEOUT') st = 'NON-DELIVERY';
+                return { zone: zo.zone, state: st };
             });
             if (allZoneOutcomes.length === 0 && bsZones.length > 0) {
-                // Fallback: no zone outcomes returned
-                allZoneOutcomes = bsZones.map(function(z) { return { zone: z, state: 'CONFIRMED' }; });
+                // No per-zone results: never claim success; show it as sent but not confirmed.
+                allZoneOutcomes = bsZones.map(function(z) { return { zone: z, state: 'IN-FLIGHT-TIMEOUT' }; });
             }
+            var confirmedZones = allZoneOutcomes.filter(function(zo) { return zo.state === 'CONFIRMED'; }).map(function(zo) { return zo.zone; });
             var okZones = allZoneOutcomes.filter(function(zo) { return zo.state !== 'NON-DELIVERY'; }).map(function(zo) { return zo.zone; });
             var failedZones = allZoneOutcomes.filter(function(zo) { return zo.state === 'NON-DELIVERY'; }).map(function(zo) { return zo.zone; });
             var zoneWords = function(zs) { return zs.map(function(z) { return z.replace('CHZ', 'zone '); }).join(' and '); };
@@ -1411,18 +1416,27 @@ function boilerPanelHeatingBranch(ws, f, panelDevice, site) {
                 }
             }
             var bsUntilStr = act.revertAtMs ? fmtTime(act.revertAtMs) : '';
-            var bsSayText;
-            if (okZones.length === 0) {
-                // Nothing reached the heating controls: never tell the customer it's done (§10.3).
-                bsSayText = "I\'m sorry, I couldn\'t change your heating from here. I\'ve logged it for our team to sort out.";
-            } else {
-                // Partial failure: speak only for the zones that worked, plus "logged the rest" (§10.3).
-                var okPrefix = failedZones.length ? "That\'s done for " + zoneWords(okZones) + ". It" : "That\'s done. Your heating";
-                bsSayText = okPrefix + " will be " + (bsDir === 'on' ? 'on' : 'off') + " until " + bsUntilStr + ", and then it goes back to its normal timetable" + bsNextOnClause + ".";
-                if (failedZones.length) bsSayText += " I\'ve logged the rest for our team.";
-            }
             // Autolog box
             var tkt2 = act.ticketId;
+            // Only say "I've logged" when the automatic ticket really exists; otherwise it is logged at Check and log.
+            var loggedVerb = tkt2 ? "I\'ve logged" : "I\'ll log";
+            var bsSayText;
+            var dirWord = bsDir === 'on' ? 'on' : 'off';
+            if (okZones.length === 0) {
+                // Nothing reached the heating controls: never tell the customer it's done (§10.3).
+                bsSayText = "I\'m sorry, I couldn\'t change your heating from here. " + loggedVerb + " it for our team to sort out.";
+            } else {
+                // "That's done" only for zones the controls confirmed; sent-but-unconfirmed zones get "I've asked".
+                var lead;
+                if (confirmedZones.length === okZones.length) {
+                    lead = failedZones.length ? "That\'s done for " + zoneWords(okZones) + ". It" : "That\'s done. Your heating";
+                } else {
+                    lead = "I\'ve asked your heating controls to turn " + (failedZones.length ? zoneWords(okZones) + ' ' : 'it ') + dirWord + ". It";
+                }
+                bsSayText = lead + " will be " + dirWord + " until " + bsUntilStr + ", and then it goes back to its normal timetable" + bsNextOnClause + ".";
+                // Partial failure: name the zones that didn't change (§10.3 "I've logged the rest").
+                if (failedZones.length) bsSayText += " I couldn\'t change " + zoneWords(failedZones) + ", so " + loggedVerb + " that for our team.";
+            }
             var autologHtml = '';
             if (tkt2) {
                 // §9.3: a zone that didn't respond gets the "didn't respond" wording, not "because we changed it".

@@ -10,6 +10,8 @@
  *       "didn't respond" auto-log wording, Check and log records "Tried to turn ... couldn't be reached"
  * RC-3  partial (zone 1 ok, zone 2 NON-DELIVERY): script speaks for zone 1 only and "logged the rest"
  * RC-4  a change that ends after the next timetable on-time never says "which next comes on at"
+ * RC-6  unconfirmed send never says "That's done"; an unknown zone result is treated as failed
+ * RC-7  no automatic ticket: the script says "I'll log", never "I've logged"
  * RC-5  putting a timer back to normal keeps its "back to normal, noted on ticket" row on the banner,
  *       and the intercept then offers "Finish and add notes", never "No further action" (§10.1, §10.2)
  */
@@ -117,7 +119,48 @@ test.describe('OOHDASH-144 §10.3 result card', () => {
         await expect(card.locator('[data-testid="boost-zone-result-CHZ2"]')).toContainText('❌');
         const say = card.locator('[data-testid="say-block"]');
         await expect(say).toContainText("That's done for zone 1");
-        await expect(say).toContainText("I've logged the rest");
+        await expect(say).toContainText("I couldn't change zone 2, so I've logged that for our team.");
+    });
+
+    test('RC-6: an unconfirmed send never says "That\'s done", and an unknown result counts as failed', async ({ page }) => {
+        await page.route('**/api/boiler-boost', route => route.fulfill({
+            status: 200, contentType: 'application/json',
+            body: JSON.stringify(fakeBoostResponse([{ zone: 'CHZ1', outcome: 'IN-FLIGHT-TIMEOUT' }, { zone: 'CHZ2', outcome: 'SOMETHING-NEW' }]))
+        }));
+        await confirmSite(page, '9010', 'Test Boiler Panel V2 (Heating)');
+        await reachDirection(page);
+        await page.locator('[data-testid="need-hot"]').click();
+        await page.locator('[data-testid="bp-zones-btn"], [data-testid^="bp-boost-off-"]').first().click();
+        const all = page.locator('[data-testid="bp-zone-all"]');
+        if (await all.isVisible().catch(() => false)) {
+            await all.click();
+            await page.locator('[data-testid="bp-zones-continue"]').click();
+        }
+        await page.locator('[data-testid="bp-dur-60"]').click();
+        const card = page.locator('[data-testid="outcome-boost"]');
+        await expect(card).toBeVisible({ timeout: 15000 });
+        await expect(card.locator('[data-testid="boost-zone-result-CHZ1"]')).toContainText('⏳');
+        await expect(card.locator('[data-testid="boost-zone-result-CHZ2"]')).toContainText('❌');
+        const say = card.locator('[data-testid="say-block"]');
+        await expect(say).not.toContainText("That's done");
+        await expect(say).toContainText("I've asked your heating controls to turn zone 1 off.");
+        await expect(say).toContainText("I couldn't change zone 2");
+    });
+
+    test('RC-7: with no automatic ticket, the script says "I\'ll log", not "I\'ve logged"', async ({ page }) => {
+        const body = fakeBoostResponse([{ zone: 'CHZ2', outcome: 'NON-DELIVERY' }]);
+        body.action.ticketId = null;
+        await page.route('**/api/boiler-boost', route => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(body) }));
+        await confirmSite(page, '9011', 'Test Boiler Panel V1 (Heating)');
+        await reachDirection(page);
+        await page.locator('[data-testid="need-cold"]').click();
+        await page.locator('[data-testid^="bp-boost-on-"]').first().click();
+        await page.locator('[data-testid="bp-dur-60"]').click();
+        const card = page.locator('[data-testid="outcome-boost"]');
+        await expect(card).toBeVisible({ timeout: 15000 });
+        await expect(card.locator('[data-testid="say-block"]')).toContainText("I'll log it for our team");
+        await expect(card.locator('[data-testid="say-block"]')).not.toContainText("I've logged");
+        await expect(card.locator('[data-testid="autolog-box"]')).toContainText("We couldn't log this automatically");
     });
 
     test('RC-4: a change ending after the next on-time does not promise that on-time', async ({ page }) => {
