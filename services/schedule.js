@@ -109,7 +109,7 @@ function parseInput(scheduleJson) {
  *         | { ok: false, reason: 'absent'|'unsafe' }}
  */
 export function decodeNextChange(scheduleJson, now, opts = {}) {
-  const { dayOrder = 'mon-first', tz = 'Europe/London' } = opts;
+  const { dayOrder = 'sun-first', tz = 'Europe/London' } = opts;
   try {
     const parsed = parseInput(scheduleJson);
     if (parsed === 'unsafe') return { ok: false, reason: 'unsafe' };
@@ -342,15 +342,17 @@ export function describeNextChange(scheduleJson, now, opts = {}) {
  * zone comes on (a step up in setpoint value) within 24 hours.
  *
  * Returns null on parse failure or empty schedule.
- * Returns { everyDay: false, currentTempC: null, nextOn: null } when timetable varies by day
- * (SQ-13 weekday order unconfirmed — we only decode when every-day, so day order is irrelevant).
+ * For non-everyDay entries, decodes using sun-first day ordering (SQ-13 confirmed for V2)
+ * unless everyDayOnly=true, which keeps the safe hold and returns {everyDay:false, currentTempC:null, nextOn:null}.
+ * V1 call sites (output2/3Schedule) pass everyDayOnly=true pending OOHDASH-151 confirming V1 day ordering.
  *
  * @param {object|Array|string|null} scheduleJson
  * @param {number} nowMs  Current time as ms since epoch
  * @param {string} [tz='Europe/London']
+ * @param {boolean} [everyDayOnly=false]  When true, day-varying schedules return null nextOn (V1 safe hold)
  * @returns {{ everyDay: boolean, currentTempC: number|null, nextOn: { atMs: number, timeText: string, dayText: string, tempC: number|null }|null }|null}
  */
-export function zoneTimetable(scheduleJson, nowMs, tz = 'Europe/London') {
+export function zoneTimetable(scheduleJson, nowMs, tz = 'Europe/London', everyDayOnly = false) {
     try {
         const parsed = parseInput(scheduleJson);
         if (!parsed || parsed === 'unsafe' || parsed.length === 0) return null;
@@ -365,10 +367,68 @@ export function zoneTimetable(scheduleJson, nowMs, tz = 'Europe/London') {
 
         // everyDay: true only when every entry has loops === '1111111'.
         const everyDay = entries.every(e => e.loops === '1111111');
-        if (!everyDay) return { everyDay: false, currentTempC: null, nextOn: null };
 
         const now = new Date(nowMs);
         const nowParts = getLocalParts(now, tz);
+
+        if (!everyDay) {
+            if (everyDayOnly) return { everyDay: false, currentTempC: null, nextOn: null };
+            // SQ-13 confirmed for V2: decode day-varying entries using sun-first ordering (loopsIdx === jsDay).
+            let currentTempC = null;
+            for (let daysBack = 0; daysBack <= 7 && currentTempC === null; daysBack++) {
+                const cDate = new Date(nowMs - daysBack * 86400000);
+                const cParts = getLocalParts(cDate, tz);
+                const dayEntries = entries.filter(e => e.loops[cParts.jsDay] === '1');
+                if (!dayEntries.length) continue;
+                const daySorted = dayEntries.slice().sort((a, b) => {
+                    const [ah, am] = a.time.split(':').map(Number);
+                    const [bh, bm] = b.time.split(':').map(Number);
+                    return (ah * 60 + am) - (bh * 60 + bm);
+                });
+                for (const e of daySorted.slice().reverse()) {
+                    const [hh, mm] = e.time.split(':').map(Number);
+                    const utc = buildCandidateUtc(cParts.year, cParts.month, cParts.day, hh, mm, tz);
+                    if (utc.getTime() <= nowMs) { currentTempC = e.value; break; }
+                }
+            }
+
+            let nextOn = null;
+            for (let daysAhead = 0; daysAhead <= 7 && !nextOn; daysAhead++) {
+                const cDate = new Date(nowMs + daysAhead * 86400000);
+                const cParts = getLocalParts(cDate, tz);
+                const dayEntries = entries.filter(e => e.loops[cParts.jsDay] === '1');
+                if (!dayEntries.length) continue;
+                const daySorted = dayEntries.slice().sort((a, b) => {
+                    const [ah, am] = a.time.split(':').map(Number);
+                    const [bh, bm] = b.time.split(':').map(Number);
+                    return (ah * 60 + am) - (bh * 60 + bm);
+                });
+                for (const e of daySorted) {
+                    const [hh, mm] = e.time.split(':').map(Number);
+                    const utc = buildCandidateUtc(cParts.year, cParts.month, cParts.day, hh, mm, tz);
+                    const atMs = utc.getTime();
+                    if (atMs <= nowMs) continue;
+                    const eMinutes = hh * 60 + mm;
+                    let prev = null;
+                    for (const pe of daySorted) {
+                        const [ph, pm] = pe.time.split(':').map(Number);
+                        if (ph * 60 + pm < eMinutes) prev = pe;
+                    }
+                    if (!prev) prev = daySorted[daySorted.length - 1];
+                    if (e.value > prev.value) {
+                        nextOn = {
+                            atMs,
+                            timeText: e.time,
+                            dayText: daysAhead === 0 ? 'today' : daysAhead === 1 ? 'tomorrow' : JS_WEEKDAY[cParts.jsDay],
+                            tempC: e.value
+                        };
+                        break;
+                    }
+                }
+            }
+
+            return { everyDay: false, currentTempC, nextOn };
+        }
         const nowMinutes = nowParts.hour * 60 + nowParts.minute;
 
         // Sort entries by time of day (ascending).
