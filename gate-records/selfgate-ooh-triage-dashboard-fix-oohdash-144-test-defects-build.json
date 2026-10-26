@@ -1,0 +1,21 @@
+{
+  "run": "selfgate-ooh-triage-dashboard-fix-oohdash-144-test-defects",
+  "phase": "build",
+  "pr": 158,
+  "approvedBy": [
+    "bigtuff8"
+  ],
+  "reviewComments": [
+    "bigtuff8: - Accept the as-built linking approach, or require it to match the design exactly?: Accept as built\n\n(submitted via the interactive gate review)\n\n<!-- gate:selected [{\"question\":\"Accept the as-built linking approach, or require it to match the design exactly?\",\"answer\":\"Accept as built\"}] -->"
+  ],
+  "mergeCommit": "20564777e9bcbdfa52c035c08f4d03251ce5a8c9",
+  "phaseBranch": "fix/oohdash-144-test-defects",
+  "releaseBranch": "main",
+  "stamp": 1793004343495,
+  "selectedOptions": [
+    {
+      "question": "Accept the as-built linking approach, or require it to match the design exactly?",
+      "answer": "Accept as built"
+    }
+  ]
+}
