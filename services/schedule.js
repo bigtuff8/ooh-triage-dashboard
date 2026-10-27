@@ -342,17 +342,15 @@ export function describeNextChange(scheduleJson, now, opts = {}) {
  * zone comes on (a step up in setpoint value) within 24 hours.
  *
  * Returns null on parse failure or empty schedule.
- * For non-everyDay entries, decodes using sun-first day ordering (SQ-13 confirmed for V2)
- * unless everyDayOnly=true, which keeps the safe hold and returns {everyDay:false, currentTempC:null, nextOn:null}.
- * V1 call sites (output2/3Schedule) pass everyDayOnly=true pending OOHDASH-151 confirming V1 day ordering.
+ * For non-everyDay entries, decodes using sun-first day ordering (SQ-13 confirmed for V2;
+ * OOHDASH-151 confirmed for V1 output2/3Schedule — 118/120 V1 sites day-varying, DEDUCED sun-first).
  *
  * @param {object|Array|string|null} scheduleJson
  * @param {number} nowMs  Current time as ms since epoch
  * @param {string} [tz='Europe/London']
- * @param {boolean} [everyDayOnly=false]  When true, day-varying schedules return null nextOn (V1 safe hold)
  * @returns {{ everyDay: boolean, currentTempC: number|null, nextOn: { atMs: number, timeText: string, dayText: string, tempC: number|null }|null }|null}
  */
-export function zoneTimetable(scheduleJson, nowMs, tz = 'Europe/London', everyDayOnly = false) {
+export function zoneTimetable(scheduleJson, nowMs, tz = 'Europe/London') {
     try {
         const parsed = parseInput(scheduleJson);
         if (!parsed || parsed === 'unsafe' || parsed.length === 0) return null;
@@ -372,8 +370,7 @@ export function zoneTimetable(scheduleJson, nowMs, tz = 'Europe/London', everyDa
         const nowParts = getLocalParts(now, tz);
 
         if (!everyDay) {
-            if (everyDayOnly) return { everyDay: false, currentTempC: null, nextOn: null };
-            // SQ-13 confirmed for V2: decode day-varying entries using sun-first ordering (loopsIdx === jsDay).
+            // Sun-first: loopsIdx === jsDay (SQ-13 V2, OOHDASH-151 V1).
             let currentTempC = null;
             for (let daysBack = 0; daysBack <= 7 && currentTempC === null; daysBack++) {
                 const cDate = new Date(nowMs - daysBack * 86400000);
