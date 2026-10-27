@@ -752,7 +752,7 @@ function bpOutcomeCard(wcode, heating, nowMs, boostAvailable, activeBoostHolds) 
         var best = null;
         for (var i = 0; i < zoneObjs.length; i++) {
             var tt = zoneObjs[i].timetable;
-            if (tt && tt.everyDay && tt.nextOn) {
+            if (tt && tt.nextOn) {
                 if (!best || tt.nextOn.atMs < best.atMs) best = tt.nextOn;
             }
         }
@@ -1158,7 +1158,7 @@ function boilerPanelHeatingBranch(ws, f, panelDevice, site) {
             var emoji = dir === 'on' ? '🔥' : '❄';
             var tt = zones0.find(function(z) { return z.zone === h.boilerZone; });
             var nextOnClause = '';
-            if (tt && tt.timetable && tt.timetable.everyDay && tt.timetable.nextOn && !(h.revertAt && tt.timetable.nextOn.atMs <= new Date(h.revertAt).getTime())) {
+            if (tt && tt.timetable && tt.timetable.nextOn && !(h.revertAt && tt.timetable.nextOn.atMs <= new Date(h.revertAt).getTime())) {
                 var n = tt.timetable.nextOn;
                 var dayPfx = (n.dayText && n.dayText !== 'today') ? (' ' + n.dayText) : '';
                 nextOnClause = ', which next comes on at ' + n.timeText + dayPfx;
@@ -1175,7 +1175,7 @@ function boilerPanelHeatingBranch(ws, f, panelDevice, site) {
         var firstUntil = firstHold.revertAt ? fmtTime(new Date(firstHold.revertAt)) : '';
         var firstTT = zones0.find(function(z) { return z.zone === firstHold.boilerZone; });
         var firstNextOn = '';
-        if (firstTT && firstTT.timetable && firstTT.timetable.everyDay && firstTT.timetable.nextOn && !(firstHold.revertAt && firstTT.timetable.nextOn.atMs <= new Date(firstHold.revertAt).getTime())) {
+        if (firstTT && firstTT.timetable && firstTT.timetable.nextOn && !(firstHold.revertAt && firstTT.timetable.nextOn.atMs <= new Date(firstHold.revertAt).getTime())) {
             var fn = firstTT.timetable.nextOn;
             firstNextOn = ', which next comes on at ' + fn.timeText + ((fn.dayText && fn.dayText !== 'today') ? ' ' + fn.dayText : '');
         }
@@ -1255,7 +1255,7 @@ function boilerPanelHeatingBranch(ws, f, panelDevice, site) {
         var earliestNextOnTemp = null;
         for (var bi = 0; bi < bpZones.length; bi++) {
             var zData = heatingZones0.find(function(z) { return z.zone === bpZones[bi]; });
-            if (zData && zData.timetable && zData.timetable.everyDay && zData.timetable.nextOn) {
+            if (zData && zData.timetable && zData.timetable.nextOn) {
                 var n2 = zData.timetable.nextOn;
                 if (earliestNextOnMs === null || n2.atMs < earliestNextOnMs) {
                     earliestNextOnMs = n2.atMs;
@@ -1409,7 +1409,7 @@ function boilerPanelHeatingBranch(ws, f, panelDevice, site) {
             var bsNextOnClause = '';
             for (var bni = 0; bni < bsZones.length; bni++) {
                 var zData2 = heatingZones1.find(function(z) { return z.zone === bsZones[bni]; });
-                if (zData2 && zData2.timetable && zData2.timetable.everyDay && zData2.timetable.nextOn && !(act.revertAtMs && zData2.timetable.nextOn.atMs <= act.revertAtMs)) {
+                if (zData2 && zData2.timetable && zData2.timetable.nextOn && !(act.revertAtMs && zData2.timetable.nextOn.atMs <= act.revertAtMs)) {
                     var nn = zData2.timetable.nextOn;
                     var dayPfx3 = (nn.dayText && nn.dayText !== 'today') ? (' ' + nn.dayText) : '';
                     bsNextOnClause = ', which next comes on at ' + nn.timeText + dayPfx3;

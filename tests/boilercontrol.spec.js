@@ -103,6 +103,20 @@ test.describe('OOHDASH-139 boiler panel heating flow', () => {
         await expect(page.locator('[data-testid="reco-boiler-panel"]')).toContainText('Part of the pub heating is off');
     });
 
+    test('BC-151-E2: V1 W3 outcome (9011 CHZ2 day-varying) — next-on clause shows (OOHDASH-151 UI change)', async ({ page }) => {
+        // Site 9011 CHZ2 is day-varying (loops=1111100 = Sun-Thu, sun-first).
+        // After OOHDASH-151 UI change, the nextOnClause should appear in the W3 reco card
+        // (", which next comes on at HH:MM [day]") — it was suppressed by the everyDay guard before.
+        await confirmSite(page, '9011', 'Test Boiler Panel V1 (Heating)');
+        await page.locator('[data-testid="tile-heating"]').click();
+        await page.locator('button.chip', { hasText: 'Bar/Restaurant' }).click();
+        await reachDirectionStep(page);
+        await page.locator('[data-testid="need-cold"]').click();
+        await expect(page.locator('[data-testid="reco-boiler-panel"]')).toBeVisible();
+        // The W3 say text references CHZ2's timetable; next-on clause must now appear for day-varying zone.
+        await expect(page.locator('[data-testid="reco-boiler-panel"]')).toContainText('which next comes on at');
+    });
+
     test('Regression: Accommodation Salus flow unchanged (site 6832)', async ({ page }) => {
         await confirmSite(page, '6832', 'Old Grey Mare');
         await page.locator('[data-testid="tile-heating"]').click();
