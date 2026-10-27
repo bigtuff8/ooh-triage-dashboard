@@ -11,7 +11,7 @@
  *   OohOverrides   — timed-override/hold documents (F010)
  *   OohAuditLog    — app action audit entries (F011/F021/F022)
  *   OohAppConfig   — kill-switch, notices, data-quality flags (F016 + admin)
- *   OohSmsLog      — P1 escalation dispatch/ack records (F014)
+ *   OohSmsLog      — P1 raised/ack records (F014; name kept for rollback compatibility — see services/p1-log.js)
  *   OohActionInflight — in-flight control actions for save-and-resume (OOHDASH-123 §7)
  */
 

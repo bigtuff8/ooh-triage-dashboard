@@ -59,12 +59,12 @@ test.describe('removals & health', () => {
         expect(Number(captured)).toBeGreaterThan(0);
     });
 
-    test('P1 text log records dispatch with deep-link and supports acknowledgement (F014 SLA hook)', async ({ page }) => {
+    test('P1 escalation log records raised ticket with deep-link and supports acknowledgement (F014 SLA hook)', async ({ page }) => {
         await signIn(page, 'Test IoT Admin');
         await page.locator('[data-testid="nav-admin"]').click();
-        const smsCard = page.locator('.card:has(h3:has-text("P1 text-message log"))');
+        const smsCard = page.locator('.card:has(h3:has-text("P1 escalation log"))');
         // earlier specs raised P1s (fridge stock-risk, contractor)
-        await expect(smsCard).toContainText('On-duty escalation manager');
+        await expect(smsCard).toContainText('Raised with ooh_p1 tag · IoT Support Dashboard pages the manager');
         await expect(smsCard).toContainText(/#\d+/);
         const ackBtn = smsCard.locator('button:has-text("Mark acknowledged")').first();
         await ackBtn.click();
