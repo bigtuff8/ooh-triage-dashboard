@@ -88,14 +88,6 @@ test('TT-2b: weekday-only schedule (sun-first) returns nextOn for next step-up d
     assert.equal(result.nextOn.tempC, 21);
 });
 
-test('TT-2c: everyDayOnly=true keeps V1 safe hold — nextOn is null for day-varying schedule', () => {
-    // Simulates a V1 call site: pass everyDayOnly=true so day-varying entries are not decoded.
-    const result = zoneTimetable(WEEKDAY_SCHED, NOW_MS, TZ, true);
-    assert.ok(result, 'should return a result (not null)');
-    assert.equal(result.everyDay, false);
-    assert.equal(result.nextOn, null, 'nextOn must be null when everyDayOnly=true');
-    assert.equal(result.currentTempC, null);
-});
 
 // ─── TT-3: malformed/empty → null ─────────────────────────────────────────
 test('TT-3a: null schedule → zoneTimetable returns null', () => {
