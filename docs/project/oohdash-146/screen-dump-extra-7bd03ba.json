@@ -1,0 +1,30 @@
+{
+ "K-none": {
+  "text": "🍳\nKitchen equipment\nguided flow\nCancel issue\n💬\nCustomer's words: \"The fryer won’t come on\"\nNo kitchen circuits on Lighthouse here.\nContinue under \"Something else\"\n📝 Anything the customer told you that isn't captured above, e.g. engineer due at 7am \nFor the ticket and the IoT helpdesk's morning review. Not sent in urgent P1 texts. Keep it factual, no personal details.\n0 / 1000\nYou: Test Handler\nEach issue is logged to a ticket when you finish it",
+  "note": "reached by removing the kitchen devices from the fixture workspace (no fixture site lacks them)"
+ },
+ "L-none": {
+  "text": "💡\nExternal lighting\nguided flow\nCancel issue\n💬\nCustomer's words: \"Car park lights are off\"\n✓\nLive read: external lighting not on Lighthouse here\nExternal lighting at this site isn't on Lighthouse.\nContinue under \"Something else\"\n📝 Anything the customer told you that isn't captured above, e.g. engineer due at 7am \nFor the ticket and the IoT helpdesk's morning review. Not sent in urgent P1 texts. Keep it factual, no personal details.\n0 / 1000\nYou: Test Handler\nEach issue is logged to a ticket when you finish it",
+  "note": "reached by removing the lighting devices from the fixture workspace (no fixture site lacks them)"
+ },
+ "FAN-none": {
+  "text": "🌀\nExtractor fans\nguided flow\nCancel issue\n💬\nCustomer's words: \"Need the fans on late\"\n✓\nLive read: extractor fans not on Lighthouse here\nExtractor fans at this site aren't on Lighthouse.\nContinue under \"Something else\"\n📝 Anything the customer told you that isn't captured above, e.g. engineer due at 7am \nFor the ticket and the IoT helpdesk's morning review. Not sent in urgent P1 texts. Keep it factual, no personal details.\n0 / 1000\nYou: Test Handler\nEach issue is logged to a ticket when you finish it",
+  "note": "reached by removing the fan devices from the fixture workspace (no fixture site lacks them)"
+ },
+ "H-none": {
+  "text": "🌡️\nHeating\nguided flow\nCancel issue\n💬\nCustomer's words: \"The bar is freezing\"\nNo heating on Lighthouse at this site.\nContinue under \"Something else\"\n📝 Anything the customer told you that isn't captured above, e.g. engineer due at 7am \nFor the ticket and the IoT helpdesk's morning review. Not sent in urgent P1 texts. Keep it factual, no personal details.\n0 / 1000\nYou: Test Handler\nEach issue is logged to a ticket when you finish it",
+  "note": "reached by removing the heating devices from the fixture workspace (no fixture site lacks them)"
+ },
+ "AC-none": {
+  "text": "❄️\nAir conditioning\nguided flow\nCancel issue\n💬\nCustomer's words: \"Aircon is blowing warm\"\n✓\nAir conditioning — not controllable from the dashboard; captured for the IoT team\nAir conditioning request (Old Grey Mare)\nCaller raised an air-conditioning issue. Aircon is not controllable from the dashboard, so it is captured and referred to the IoT team rather than actioned here.\nRecord outcome\n📝 Anything the customer told you that isn't captured above, e.g. engineer due at 7am \nFor the ticket and the IoT helpdesk's morning review. Not sent in urgent P1 texts. Keep it factual, no personal details.\n0 / 1000\nYou: Test Handler\nEach issue is logged to a ticket when you finish it",
+  "note": "today the air conditioning flow is the same at every site (row AC)"
+ },
+ "CN-devoff": {
+  "text": "📡\nConnection check\nguided flow\nCancel issue\n💬\nCustomer's words: \"The bar is freezing\"\n✓\nConnection check: the site is reachable\nEverything at this site is showing online — the Lighthouse equipment looks healthy. If the caller says nothing is working, it may be a different fault.\nCapture what the caller reports\n📝 Anything the customer told you that isn't captured above, e.g. engineer due at 7am \nFor the ticket and the IoT helpdesk's morning review. Not sent in urgent P1 texts. Keep it factual, no personal details.\n0 / 1000\nYou: Test Handler\nEach issue is logged to a ticket when you finish it",
+  "note": "site 7004 with one thermostat set offline; the connection check run exactly as the heating divert runs it (flows.js:1680: cat connectivity, from heating)"
+ },
+ "WS-offline": {
+  "text": "📡\nSome Lighthouse equipment at this site is not responding.\nRun connection check\n\nThis step is optional — you can go straight to the issue.",
+  "note": ""
+ }
+}

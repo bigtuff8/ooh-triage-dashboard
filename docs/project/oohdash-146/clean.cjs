@@ -1,0 +1,2 @@
+const BOIL=[/^.{0,3}$/,/^guided flow$/,/^Cancel issue$/,/^📝 Anything the customer/,/^For the ticket and the IoT helpdesk/,/^0 \/ 1000$/,/^\d+ \/ 1000$/,/^You: /,/^Each issue is logged/,/^💬$/,/^✓$/,/^(Hot water|Kitchen equipment|External lighting|Extractor fans|Fridges & freezers|Connection check|Contractor on site|Something else \/ not sure|Air conditioning|Heating)$/];
+module.exports=function clean(t){return t.split('\n').map(s=>s.trim()).filter(s=>s&&!BOIL.some(r=>r.test(s))).join(' / ');};
