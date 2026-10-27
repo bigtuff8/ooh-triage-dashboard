@@ -114,6 +114,31 @@ test.describe('OOHDASH-139 boiler panel heating flow', () => {
     });
 });
 
+test.describe('OOHDASH-151: V1 day-varying schedule (guard lifted)', () => {
+    // Site 9011 CHZ1: every-day (loops=1111111), CHZ2: day-varying (loops=1111100 = Sun-Thu, sun-first).
+    // Before OOHDASH-151: everyDayOnly guard made CHZ2 timetable.nextOn null.
+    // After OOHDASH-151: guard removed; CHZ2 timetable.nextOn is computed from the sun-first schedule.
+    test('BC-151-E1: V1 site (9011) CHZ2 day-varying timetable — nextOn is non-null and falls on an active sun-first day', async ({ page }) => {
+        await signIn(page, 'Test Handler');
+        // Confirm via API (returns workspace inline — no second round-trip needed).
+        const resp = await page.request.post('/api/sites/9011/confirm');
+        expect(resp.ok()).toBe(true);
+        const { workspace } = await resp.json();
+        const zones = workspace.boilerControl?.heating?.zones ?? [];
+        const chz2 = zones.find(z => z.zone === 'CHZ2');
+        expect(chz2, 'CHZ2 zone must be present in V1 fixture 9011').toBeTruthy();
+        // Core assertion: nextOn must be non-null (was null with the everyDayOnly guard).
+        expect(chz2.timetable, 'CHZ2 timetable must be non-null').not.toBeNull();
+        expect(chz2.timetable.everyDay, 'CHZ2 everyDay must be false (day-varying schedule)').toBe(false);
+        expect(chz2.timetable.nextOn, 'CHZ2 nextOn must be non-null after OOHDASH-151 guard removal').not.toBeNull();
+        // Sun-first sanity check: loops=1111100 → active jsDay [0,1,2,3,4] (Sun-Thu).
+        // nextOn atMs must land on one of those days under correct (sun-first) decoding.
+        // Definitive sun-first day assertions live in TT-4a/b/c (unit tests, fixed reference time).
+        const nextOnJsDay = new Date(chz2.timetable.nextOn.atMs).getDay();
+        expect([0, 1, 2, 3, 4], 'nextOn must fall on a sun-first active day (Sun–Thu, jsDay 0–4) for loops=1111100').toContain(nextOnJsDay);
+    });
+});
+
 test.describe('OOHDASH-115-F2 C&B scope trim', () => {
     test.beforeEach(async ({ page }) => { await signIn(page, 'Test Handler'); });
 
