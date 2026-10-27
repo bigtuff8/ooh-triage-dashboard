@@ -1,0 +1,30 @@
+{
+  "request": {
+    "siteNo": "6832",
+    "siteName": "Old Grey Mare",
+    "callerWords": null,
+    "additionalNotes": null,
+    "type": "escalate-p1",
+    "subject": "Refrigeration temperature alarm — stock at risk",
+    "detail": "Caller reports refrigeration failure with stock at risk. Monitoring-only on Lighthouse; escalated for immediate advice + appliance callout guidance.",
+    "p1Summary": "Refrigeration failure — stock at risk",
+    "OohCaptureClass": null,
+    "issueLabel": "Refrigeration temperature alarm — stock at risk",
+    "issueCls": "red"
+  },
+  "response": {
+    "ticket": {
+      "id": 45176,
+      "url": "#fixture-ticket-45176",
+      "title": "[OOH] 6832 Old Grey Mare - Refrigeration temperature alarm — stock at risk"
+    },
+    "p1": {
+      "raisedAt": "2026-10-27T07:52:52.147Z",
+      "link": "https://zendesk-uat.airedale-api.co.uk/?ticket=45176"
+    },
+    "reconciliation": {
+      "action": "none",
+      "candidates": 0
+    }
+  }
+}

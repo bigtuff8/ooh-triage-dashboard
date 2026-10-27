@@ -1,0 +1,9 @@
+🚨 Escalated — P1
+
+Contractor Test Engineer, ExampleCo on site now: needs BMS access to check the heating. Escalated immediately.
+
+The P1 is logged as ticket #45177 in the IoT Support dashboard, which pages the on-duty manager.
+
+"I've raised an urgent P1 ticket for this site and someone will call you back shortly. Please ask the engineer to hold on."
+
+Ticket #45177

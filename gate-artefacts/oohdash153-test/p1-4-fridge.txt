@@ -1,0 +1,9 @@
+🚨 Escalated — P1
+
+Caller reports refrigeration failure with stock at risk. Monitoring-only on Lighthouse; escalated for immediate advice + appliance callout guidance.
+
+The P1 is logged as ticket #45176 in the IoT Support dashboard, which pages the on-duty manager.
+
+"I've raised an urgent P1 ticket for this site and someone will call you back shortly. The fridge itself isn't controlled by Lighthouse, so alongside our callback you should follow your normal appliance repair route."
+
+Ticket #45176

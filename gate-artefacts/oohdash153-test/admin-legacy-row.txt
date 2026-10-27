@@ -1,0 +1,25 @@
+=== Admin P1 log card with legacy-shaped entry (mocked via page.route) ===
+
+Legacy entry injected: { dispatchOk: false, sentTo: "On-duty escalation manager",
+  provider: "log", origin: "ooh-dashboard", dispatchReason: "log-mode" }
+
+Card innerText:
+P1 escalation log
+Tue 07:51	Old Grey Mare 6832	Raised with ooh_p1 tag · IoT Support Dashboard pages the manager	#99001	Mark acknowledged
+Tue 07:52	Angel Inn 6749	Raised with ooh_p1 tag · IoT Support Dashboard pages the manager	#45178	ack 07:52
+Tue 07:52	Brentwood 6759	Raised with ooh_p1 tag · IoT Support Dashboard pages the manager	#45177	Mark acknowledged
+Tue 07:52	Old Grey Mare 6832	Raised with ooh_p1 tag · IoT Support Dashboard pages the manager	#45176	Mark acknowledged
+Tue 07:52	Angel Inn 6749	Raised with ooh_p1 tag · IoT Support Dashboard pages the manager	#45175	Mark acknowledged
+Tue 07:52	OOHDASH-140 Tuya Fixture Site 8888	Raised with ooh_p1 tag · IoT Support Dashboard pages the manager	#45174	Mark acknowledged
+Tue 07:52	Old Grey Mare 6832	Raised with ooh_p1 tag · IoT Support Dashboard pages the manager	#45173	Mark acknowledged
+Tue 07:52	Angel Inn 6749	Raised with ooh_p1 tag · IoT Support Dashboard pages the manager	#45168	Mark acknowledged
+Tue 07:52	Angel Inn 6749	Raised with ooh_p1 tag · IoT Support Dashboard pages the manager	#45167	Mark acknowledged
+Tue 07:52	Angel Inn 6749	Raised with ooh_p1 tag · IoT Support Dashboard pages the manager	#45165	Mark acknowledged
+Tue 07:51	Angel Inn 6749	Raised with ooh_p1 tag · IoT Support Dashboard pages the manager	#45164	Mark acknowledged
+Tue 07:51	Angel Inn 6749	Raised with ooh_p1 tag · IoT Support Dashboard pages the manager	#45163	Mark acknowledged
+Tue 07:51	Old Grey Mare 6832	Raised with ooh_p1 tag · IoT Support Dashboard pages the manager	#45160	Mark acknowledged
+Tue 07:49	Angel Inn 6749	Raised with ooh_p1 tag · IoT Support Dashboard pages the manager	#45133	Mark acknowledged
+Tue 07:49	Angel Inn 6749	Raised with ooh_p1 tag · IoT Support Dashboard pages the manager	#45132	Mark acknowledged
+
+send-failed tag count: 0 (expected)
+Static text present: true
