@@ -1479,6 +1479,9 @@ async function fetchLiveSitesByNumber(siteNo) {
     const cached = perSiteCache.get(key);
     if (cached && Date.now() - cached.at < LIVE_CACHE_TTL) return cached.sites;
 
+    const t0 = Date.now();
+    const siteNamePromise = resolveSiteName(key).catch(err => { console.error(`[TB] Site name enrichment failed for ${key}: ${err.message}`); return null; });
+
     const { brand, tokens } = siteQueryTokens(key);
     const filter = siteNameFilter(brand, tokens);
 
@@ -1495,10 +1498,12 @@ async function fetchLiveSitesByNumber(siteNo) {
         });
 
     // Step 3 — await both in parallel. Wall-clock cost = max(token fetch, legacy fetch), not sum.
+    const t1 = Date.now();
     const [tokenResults, legacyRaw] = await Promise.all([
         Promise.all(tokenPromises),
         legacyPromise
     ]);
+    const tbSearchMs = Date.now() - t1;
 
     // Step 4 — deduplicate by TB id. Token results are added first (priority); legacy results
     // skip any id already seen.
@@ -1519,6 +1524,7 @@ async function fetchLiveSitesByNumber(siteNo) {
     const matched = [...byId.values()].filter(d =>
         filter.test(normaliseName(d.name)) || isLegacySalusForSite(d.name, key)
     );
+    const deviceCount = matched.length;
 
     // OOHDASH-140: lazy helpers for Tuya (dynamic import to avoid coupling to fixture-mode tests)
     async function _readSiteListing(br, k) {
@@ -1537,6 +1543,7 @@ async function fetchLiveSitesByNumber(siteNo) {
     const tuyaEnabled = config.tuya?.readEnabled && config.tuya?.clientId && !await _tuyaReadOff().catch(() => true);
 
     // Latest telemetry + Tuya listing run concurrently
+    const t2 = Date.now();
     const [telemetryById, tuyaListing] = await Promise.all([
         fetchTelemetry(matched),
         tuyaEnabled ? _readSiteListing(brand, key).catch(err => {
@@ -1544,6 +1551,7 @@ async function fetchLiveSitesByNumber(siteNo) {
             return null;
         }) : Promise.resolve(null)
     ]);
+    const tbReadsMs = Date.now() - t2;
 
     const now = Date.now();
     const devices = matched.map(d => {
@@ -1585,12 +1593,10 @@ async function fetchLiveSitesByNumber(siteNo) {
     }
 
     // Zendesk human-name enrichment (non-fatal, mirrors bridge.js — searchSites/audit read siteName).
-    let humanName = null;
-    try {
-        humanName = await resolveSiteName(key);
-    } catch (err) {
-        console.error(`[TB] Site name enrichment failed for ${key}: ${err.message}`);
-    }
+    const t3 = Date.now();
+    const humanName = await siteNamePromise;
+    const zdNameMs = Date.now() - t3;
+    console.log(`[SITE] ${key} resolve: tb-search=${tbSearchMs}ms devices=${deviceCount} tb-reads=${tbReadsMs}ms zd-name=${zdNameMs}ms total=${Date.now() - t0}ms`);
     // OOHDASH-114-F1: derive boilerControl field.
     // OOHDASH-136: also decode the DHW override state and attach as boilerControl.dhwOverride.
     const boilerControlRaw = matched
