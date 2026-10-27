@@ -53,12 +53,7 @@ DECISION: Ticket type | Same ooh_p1 tag and IoT Support Dashboard paging path as
 
 **Location:** `public/js/flows.js:1866-1868`
 
-```js
-const offlineDevices = ks.filter(d => d.tuya && d.tuya.verdict === 'offline');
-if (offlineDevices.length > 0) {
-    f.cat = 'connectivity'; f.stage = 0; return FLOWR.connectivity(ws, f);
-}
-```
+At line 1866, the code computes `offlineDevices` (kitchen circuits where `tuya.verdict === 'offline'`). If any offline device is found, it immediately sets `f.cat = 'connectivity'` and calls `FLOWR.connectivity` — before any service-criticality question has been asked.
 
 When any kitchen circuit is offline in live mode, the flow redirects unconditionally to the connectivity flow **before asking whether service is active**. The connectivity flow always exits as `outcomeCaptured` — "Equipment unreachable / needs IoT investigation." No P1 path exists.
 
@@ -76,24 +71,9 @@ In live mode, after the offline check, the flow goes straight to the device pick
 
 ## Code trace — the path Kirsty followed
 
-```
-live-mode kitchen flow stage 0 (site 6819, 20:39 UTC):
-  flows.js:1852-1853: liveKs populated; isLiveMode = true
-  flows.js:1866:      offlineDevices = kitchen devices where tuya.verdict === 'offline'
-                      (all circuits offline — power cut by DST-early schedule)
-  flows.js:1867-1868: offlineDevices.length > 0
-                      → f.cat = 'connectivity'; FLOWR.connectivity(ws, f)
-                      ← NO crit question, NO P1 path ←
-  connectivity flow   → outcomeCaptured → ticket #51205
-```
+**Live mode (site 6819, 20:39 UTC):** `liveKs` is populated; `isLiveMode` is true. The flow computes `offlineDevices` at `flows.js:1866` — all circuits are offline (power cut by the DST-early schedule). Because `offlineDevices.length > 0`, the flow sets `f.cat = 'connectivity'` and calls `FLOWR.connectivity` at line 1867–1868. No service-criticality question, no P1 path. The connectivity flow exits as `outcomeCaptured` → ticket #51205.
 
-```
-legacy-mode kitchen flow stage 0 (non-Tuya site, same scenario):
-  flows.js:1857: off = ks.some(k => !k.online)
-  flows.js:1858: if (off) → connectivity (same gap here too, but...)
-  flows.js:1859: else → "Is the kitchen needed for service right now?"
-                   → crit:1 → P1
-```
+**Legacy mode (non-Tuya site, same scenario for comparison):** At `flows.js:1857`, `off` is computed from `ks.some(k => !k.online)`. If all circuits are offline, the same connectivity divert fires — the legacy path shares this gap for offline kitchen circuits. For reachable circuits, the legacy path at `flows.js:1859` asks "Is the kitchen needed for service right now?" and goes to P1 on yes. Live mode has no equivalent question in any reachable-device branch.
 
 Both modes share the "any-offline → connectivity" divert without a crit check first. Legacy mode asks crit for non-offline kitchen issues; live mode never does.
 
@@ -103,39 +83,9 @@ Both modes share the "any-offline → connectivity" divert without a crit check 
 
 **One question, placed before the offline check, covers both bugs.**
 
-In `public/js/flows.js`, before the `offlineDevices` check at line 1866, insert:
+In `public/js/flows.js`, before the `offlineDevices` check at line 1866, insert a service-criticality gate. The gate checks if `f.data.crit` is unset — if so, render the question chip ("Is the kitchen needed for service right now?") and return. On re-entry: if crit is 1 (business-critical) and any offline device exists, call `outcomeP1` immediately with a kitchen-emergency subject and the override button tip in the script. If crit is 0 and offline devices exist, divert to the connectivity flow as today.
 
-```js
-// Ask service criticality before any offline divert or device picker.
-// Kitchen off during service is P1 regardless of cause (offline, schedule, fault).
-if (f.data.crit === undefined) {
-    return `<div class="stepq">Is the kitchen needed for service <b>right now</b>
- (food being served / hotel breakfast)?</div>
-   <div class="chips">
-     <button class="chip" data-testid="kitchen-critical"
-       onclick="flowStep({crit:1})">Yes — business critical now</button>
-     <button class="chip" data-testid="kitchen-notcritical"
-       onclick="flowStep({crit:0})">No — needed later / tomorrow</button>
-   </div>`;
-}
-// crit is now set.
-// If crit:1 and any offline device → P1 immediately (don't divert to connectivity).
-if (f.data.crit === 1 && offlineDevices.length > 0) {
-    doneLine('Business-critical during service — circuits offline — P1');
-    return outcomeP1(f, 'crit', {
-        subject: 'Kitchen equipment off during service — P1',
-        detail: 'Kitchen circuits offline while the site is actively serving. Needs immediate IoT action.',
-        script: 'I\'ve raised an urgent P1 ticket. Someone will call back shortly. The on-site override switch, if available, is safe to try in the meantime.',
-        p1Summary: 'Kitchen equipment offline during service'
-    });
-}
-// crit:0 and offline → connectivity divert as today
-if (offlineDevices.length > 0) {
-    f.cat = 'connectivity'; f.stage = 0; return FLOWR.connectivity(ws, f);
-}
-```
-
-In stage 1, before `verdictCard` is shown: if `f.data.crit === 1` and verdict is A/C/D/off-unknown → P1. If `f.data.crit === 0` → show verdictCard with override guidance as today.
+In stage 1, before `verdictCard` is shown: if crit is 1 and verdict is A, C, D, or off-unknown, call `outcomeP1`. If crit is 0, show `verdictCard` with override guidance as today.
 
 **New tests:**
 - TF-159-01: live mode + offline circuit + crit:1 → `outcome-p1` (covers Kirsty's exact scenario)
