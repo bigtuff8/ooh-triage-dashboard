@@ -193,9 +193,16 @@ export const SCOPE_GROUPS = [
 ];
 
 async function workspacePayload(site) {
-    let tickets = [];
-    try { tickets = await zendesk.ticketsForSite(site.siteNo); }
-    catch (err) { console.error(`[API] Site tickets unavailable: ${err.message}`); }
+    const t0 = Date.now();
+    let zdMs = 0, cosmosMs = 0;
+    const [tickets, activeBoostHolds] = await Promise.all([
+        zendesk.ticketsForSite(site.siteNo)
+            .then(r => { zdMs = Date.now() - t0; return r; })
+            .catch(err => { zdMs = Date.now() - t0; console.error(`[API] Site tickets unavailable: ${err.message}`); return []; }),
+        overrides.activeBoostHoldsForSite(site.siteNo)
+            .then(r => { cosmosMs = Date.now() - t0; return r; })
+    ]);
+    console.log(`[SITE] ${site.siteNo} workspace: zd-tickets=${zdMs}ms cosmos-boost=${cosmosMs}ms total=${Date.now() - t0}ms`);
 
     const P1_WINDOW_MS = 24 * 60 * 60 * 1000;
     const activeP1Tickets = tickets.filter(t =>
@@ -251,9 +258,6 @@ async function workspacePayload(site) {
         off: !boostBaseDenied
     };
 
-    // OOHDASH-144: active boiler-panel holds for the banner + flow intercept.
-    // Reads from the Cosmos store; null on failure (fail-soft — banner simply doesn't show).
-    const activeBoostHolds = await overrides.activeBoostHoldsForSite(site.siteNo);
 
     // OOHDASH-144 §8.1a: boiler-panel sites with boostAvailable show Heating as "Controllable from here"
     // (even though device.controllable is false — the boost system is the control path, not the registry).
