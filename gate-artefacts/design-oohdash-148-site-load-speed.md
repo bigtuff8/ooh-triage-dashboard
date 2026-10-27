@@ -3,7 +3,7 @@ SECTION: What this design changes
 Three server-only changes to the site-load path (Options A, B, C from the discovery gate), plus timing logs in the same PR. No client changes, no infrastructure, no new dependencies.
 
 SECTION: Option A — parallelise workspacePayload
-In routes/api.js, `workspacePayload` (line 195) awaits `ticketsForSite` and then `activeBoostHoldsForSite` sequentially. They are independent calls. Replace with `Promise.all` with per-call error isolation: ticketsForSite gets a `.catch(() => [])` inline (preserving the existing fail-soft behaviour), activeBoostHoldsForSite already returns null on failure. The two awaits collapse to one parallel await. The rest of workspacePayload is unchanged — `tickets` and `activeBoostHolds` bind to the same names so no downstream code changes.
+In routes/api.js, `workspacePayload` (line 195) awaits `ticketsForSite` at line 197 and then `activeBoostHoldsForSite` at line 256. They are independent calls. The fix: replace the two sequential awaits with a single `Promise.all` at the TOP of the function body (lines 196–198 in the current file), destructuring into `[tickets, activeBoostHolds]`. `ticketsForSite` gets an inline `.catch` returning `[]`; `activeBoostHoldsForSite` already returns null on failure. The body from line 200 onward is UNCHANGED — no code moves or is hoisted. `activeP1Tickets` at line 201 (which uses `tickets`) runs after the Promise.all settles, so `tickets` is available. The `activeBoostHolds` await at line 256 is removed (now covered by the Promise.all). Verification required at build: confirm lines 200–207 (`activeP1Tickets`) and lines 209–252 (scopeGroups, effectiveDevices, boostAvailable) have no dependency on either call result except `tickets` in `activeP1Tickets` — a read of this code section already confirms this.
 
 SECTION: Option B — run ZD name enrichment concurrently with TB reads
 In services/tb-device.js, `fetchLiveSitesByNumber` (line 1477) awaits `resolveSiteName(key)` sequentially AFTER `fetchTelemetry` resolves (line 1590). Since `resolveSiteName` only needs `key` (known at function entry), fire it alongside the TB text searches (line 1486). At the point where `humanName` is set (line 1590), replace the try/catch block with `await siteNamePromise` — the promise is already in flight. No semantic change to the result; the site name is still nil-safe.
@@ -15,7 +15,7 @@ SECTION: Timing logs
 Add `Date.now()` diffs at four points in `fetchLiveSitesByNumber` (tb-search, tb-reads, zd-name, total) and two points in `workspacePayload` (zd-tickets, cosmos-boost, total). Log format: `[SITE] <siteNo> resolve: tb-search=Nms devices=N tb-reads=Nms zd-name=Nms total=Nms` and `[SITE] <siteNo> workspace: zd-tickets=Nms cosmos-boost=Nms total=Nms`. Only fires on cache miss (cold loads); warm-cache returns skip logging.
 
 SECTION: Test impact
-No unit tests directly test activeReadProbe, workspacePayload call order, or resolveSiteName concurrency. The Playwright e2e suite uses fixture mode for all data reads and never reaches the live TB/ZD paths. No test changes required. The timing log lines are new console.log output — no test asserts on console output so no test is broken.
+Option C requires one new unit test: given a `tbSession` with a cached valid token, calling `activeReadProbe()` concurrently with `getToken()` must result in exactly ONE POST /api/auth/login per probe cycle (not two), and a failed `activeReadProbe()` must not evict the shared token. No other unit tests are affected. The Playwright e2e suite uses fixture mode and never reaches the live TB path. Timing log lines are new console output — no test asserts on console.
 
 SECTION: Risk assessment
 Option A (parallel await): ticketsForSite and activeBoostHoldsForSite are independent; no ordering dependency. Option B (concurrent ZD name): resolveSiteName result is nil-safe; device enumeration unaffected. Option C (probe eviction fix): fresh POST /api/auth/login still runs on every health cycle; revoked-credential detection preserved. Concurrent requests that happen to use a revoked token during the probe flight will receive a 401 and clear `token = null` in the existing catch branch — same recovery path as before, one request later. Timing logs: read-only console output, no behavioural change.
@@ -35,9 +35,9 @@ DECISION: Approve design and proceed to build? | Approve — proceed to build | 
 
 `workspacePayload` (line 195) currently awaits `zendesk.ticketsForSite` and then, sixty lines later, awaits `overrides.activeBoostHoldsForSite`. These are independent: one is a Zendesk search, the other a Cosmos query. The sequential pattern means the workspace phase costs the sum of both round-trips.
 
-The change: replace the two sequential `await` calls with a single `Promise.all`. `ticketsForSite` gets an inline `.catch` returning `[]` to preserve the existing fail-soft behaviour. `activeBoostHoldsForSite` already returns `null` on failure. The result destructures into the same `tickets` and `activeBoostHolds` names, so no downstream code in `workspacePayload` changes. Wall-clock cost drops from sum(ZD, Cosmos) to max(ZD, Cosmos).
+The change: replace lines 196–198 (the `ticketsForSite` await at the top of the function) and line 256 (the `activeBoostHoldsForSite` await at the bottom) with a single `Promise.all` placed at lines 196–198. `ticketsForSite` gets an inline `.catch` returning `[]` to preserve the existing fail-soft behaviour. `activeBoostHoldsForSite` already returns `null` on failure. The result destructures into the same `tickets` and `activeBoostHolds` names.
 
-The sixty lines of synchronous work currently between the two awaits (scope group filtering, `effectiveDevices` mapping, boost availability flags) move above the `Promise.all` — they don't depend on either call and can run first.
+The function body from line 200 onward is **unchanged** — no code moves. `activeP1Tickets` at line 201 (which filters `tickets`) runs after the `Promise.all` settles and has access to `tickets`. Lines 209–252 (scope group filtering, `effectiveDevices` mapping, boost availability flags) use only `site` and `config` — no dependency on either awaited result, confirmed by code read. Wall-clock cost drops from sum(ZD tickets, Cosmos boost) to max(ZD tickets, Cosmos boost).
 
 ---
 
@@ -89,7 +89,7 @@ Option B: `resolveSiteName` is already wrapped in a catch-returning-null. Starti
 
 Option C: A request that happens to hold a revoked token during the probe flight will receive a 401 from ThingsBoard. The existing `catch` branch in `request()` already handles this — it sets `token = null` so the next call re-authenticates. The net effect is one request returns an error and retries, exactly the same as the pre-fix behaviour on a hard revocation.
 
-No Playwright e2e tests touch the live TB or ZD paths. No unit tests assert on probe call order or workspace call sequencing. No test changes needed.
+No Playwright e2e tests touch the live TB or ZD paths. No existing unit tests are broken. One new unit test is required for Option C: given a cached valid token in `tbSession`, calling `activeReadProbe()` concurrently with `getToken()` must fire exactly one POST `/api/auth/login` (not two), and a failed `activeReadProbe()` must leave the shared `token`/`expiry` unchanged.
 
 ---
 
