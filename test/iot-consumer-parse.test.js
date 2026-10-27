@@ -18,7 +18,7 @@ import { readFileSync } from 'fs';
 import { execFileSync } from 'child_process';
 
 const IOT_REPO = process.env.IOT_REPO_PATH || '../iot-support-dashboard';
-const IOT_EXPECTED_SHA = 'b217f34';
+const IOT_EXPECTED_SHA = '73100f2';
 
 /* ------------------------------------------------------------------ */
 /* Vendored regexes — pinned to iot-support-dashboard b217f34         */
