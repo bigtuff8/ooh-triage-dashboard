@@ -122,6 +122,20 @@ test.describe('OOHDASH-139 boiler panel heating flow', () => {
         for (const day of weekdays) {
             expect(cardText, `W3 card must not contain named weekday '${day}' — dayText guard must suppress it`).not.toContain(day);
         }
+        // Null-path: confirm the API returns null or non-null nextOn without crashing the render.
+        // earliestNextOn() null-guards: `tt && tt.nextOn && (tt.nextOn.dayText === ...)` —
+        // the && chain short-circuits before .dayText when nextOn is null, so no TypeError.
+        const resp = await page.request.post('/api/sites/9011/confirm');
+        expect(resp.ok()).toBe(true);
+        const { workspace } = await resp.json();
+        const zones = workspace.boilerControl?.heating?.zones ?? [];
+        const chz2 = zones.find(z => z.zone === 'CHZ2');
+        // Whether nextOn is null (guard suppressed it) or non-null (today/tomorrow), card renders without throw.
+        const nextOnIsNullOrTodayTomorrow = chz2.timetable === null
+            || chz2.timetable.nextOn === null
+            || chz2.timetable.nextOn.dayText === 'today'
+            || chz2.timetable.nextOn.dayText === 'tomorrow';
+        expect(nextOnIsNullOrTodayTomorrow, 'CHZ2 nextOn must be null or today/tomorrow — named weekday would be suppressed by guard').toBe(true);
     });
 
     test('Regression: Accommodation Salus flow unchanged (site 6832)', async ({ page }) => {
