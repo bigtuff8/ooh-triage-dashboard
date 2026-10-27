@@ -109,3 +109,45 @@ Every Tuya kitchen call where the caller says service is active and any circuit 
 
 *Investigation by ooh-triage-dashboard-R1-mvr5x7x6 · 2026-10-27*
 *Evidence: Zendesk #51205 | data/tuya-sites.json:142 | public/js/flows.js:1866-1868*
+
+
+---
+
+## Rework addendum — round 1 (discovery/draft)
+
+### Panel verdicts addressed
+
+**critical-thinker — Override tip in the offline branch**
+
+The concern is correct and the prior fix description was wrong. When `offlineDevices.length > 0`, the Lighthouse gateway is unreachable and "no remote action possible" — the on-site PowerPause override button cannot be triggered remotely and is irrelevant. Telling an operator in a live kitchen emergency that the override is "safe to use" wastes time on the worst call type. The fix scope is amended: the override tip must be **omitted entirely from the offline-branch P1 card**. It belongs only in the reachable-device branch (Verdict C/A/D/off-unknown), where the relay is addressable. The offline P1 card should say only: "P1 raised — kitchen offline during active service; IoT team dispatched." No override mention.
+
+**critical-thinker — Legacy-mode offline gap left silent**
+
+The code trace explicitly notes "the legacy path shares this gap for offline kitchen circuits" — meaning non-Tuya sites have an identical P1 miss when all kitchen circuits are offline and service is active. This was identified and then excluded from scope without a decision. That is not acceptable for a known P1 miss at peer sites. A new decision is added below (Decision: Legacy-mode offline gap) requiring the operator to choose: raise a separate ticket now, or explicitly accept the gap with a rationale. It cannot remain undecided.
+
+**critical-thinker — Decision split: Override advice by branch**
+
+The single "Override advice in P1 card" decision conflates two distinct situations with opposite correct answers. It is replaced by two branch-specific decisions with separate recommendations. The offline-branch decision has a clear recommended answer (OMIT — device unreachable) and so is no longer open for discussion unless the operator has reason to deviate. The reachable-device branch decision retains the original choice.
+
+---
+
+### Summary of additions
+
+**1. Override tip scoped out of the offline branch.**
+The P1 card content now differs by branch. Offline branch: P1 card contains subject line and IoT dispatch note only — no override tip. Reachable-device branch (Verdict C/A/D/off-unknown): P1 card contains subject line, IoT dispatch note, and the override tip. The fix description in the "Fix" section above is amended accordingly: the phrase "and the override button tip in the script" applies only to the reachable-device P1 outcome, not to the offline-device P1 outcome.
+
+**2. Legacy-mode offline gap given a decision.**
+A new decision is added requiring an explicit choice:
+
+> **DECISION: Legacy-mode offline gap (non-Tuya sites)** | Raise a new ticket now covering flows.js:1855-1861 offline divert (legacy path) — same crit-gate fix, scoped to non-Tuya sites (recommended) | Accept the gap for now: legacy-mode offline kitchen calls are low volume and IoT team handles them via connectivity ticket as today | Need more thought
+
+Until this decision is made, the gap is known and owned — it is not silently excluded.
+
+**3. Override decision split into two.**
+The single open decision is replaced:
+
+> **DECISION: Override tip — offline branch P1 card** | OMIT the override tip; device is unreachable, advice wastes time on a live P1 call (recommended) | Include it anyway — on-site staff may be able to press it physically without remote connectivity
+
+> **DECISION: Override tip — reachable-device branch P1 card (Verdict C/A/D)** | Include "The on-site PowerPause override button is safe to use in the meantime" (recommended) | Keep P1 card simple, omit override tip | Need more thought
+
+The first of these has a strong recommended answer driven by the offline evidence; the operator is asked to confirm or deviate. The second preserves the original open question for judgement.
