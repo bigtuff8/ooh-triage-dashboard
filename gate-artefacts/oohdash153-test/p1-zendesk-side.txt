@@ -1,0 +1,15 @@
+Ticket ID: 45176
+Tags: ooh, ooh_p1
+Contains ooh_p1: true
+Timeline comments:
+  [0] OOH agent: Refrigeration temperature alarm — stock at risk
+Operator: Test Handler (OOH)
+Outcome: escalate-p1
+Transcript:
+07:52 | Site selected: Old Grey Mare (6832)
+07:52 | Caller reports refrigeration failure with stock…
+
+NOT SENT present: false
+ACTION NEEDED present: false
+#ooh-p1-dispatch present: false
+P1 escalation raised present: false

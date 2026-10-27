@@ -1,0 +1,9 @@
+🚨 Escalated — P1
+
+Caller reported: Gas smell in the cellar near the main fuse board. Did not fit a specific tile; handler judged it urgent tonight.
+
+The P1 is logged as ticket #45178 in the IoT Support dashboard, which pages the on-duty manager.
+
+"I've raised an urgent P1 ticket for this site and someone will call you back shortly."
+
+Ticket #45178
