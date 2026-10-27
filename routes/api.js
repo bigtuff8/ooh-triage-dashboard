@@ -15,7 +15,7 @@ import * as killswitch from '../services/killswitch.js';
 import * as overrides from '../services/overrides.js';
 import * as zendesk from '../services/zendesk.js';
 import { hhmm } from '../services/zendesk.js';
-import * as escalation from '../services/escalation.js';
+import * as p1Log from '../services/p1-log.js';
 import * as reconciliation from '../services/reconciliation.js';
 import * as audit from '../services/audit.js';
 import * as metrics from '../services/metrics.js';
@@ -469,10 +469,9 @@ export function buildOutcomeTranscript({ action, type, siteNo, siteName, detail,
         if (detail) steps.push({ time: hhmm(outcomeTime), text: detail });
         if (holdText) steps.push({ time: hhmm(outcomeTime), text: holdText });
     }
-    // Test 11c — neutral, true-at-build-time line. The transcript is built (and the [TRG] first
-    // comment baked) BEFORE escalateP1 runs, so dispatchOk does not exist here — asserting "SMS
-    // dispatched" was a false claim in log-mode. The ACTUAL dispatch result is written afterwards by
-    // addP1DispatchNote as a second #ooh-p1-dispatch comment. Does not perturb the Outcome: anchor.
+    // OOHDASH-153: neutral, true-at-build-time step. The transcript is built (and the [TRG] first
+    // comment baked) before recordP1Raised runs. The real paging is handled by the IoT Support
+    // Dashboard watching the ooh_p1 tag (Approach B). Does not perturb the Outcome: anchor.
     if (type === 'escalate-p1') steps.push({ time: hhmm(outcomeTime), text: 'P1 escalation raised — on-duty manager to be paged' });
     return steps;
 }
@@ -551,19 +550,10 @@ router.post('/outcomes', wrap(async (req, res) => {
 
     let p1 = null;
     if (isP1) {
-        // origin: 'ooh-dashboard' asserts the OOH categorisation to escalateP1's fail-closed guard
-        // (§1A) — valid here because this path has just created an OOH-categorised ticket above
-        // (ooh_p1 tag, "Support Request" category, [OOH] subject). Only a verified OOH P1 pages.
-        p1 = await escalation.escalateP1({ operator: op, siteNo, siteName, ticketId: ticket.id, summary: p1Summary || subject, origin: 'ooh-dashboard' });
-        // Test 11c — corrective post-dispatch comment carrying the ACTUAL send result (sent /
-        // log-mode-not-sent / failed). Like reconciliation + the SMS log, it must NEVER block or
-        // fail the outcome — wrap fail-safe, alert on failure, and return the ticket regardless.
-        try {
-            await zendesk.addP1DispatchNote(ticket.id, p1);
-        } catch (err) {
-            console.error(`[API] P1 dispatch note failed for ticket #${ticket.id}: ${err.message}`);
-            metrics.raiseAlert('p1-dispatch-note-failed', `P1 dispatch note for ticket #${ticket.id} (${siteName}) failed to write — dispatch result not recorded on the ticket`);
-        }
+        // OOHDASH-153 (Approach B): record a positive audit entry in OohSmsLog. The ticket with the
+        // ooh_p1 tag already exists above — that tag is what triggers the IoT Support Dashboard to
+        // page the on-duty manager. recordP1Raised is fail-safe and never blocks the outcome.
+        p1 = await p1Log.recordP1Raised({ operator: op, siteNo, siteName, ticketId: ticket.id, summary: p1Summary || subject });
     }
 
     let auditId = action?.auditId || null;
@@ -607,7 +597,7 @@ router.post('/outcomes', wrap(async (req, res) => {
 
     res.json({
         ticket,
-        p1: p1 ? { dispatchedAt: p1.dispatchedAt, sentTo: p1.sentTo, link: p1.OohP1EscalationLink, dispatchOk: p1.dispatchOk, provider: p1.provider } : null,
+        p1: p1 ? { raisedAt: p1.dispatchedAt, link: p1.OohP1EscalationLink } : null,
         reconciliation: reconcileResult
     });
 }));
@@ -767,9 +757,9 @@ admin.delete('/notices/:id', wrap(async (req, res) => {
 
 admin.get('/data-quality', wrap(async (req, res) => res.json({ flags: await notices.dataQualityFlags() })));
 
-admin.get('/sms-log', wrap(async (req, res) => res.json({ log: await escalation.smsLog() })));
+admin.get('/sms-log', wrap(async (req, res) => res.json({ log: await p1Log.p1Log() })));
 admin.post('/sms-log/:id/ack', wrap(async (req, res) => {
-    res.json({ entry: await escalation.acknowledgeP1(req.params.id, req.session.operator.name) });
+    res.json({ entry: await p1Log.acknowledgeP1(req.params.id, req.session.operator.name) });
 }));
 
 admin.get('/metrics', wrap(async (req, res) => {

@@ -1891,7 +1891,7 @@ const FLOWR = {
                     return outcomeP1(f, 'crit', {
                         subject: 'Kitchen equipment off during service — P1',
                         detail: 'Kitchen circuits off while the site is actively serving. Remote switching not available; needs immediate IoT action.',
-                        script: 'This is urgent so I\'ve escalated it right now — a text has gone to our on-duty manager and someone will call you back shortly. In the meantime the on-site override switch, if you have one, is safe to use.',
+                        script: 'I\'ve raised an urgent P1 ticket for this site and someone will call you back shortly. In the meantime the on-site override switch, if you have one, is safe to use.',
                         p1Summary: 'Kitchen equipment off during service'
                     });
                 }
@@ -2050,7 +2050,7 @@ const FLOWR = {
                     return outcomeP1(f, 'crit', {
                         subject: 'Kitchen equipment off during service — P1',
                         detail: 'Kitchen circuits off while the site is actively serving. Remote switching not available; needs immediate IoT action.',
-                        script: 'This is urgent so I\'ve escalated it right now — a text has gone to our on-duty manager and someone will call you back shortly. In the meantime the on-site override switch, if you have one, is safe to use.',
+                        script: 'I\'ve raised an urgent P1 ticket for this site and someone will call you back shortly. In the meantime the on-site override switch, if you have one, is safe to use.',
                         p1Summary: 'Kitchen equipment off during service'
                     });
                 }
@@ -2128,7 +2128,7 @@ const FLOWR = {
             return outcomeP1(f, 'cap', {
                 subject: 'External lighting not working — P1',
                 detail: 'Manual override did not resolve the outside lights; possible tripped supply or failed controller. Remote switching not available — needs immediate IoT/electrical follow-up.',
-                script: 'I\'ve escalated this as urgent — a text has gone to our on-duty manager and someone will call you back shortly. If the dark frontage is a safety concern right now, your site\'s duty-manager procedure for calling out an electrician still applies, as this may be an electrical supply issue rather than the lighting control.',
+                script: 'I\'ve raised an urgent P1 ticket for this site and someone will call you back shortly. If the dark frontage is a safety concern right now, your site\'s duty-manager procedure for calling out an electrician still applies, as this may be an electrical supply issue rather than the lighting control.',
                 p1Summary: 'External lighting not responding'
             });
         }
@@ -2180,7 +2180,7 @@ const FLOWR = {
                 return outcomeP1(f, 'risk', {
                     subject: 'Refrigeration temperature alarm — stock at risk',
                     detail: 'Caller reports refrigeration failure with stock at risk. Monitoring-only on Lighthouse; escalated for immediate advice + appliance callout guidance.',
-                    script: 'I\'ve escalated this as urgent — a text has gone to our on-duty manager. The fridge itself isn\'t controlled by Lighthouse, so alongside our callback you should follow your normal appliance repair route — but someone will ring you shortly.',
+                    script: 'I\'ve raised an urgent P1 ticket for this site and someone will call you back shortly. The fridge itself isn\'t controlled by Lighthouse, so alongside our callback you should follow your normal appliance repair route.',
                     p1Summary: 'Refrigeration failure — stock at risk'
                 });
             }
@@ -2325,7 +2325,7 @@ const FLOWR = {
             return outcomeP1(f, 'p1', {
                 subject: 'Contractor on site needs IoT support — P1',
                 detail: `Contractor ${f.data.cn} on site now: ${f.data.cw}. Escalated immediately.`,
-                script: 'I\'ve sent an urgent text to our on-duty manager and they\'ll ring the site straight back — usually within a few minutes. Please ask the engineer to hold on.',
+                script: 'I\'ve raised an urgent P1 ticket for this site and someone will call you back shortly. Please ask the engineer to hold on.',
                 p1Summary: `Contractor on site: ${f.data.cw}`
             });
         }
@@ -2408,7 +2408,7 @@ const FLOWR = {
         return outcomeP1(f, 'p1', {
             subject: 'Contractor on site needs IoT support — P1',
             detail: `Contractor ${f.data.cn} on site now: ${f.data.cw}. Escalated immediately.`,
-            script: 'I\'ve sent an urgent text to our on-duty manager and they\'ll ring the site straight back — usually within a few minutes. Please ask the engineer to hold on.',
+            script: 'I\'ve raised an urgent P1 ticket for this site and someone will call you back shortly. Please ask the engineer to hold on.',
             p1Summary: `Contractor on site: ${f.data.cw}`
         });
     },
@@ -2447,7 +2447,7 @@ const FLOWR = {
             return outcomeP1(f, 'p1', {
                 subject: 'Something else - urgent, escalated as P1',
                 detail: `Caller reported: ${reason}. Did not fit a specific tile; handler judged it urgent tonight.`,
-                script: 'I\'ve escalated this as urgent — a text has gone to our on-duty manager and someone will call you back shortly.',
+                script: 'I\'ve raised an urgent P1 ticket for this site and someone will call you back shortly.',
                 p1Summary: otherP1Summary(reason)
             });
         }

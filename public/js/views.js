@@ -619,9 +619,9 @@ function paintAdmin() {
     <tr><td>Captured for next day</td><td><b>${m.totals.captured}</b> <span class="small">${Object.entries(m.captureVolumeByClass).map(([k, v]) => `${esc(k)}: ${v}`).join(' · ') || ''}</span></td></tr>
    </table>
   </div>
-  <div class="card"><h3>P1 text-message log</h3>
+  <div class="card"><h3>P1 escalation log</h3>
    ${a.sms.length ? `<table class="tbl">${a.sms.map(sl =>
-        `<tr><td>${esc(new Date(sl.dispatchedAt).toLocaleString('en-GB', { weekday: 'short', hour: '2-digit', minute: '2-digit' }))}</td><td><b>${esc(sl.siteName)}</b> <span class="mono">${esc(sl.siteNo)}</span></td><td>${esc(sl.sentTo)}${sl.dispatchOk ? '' : ' <span class="tag red">send failed</span>'}</td><td><a href="${esc(sl.OohP1EscalationLink)}" target="_blank" rel="noopener">#${sl.ticketId}</a></td><td>${sl.OohP1AckAt ? `<span class="tag green">ack ${esc(new Date(sl.OohP1AckAt).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }))}</span>` : `<button class="btn link" onclick="ackP1('${sl.id}')">Mark acknowledged</button>`}</td></tr>`).join('')}</table>` : '<p class="small">No P1 texts sent yet.</p>'}
+        `<tr><td>${esc(new Date(sl.dispatchedAt).toLocaleString('en-GB', { weekday: 'short', hour: '2-digit', minute: '2-digit' }))}</td><td><b>${esc(sl.siteName)}</b> <span class="mono">${esc(sl.siteNo)}</span></td><td>Raised with ooh_p1 tag · IoT Support Dashboard pages the manager</td><td><a href="${esc(sl.OohP1EscalationLink)}" target="_blank" rel="noopener">#${sl.ticketId}</a></td><td>${sl.OohP1AckAt ? `<span class="tag green">ack ${esc(new Date(sl.OohP1AckAt).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }))}</span>` : `<button class="btn link" onclick="ackP1('${sl.id}')">Mark acknowledged</button>`}</td></tr>`).join('')}</table>` : '<p class="small">No P1 escalations raised yet.</p>'}
   </div>
   <div class="card"><h3>Capability &amp; guardrail registry <span class="tag grey">read-only mirror of server registry</span></h3>
    <table class="tbl" data-testid="admin-registry"><tr><th>Device type</th><th>Allowed commands</th><th>Ranges (app policy)</th></tr>
