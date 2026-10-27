@@ -103,20 +103,25 @@ test.describe('OOHDASH-139 boiler panel heating flow', () => {
         await expect(page.locator('[data-testid="reco-boiler-panel"]')).toContainText('Part of the pub heating is off');
     });
 
-    test('BC-151-E2: V1 W3 outcome (9011 CHZ2 day-varying, partial-week) — next-on clause suppressed for named-weekday cases (OOHDASH-151)', async ({ page }) => {
-        // Site 9011 CHZ2 is partial-week (loops=1111100 = Sun-Thu, Fri+Sat off).
-        // OOHDASH-151 guard: nextOnClause only shows when dayText is 'today'/'tomorrow'.
-        // For CHZ2, nextOn may be 'Sunday' (named weekday) if tested on Fri or Sat — suppressed.
-        // This test verifies the W3 card renders without crashing; nextOnClause may or may not show
-        // depending on the test-run day (today/tomorrow safe, named weekday suppressed).
+    test('BC-151-E2: V1 W3 outcome (9011 CHZ2 partial-week) — named weekday is NEVER shown in card (OOHDASH-151 dayText guard)', async ({ page }) => {
+        // Site 9011 CHZ2: loops=1111100 (Sun-Thu active, Fri+Sat off under sun-first).
+        // Unit test TT-2b proves schedule.js returns nextOn.dayText='Sunday' when run on Fri/Sat.
+        // The flows.js dayText guard (dayText === 'today' || dayText === 'tomorrow') suppresses named weekdays.
+        // NEGATIVE-PATH: assert no named weekday name appears in the W3 card, ever — on any test day.
         await confirmSite(page, '9011', 'Test Boiler Panel V1 (Heating)');
         await page.locator('[data-testid="tile-heating"]').click();
         await page.locator('button.chip', { hasText: 'Bar/Restaurant' }).click();
         await reachDirectionStep(page);
         await page.locator('[data-testid="need-cold"]').click();
-        await expect(page.locator('[data-testid="reco-boiler-panel"]')).toBeVisible();
-        // Card must render without crash; content depends on run day.
-        await expect(page.locator('[data-testid="reco-boiler-panel"]')).toContainText('Part of the pub heating is off');
+        const card = page.locator('[data-testid="reco-boiler-panel"]');
+        await expect(card).toBeVisible();
+        await expect(card).toContainText('Part of the pub heating is off');
+        // Negative path: named weekdays must never appear (guard suppresses them).
+        const weekdays = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+        const cardText = await card.innerText();
+        for (const day of weekdays) {
+            expect(cardText, `W3 card must not contain named weekday '${day}' — dayText guard must suppress it`).not.toContain(day);
+        }
     });
 
     test('Regression: Accommodation Salus flow unchanged (site 6832)', async ({ page }) => {
