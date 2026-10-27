@@ -65,7 +65,6 @@ mock.module('../services/zendesk.js', {
         zendeskStatus: () => ({ healthy: true }),
         addLateSyncNote: _noop,
         createLateSyncTicket: _noop,
-        addP1DispatchNote: _noop,
         createOutcomeTicket: _noop,
         addFeedbackNote: _noop,
         getFeedbackThread: async () => [],

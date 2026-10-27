@@ -747,12 +747,15 @@ function bpOutcomeCard(wcode, heating, nowMs, boostAvailable, activeBoostHolds) 
         return '<div class="gtk" data-testid="gtk-block"><span class="gtk-label">ℹ Good to know (for you, not the customer)</span>' + text + '</div>';
     }
 
-    // Helper: find the earliest nextOn across a set of zone objects
+    // Helper: find the earliest nextOn across a set of zone objects.
+    // Only uses nextOn when dayText is 'today' or 'tomorrow' — never a named weekday.
+    // This bounds the risk of a wrong day-order deduction: today/tomorrow is day-order-agnostic
+    // for all-7-days zones (the whole V1 estate as of 2026-10-27 estate sweep).
     function earliestNextOn(zoneObjs) {
         var best = null;
         for (var i = 0; i < zoneObjs.length; i++) {
             var tt = zoneObjs[i].timetable;
-            if (tt && tt.everyDay && tt.nextOn) {
+            if (tt && tt.nextOn && (tt.nextOn.dayText === 'today' || tt.nextOn.dayText === 'tomorrow')) {
                 if (!best || tt.nextOn.atMs < best.atMs) best = tt.nextOn;
             }
         }
@@ -1158,7 +1161,7 @@ function boilerPanelHeatingBranch(ws, f, panelDevice, site) {
             var emoji = dir === 'on' ? '🔥' : '❄';
             var tt = zones0.find(function(z) { return z.zone === h.boilerZone; });
             var nextOnClause = '';
-            if (tt && tt.timetable && tt.timetable.everyDay && tt.timetable.nextOn && !(h.revertAt && tt.timetable.nextOn.atMs <= new Date(h.revertAt).getTime())) {
+            if (tt && tt.timetable && tt.timetable.nextOn && (tt.timetable.nextOn.dayText === 'today' || tt.timetable.nextOn.dayText === 'tomorrow') && !(h.revertAt && tt.timetable.nextOn.atMs <= new Date(h.revertAt).getTime())) {
                 var n = tt.timetable.nextOn;
                 var dayPfx = (n.dayText && n.dayText !== 'today') ? (' ' + n.dayText) : '';
                 nextOnClause = ', which next comes on at ' + n.timeText + dayPfx;
@@ -1175,7 +1178,7 @@ function boilerPanelHeatingBranch(ws, f, panelDevice, site) {
         var firstUntil = firstHold.revertAt ? fmtTime(new Date(firstHold.revertAt)) : '';
         var firstTT = zones0.find(function(z) { return z.zone === firstHold.boilerZone; });
         var firstNextOn = '';
-        if (firstTT && firstTT.timetable && firstTT.timetable.everyDay && firstTT.timetable.nextOn && !(firstHold.revertAt && firstTT.timetable.nextOn.atMs <= new Date(firstHold.revertAt).getTime())) {
+        if (firstTT && firstTT.timetable && firstTT.timetable.nextOn && (firstTT.timetable.nextOn.dayText === 'today' || firstTT.timetable.nextOn.dayText === 'tomorrow') && !(firstHold.revertAt && firstTT.timetable.nextOn.atMs <= new Date(firstHold.revertAt).getTime())) {
             var fn = firstTT.timetable.nextOn;
             firstNextOn = ', which next comes on at ' + fn.timeText + ((fn.dayText && fn.dayText !== 'today') ? ' ' + fn.dayText : '');
         }
@@ -1255,7 +1258,7 @@ function boilerPanelHeatingBranch(ws, f, panelDevice, site) {
         var earliestNextOnTemp = null;
         for (var bi = 0; bi < bpZones.length; bi++) {
             var zData = heatingZones0.find(function(z) { return z.zone === bpZones[bi]; });
-            if (zData && zData.timetable && zData.timetable.everyDay && zData.timetable.nextOn) {
+            if (zData && zData.timetable && zData.timetable.nextOn && (zData.timetable.nextOn.dayText === 'today' || zData.timetable.nextOn.dayText === 'tomorrow')) {
                 var n2 = zData.timetable.nextOn;
                 if (earliestNextOnMs === null || n2.atMs < earliestNextOnMs) {
                     earliestNextOnMs = n2.atMs;
@@ -1409,7 +1412,7 @@ function boilerPanelHeatingBranch(ws, f, panelDevice, site) {
             var bsNextOnClause = '';
             for (var bni = 0; bni < bsZones.length; bni++) {
                 var zData2 = heatingZones1.find(function(z) { return z.zone === bsZones[bni]; });
-                if (zData2 && zData2.timetable && zData2.timetable.everyDay && zData2.timetable.nextOn && !(act.revertAtMs && zData2.timetable.nextOn.atMs <= act.revertAtMs)) {
+                if (zData2 && zData2.timetable && zData2.timetable.nextOn && (zData2.timetable.nextOn.dayText === 'today' || zData2.timetable.nextOn.dayText === 'tomorrow') && !(act.revertAtMs && zData2.timetable.nextOn.atMs <= act.revertAtMs)) {
                     var nn = zData2.timetable.nextOn;
                     var dayPfx3 = (nn.dayText && nn.dayText !== 'today') ? (' ' + nn.dayText) : '';
                     bsNextOnClause = ', which next comes on at ' + nn.timeText + dayPfx3;
@@ -1891,7 +1894,7 @@ const FLOWR = {
                     return outcomeP1(f, 'crit', {
                         subject: 'Kitchen equipment off during service — P1',
                         detail: 'Kitchen circuits off while the site is actively serving. Remote switching not available; needs immediate IoT action.',
-                        script: 'This is urgent so I\'ve escalated it right now — a text has gone to our on-duty manager and someone will call you back shortly. In the meantime the on-site override switch, if you have one, is safe to use.',
+                        script: 'I\'ve raised an urgent P1 ticket for this site and someone will call you back shortly. In the meantime the on-site override switch, if you have one, is safe to use.',
                         p1Summary: 'Kitchen equipment off during service'
                     });
                 }
@@ -2050,7 +2053,7 @@ const FLOWR = {
                     return outcomeP1(f, 'crit', {
                         subject: 'Kitchen equipment off during service — P1',
                         detail: 'Kitchen circuits off while the site is actively serving. Remote switching not available; needs immediate IoT action.',
-                        script: 'This is urgent so I\'ve escalated it right now — a text has gone to our on-duty manager and someone will call you back shortly. In the meantime the on-site override switch, if you have one, is safe to use.',
+                        script: 'I\'ve raised an urgent P1 ticket for this site and someone will call you back shortly. In the meantime the on-site override switch, if you have one, is safe to use.',
                         p1Summary: 'Kitchen equipment off during service'
                     });
                 }
@@ -2128,7 +2131,7 @@ const FLOWR = {
             return outcomeP1(f, 'cap', {
                 subject: 'External lighting not working — P1',
                 detail: 'Manual override did not resolve the outside lights; possible tripped supply or failed controller. Remote switching not available — needs immediate IoT/electrical follow-up.',
-                script: 'I\'ve escalated this as urgent — a text has gone to our on-duty manager and someone will call you back shortly. If the dark frontage is a safety concern right now, your site\'s duty-manager procedure for calling out an electrician still applies, as this may be an electrical supply issue rather than the lighting control.',
+                script: 'I\'ve raised an urgent P1 ticket for this site and someone will call you back shortly. If the dark frontage is a safety concern right now, your site\'s duty-manager procedure for calling out an electrician still applies, as this may be an electrical supply issue rather than the lighting control.',
                 p1Summary: 'External lighting not responding'
             });
         }
@@ -2180,7 +2183,7 @@ const FLOWR = {
                 return outcomeP1(f, 'risk', {
                     subject: 'Refrigeration temperature alarm — stock at risk',
                     detail: 'Caller reports refrigeration failure with stock at risk. Monitoring-only on Lighthouse; escalated for immediate advice + appliance callout guidance.',
-                    script: 'I\'ve escalated this as urgent — a text has gone to our on-duty manager. The fridge itself isn\'t controlled by Lighthouse, so alongside our callback you should follow your normal appliance repair route — but someone will ring you shortly.',
+                    script: 'I\'ve raised an urgent P1 ticket for this site and someone will call you back shortly. The fridge itself isn\'t controlled by Lighthouse, so alongside our callback you should follow your normal appliance repair route.',
                     p1Summary: 'Refrigeration failure — stock at risk'
                 });
             }
@@ -2325,7 +2328,7 @@ const FLOWR = {
             return outcomeP1(f, 'p1', {
                 subject: 'Contractor on site needs IoT support — P1',
                 detail: `Contractor ${f.data.cn} on site now: ${f.data.cw}. Escalated immediately.`,
-                script: 'I\'ve sent an urgent text to our on-duty manager and they\'ll ring the site straight back — usually within a few minutes. Please ask the engineer to hold on.',
+                script: 'I\'ve raised an urgent P1 ticket for this site and someone will call you back shortly. Please ask the engineer to hold on.',
                 p1Summary: `Contractor on site: ${f.data.cw}`
             });
         }
@@ -2408,7 +2411,7 @@ const FLOWR = {
         return outcomeP1(f, 'p1', {
             subject: 'Contractor on site needs IoT support — P1',
             detail: `Contractor ${f.data.cn} on site now: ${f.data.cw}. Escalated immediately.`,
-            script: 'I\'ve sent an urgent text to our on-duty manager and they\'ll ring the site straight back — usually within a few minutes. Please ask the engineer to hold on.',
+            script: 'I\'ve raised an urgent P1 ticket for this site and someone will call you back shortly. Please ask the engineer to hold on.',
             p1Summary: `Contractor on site: ${f.data.cw}`
         });
     },
@@ -2447,7 +2450,7 @@ const FLOWR = {
             return outcomeP1(f, 'p1', {
                 subject: 'Something else - urgent, escalated as P1',
                 detail: `Caller reported: ${reason}. Did not fit a specific tile; handler judged it urgent tonight.`,
-                script: 'I\'ve escalated this as urgent — a text has gone to our on-duty manager and someone will call you back shortly.',
+                script: 'I\'ve raised an urgent P1 ticket for this site and someone will call you back shortly.',
                 p1Summary: otherP1Summary(reason)
             });
         }

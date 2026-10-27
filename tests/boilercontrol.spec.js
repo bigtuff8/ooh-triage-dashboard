@@ -103,6 +103,41 @@ test.describe('OOHDASH-139 boiler panel heating flow', () => {
         await expect(page.locator('[data-testid="reco-boiler-panel"]')).toContainText('Part of the pub heating is off');
     });
 
+    test('BC-151-E2: V1 W3 outcome (9011 CHZ2 partial-week) — named weekday is NEVER shown in card (OOHDASH-151 dayText guard)', async ({ page }) => {
+        // Site 9011 CHZ2: loops=1111100 (Sun-Thu active, Fri+Sat off under sun-first).
+        // Unit test TT-2b proves schedule.js returns nextOn.dayText='Sunday' when run on Fri/Sat.
+        // The flows.js dayText guard (dayText === 'today' || dayText === 'tomorrow') suppresses named weekdays.
+        // NEGATIVE-PATH: assert no named weekday name appears in the W3 card, ever — on any test day.
+        await confirmSite(page, '9011', 'Test Boiler Panel V1 (Heating)');
+        await page.locator('[data-testid="tile-heating"]').click();
+        await page.locator('button.chip', { hasText: 'Bar/Restaurant' }).click();
+        await reachDirectionStep(page);
+        await page.locator('[data-testid="need-cold"]').click();
+        const card = page.locator('[data-testid="reco-boiler-panel"]');
+        await expect(card).toBeVisible();
+        await expect(card).toContainText('Part of the pub heating is off');
+        // Negative path: named weekdays must never appear (guard suppresses them).
+        const weekdays = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+        const cardText = await card.innerText();
+        for (const day of weekdays) {
+            expect(cardText, `W3 card must not contain named weekday '${day}' — dayText guard must suppress it`).not.toContain(day);
+        }
+        // Null-path: confirm the API returns null or non-null nextOn without crashing the render.
+        // earliestNextOn() null-guards: `tt && tt.nextOn && (tt.nextOn.dayText === ...)` —
+        // the && chain short-circuits before .dayText when nextOn is null, so no TypeError.
+        const resp = await page.request.post('/api/sites/9011/confirm');
+        expect(resp.ok()).toBe(true);
+        const { workspace } = await resp.json();
+        const zones = workspace.boilerControl?.heating?.zones ?? [];
+        const chz2 = zones.find(z => z.zone === 'CHZ2');
+        // Whether nextOn is null (guard suppressed it) or non-null (today/tomorrow), card renders without throw.
+        const nextOnIsNullOrTodayTomorrow = chz2.timetable === null
+            || chz2.timetable.nextOn === null
+            || chz2.timetable.nextOn.dayText === 'today'
+            || chz2.timetable.nextOn.dayText === 'tomorrow';
+        expect(nextOnIsNullOrTodayTomorrow, 'CHZ2 nextOn must be null or today/tomorrow — named weekday would be suppressed by guard').toBe(true);
+    });
+
     test('Regression: Accommodation Salus flow unchanged (site 6832)', async ({ page }) => {
         await confirmSite(page, '6832', 'Old Grey Mare');
         await page.locator('[data-testid="tile-heating"]').click();
@@ -111,6 +146,31 @@ test.describe('OOHDASH-139 boiler panel heating flow', () => {
         // Normal Salus flow — 4 need chips present (not 2 like boiler panel)
         await expect(page.locator('[data-testid="need-warm"]')).toBeVisible();
         await expect(page.locator('[data-testid="need-cool"]')).toBeVisible();
+    });
+});
+
+test.describe('OOHDASH-151: V1 day-varying schedule (guard lifted)', () => {
+    // Site 9011 CHZ1: every-day (loops=1111111), CHZ2: day-varying (loops=1111100 = Sun-Thu, sun-first).
+    // Before OOHDASH-151: everyDayOnly guard made CHZ2 timetable.nextOn null.
+    // After OOHDASH-151: guard removed; CHZ2 timetable.nextOn is computed from the sun-first schedule.
+    test('BC-151-E1: V1 site (9011) CHZ2 day-varying timetable — nextOn is non-null and falls on an active sun-first day', async ({ page }) => {
+        await signIn(page, 'Test Handler');
+        // Confirm via API (returns workspace inline — no second round-trip needed).
+        const resp = await page.request.post('/api/sites/9011/confirm');
+        expect(resp.ok()).toBe(true);
+        const { workspace } = await resp.json();
+        const zones = workspace.boilerControl?.heating?.zones ?? [];
+        const chz2 = zones.find(z => z.zone === 'CHZ2');
+        expect(chz2, 'CHZ2 zone must be present in V1 fixture 9011').toBeTruthy();
+        // Core assertion: nextOn must be non-null (was null with the everyDayOnly guard).
+        expect(chz2.timetable, 'CHZ2 timetable must be non-null').not.toBeNull();
+        expect(chz2.timetable.everyDay, 'CHZ2 everyDay must be false (day-varying schedule)').toBe(false);
+        expect(chz2.timetable.nextOn, 'CHZ2 nextOn must be non-null after OOHDASH-151 guard removal').not.toBeNull();
+        // Sun-first sanity check: loops=1111100 → active jsDay [0,1,2,3,4] (Sun-Thu).
+        // nextOn atMs must land on one of those days under correct (sun-first) decoding.
+        // Definitive sun-first day assertions live in TT-4a/b/c (unit tests, fixed reference time).
+        const nextOnJsDay = new Date(chz2.timetable.nextOn.atMs).getDay();
+        expect([0, 1, 2, 3, 4], 'nextOn must fall on a sun-first active day (Sun–Thu, jsDay 0–4) for loops=1111100').toContain(nextOnJsDay);
     });
 });
 

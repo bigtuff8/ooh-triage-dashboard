@@ -1,0 +1,9 @@
+🚨 Escalated — P1
+
+Manual override did not resolve the outside lights; possible tripped supply or failed controller. Remote switching not available — needs immediate IoT/electrical follow-up.
+
+The P1 is logged as ticket #45175 in the IoT Support dashboard, which pages the on-duty manager.
+
+"I've raised an urgent P1 ticket for this site and someone will call you back shortly. If the dark frontage is a safety concern right now, your site's duty-manager procedure for calling out an electrician still applies, as this may be an electrical supply issue rather than the lighting control."
+
+Ticket #45175

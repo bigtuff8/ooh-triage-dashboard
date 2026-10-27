@@ -11,7 +11,7 @@
  * and rendered at the top of the F026 review queue:
  *  - write failed/rejected streak (≥3 within 30 minutes)
  *  - revert failure / revert blocked (raised by overrides.js)
- *  - SMS dispatch failure (raised by escalation.js)
+ *  - P1 log write failure (raised by p1-log.js)
  *  - DriftDetected overnight (recorded when reads surface it)
  */
 

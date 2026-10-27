@@ -106,19 +106,8 @@ export const config = {
         database: env('COSMOS_DATABASE', 'ooh-dashboard')
     },
 
-    sms: {
-        provider: env('SMS_PROVIDER', 'log'), // 'log' | 'twilio' — gateway choice pending Spencer/James (Q-F)
-        twilio: {
-            accountSid: env('TWILIO_ACCOUNT_SID'),
-            authToken: env('TWILIO_AUTH_TOKEN'),
-            from: env('TWILIO_FROM')
-        },
-        onDutyNumber: env('ESCALATION_ONDUTY_NUMBER'),
-        onDutyName: env('ESCALATION_ONDUTY_NAME', 'On-duty escalation manager')
-    },
-
     // IoT Support dashboard base URL for P1 deep-links (F004/F026). Default is the live UAT host
-    // so the P1 SMS deep-link (/?ticket={id}) resolves correctly even if the env var is unset;
+    // so the P1 deep-link (/?ticket={id}) resolves correctly even if the env var is unset;
     // production still sets IOT_DASH_BASE_URL explicitly via the Spencer-managed secret.
     iotDashBaseUrl: env('IOT_DASH_BASE_URL', 'https://zendesk-uat.airedale-api.co.uk'),
 
@@ -140,7 +129,7 @@ export const config = {
         // OOHDASH-123 / DD-SCHED-DISPLAY (James override: decoded display ON by default). dayOrder + tz
         // are single invertible constants so an SQ-13 correction is a config change, not a rebuild.
         schedule: {
-            dayOrder: env('OOH_SCHED_DAY_ORDER', 'mon-first'),   // 'mon-first' | 'sun-first'
+            dayOrder: env('OOH_SCHED_DAY_ORDER', 'sun-first'),   // 'mon-first' | 'sun-first' — OOHDASH-152
             tz: env('OOH_SCHED_TZ', 'Europe/London'),
             decoded: env('OOH_SCHED_DECODED', 'on') !== 'off'
         },

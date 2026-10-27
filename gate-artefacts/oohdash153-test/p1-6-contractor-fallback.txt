@@ -1,0 +1,26 @@
+P1 path 6: Contractor fallback (flows.js line 2411)
+
+STATUS: DEAD CODE — unreachable through any normal UI flow.
+
+Structural analysis: line 2411 is a "should not be reached" fallback inside FLOWR.contractor.
+All four contractor flow state branches return before reaching this line:
+  ppguidance=no           → return at line 2325/2328 (tested as p1-5-contractor-pp-no)
+  ppguidance=yes, no type → return at line 2359
+  ppguidance=yes, no done → return at line 2379
+  ppguidance=yes, ppdone  → return at line 2397
+
+Behavioural UI test: IMPOSSIBLE (no path reaches the code).
+Source-check assertion: REMOVED (banned by tester persona — string presence ≠ behaviour).
+
+Evidence deferred to unit source guard (test/p1-log.test.js):
+  - D2 sentence appears exactly 7 times in flows.js (unit guard passes 845/1)
+  - Old SMS wording absent from flows.js (unit guard passes)
+
+Old wording absent check (supplementary grep, not a test assertion):
+  "sent an urgent text" absent: true
+  "usually within a few minutes" absent: true
+  Combined: true
+
+FINDING for report: flows.js line 2411 is dead code. It has the correct D2 script
+text per source inspection and the unit guard, but can never execute. It should be
+removed in a follow-on cleanup or made reachable if the intent is a true fallback.

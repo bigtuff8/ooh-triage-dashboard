@@ -77,11 +77,17 @@ test('TT-2a: weekday-only schedule returns everyDay:false', () => {
     assert.equal(result.everyDay, false, 'everyDay should be false for non-1111111 loops');
 });
 
-test('TT-2b: weekday-only schedule returns no nextOn', () => {
+test('TT-2b: weekday-only schedule (sun-first) returns nextOn for next step-up day', () => {
+    // WEEKDAY_SCHED loops='1111100' with sun-first = Sun-Thu active. NOW=Fri 20:00 GMT.
+    // Fri+Sat have no entries; Sun has 06:30 (21°C, step-up from 23:00 setback).
     const result = zoneTimetable(WEEKDAY_SCHED, NOW_MS, TZ);
     assert.ok(result, 'should return a result');
-    assert.equal(result.nextOn, null, 'nextOn should be null for non-every-day schedule (SQ-13 unconfirmed)');
+    assert.ok(result.nextOn, 'nextOn should now be non-null (SQ-13 confirmed)');
+    assert.equal(result.nextOn.timeText, '06:30', 'next step-up is 06:30');
+    assert.equal(result.nextOn.dayText, 'Sunday', 'next active day after Fri is Sunday');
+    assert.equal(result.nextOn.tempC, 21);
 });
+
 
 // ─── TT-3: malformed/empty → null ─────────────────────────────────────────
 test('TT-3a: null schedule → zoneTimetable returns null', () => {
@@ -144,4 +150,55 @@ test('UN-1d: until-next-on with null nextOnMs → fallback until-0700', () => {
     const result = clampBoostWindow(now, 'off', 'until-next-on', 'Europe/London', null);
     assert.equal(result.ok, true, 'should be ok (fallback path)');
     assert.equal(result.fallback, 'until-0700', 'should fallback to until-0700 when no timetable');
+});
+
+// ─── TT-4: day-varying schedule (SQ-13 confirmed sun-first) ───────────────
+// Schedule: loops='1000011' (Sun/Fri/Sat) at 09:00 + setback at 22:00,
+//           loops='0111100' (Mon-Thu) at 11:00 + setback at 22:00.
+// All times GMT (winter, UTC+0). Dates around 2027-01-15 (Friday).
+const DAY_VARYING_SCHED = {
+    schedule: [
+        { value: 21, time: '09:00', loops: '1000011', timer_id: 'dv1' }, // Sun/Fri/Sat heat on
+        { value: 15, time: '22:00', loops: '1000011', timer_id: 'dv2' }, // Sun/Fri/Sat setback
+        { value: 21, time: '11:00', loops: '0111100', timer_id: 'dv3' }, // Mon-Thu heat on
+        { value: 15, time: '22:00', loops: '0111100', timer_id: 'dv4' }, // Mon-Thu setback
+    ]
+};
+
+test('TT-4a: day-varying schedule — at Fri 20:00 nextOn is Sat 09:00 (tomorrow)', () => {
+    // Fri 20:00: today's 09:00 already fired; 22:00 setback is next but is not a step-up.
+    // Sat (jsDay=6, loops[6]='1'): 09:00 (21°C), prev=22:00 (15°C) → step-up → nextOn.
+    const friEvening = Date.UTC(2027, 0, 15, 20, 0, 0); // Fri 2027-01-15 20:00 GMT
+    const result = zoneTimetable(DAY_VARYING_SCHED, friEvening, TZ);
+    assert.ok(result, 'should return a result');
+    assert.equal(result.everyDay, false);
+    assert.ok(result.nextOn, 'should have nextOn');
+    assert.equal(result.nextOn.timeText, '09:00');
+    assert.equal(result.nextOn.dayText, 'tomorrow');
+    assert.equal(result.nextOn.tempC, 21);
+});
+
+test('TT-4b: day-varying schedule — at Mon 08:00 nextOn is Mon 11:00 (today)', () => {
+    // Mon (jsDay=1, loops[1]='1' for dv3/dv4): 11:00 step-up fires today after 08:00.
+    const monMorning = Date.UTC(2027, 0, 18, 8, 0, 0); // Mon 2027-01-18 08:00 GMT
+    const result = zoneTimetable(DAY_VARYING_SCHED, monMorning, TZ);
+    assert.ok(result, 'should return a result');
+    assert.equal(result.everyDay, false);
+    assert.ok(result.nextOn, 'should have nextOn');
+    assert.equal(result.nextOn.timeText, '11:00');
+    assert.equal(result.nextOn.dayText, 'today');
+    assert.equal(result.nextOn.tempC, 21);
+});
+
+test('TT-4c: day-varying schedule — at Sun 10:00 nextOn is Mon 11:00 (tomorrow)', () => {
+    // Sun (jsDay=0, loops[0]='1'): 09:00 already fired; 22:00 setback is not a step-up.
+    // Mon (jsDay=1): 11:00 step-up is next → tomorrow.
+    const sunMidMorning = Date.UTC(2027, 0, 17, 10, 0, 0); // Sun 2027-01-17 10:00 GMT
+    const result = zoneTimetable(DAY_VARYING_SCHED, sunMidMorning, TZ);
+    assert.ok(result, 'should return a result');
+    assert.equal(result.everyDay, false);
+    assert.ok(result.nextOn, 'should have nextOn');
+    assert.equal(result.nextOn.timeText, '11:00');
+    assert.equal(result.nextOn.dayText, 'tomorrow');
+    assert.equal(result.nextOn.tempC, 21);
 });

@@ -1,0 +1,41 @@
+=== Admin P1 escalation log card ===
+
+--- BEFORE ack ---
+P1 escalation log
+Tue 07:52	Angel Inn 6749	Raised with ooh_p1 tag · IoT Support Dashboard pages the manager	#45178	Mark acknowledged
+Tue 07:52	Brentwood 6759	Raised with ooh_p1 tag · IoT Support Dashboard pages the manager	#45177	Mark acknowledged
+Tue 07:52	Old Grey Mare 6832	Raised with ooh_p1 tag · IoT Support Dashboard pages the manager	#45176	Mark acknowledged
+Tue 07:52	Angel Inn 6749	Raised with ooh_p1 tag · IoT Support Dashboard pages the manager	#45175	Mark acknowledged
+Tue 07:52	OOHDASH-140 Tuya Fixture Site 8888	Raised with ooh_p1 tag · IoT Support Dashboard pages the manager	#45174	Mark acknowledged
+Tue 07:52	Old Grey Mare 6832	Raised with ooh_p1 tag · IoT Support Dashboard pages the manager	#45173	Mark acknowledged
+Tue 07:52	Angel Inn 6749	Raised with ooh_p1 tag · IoT Support Dashboard pages the manager	#45168	Mark acknowledged
+Tue 07:52	Angel Inn 6749	Raised with ooh_p1 tag · IoT Support Dashboard pages the manager	#45167	Mark acknowledged
+Tue 07:52	Angel Inn 6749	Raised with ooh_p1 tag · IoT Support Dashboard pages the manager	#45165	Mark acknowledged
+Tue 07:51	Angel Inn 6749	Raised with ooh_p1 tag · IoT Support Dashboard pages the manager	#45164	Mark acknowledged
+Tue 07:51	Angel Inn 6749	Raised with ooh_p1 tag · IoT Support Dashboard pages the manager	#45163	Mark acknowledged
+Tue 07:51	Old Grey Mare 6832	Raised with ooh_p1 tag · IoT Support Dashboard pages the manager	#45160	Mark acknowledged
+Tue 07:49	Angel Inn 6749	Raised with ooh_p1 tag · IoT Support Dashboard pages the manager	#45133	Mark acknowledged
+Tue 07:49	Angel Inn 6749	Raised with ooh_p1 tag · IoT Support Dashboard pages the manager	#45132	Mark acknowledged
+
+--- AFTER ack ---
+P1 escalation log
+Tue 07:52	Angel Inn 6749	Raised with ooh_p1 tag · IoT Support Dashboard pages the manager	#45178	ack 07:52
+Tue 07:52	Brentwood 6759	Raised with ooh_p1 tag · IoT Support Dashboard pages the manager	#45177	Mark acknowledged
+Tue 07:52	Old Grey Mare 6832	Raised with ooh_p1 tag · IoT Support Dashboard pages the manager	#45176	Mark acknowledged
+Tue 07:52	Angel Inn 6749	Raised with ooh_p1 tag · IoT Support Dashboard pages the manager	#45175	Mark acknowledged
+Tue 07:52	OOHDASH-140 Tuya Fixture Site 8888	Raised with ooh_p1 tag · IoT Support Dashboard pages the manager	#45174	Mark acknowledged
+Tue 07:52	Old Grey Mare 6832	Raised with ooh_p1 tag · IoT Support Dashboard pages the manager	#45173	Mark acknowledged
+Tue 07:52	Angel Inn 6749	Raised with ooh_p1 tag · IoT Support Dashboard pages the manager	#45168	Mark acknowledged
+Tue 07:52	Angel Inn 6749	Raised with ooh_p1 tag · IoT Support Dashboard pages the manager	#45167	Mark acknowledged
+Tue 07:52	Angel Inn 6749	Raised with ooh_p1 tag · IoT Support Dashboard pages the manager	#45165	Mark acknowledged
+Tue 07:51	Angel Inn 6749	Raised with ooh_p1 tag · IoT Support Dashboard pages the manager	#45164	Mark acknowledged
+Tue 07:51	Angel Inn 6749	Raised with ooh_p1 tag · IoT Support Dashboard pages the manager	#45163	Mark acknowledged
+Tue 07:51	Old Grey Mare 6832	Raised with ooh_p1 tag · IoT Support Dashboard pages the manager	#45160	Mark acknowledged
+Tue 07:49	Angel Inn 6749	Raised with ooh_p1 tag · IoT Support Dashboard pages the manager	#45133	Mark acknowledged
+Tue 07:49	Angel Inn 6749	Raised with ooh_p1 tag · IoT Support Dashboard pages the manager	#45132	Mark acknowledged
+
+--- Metrics row text ---
+Self-serve rate	7% (45 outcomes)
+Control success rate	100% (3 dispatched · 0 failed)
+P1 escalations / SLA	14 · median ack 0 min
+Captured for next day	27 unclassified: 2 · hot-water: 2 · general: 17 · dark-fleet-heating: 1 · aircon-referral: 3 · lighting: 1 · data-quality: 1

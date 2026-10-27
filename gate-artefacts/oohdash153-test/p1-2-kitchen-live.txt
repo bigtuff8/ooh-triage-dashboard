@@ -1,0 +1,9 @@
+🚨 Escalated — P1
+
+Kitchen circuits off while the site is actively serving. Remote switching not available; needs immediate IoT action.
+
+The P1 is logged as ticket #45174 in the IoT Support dashboard, which pages the on-duty manager.
+
+"I've raised an urgent P1 ticket for this site and someone will call you back shortly. In the meantime the on-site override switch, if you have one, is safe to use."
+
+Ticket #45174
