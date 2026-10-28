@@ -1,4 +1,7 @@
 <!-- gate:contract
+SECTION: Interactive prototype — click through the real screens
+The prototype is ../docs/project/mockups/OOHDASH-159-mockup.html, embedded in this review. It is built from the real OOH Dashboard screens, captured by running the app twice: once on today's code and once on a working copy of the proposed change. Every screen is the app's own output, not a drawing. A "Live today / Proposed" switch shows the before and after for four scenarios. 1: Kirsty's call, a Tuya site with the kitchen not reporting. 2: a Tuya site with a circuit reachable but off (Bain-marie, Fryer, Dishwasher, Several). 3: an older site with the kitchen not reporting. 4: an older site with the kitchen reachable, which is unchanged. Screens that differ from today are outlined in amber and marked "New or changed screen". A decision switch shows both answers to the open decision below. The same page is also published as its own web page at https://home-desktop-jb-new.tail30d2e6.ts.net/review/oohdash-159-mockup.html for viewing outside the PR.
+
 SECTION: What this design changes
 One file of product code (public/js/flows.js, the kitchen flow only) plus tests and one new fixture site. The caller is asked "Is the kitchen needed for service right now?" BEFORE the dashboard sends the call down a path that has no P1. A "Yes" raises a P1 straight away. A "No" carries on exactly as today. Three gaps are closed in one PR (D3 + D5): live-mode offline circuits, live-mode reachable-but-off circuits (verdicts A, C, D and off-unknown), and legacy-mode offline circuits. Same ooh_p1 P1 path and IoT Support Dashboard paging as every other P1 (D4). No server, infrastructure or ticket-type changes.
 
@@ -15,7 +18,7 @@ SECTION: The new question uses the existing wording and buttons
 The question, both buttons and their test ids (kitchen-critical, kitchen-notcritical) are copied word for word from the existing legacy question. The operator sees one familiar question, never a new one. On the live-mode screens the buttons record the answer and keep the live circuit data, so "No" returns to the live verdict card and not to the legacy captured ticket.
 
 SECTION: Follow-up steps after the caller has already said "No"
-Today, "Override didn't work" (A, C, off-unknown) and "Fuse board is fine / still off" (D) re-ask the service question. After this change the caller has already answered "No" at that point. The recommended design skips the repeat and goes straight to the existing captured ticket for the IoT team. "Caller still says it's our problem" (B and E) keeps asking, because the question was never asked on those routes. See the decision below.
+Today, "Override didn't work" (A, C, off-unknown) and "Fuse board is fine / still off" (D) re-ask the service question. After this change the caller has already answered "No" at that point. The recommended design skips the repeat and goes straight to a captured ticket for the IoT team: "Kitchen circuit off — not needed until later", naming the circuit, what failed and the live reading. The script is "I've logged it for the IoT team to sort out first thing tomorrow." "Caller still says it's our problem" (B and E) keeps asking, because the question was never asked on those routes. See the decision below.
 
 SECTION: P1 card text
 Both new P1 outcomes keep the existing subject "Kitchen equipment off during service — P1" and the text-message summary "Kitchen equipment off during service", so the IoT team sees one consistent P1 type. Offline card: detail says which circuits are not reporting while the site is serving, and that the IoT team needs to act now. The script is "I've raised an urgent P1 ticket for this site and someone will call you back shortly." with no override mention. Reachable-but-off card: the detail gives the circuit, its live reading and its schedule. The script adds "In the meantime, the override button on the front of the PowerPause unit is safe to use — pressing it once should bring the circuit on." The ticket number is shown on the card as today.
@@ -31,6 +34,9 @@ DECISION: Approve design and proceed to build? | Approve — proceed to build | 
 -->
 
 # OOHDASH-159 Design — P1 missed: kitchen off during active service
+
+**Interactive prototype (real screens):** [OOHDASH-159-mockup.html](../docs/project/mockups/OOHDASH-159-mockup.html), embedded in this review.
+**Standalone copy:** https://home-desktop-jb-new.tail30d2e6.ts.net/review/oohdash-159-mockup.html
 
 **Date:** 2026-10-28
 **Status:** Design — awaiting gate approval
@@ -94,7 +100,12 @@ When every circuit is reporting, the block does nothing. The existing legacy bra
 
 ## Follow-up after "No" (decision)
 
-Once the caller has said "No", "Override didn't work" and "Fuse board is fine / still off" would ask the same question again. The recommended design reads the answer already given and goes straight to the existing captured ticket (`kitchen-powerpause`), with no repeat question. The alternative keeps the repeat question, in case the situation changed during the call. James to choose.
+Once the caller has said "No", "Override didn't work" and "Fuse board is fine / still off" would ask the same question again. The recommended design reads the answer already given and goes straight to a captured ticket (`kitchen-powerpause`), with no repeat question:
+- Subject: "Kitchen circuit off — not needed until later".
+- Detail: "[circuit] is off and the on-site override didn't bring it on (or: the fuse board is fine). The customer doesn't need it for service until later." followed by the live reading.
+- Script: "I've logged it for the IoT team to sort out first thing tomorrow."
+
+The call trail shows "Not needed for service right now", then "Override did not work" or "Fuse board is fine". The alternative keeps the repeat question, in case the situation changed during the call. James to choose.
 
 ---
 
@@ -109,6 +120,14 @@ Both outcomes keep the subject **"Kitchen equipment off during service — P1"**
 **Reachable but off (Fix 2):**
 - Detail: "Kitchen circuit off while the site is actively serving." followed by the live fact line (relay state, schedule state, read time).
 - Script: "I've raised an urgent P1 ticket for this site and someone will call you back shortly. In the meantime, the override button on the front of the PowerPause unit is safe to use — pressing it once should bring the circuit on."
+
+---
+
+## Prototype — how it was built
+
+The prototype was not drawn. The app ran locally in fixture mode twice, once on today's code and once on a throwaway working copy of the change described here. A script then clicked every kitchen button on four fixture sites and saved each real screen. The prototype replays those screens, so every word and button is exactly what the build would show. The working copy is not committed. The build re-implements it under review.
+
+Prototype fixture notes: new site 8889 has two Tuya circuits (Fryer, Bain-marie), both not reporting, with `online` false as a dead gateway would show. Site names are fictional in the prototype.
 
 ---
 
