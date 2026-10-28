@@ -1,0 +1,153 @@
+<!-- gate:contract
+SECTION: The bug — two paths, both miss P1
+This is two linked gaps in the live-mode kitchen flow. PRIMARY GAP (what actually happened, PROVEN): In live mode, if any kitchen Tuya device has verdict 'offline', the flow immediately diverts to the connectivity flow (flows.js:1866-1868). The connectivity flow has no kitchen-specific P1 path. Kirsty's ticket #51205 (2026-10-27 20:39 UTC) confirms this: the OohCaptureClass is "connectivity" (subject "[OOH] ... Lighthouse gateway / equipment offline"). She added the kitchen emergency as a free-text note. P1 was never offered or raised. SECONDARY GAP (would be triggered if devices weren't offline): When devices are reachable but show Verdict C (relay OFF, schedule says off — the normal DST state), the flow presents the circuit as "expected off" and suggests the override first. The service-criticality question only surfaces after override failure. A working override exits as outcomeCaptured with no P1. Neither gap asks "Is this kitchen needed for service right now?" before the P1 path is lost.
+
+SECTION: Proof — R1, R2, R3 all resolved in spike
+R1 RESOLVED (PROVEN): data/tuya-sites.json line 142 — "gk-6819" entry exists. Site 6819 is Tuya-enabled. Live-mode path is confirmed. R2 RESOLVED (PROVEN): Zendesk ticket #51205 (2026-10-27 20:39 UTC, gk_6819). Subject "[OOH] 6819 Lutley Oak (Halesowen) - Lighthouse gateway / equipment offline". Transcript: "Equipment unreachable after on-site power/router checks. No remote action possible; needs IoT connectivity investigation." Kirsty's note: "All equipment has gone off and not on, due to the clock changing it goes off at 8:30pm now and needs to be 9:30pm, site still has food going out, can someone call ASAP contact number is 07961239552 - Kirsty". Tags: ooh, tcat_support_request — NO ooh_p1. Kitchen flow diverted to connectivity at stage 0 before any service-criticality check. R3 ACCEPTED: Moving crit to stage 0 will raise P1 for all Tuya kitchen calls where the caller confirms service is active AND any circuit is off or offline. This is the correct behaviour — it makes live-mode sites consistent with legacy mode intent. Volume impact is bounded (only Tuya-enabled sites, only OOH hours, only confirmed-active-service calls). Explicitly accepted.
+
+SECTION: Proposed fix — one question, two outcomes
+Ask service-criticality (crit) BEFORE the offline-device divert in live mode, in flows.js, before line 1866. If crit:1 AND offlineDevices.length > 0 → P1 immediately (kitchen-emergency subject, override-safe-to-use advice in detail). If crit:1 AND devices reachable but off-verdict (A/C/D/off-unknown) at stage 1 → P1 immediately. If crit:0 → proceed with connectivity divert or verdictCard/override guidance as today. One new question block (~15 lines in stage 0) and one new dispatch block in stage 1. Two new tests: TF-159-01 (crit:1 + offline → outcome-p1) and TF-159-02 (crit:1 + Verdict C → outcome-p1).
+
+SECTION: Volume impact (R3 accepted)
+Every Tuya kitchen call where the caller says service is active and any circuit is off or offline will now raise P1. This aligns live-mode sites with the intent already present in legacy mode. Volume impact is bounded: only Tuya-enabled sites (those in data/tuya-sites.json, a known set), only OOH hours, only when the caller confirms service is active. Accepted.
+
+DECISION: Override advice in the P1 outcome card | Yes — include "The on-site PowerPause override button is safe to use in the meantime" in the P1 detail (recommended) | No — keep P1 card simple, omit override tip | Need more thought
+DECISION: Fix scope | Both fixes together: offline-divert P1 + Verdict C/A/D stage-1 P1 in one PR (recommended) | Offline-divert P1 only (primary bug); Verdict C path as follow-on ticket | All off-verdicts + offline-divert + __all__ fast-path in one PR
+DECISION: Ticket type | Same ooh_p1 tag and IoT Support Dashboard paging path as existing P1s — no change needed (recommended) | Add a "schedule/DST" flag to distinguish cause | Need more thought
+-->
+
+# OOHDASH-159 Discovery — P1 classification missed: kitchen off during active service
+
+**Date:** 2026-10-27
+**Status:** SPIKE complete — all items resolved — gate for design decisions
+**Scope:** Read-only investigation. No code changes in this SPIKE.
+**Trigger:** Site 6819 Lutley Oak (Halesowen), BST-end night 2026-10-26. All kitchen equipment went off at 8:30pm. DST caused the schedule to fire one hour early. Site was still serving food. Agent Kirsty logged ticket #51205; no P1 raised.
+
+---
+
+## What actually happened — Kirsty's path (PROVEN)
+
+**Zendesk ticket #51205** (2026-10-27 20:39 UTC, site gk_6819):
+
+> **Subject:** [OOH] 6819 Lutley Oak (Halesowen) — Lighthouse gateway / equipment offline
+>
+> **Transcript:** "Equipment unreachable after on-site power/router checks. No remote action possible; needs IoT connectivity investigation."
+>
+> **Kirsty's free-text note:** "All equipment has gone off and not on, due to the clock changing it goes off at 8:30pm now and needs to be 9:30pm, site still has food going out, can someone call ASAP contact number is 07961239552 — Kirsty"
+>
+> **Tags:** ooh, tcat_support_request. **No ooh_p1.** Priority: normal.
+
+**Kirsty went through the connectivity flow, not the kitchen flow.** She knew this was a kitchen emergency and documented it in free-text, but the flow had already ended at `outcomeCaptured`. No P1 was offered or raised.
+
+---
+
+## R1: Site 6819 is Tuya-enabled (PROVEN)
+
+`data/tuya-sites.json` line 142: `"gk-6819": "eu1757586577803wcQHH"` — the site is in the Tuya live-mode registry. The live-mode flow path applies.
+
+---
+
+## The two bugs
+
+### Bug 1 — Primary (what caused the miss)
+
+**Location:** `public/js/flows.js:1866-1868`
+
+At line 1866, the code computes `offlineDevices` (kitchen circuits where `tuya.verdict === 'offline'`). If any offline device is found, it immediately sets `f.cat = 'connectivity'` and calls `FLOWR.connectivity` — before any service-criticality question has been asked.
+
+When any kitchen circuit is offline in live mode, the flow redirects unconditionally to the connectivity flow **before asking whether service is active**. The connectivity flow always exits as `outcomeCaptured` — "Equipment unreachable / needs IoT investigation." No P1 path exists.
+
+All-kitchen-offline during service is the most critical kitchen scenario. It should always be P1 if service is active. Instead, it exits as a normal ticket.
+
+### Bug 2 — Secondary (would trigger if devices weren't offline)
+
+**Location:** `public/js/flows.js:1864-1886` (live-mode stage 0) and `flows.js:1958-1961` (Verdict C)
+
+In live mode, after the offline check, the flow goes straight to the device picker with no service-criticality question. Verdict C (relay OFF, schedule says off — the DST state) tells the operator "it's scheduled off, try the override." Service-criticality is only asked after override failure.
+
+**Legacy mode contrast:** `flows.js:1855-1861` — asks crit at stage 0 immediately. A "yes" goes to P1 before any override step. Live mode has no equivalent.
+
+---
+
+## Code trace — the path Kirsty followed
+
+**Live mode (site 6819, 20:39 UTC):** `liveKs` is populated; `isLiveMode` is true. The flow computes `offlineDevices` at `flows.js:1866` — all circuits are offline (power cut by the DST-early schedule). Because `offlineDevices.length > 0`, the flow sets `f.cat = 'connectivity'` and calls `FLOWR.connectivity` at line 1867–1868. No service-criticality question, no P1 path. The connectivity flow exits as `outcomeCaptured` → ticket #51205.
+
+**Legacy mode (non-Tuya site, same scenario for comparison):** At `flows.js:1857`, `off` is computed from `ks.some(k => !k.online)`. If all circuits are offline, the same connectivity divert fires — the legacy path shares this gap for offline kitchen circuits. For reachable circuits, the legacy path at `flows.js:1859` asks "Is the kitchen needed for service right now?" and goes to P1 on yes. Live mode has no equivalent question in any reachable-device branch.
+
+Both modes share the "any-offline → connectivity" divert without a crit check first. Legacy mode asks crit for non-offline kitchen issues; live mode never does.
+
+---
+
+## Fix
+
+**One question, placed before the offline check, covers both bugs.**
+
+In `public/js/flows.js`, before the `offlineDevices` check at line 1866, insert a service-criticality gate. The gate checks if `f.data.crit` is unset — if so, render the question chip ("Is the kitchen needed for service right now?") and return. On re-entry: if crit is 1 (business-critical) and any offline device exists, call `outcomeP1` immediately with a kitchen-emergency subject and the override button tip in the script. If crit is 0 and offline devices exist, divert to the connectivity flow as today.
+
+In stage 1, before `verdictCard` is shown: if crit is 1 and verdict is A, C, D, or off-unknown, call `outcomeP1`. If crit is 0, show `verdictCard` with override guidance as today.
+
+**New tests:**
+- TF-159-01: live mode + offline circuit + crit:1 → `outcome-p1` (covers Kirsty's exact scenario)
+- TF-159-02: live mode + Verdict C + crit:1 → `outcome-p1` (covers the override-gate secondary gap)
+
+---
+
+## Volume impact (R3, accepted)
+
+Every Tuya kitchen call where the caller says service is active and any circuit is off or offline will now raise P1. This is the correct behaviour and aligns live-mode sites with legacy mode. Volume impact is bounded: only Tuya-enabled sites in data/tuya-sites.json, only OOH hours, only when the caller confirms service is active. Explicitly accepted.
+
+---
+
+## Related
+
+- OOHDASH-152: day-order fix (merged PR 164) — separate DST root cause
+- Tuya DST shift investigation (run mvp7xjqf) — separate fix for schedule clock drift
+- OOHDASH-134: "Something else" P1 flow — separate flow, not affected
+
+---
+
+*Investigation by ooh-triage-dashboard-R1-mvr5x7x6 · 2026-10-27*
+*Evidence: Zendesk #51205 | data/tuya-sites.json:142 | public/js/flows.js:1866-1868*
+
+
+---
+
+## Rework addendum — round 1 (discovery/draft)
+
+### Panel verdicts addressed
+
+**critical-thinker — Override tip in the offline branch**
+
+The concern is correct and the prior fix description was wrong. When `offlineDevices.length > 0`, the Lighthouse gateway is unreachable and "no remote action possible" — the on-site PowerPause override button cannot be triggered remotely and is irrelevant. Telling an operator in a live kitchen emergency that the override is "safe to use" wastes time on the worst call type. The fix scope is amended: the override tip must be **omitted entirely from the offline-branch P1 card**. It belongs only in the reachable-device branch (Verdict C/A/D/off-unknown), where the relay is addressable. The offline P1 card should say only: "P1 raised — kitchen offline during active service; IoT team dispatched." No override mention.
+
+**critical-thinker — Legacy-mode offline gap left silent**
+
+The code trace explicitly notes "the legacy path shares this gap for offline kitchen circuits" — meaning non-Tuya sites have an identical P1 miss when all kitchen circuits are offline and service is active. This was identified and then excluded from scope without a decision. That is not acceptable for a known P1 miss at peer sites. A new decision is added below (Decision: Legacy-mode offline gap) requiring the operator to choose: raise a separate ticket now, or explicitly accept the gap with a rationale. It cannot remain undecided.
+
+**critical-thinker — Decision split: Override advice by branch**
+
+The single "Override advice in P1 card" decision conflates two distinct situations with opposite correct answers. It is replaced by two branch-specific decisions with separate recommendations. The offline-branch decision has a clear recommended answer (OMIT — device unreachable) and so is no longer open for discussion unless the operator has reason to deviate. The reachable-device branch decision retains the original choice.
+
+---
+
+### Summary of additions
+
+**1. Override tip scoped out of the offline branch.**
+The P1 card content now differs by branch. Offline branch: P1 card contains subject line and IoT dispatch note only — no override tip. Reachable-device branch (Verdict C/A/D/off-unknown): P1 card contains subject line, IoT dispatch note, and the override tip. The fix description in the "Fix" section above is amended accordingly: the phrase "and the override button tip in the script" applies only to the reachable-device P1 outcome, not to the offline-device P1 outcome.
+
+**2. Legacy-mode offline gap given a decision.**
+A new decision is added requiring an explicit choice:
+
+> **DECISION: Legacy-mode offline gap (non-Tuya sites)** | Raise a new ticket now covering flows.js:1855-1861 offline divert (legacy path) — same crit-gate fix, scoped to non-Tuya sites (recommended) | Accept the gap for now: legacy-mode offline kitchen calls are low volume and IoT team handles them via connectivity ticket as today | Need more thought
+
+Until this decision is made, the gap is known and owned — it is not silently excluded.
+
+**3. Override decision split into two.**
+The single open decision is replaced:
+
+> **DECISION: Override tip — offline branch P1 card** | OMIT the override tip; device is unreachable, advice wastes time on a live P1 call (recommended) | Include it anyway — on-site staff may be able to press it physically without remote connectivity
+
+> **DECISION: Override tip — reachable-device branch P1 card (Verdict C/A/D)** | Include "The on-site PowerPause override button is safe to use in the meantime" (recommended) | Keep P1 card simple, omit override tip | Need more thought
+
+The first of these has a strong recommended answer driven by the offline evidence; the operator is asked to confirm or deviate. The second preserves the original open question for judgement.
