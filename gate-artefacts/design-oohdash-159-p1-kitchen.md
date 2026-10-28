@@ -2,6 +2,9 @@
 SECTION: Interactive prototype — click through the real screens
 The prototype is ../docs/project/mockups/OOHDASH-159-mockup.html, embedded in this review. It is built from the real OOH Dashboard screens, captured by running the app twice: once on today's code and once on a working copy of the proposed change. Every screen is the app's own output, not a drawing. A "Live today / Proposed" switch shows the before and after for four scenarios. 1: Kirsty's call, a Tuya site with the kitchen not reporting. 2: a Tuya site with a circuit reachable but off (Bain-marie, Fryer, Dishwasher, Several). 3: an older site with the kitchen not reporting. 4: an older site with the kitchen reachable, which is unchanged. Screens that differ from today are outlined in amber and marked "New or changed screen". A decision switch shows both answers to the open decision below. The same page is also published as its own web page at https://home-desktop-jb-new.tail30d2e6.ts.net/review/oohdash-159-mockup.html for viewing outside the PR.
 
+SECTION: Rev 2 — Record outcome warns that it raises a P1 (James review)
+From James's prototype review: before an agent records a P1, the confirm step must say plainly that recording raises a P1. Every P1 confirm step now shows a red notice under the outcome summary: "This raises a P1. Recording this outcome logs an urgent P1 ticket in the IoT Support dashboard, which pages the on-duty manager straight away." The button reads "Record outcome and raise P1" instead of "Record outcome". All P1 outcomes in the dashboard share this one confirm step (heating, hot water, lighting, kitchen, Something else), so the warning applies to every P1, consistently. Non-P1 outcomes keep the plain "Record outcome" button. The button test id (record-outcome) does not change. The notice has its own test id (p1-confirm-warning). One new e2e assertion: a P1 confirm step shows the warning and the new button label, and a captured (non-P1) confirm step does not.
+
 SECTION: What this design changes
 One file of product code (public/js/flows.js, the kitchen flow only) plus tests and one new fixture site. The caller is asked "Is the kitchen needed for service right now?" BEFORE the dashboard sends the call down a path that has no P1. A "Yes" raises a P1 straight away. A "No" carries on exactly as today. Three gaps are closed in one PR (D3 + D5): live-mode offline circuits, live-mode reachable-but-off circuits (verdicts A, C, D and off-unknown), and legacy-mode offline circuits. Same ooh_p1 P1 path and IoT Support Dashboard paging as every other P1 (D4). No server, infrastructure or ticket-type changes.
 
@@ -42,6 +45,17 @@ DECISION: Approve design and proceed to build? | Approve — proceed to build | 
 **Status:** Design — awaiting gate approval
 **Discovery:** PR #182 (merged 2026-10-28) — James decisions D1–D5 binding
 **Scope:** `public/js/flows.js` kitchen flow only, plus e2e tests and one fixture site. No server, infra or ticket-type changes.
+
+---
+
+## Rev 2 — the P1 confirm step says it raises a P1
+
+James's prototype review found the flow lacking: on the P1 routes, "Record outcome" gave no sign that pressing it raises a P1. The change is in `finishOutcome` (flows.js ~268), the confirm step every outcome passes through. When the outcome is a P1 (payload type `escalate-p1`, which every `outcomeP1` call sets):
+
+- A red notice sits under the outcome summary: **"🚨 This raises a P1.** Recording this outcome logs an urgent P1 ticket in the IoT Support dashboard, which pages the on-duty manager straight away."
+- The button reads **"Record outcome and raise P1"**.
+
+All P1s share this step, so the warning appears on every P1 across the dashboard, not only the kitchen ones. Non-P1 outcomes are unchanged. The test id `record-outcome` is kept, so existing tests still find the button; the notice carries `p1-confirm-warning`. One new e2e check: a P1 confirm step shows the notice and the new label, and a captured confirm step does not.
 
 ---
 
