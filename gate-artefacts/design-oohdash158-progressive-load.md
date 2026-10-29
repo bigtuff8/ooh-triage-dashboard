@@ -382,3 +382,120 @@ Four correctness changes are added to the design:
 **3. Server timeout + client give-up state specified.** `fetchTelemetry` is wrapped in a `Promise.race` with a 30s deadline (configurable via `TB_DEVICE_READ_TIMEOUT_MS`). On expiry the Promise rejects, `inFlightReads` entry is deleted, `perSiteCache` is not written. Client-side: after 5 consecutive poll failures or 45 seconds wall-clock (whichever comes first), the fast poll cancels and scope tiles transition to a `tile-error` state showing "Unable to load device data — please refresh" with a Refresh button. The silent `catch{}` is replaced by a failure counter and a ceiling. Three new test cases are added to cover these paths.
 
 **4. Concurrent same-site resolves use set-if-absent.** `inFlightReads.set(key, …)` is guarded by `if (!inFlightReads.has(key))`, so the first caller's Promise registration cannot be overwritten by a concurrent second `/resolve` for the same site. This prevents one Promise's `finally`-delete from orphaning another's registration.
+
+---
+
+## Rework addendum — round 2 (design/draft)
+
+### Panel verdicts addressed
+
+**critical-thinker — flow entry guard uses truthy check; `'error'` string breaks it**
+
+The guard `if (!state.workspace?.devicesReady)` treats any truthy value as "ready". `devicesReady === 'error'` is a non-empty string, so `!state.workspace?.devicesReady` evaluates to `false` — the guard **does not block** flow entry in the error state. Same flaw affects every render branch that tests `devicesReady` as a boolean shorthand.
+
+**Fix — all `devicesReady` reads must use strict `=== true` / `!== true`:**
+
+Flow entry guard (corrected):
+```js
+if (state.workspace?.devicesReady !== true) {
+    const msg = state.workspace?.devicesReady === 'error'
+        ? 'Unable to load device data — please refresh'
+        : 'Loading device data — available in a moment';
+    toast(msg);
+    return;
+}
+```
+
+Render branch conditions (corrected):
+```js
+// loading state
+if (devicesReady !== true && devicesReady !== 'error') { /* tile-loading */ }
+// error state
+if (devicesReady === 'error') { /* tile-error */ }
+// ready
+if (devicesReady === true) { /* normal tiles */ }
+```
+
+Drop-to-30s check (corrected):
+```js
+if (workspace.devicesReady === true && fastPoll) {
+    scheduleWorkspaceRefresh(false);
+}
+```
+
+Build must audit every location in `views.js` that reads `devicesReady` and confirm it uses strict equality — no truthy/falsy shorthand anywhere.
+
+---
+
+**critical-thinker — background telemetry Promise has no `.catch()`; rejection is unhandled**
+
+The async IIFE stored in `inFlightReads` has `try/finally`. `finally` deletes the Map entry and then the outer Promise still rejects. In the progressive path nobody awaits this Promise, so the rejection escapes the call stack — an `UnhandledPromiseRejection` log line, or a process crash under `--unhandled-rejections=throw` (Node 15+ default). This is exactly the failure path the timeout was added for.
+
+**Fix — split the stored reference from the swallowing subscriber:**
+
+```js
+const bgPromise = (async () => {
+    try {
+        const timeout = new Promise((_, reject) =>
+            setTimeout(() => reject(new Error('TB read timeout')), TB_TIMEOUT)
+        );
+        const full = await Promise.race([fetchTelemetry(matched), timeout]);
+        perSiteCache.set(key, { sites: buildFullResult(full, siteNamePromise), at: Date.now() });
+    } finally {
+        inFlightReads.delete(key);
+    }
+})();
+// Second subscriber — swallows the rejection so Node never sees it as unhandled.
+// Does not interfere with any /confirm awaiter on the same bgPromise reference.
+bgPromise.catch(err =>
+    console.error('[tb-device] background read failed for site', key, err.message)
+);
+inFlightReads.set(key, bgPromise);
+```
+
+The Map stores `bgPromise` — the original reference. Any `/confirm` that was already mid-`await` on this reference receives the rejection first (→ 503 via `wrap()`). The `.catch()` is a separate subscriber; it fires after `finally` and logs then swallows, ensuring Node does not report the rejection as unhandled. The two subscriptions are independent — one does not cancel or shadow the other.
+
+---
+
+**critical-thinker — `/confirm` await contract is contradictory; Phase 1a and 1b disagree**
+
+Phase 1a stated: "When `/confirm` calls `getSitesByNumber(siteNo)`: if `inFlightReads` has an entry, `await inFlightReads.get(key)`." That blocks `/confirm` for up to 15 seconds and kills the progressive feature. Phase 1b stated: "`/confirm` returns immediately." These cannot both be true. Addendum 1 corrected the readiness signal to `perSiteCache.has()` but did not explicitly retire the Phase 1a await description. Build was left holding two contradictory instructions.
+
+**Unambiguous contract — `/confirm` does not await `inFlightReads`. Ever.**
+
+```
+/confirm sequence:
+  1. confirmSite(siteNo) — writes the session token. Unchanged.
+  2. perSiteCache.has(String(siteNo)) — synchronous Map lookup. No await. No yield.
+  3. workspacePayload(site, devicesReady) — builds and returns the workspace object.
+  4. res.json(...) — responds immediately.
+
+/confirm never touches inFlightReads at execution time.
+/confirm never calls getSitesByNumber.
+The perSiteCache.has() check is a passive read of a separate Map — not a wait on the in-flight Promise.
+```
+
+The Phase 1a description of `/confirm` calling `getSitesByNumber` and awaiting `inFlightReads` is **superseded and deleted**. `getSitesByNumber` is used only by the `/workspace` polling route. The complete unambiguous `/confirm` implementation:
+
+```js
+router.post('/sites/:siteNo/confirm', wrap(async (req, res) => {
+    const siteNo = String(req.params.siteNo);
+    const { token, site } = await resolution.confirmSite(siteNo, req.session.operator);
+    const devicesReady = perSiteCache.has(siteNo);   // synchronous — no await
+    res.json({ confirmToken: token, workspace: await workspacePayload(site, devicesReady) });
+}));
+```
+
+If Build sees any form of `await inFlightReads` inside the `/confirm` route handler, that is a build error and must be raised before merge.
+
+---
+
+### Summary of additions
+
+Three correctness fixes are added to the design:
+
+**1. All `devicesReady` checks corrected to strict equality.** Every truthy/falsy guard in `views.js` — the flow entry guard, the render branch conditions, and the drop-to-30s check — is replaced with `=== true`, `!== true`, or `=== 'error'`. The `'error'` tri-state is a truthy string; the previous boolean shorthand evaluated it as "ready", allowing triage flows to open with no device data. Build must audit all `devicesReady` reads in `views.js` and confirm strict equality is used at every point before merge.
+
+**2. Background Promise `.catch()` added as a separate subscriber.** The async IIFE is assigned to `bgPromise` before being stored in the Map. A `.catch()` is chained on `bgPromise` as an independent second subscriber that logs and swallows the error. The Map stores the original `bgPromise` reference, so any `/confirm` awaiter still receives the rejection through the existing `wrap()` 503 path. The two subscribers are independent; neither cancels the other. This closes the unhandled-rejection risk on the timeout and TB-error paths without altering the server error-response behaviour.
+
+**3. `/confirm` await contract stated once, unambiguously, as a Build gate.** The Phase 1a description of `/confirm` awaiting `inFlightReads` is explicitly retired. The complete route implementation is given above. `/confirm` performs one synchronous `perSiteCache.has()` lookup and returns immediately — it never awaits `inFlightReads` and never calls `getSitesByNumber`. Any `await inFlightReads` found in the `/confirm` route during build is a build error and must be raised before merge.
