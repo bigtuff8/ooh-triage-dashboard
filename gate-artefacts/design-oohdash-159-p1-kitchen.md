@@ -207,7 +207,7 @@ The concern is correct: if a Zendesk status is renamed, a ticket is merged into 
 | Unknown or renamed status | 200 with unrecognised value | "Being handled by the IoT team" |
 | Ticket merged (target ticket survives; merged ticket gets status `closed` + `merged` tag) | 200, status `closed`, tag `merged` | "Merged with another ticket — being handled by the IoT team" |
 | Ticket deleted | 404 | "Ticket no longer available" |
-| Zendesk API error or timeout | 4xx / 5xx / timeout | "Status unavailable — check Zendesk if this is urgent" |
+| Zendesk API error or timeout | 4xx / 5xx / timeout | "Status not available right now" (OOH agents have no Zendesk access, so never point them there) |
 | Call record linked to a ticket that was later re-tagged or split | Any of the above | Same fallbacks; the endpoint never surfaces a raw Zendesk status string to the UI |
 
 The mapping table above is added to the data dictionary as the `ticketStatusMap` contract. Build must treat any value outside the left column as the "unknown status" fallback — the mapping is a closed list, not a catch-all `toString()`. The IoT team should be made aware (open flag 5 below) that renaming a status in Zendesk will degrade in-app display to the generic phrase until the map is updated in code; this is a one-line change and does not require a design revision.
