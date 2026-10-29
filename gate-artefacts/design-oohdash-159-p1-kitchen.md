@@ -223,3 +223,45 @@ Three concrete additions resolve the block:
 **2. Durable-state idle sweep with conditional write** (addresses the multi-replica verdict fully). The sweep performs a Cosmos point-read per candidate call before finalising, and uses a conditional patch to prevent double-finalisation under concurrent replicas. No in-memory timestamp is trusted for the finalise decision. Design is safe at any replica count.
 
 **3. Ticket status fallback map** (addresses the status-vocabulary verdict). The `ticketStatusMap` is defined as a closed mapping from Zendesk status values to plain-English phrases, with explicit entries for merged tickets, deleted tickets, API failures, and unknown values. The API never surfaces a raw Zendesk status to the UI. A new open flag (5) asks the IoT team to notify the development team if any Zendesk status is renamed, so the map can be updated.
+
+---
+
+## Rework addendum — round 2 (design/draft)
+
+### Panel verdicts addressed
+
+**Critical-thinker — `visibilitychange→hidden` fires on alt-tab and on opening the guide link, triggering erroneous finalisation**
+
+The concern is correct and the design was wrong. `visibilitychange→hidden` fires whenever the agent switches to another window or opens any new tab — including the PowerPause guide that every override step mandates. The previous spec described "leaving the screen" as the trigger but used `visibilitychange` as the implementation detail, which is too broad by exactly the width of the problem.
+
+Fix: "Left the screen" finalisation uses `pagehide` (the actual-unload event), not `visibilitychange`. The heartbeat runs unconditionally while the call record is open, regardless of `document.visibilityState`.
+
+| Event | Meaning | Heartbeat | Finalise |
+|---|---|---|---|
+| `visibilitychange` → hidden | Tab backgrounded; agent alt-tabbed or opened guide | Continues | No |
+| `visibilitychange` → visible | Tab foregrounded | Continues | No |
+| `pagehide` (persisted: false) | Tab closed or URL navigated away | Stop | Yes — keepalive fetch |
+| `pagehide` (persisted: true) | Tab entering bfcache | Continues (resumes on `pageshow`) | No |
+| `beforeunload` | Belt-and-braces unload | Stop | Keepalive backup |
+
+`setInterval` and `fetch` continue to run in backgrounded tabs in all major browsers; there is no suppression on hide. The heartbeat gap that the idle sweep looks for can only occur if the tab is genuinely gone.
+
+This also resolves the third finding (heartbeat-only-while-visible): because the heartbeat is never gated on visibility, a hidden-but-open tab — the agent on a P1, switching between this dashboard and other systems — continues generating heartbeats every two minutes for the full idle window. The idle sweep sees a recent `lastHeartbeatAt` and does not finalise.
+
+**Critical-thinker — Silent data-loss when a still-open tab receives 'already' after an erroneous finalise**
+
+Round 1 described same-operator resume at site-confirm, which covers the agent who navigates to a different site and returns. It does not cover the agent whose tab is still open when the call record was finalised in the background (for example, a heartbeat gap during a brief network drop triggered the sweep). In that state the agent continues clicking through the journey; the server silently returns `200 already`; the rest of the call is never recorded.
+
+Fix: the API distinguishes two cases. A known duplicate (the same issueKey and journey state already on the finalised record) returns `200 already` — silent no-op, correct. An unknown issue arriving on a finalised record from the same operator returns `409 Conflict { reason: "call-already-finalised", callId }`. The 409 is the signal that the tab is disconnected from a live call record.
+
+On receiving a 409, the browser shows a non-blocking in-tab recovery banner below the site header — no navigation, no modal, no interruption to the screen the agent is on. It reads: "This call was saved automatically — if you need to add anything, click Continue to reopen it." One button: Continue. The button sends `POST /api/calls/:id/reopen` (same-operator, two-hour window). While the call is in the disconnected state, writes are queued in the browser. On reopen they are replayed in order; the call record continues as if the interruption had not occurred. If the agent ignores the banner and closes the tab, the already-saved record stands — no further data-loss beyond what was unsaved at the moment of mis-finalisation.
+
+### Summary of additions
+
+Three targeted changes resolve all three findings:
+
+**1. Redefine "left the screen" as `pagehide`, not `visibilitychange`.** The heartbeat is not gated on visibility — it runs at all times while the call record is open. Only `pagehide` (persisted: false) triggers the keepalive finalise. The data-dictionary row for `finalReason: left-screen` is annotated accordingly: *fired by pagehide (persisted: false); visibilitychange triggers nothing*. The heartbeat row is updated: *sent unconditionally while the call record is open; not paused on visibilitychange→hidden*. Test R5-11 is amended: the trigger must be actual tab closure (not switching windows), and a parallel test R5-11b should confirm that switching to the guide tab and back does not finalise the call.
+
+**2. In-tab recovery banner on `409 Conflict`.** The API returns `409 Conflict` — not silent `200 already` — when a progress or finalise write arrives for an unknown issue on a finalised call record from the same operator. The browser shows a non-blocking banner with a single Continue button. `POST /api/calls/:id/reopen` re-opens the record within a two-hour, same-operator window. Local writes are queued and replayed on reopen. New data-dictionary entries: `/api/calls/:id/reopen` (POST, sign-in and operator-bound, two-hour window); `call-already-finalised` (409 reason code); `callReconnectQueue` (browser-side queue of pending writes, flushed on reopen or discarded on tab close). New test R5-19: confirm site, force an erroneous finalise (OOH_CALL_IDLE_MIN=0 with heartbeat suppressed in test harness), continue a journey step in the same open tab, verify the 409 banner appears, press Continue, verify subsequent writes are recorded on the reopened record and the final call record is complete.
+
+**3. Clarification of the same-operator resume scope.** Same-operator resume (round-1 addition, triggered at site-confirm) and in-tab recovery (this addition, triggered by a 409 in the open tab) are complementary and non-overlapping paths. Same-operator resume covers: agent navigates away and returns to the site-confirm flow. In-tab recovery covers: agent's tab remains open throughout. Together they close the mis-finalisation gap completely.
