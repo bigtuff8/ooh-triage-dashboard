@@ -5,6 +5,9 @@ The prototype is ../docs/project/mockups/OOHDASH-159-mockup.html, embedded in th
 SECTION: Rev 2 — Record outcome warns that it raises a P1 (James review)
 From James's prototype review: before an agent records a P1, the confirm step must say plainly that recording raises a P1. Every P1 confirm step now shows a red notice under the outcome summary: "This raises a P1. Recording this outcome logs an urgent P1 ticket in the IoT Support dashboard, which pages the on-duty manager straight away." The button reads "Record outcome and raise P1" instead of "Record outcome". All P1 outcomes in the dashboard share this one confirm step (heating, hot water, lighting, kitchen, Something else), so the warning applies to every P1, consistently. Non-P1 outcomes keep the plain "Record outcome" button. The button test id (record-outcome) does not change. The notice has its own test id (p1-confirm-warning). One new e2e assertion: a P1 confirm step shows the warning and the new button label, and a captured (non-P1) confirm step does not.
 
+SECTION: Rev 3 — circuit cards separate guidance from the words to say (James review)
+From James's prototype review: the kitchen circuit cards mixed notes for the agent with words to say to the customer in one quoted block. Every live circuit card (should have come on, on as expected, scheduled off, no schedule, on but no power, always-on, on outside hours, schedule unreadable) is now split using the dashboard's existing standard from OOHDASH-144. First the reading in the headline. Then "Good to know (for you, not the customer)": what the reading means and what to do next. Then "Say to the customer": plain words the agent can read out. Two small wording fixes on the same cards: the "ON as expected" headline no longer shows "until ?" when there is no next off time, and the "Caller still says it's our problem" button now says "Customer". The flow, buttons and outcomes do not change. Test ids are kept.
+
 SECTION: What this design changes
 One file of product code (public/js/flows.js, the kitchen flow only) plus tests and one new fixture site. The caller is asked "Is the kitchen needed for service right now?" BEFORE the dashboard sends the call down a path that has no P1. A "Yes" raises a P1 straight away. A "No" carries on exactly as today. Three gaps are closed in one PR (D3 + D5): live-mode offline circuits, live-mode reachable-but-off circuits (verdicts A, C, D and off-unknown), and legacy-mode offline circuits. Same ooh_p1 P1 path and IoT Support Dashboard paging as every other P1 (D4). No server, infrastructure or ticket-type changes.
 
@@ -45,6 +48,23 @@ DECISION: Approve design and proceed to build? | Approve — proceed to build | 
 **Status:** Design — awaiting gate approval
 **Discovery:** PR #182 (merged 2026-10-28) — James decisions D1–D5 binding
 **Scope:** `public/js/flows.js` kitchen flow only, plus e2e tests and one fixture site. No server, infra or ticket-type changes.
+
+---
+
+## Rev 3 — circuit cards: "Good to know" split from "Say to the customer"
+
+James's review found that the circuit cards mixed agent guidance and customer wording in one quoted block. Every live circuit card in `verdictCard` (flows.js ~1940) now uses the dashboard's existing OOHDASH-144 blocks, in this order: the reading (headline), **ℹ Good to know (for you, not the customer)** (`gtk-block`), then **🗣 Say to the customer** (`say-block`). Then come the buttons and the live reading, as today.
+
+| Card | Good to know (agent) | Say to the customer |
+|---|---|---|
+| A — should have come on | It should have come on at [time] but hasn't started; one press of the PowerPause override brings it on. | "Your [circuit] should have come on at [time] but it hasn't started by itself. There's an override button on the front of the PowerPause unit. Press it once and it should come on straight away." |
+| B / always-on / on outside hours — on as expected | Power is reaching it; if it isn't working it's the appliance, so the site's repairs team. | "The [circuit] has power and is switched on at our end. If it still isn't working, it's most likely a fault with the appliance itself, so please contact your repairs team." |
+| C — scheduled off | Normal: scheduled off until [time]; the override brings it on early and it goes back to normal at the next change. | "The [circuit] is off because it's scheduled to be off at this time. It's due to come on at [time]. If you need it now, press the override button on the front of the PowerPause unit once and it will come on early. It'll go back to its normal times after that." |
+| D — no schedule, off | Meant to stay on; off suggests a trip, so check the fuse board first. | "The [circuit] is meant to stay on all the time, so it may have tripped. Could you check the fuse board first? If everything looks fine there, let me know and I'll pass it to our IoT team." |
+| E — on, no power drawn | On at our end but drawing nothing; tripped or switched off at the unit, so an appliance fault for the repairs team. | "The [circuit] has power at our end, but the appliance isn't drawing any. Please check it hasn't been switched off on the appliance itself. If it's switched on and still won't work, it's a fault with the appliance, so please contact your repairs team." |
+| Schedule unreadable, off | The schedule can't be read, so we can't tell if off is expected; the override brings it on. | "I can see the [circuit] is off, but I can't see its schedule right now. Press the override button on the front of the PowerPause unit once and it should come on straight away." |
+
+Also on these cards: the "ON as expected" headline reads "Schedule: on since [time]" when there is no next off time (it showed "until ?"), and "Caller still says it's our problem" becomes "Customer still says it's our problem" (button and call-trail line). Test ids are unchanged.
 
 ---
 
