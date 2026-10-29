@@ -499,3 +499,143 @@ Three correctness fixes are added to the design:
 **2. Background Promise `.catch()` added as a separate subscriber.** The async IIFE is assigned to `bgPromise` before being stored in the Map. A `.catch()` is chained on `bgPromise` as an independent second subscriber that logs and swallows the error. The Map stores the original `bgPromise` reference, so any `/confirm` awaiter still receives the rejection through the existing `wrap()` 503 path. The two subscribers are independent; neither cancels the other. This closes the unhandled-rejection risk on the timeout and TB-error paths without altering the server error-response behaviour.
 
 **3. `/confirm` await contract stated once, unambiguously, as a Build gate.** The Phase 1a description of `/confirm` awaiting `inFlightReads` is explicitly retired. The complete route implementation is given above. `/confirm` performs one synchronous `perSiteCache.has()` lookup and returns immediately — it never awaits `inFlightReads` and never calls `getSitesByNumber`. Any `await inFlightReads` found in the `/confirm` route during build is a build error and must be raised before merge.
+
+---
+
+## Rework addendum — round 1 (design/committee)
+
+### Panel verdicts addressed
+
+**technical** — *Design sound and well-reworked, but the riskiest async path on a universal route ships untested; three concrete build gaps.*
+
+The panel identifies four concrete gaps. Each is addressed below.
+
+---
+
+**Gap 1 — Phase 1a async coordination has zero automated coverage**
+
+The test plan's claim that `inFlightReads` coordination is "covered by the integration path" is incorrect and is retired. Fixture mode is synchronous; `fetchTelemetry` returns immediately; `inFlightReads` is never populated. No fixture-mode or Playwright test exercises the async coordination paths. Four unit tests over `fetchLiveSitesByNumber` are required before build, using a mocked `fetchTelemetry` and fake timers:
+
+| Unit test | Mock setup | Assertion |
+|---|---|---|
+| Set-if-absent under concurrency | Two calls to `fetchLiveSitesByNumber(siteNo)` fired before any mock resolves | `inFlightReads` has exactly one entry for the key; `fetchTelemetry` was called exactly once |
+| Timeout-reject path | `fetchTelemetry` never resolves; fake timers advance past `TB_TIMEOUT` | `inFlightReads` entry is deleted; `perSiteCache` has no entry for the key |
+| Concurrent-resolve: `perSiteCache` write on settlement | `fetchTelemetry` resolves after 100 ms; two concurrent calls in flight | `perSiteCache` is written exactly once; its `sites` field matches `buildFullResult` output |
+| Background `.catch()` suppresses unhandled rejection | `fetchTelemetry` rejects immediately | No `UnhandledPromiseRejection` event fires; `console.error` is called with the site key and error message |
+
+These tests run in the unit suite, not in Playwright. The timeout-reject test must also cover a hang inside `buildFullResult` (see Gap 2).
+
+---
+
+**Gap 2 — `Promise.race` bounds only `fetchTelemetry`; Tuya read and `siteNamePromise` are outside the deadline**
+
+The addendum-1 timeout code:
+
+```js
+const full = await Promise.race([fetchTelemetry(matched), timeout]);
+perSiteCache.set(key, { sites: buildFullResult(full, siteNamePromise), at: Date.now() });
+```
+
+`buildFullResult` awaits `siteNamePromise` (Zendesk name lookup) and may perform a Tuya read. Both are outside the race. A hung Tuya or Zendesk call holds the async IIFE open indefinitely: `finally` only fires when the body exits, so `inFlightReads` is never cleared and `perSiteCache` is never written.
+
+**Fix — race must wrap the entire background operation:**
+
+```js
+if (!inFlightReads.has(key)) {
+    const bgPromise = (async () => {
+        try {
+            const doAll = async () => {
+                const full = await fetchTelemetry(matched);
+                return buildFullResult(full, siteNamePromise); // awaits Tuya + ZD name
+            };
+            const timeout = new Promise((_, reject) =>
+                setTimeout(() => reject(new Error('TB read timeout')), TB_TIMEOUT)
+            );
+            const result = await Promise.race([doAll(), timeout]);
+            perSiteCache.set(key, { sites: result, at: Date.now() });
+        } finally {
+            inFlightReads.delete(key);
+        }
+    })();
+    bgPromise.catch(err =>
+        console.error('[tb-device] background read failed for site', key, err.message)
+    );
+    inFlightReads.set(key, bgPromise);
+}
+```
+
+`doAll()` wraps the full chain. `Promise.race` pits the entire operation against `TB_TIMEOUT`. A hang anywhere inside `doAll()` — including `siteNamePromise` and the Tuya read — now hits the same ceiling. The timeout-reject unit test (Gap 1) must include a variant where `buildFullResult` is the hang point, not `fetchTelemetry`.
+
+---
+
+**Gap 3 — `/workspace` await contract unspecified**
+
+Addendum 2 retired the `/confirm`-awaits-`inFlightReads` description but never stated the equivalent contract for `/workspace`. The route calls `getSitesByNumber` — it is ambiguous whether that blocks on `inFlightReads`. If it does, a 2 s poll call hangs for up to 30 s on the first fire, defeating fast-poll entirely.
+
+**Unambiguous contract — `/workspace` also never awaits `inFlightReads`:**
+
+```js
+router.get('/sites/:siteNo/workspace', wrap(async (req, res) => {
+    const siteNo = String(req.params.siteNo);
+    // ... existing confirmToken validation (unchanged) ...
+    const cached = perSiteCache.get(siteNo);
+    const devicesReady = !!cached && (Date.now() - cached.at) < SESSION_CACHE_TTL_MS;
+    const site = devicesReady ? cached.sites[0] : req.session.preliminarySite;
+    res.json({ workspace: await workspacePayload(site, devicesReady) });
+}));
+```
+
+`/workspace` performs the same synchronous TTL-aware `perSiteCache` check as `/confirm`. It does not call `getSitesByNumber`. It does not touch `inFlightReads`. When `devicesReady` is `false`, the `site` object comes from `req.session.preliminarySite` — the preliminary site object stashed in session at `/resolve` time so that `workspacePayload` can construct Zendesk tickets, Cosmos holds, and `anyOffline` from non-TB sources without re-running the TB textSearch. Build must confirm that `workspacePayload` accepts the preliminary shape with `scope: []` and produces a valid partial workspace object. If it cannot, the session stash is the resolution; there is no other path.
+
+Any `await inFlightReads.get(...)` or `await getSitesByNumber(...)` inside the `/workspace` handler is a build error and must be raised before merge.
+
+---
+
+**Gap 4 — `perSiteCache` TTL unspecified; `devicesReady` mid-session flip has no recovery**
+
+The design never stated `perSiteCache`'s TTL. If the cache expires during an active 30 s polling session, `/workspace` returns `devicesReady: false`, the client re-renders scope tiles as greyed-and-loading, and the poll stays at 30 s with no recovery path and no server-side re-warm.
+
+**Two-part fix:**
+
+*(a) Specify `perSiteCache` TTL.* A `SESSION_CACHE_TTL_MS` env var (default `1_200_000` — 20 minutes) governs the TTL check used in both `/confirm` and `/workspace` (the `(Date.now() - cached.at) < SESSION_CACHE_TTL_MS` expression shown in Gap 3). Twenty minutes exceeds any realistic single-site call-handling session. The threshold is configurable without a deploy.
+
+*(b) Client re-enters fast-poll if `devicesReady` flips false during 30 s polling.* `scheduleWorkspaceRefresh` is amended:
+
+```js
+if (workspace.devicesReady !== true && !fastPoll) {
+    scheduleWorkspaceRefresh(true);  // re-enter fast-poll; resets the 45 s ceiling
+    if (state.view === 'site') render();
+    return;
+}
+```
+
+When re-entering fast-poll, the server must also re-warm the cache. `/workspace` triggers a new background warm when `perSiteCache` is cold and `inFlightReads` has no entry:
+
+```js
+if (!devicesReady && !inFlightReads.has(siteNo)) {
+    warmCacheIfCold(siteNo, req.session.preliminarySite);
+    // warmCacheIfCold: the set-if-absent inFlightReads block from fetchLiveSitesByNumber,
+    // extracted into a shared helper callable from both the resolve and workspace paths
+}
+```
+
+`warmCacheIfCold(siteNo, preliminarySite)` is the `inFlightReads` set-if-absent block from `fetchLiveSitesByNumber` extracted into module scope. `req.session.preliminarySite` carries the TB-matched stubs stashed at `/resolve` time; `fetchTelemetry` can be re-fired from them without repeating the textSearch. Two new tests cover this path:
+
+| Test | Setup | Assertion |
+|---|---|---|
+| Unit: TTL expiry triggers re-warm | `fetchLiveSitesByNumber` settles, fake timers advance past `SESSION_CACHE_TTL_MS`, then call `/workspace` | `inFlightReads` is populated (re-warm triggered); response returns `devicesReady: false` |
+| Playwright e2e: mid-session flip recovery | Stub `/workspace` to return `devicesReady: false` on one 30 s poll cycle after initial unlock | Tiles temporarily re-enter loading state; fast-poll resumes; tiles unlock on subsequent `devicesReady: true` response |
+
+---
+
+### Summary of additions
+
+Four technical gaps are closed in this addendum:
+
+**1. Unit tests specified for all Phase 1a async coordination paths.** The "covered by the integration path" claim is retired. Four unit tests are added: set-if-absent under concurrency, timeout-reject (with `fetchTelemetry` as the hang point and with `buildFullResult` as the hang point), concurrent-resolve cache write, and background `.catch()` suppression. All run in the unit suite with mocked `fetchTelemetry` and fake timers, before build.
+
+**2. `Promise.race` extended to bound the entire background operation.** The previous race covered `fetchTelemetry` only. `buildFullResult` — which awaits `siteNamePromise` (Zendesk) and may perform a Tuya read — was outside the deadline. The race is rewritten as `Promise.race([doAll(), timeout])` where `doAll()` wraps the full chain. A hung Tuya or Zendesk call now hits the same `TB_TIMEOUT` ceiling as a hung TB read.
+
+**3. `/workspace` await contract stated explicitly.** `/workspace` performs a synchronous TTL-aware `perSiteCache` check — no await, no `inFlightReads` touch. The full implementation is given above. When `devicesReady` is `false`, the `site` object comes from `req.session.preliminarySite`, stashed at `/resolve` time. Build must confirm `workspacePayload` accepts the preliminary shape; if it does not, the session stash is the resolution. Any `await inFlightReads.get(...)` in the `/workspace` handler is a build error.
+
+**4. `perSiteCache` TTL specified; mid-session flip recovery designed.** `SESSION_CACHE_TTL_MS` (default 20 minutes, env-configurable) governs the TTL check in both routes. If the cache expires mid-session during 30 s polling, the client re-enters fast-poll mode and `/workspace` triggers a re-warm via `warmCacheIfCold()` — a shared helper extracted from `fetchLiveSitesByNumber` — using the `preliminarySite` stashed in session. Two new tests (one unit, one Playwright) cover the TTL expiry and recovery path.
