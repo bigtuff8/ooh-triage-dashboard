@@ -265,3 +265,64 @@ Three targeted changes resolve all three findings:
 **2. In-tab recovery banner on `409 Conflict`.** The API returns `409 Conflict` — not silent `200 already` — when a progress or finalise write arrives for an unknown issue on a finalised call record from the same operator. The browser shows a non-blocking banner with a single Continue button. `POST /api/calls/:id/reopen` re-opens the record within a two-hour, same-operator window. Local writes are queued and replayed on reopen. New data-dictionary entries: `/api/calls/:id/reopen` (POST, sign-in and operator-bound, two-hour window); `call-already-finalised` (409 reason code); `callReconnectQueue` (browser-side queue of pending writes, flushed on reopen or discarded on tab close). New test R5-19: confirm site, force an erroneous finalise (OOH_CALL_IDLE_MIN=0 with heartbeat suppressed in test harness), continue a journey step in the same open tab, verify the 409 banner appears, press Continue, verify subsequent writes are recorded on the reopened record and the final call record is complete.
 
 **3. Clarification of the same-operator resume scope.** Same-operator resume (round-1 addition, triggered at site-confirm) and in-tab recovery (this addition, triggered by a 409 in the open tab) are complementary and non-overlapping paths. Same-operator resume covers: agent navigates away and returns to the site-confirm flow. In-tab recovery covers: agent's tab remains open throughout. Together they close the mis-finalisation gap completely.
+
+---
+
+## Rework addendum — round 1 (design/committee)
+
+### Panel verdicts addressed
+
+**Security — IDOR on GET /api/tickets/:id/view**
+
+The concern is correct. The previous spec stated only "requires sign-in" as the authz condition, which allows any authenticated agent to enumerate `:id` and read subject, status and thread of any Zendesk ticket — including tickets from non-OOH calls and unrelated sites.
+
+Fix: the endpoint applies three-layer server-side scoping, all evaluated before any Zendesk API call is made:
+
+1. **OOH-tag filter.** The ticket must carry the `ooh` tag (fetched from Zendesk). Tickets without it are rejected with 403. This excludes all non-OOH tickets regardless of the `:id` supplied.
+2. **Operator-session scope.** The ticket must appear in a call record owned by the requesting operator, or be linked to the current session's confirmed site. A ticket the operator has never touched is rejected with 403, not 404 — returning 404 would let an enumerator confirm non-existence.
+3. **In-session site scope (tighter, when a call is active).** If the request arrives while the operator has a live call record, the ticket's `siteNo` must match the call record's `siteNo`. This prevents tab-reuse across sites leaking cross-site data.
+
+The data-dictionary row for `/api/tickets/:id/view` is updated from "requires sign-in" to: *sign-in required; ticket must carry `ooh` tag; ticket must be linked to a call record owned by the requesting operator or to the current session's confirmed site; 403 on any scope failure, never 404 on an auth failure, to prevent enumeration.*
+
+**Security — Unspecified output encoding for free-text sinks**
+
+The concern is correct. Five sinks accept text from the agent or relayed from the customer, and all are rendered into HTML or inserted into Zendesk:
+
+| Sink | Source | Rendered into |
+|---|---|---|
+| Notes box | agent-typed | Zendesk comment body; `/ticket/:id` thread |
+| "Which equipment is it?" (not-on-list) | agent-typed / customer-reported | Zendesk comment body; screen dump |
+| Timetable fields (days, times, anything else) | agent-typed | Zendesk comment body; confirmation card |
+| `/ticket/:id` thread | Zendesk comment content (agent, IoT team) | HTML page |
+| Screen dump | all of the above | server-generated HTML |
+
+Fix, as a build condition — context-aware escaping is mandatory at every sink:
+
+- **HTML contexts** (`/ticket/:id`, screen dump, confirmation cards): all free-text values must be HTML-entity-encoded before insertion. DOM writes must use `textContent`, never `innerHTML`; server-rendered templates must pass every variable through the project's existing server-side HTML escape helper. If no such helper exists it must be created — this is a build pre-condition, not optional cleanup.
+- **Zendesk comment body**: free-text values inserted into Zendesk comments must be wrapped in a code fence or otherwise escaped for Markdown to prevent injection of formatting (links, images, embedded HTML) that Zendesk renders in its own UI.
+
+A build pre-condition is added as open flag 6: *Encoding audit required before merge. Review every template and DOM write that touches the five `FreetextSinks` entries in the data dictionary. A code-review checklist item must be signed off by the build lead before the PR is merged.*
+
+The `FreetextSinks` entry is added to the data dictionary (see summary below).
+
+**Security — OohCallRecords retention/access and server-side auth on /ticket/:id and the guide**
+
+Three minor items, each addressed:
+
+1. **OohCallRecords RBAC.** The data dictionary already states "same as OohAuditLog; internal only." Open flag 7 is added: Spencer must confirm the Cosmos RBAC policy for the new `OohCallRecords` container matches `OohAuditLog` — specifically that no public or cross-tenant read role is granted — before release.
+2. **Server-side auth on `/ticket/:id`.** The data-dictionary entry previously said "requires sign-in" without specifying enforcement. It is updated: *enforced server-side by the same auth middleware as `/api/tickets/:id/view`; unauthenticated requests receive a redirect to sign-in, not a 401 that leaks page structure.* UI-routing alone is not sufficient.
+3. **Server-side auth on the guide.** `/guides/powerpause-contractor-info.html` is a static file. Static files served from `public/` are unauthenticated by default. The data-dictionary entry says "requires sign-in" — this must be enforced by the serving layer (a middleware guard, or placing the file outside `public/` under an auth-gated handler). Open flag 8 is added: *if the static server cannot enforce per-file auth, the guide must be moved to a server-rendered route before release.*
+
+---
+
+### Summary of additions
+
+Four targeted additions resolve all three security findings:
+
+**1. Three-layer IDOR scope on `/api/tickets/:id/view`.** The endpoint now requires: (a) sign-in, (b) `ooh` tag present on the ticket, (c) the ticket linked to a call record owned by the requesting operator or to the current session's confirmed site. All scope failures return 403 with no 404 fallback to prevent enumeration. The data-dictionary entry is updated to reflect all three layers explicitly.
+
+**2. Context-aware escaping as a named build condition.** Five free-text sinks are catalogued in a new data-dictionary entry, `FreetextSinks`, each with its mandatory encoding rule: `textContent`/entity-encoding for HTML contexts; code-fence or Markdown escaping for Zendesk comment bodies; server-side escape helper for the screen dump. Open flag 6 makes an encoding audit and build-lead sign-off a merge pre-condition.
+
+**3. OohCallRecords RBAC confirmation.** Open flag 7 asks Spencer to verify the Cosmos RBAC policy for the new container matches `OohAuditLog` before go-live.
+
+**4. Server-side auth confirmed for `/ticket/:id` and the guide.** Both data-dictionary entries are updated from the vague "requires sign-in" to explicit statements of server-side middleware enforcement and redirect behaviour for unauthenticated requests. Open flag 8 covers the guide's static-serving risk and requires a route change if the static server cannot enforce per-file auth.
