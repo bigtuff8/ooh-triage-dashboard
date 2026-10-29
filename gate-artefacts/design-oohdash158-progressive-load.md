@@ -348,6 +348,100 @@ Five specification gaps are closed in this addendum.
 
 **5. Session TTL alignment and timeout env var scope documented.** Minimum required session TTL is stated as SESSION_CACHE_TTL_MS (20 min); Build must verify before merge. TB_DEVICE_READ_TIMEOUT_MS receives a code comment listing all three services it bounds; a release checklist note is added.
 
+---
+
+## Rework addendum — round 3 (design/committee)
+
+### Panel verdicts addressed
+
+**critical-thinker — in-process state assumes single-replica; cost claim is wrong under multi-replica; /confirm and /workspace readiness checks are inconsistent**
+
+Three findings, all addressed below.
+
+---
+
+*Finding 1 — in-process state (`inFlightReads`, `perSiteCache`) requires a topology assertion.*
+
+`inFlightReads` and `perSiteCache` are module-level Maps: they live in the memory of whichever process serves the request. Under a multi-replica deployment with round-robin load balancing, the background read warms only the resolve pod's cache. A subsequent `/workspace` poll routed to a different replica finds `perSiteCache` cold, returns `devicesReady: false`, triggers another `warmCacheIfCold`, and the cycle repeats for every cold replica. The design never stated the topology it depends on.
+
+**Design position — single-replica or session affinity required:**
+
+This feature is correct only when all requests for a given operator session are served by the same process. That is satisfied by either:
+
+(a) **Single-replica deployment (current).** The live OOH triage dashboard runs as a single-pod Kubernetes deployment. Under this topology the in-process Maps are authoritative and no cross-pod coordination is needed.
+
+(b) **Session affinity (sticky sessions).** If the deployment is ever scaled to multiple replicas, Kubernetes session affinity must be enabled on the Service or Ingress (`sessionAffinity: ClientIP` or cookie-based via the Ingress). Without it, this feature cannot deliver a correct `devicesReady` signal across replicas.
+
+Build gate items before merge:
+
+```
+kubectl get deployment <deployment-name> -n <namespace> -o jsonpath='{.spec.replicas}'
+```
+
+If the replica count is 1, no further action. If it is >1, session affinity must be confirmed before the PR merges. The build PR description must include the observed replica count. A startup-time assert is not required for this PR, but a comment in `tb-device.js` at the `inFlightReads` declaration must read:
+
+```js
+// inFlightReads and perSiteCache are per-process in-memory Maps.
+// This feature requires single-replica deployment or Kubernetes session affinity.
+// Scaling to >1 replica without sticky sessions will produce flip-flop devicesReady signals.
+const inFlightReads = new Map();
+```
+
+---
+
+*Finding 2 — cost evaluation conditioned on topology.*
+
+The cost section claimed "one TB read per site open, bounded." That claim is correct under single-replica deployment. Under multi-replica without session affinity it would become one TB read per cold replica per site open — unbounded as the replica count grows. The amended cost statement:
+
+Under the current single-replica deployment: one TB read per site open, bounded, identical to the existing load. Under a future multi-replica deployment: this feature requires session affinity to remain bounded; without it, the cost multiplies by replica count. The deployment topology gate (Build item above) enforces the bounded claim before any replica-count change can ship.
+
+---
+
+*Finding 3 — readiness check inconsistency between `/confirm` and `/workspace`.*
+
+The addendum-1 correction introduced `perSiteCache.has(siteNo)` in `/confirm` (bare existence check, no TTL) while Gap-3 introduced a TTL-aware `(Date.now() - cached.at) < SESSION_CACHE_TTL_MS` check in `/workspace`. An expired-but-present cache entry makes `/confirm` report `devicesReady: true` (stale data) while `/workspace` reports `devicesReady: false` (correctly expired). The client receives contradictory signals within a single 2s poll cycle.
+
+**Fix — identical TTL-aware check in both routes:**
+
+```js
+// Shared helper (can be an inline expression in both routes):
+function isCacheWarm(siteNo) {
+    const cached = perSiteCache.get(String(siteNo));
+    return !!cached && (Date.now() - cached.at) < SESSION_CACHE_TTL_MS;
+}
+```
+
+`/confirm` route:
+
+```js
+const devicesReady = isCacheWarm(siteNo);
+const site = devicesReady ? perSiteCache.get(String(siteNo)).sites[0] : stash.preliminarySite;
+res.json({ confirmToken: token, workspace: await workspacePayload(site, devicesReady) });
+```
+
+`/workspace` route (Gap-3 implementation, amended to use the same helper):
+
+```js
+const devicesReady = isCacheWarm(siteNo);
+const site = devicesReady ? perSiteCache.get(String(siteNo)).sites[0] : stash.preliminarySite;
+```
+
+Both routes now use the identical TTL-aware check. An expired-but-present entry is treated as cold in both. Build must confirm `isCacheWarm` is defined before either route is implemented, and that `SESSION_CACHE_TTL_MS` is imported/accessible from both routes.
+
+A new unit test is required: cache entry written, fake timers advanced past `SESSION_CACHE_TTL_MS`, then both `/confirm` and `/workspace` are called and both must return `devicesReady: false`.
+
+---
+
+### Summary of additions
+
+Three correctness fixes are added in this addendum.
+
+**1. Topology assertion stated as a Build gate item.** The feature depends on in-process Maps that are not shared across processes. Under the current single-replica deployment this is correct. A code comment on `inFlightReads` states the single-replica/session-affinity requirement. Build must observe and record the replica count before merge; if >1, session affinity must be confirmed. The cost claim is now explicitly conditioned on this topology constraint.
+
+**2. Cost evaluation updated to reflect topology dependency.** The "one TB read per site open, bounded" claim holds under single-replica deployment and is conditioned on the topology gate. Under a future multi-replica deployment, session affinity is required to preserve the bounded claim; without it, the cost multiplies by replica count and the feature is incorrect.
+
+**3. Readiness check made consistent across both routes.** `/confirm` previously used a bare `perSiteCache.has()` (no TTL) while `/workspace` used a TTL-aware check. An expired cache entry caused contradictory `devicesReady` signals within the same poll cycle. Both routes now use an identical TTL-aware `isCacheWarm()` helper. A unit test is added: expired-cache scenario must return `devicesReady: false` from both routes.
+
 
 ---
 
