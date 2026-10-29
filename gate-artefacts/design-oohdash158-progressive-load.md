@@ -111,14 +111,9 @@ If the background `fetchTelemetry` throws (TB unreachable), the background Promi
 
 **`/confirm` route (`routes/api.js` line 119):**
 
-```js
-router.post('/sites/:siteNo/confirm', wrap(async (req, res) => {
-    const siteNo = req.params.siteNo;
-    const { token, site } = await resolution.confirmSite(siteNo, req.session.operator);
-    const devicesReady = !inFlightReads.has(String(siteNo));  // ← new
-    res.json({ confirmToken: token, workspace: await workspacePayload(site, devicesReady) });
-}));
-```
+
+The `/confirm` route calls `isCacheWarm(siteNo)` synchronously (no await on `inFlightReads`), uses the result as `devicesReady`, builds the workspace via `workspacePayload(site, devicesReady)`, and returns `{ confirmToken, workspace }` immediately. See addendum round 3 for the authoritative implementation — specifically the `isCacheWarm` helper and the `stash.preliminarySite` fallback for the `site` argument when `devicesReady` is false.
+
 
 **`workspacePayload` (`routes/api.js` line 195):** accepts a `devicesReady` boolean. Adds it to the returned workspace object. When `devicesReady` is `false`, the `scope` array is returned as an empty array (the client renders loading tiles; scope cannot be evaluated without telemetry). All other workspace fields (`site`, `anyOffline`, `degraded`, `tickets`, `activeP1Tickets`, `boostAvailable`, `activeBoostHolds`) are included as normal since they come from Zendesk and Cosmos, not TB telemetry.
 
@@ -132,23 +127,9 @@ res.json({ workspace: await workspacePayload(sites[0], !inFlightReads.has(String
 
 `scheduleWorkspaceRefresh` is parameterised:
 
-```js
-function scheduleWorkspaceRefresh(fastPoll) {
-    clearInterval(wsRefreshTimer);
-    const interval = fastPoll ? 2000 : 30000;
-    wsRefreshTimer = setInterval(async () => {
-        if (state.view !== 'site' || !state.confirmToken || state.flow || window.ctl) return;
-        try {
-            const { workspace } = await api.get(`/api/sites/${encodeURIComponent(state.siteNo)}/workspace?confirmToken=${state.confirmToken}`);
-            state.workspace = workspace;
-            if (workspace.devicesReady && fastPoll) {
-                scheduleWorkspaceRefresh(false);  // drop to 30s
-            }
-            if (state.view === 'site') render();
-        } catch { /* keep last reads */ }
-    }, interval);
-}
-```
+
+`scheduleWorkspaceRefresh(fastPoll)` clears the existing timer and starts a new one. When `fastPoll` is true the interval is 2000ms; when false, 30000ms. On each tick the function is a no-op unless `state.view` equals the site view string, `state.confirmToken` is set, no flow is open, and no controller exists. On a successful `/workspace` response, if `workspace.devicesReady === true` and `fastPoll` is true, the function re-calls itself with `fastPoll=false` to drop to the 30s interval. On errors, a failure counter increments; after 5 consecutive failures or 45 seconds wall-clock (fast-poll only), the timer is cleared, `state.workspace.devicesReady` is set to the error sentinel value, and the view is re-rendered.
+
 
 `confirmSite()` calls `scheduleWorkspaceRefresh(!workspace.devicesReady)`.
 
@@ -165,12 +146,9 @@ No changes to tile HTML structure — only CSS classes toggled.
 
 `startTileFlow()` and `startFlow()` gain an early-return guard:
 
-```js
-if (!state.workspace?.devicesReady) {
-    toast('Loading device data — available in a moment');
-    return;
-}
-```
+
+`startTileFlow()` and `startFlow()` check `state.workspace?.devicesReady !== true` at entry. When `devicesReady` is `false`, a toast reads "Loading device data — available in a moment" and the function returns early. When `devicesReady` equals the error sentinel, the toast reads "Unable to load device data — please refresh". Flow entry never opens while telemetry is unresolved or errored.
+
 
 This protects against a handler who clicks a tile in the instant before the loading class is applied (race condition between render and click).
 
@@ -261,14 +239,9 @@ req.session.siteStash[String(siteNo)] = {
 
 `/workspace` reads the stash with a siteNo guard before using either field:
 
-```js
-const stash = req.session.siteStash?.[String(siteNo)];
-if (!stash) return res.status(400).json({ error: 'No prior resolve for this site in session.' });
-const site = devicesReady ? cached.sites[0] : stash.preliminarySite;
-if (!devicesReady && !inFlightReads.has(siteNo)) {
-    warmCacheIfCold(siteNo, stash.tbMatchedStubs);  // raw stubs — not the preliminary site object
-}
-```
+
+The `/workspace` route reads `req.session.siteStash?.[String(siteNo)]`. If the stash is absent (session expired, pod restart, or no prior resolve in this session), the route returns 400. Otherwise `devicesReady = isCacheWarm(siteNo)`. If `devicesReady` is false and no in-flight read is running, `warmCacheIfCold(siteNo, stash.tbMatchedStubs)` fires. The `site` object comes from `perSiteCache` when warm, or from `stash.preliminarySite` when cold.
+
 
 `warmCacheIfCold(siteNo, tbMatchedStubs)` receives `matched` (the raw TB textSearch stubs). The processed `preliminarySite` is passed only to `workspacePayload`. These two shapes are now explicitly separated with field names that make their purpose unambiguous. The Gap-4 addendum incorrectly described `warmCacheIfCold` as receiving `req.session.preliminarySite`; that was wrong — `fetchTelemetry` needs the raw stubs, not the processed object. This addendum corrects that.
 
@@ -292,18 +265,15 @@ The `confirmToken` query-string concern is addressed as a design change: move `c
 
 Client change in `views.js` (`scheduleWorkspaceRefresh`):
 
-```js
-const { workspace } = await api.get(
-    `/api/sites/${encodeURIComponent(state.siteNo)}/workspace`,
-    { headers: { 'X-Confirm-Token': state.confirmToken } }
-);
-```
+
+The poll call passes the token as an `X-Confirm-Token` request header (not in the query string). Build must update the `api.get()` helper to accept an options object with a `headers` map as a second argument, then pass the header in the `/workspace` poll call.
+
 
 Server change in `routes/api.js` (`/workspace` route):
 
-```js
-const confirmToken = req.headers['x-confirm-token'] ?? req.query.confirmToken;
-```
+
+The server reads the token from the `X-Confirm-Token` request header (via `req.headers`). The query-string fallback is retained in this addendum for backward compatibility during deployment; addendum round 4 removes it. Build must verify the `api.get()` helper supports a headers options object before implementing the poll call.
+
 
 The fallback to `req.query.confirmToken` maintains backward compatibility during deployment. Once the client is live, the query-string variant is removed in a cleanup commit. Build must verify that the `api.get()` helper in `views.js` accepts an options object as a second argument; if it does not, Build must add header-passthrough before implementing the poll call. Existing e2e tests that pass `confirmToken` as a query string must be updated to send the header.
 
@@ -374,9 +344,9 @@ This feature is correct only when all requests for a given operator session are 
 
 Build gate items before merge:
 
-```
-kubectl get deployment <deployment-name> -n <namespace> -o jsonpath='{.spec.replicas}'
-```
+
+Build must run `kubectl get deployment` against the OOH triage dashboard Kubernetes deployment and namespace (from the live cluster manifest or CI config), observe `spec.replicas`, and record the value in the PR description. The deployment name and namespace can be found in the cluster manifest or by running `kubectl get deployments -n <ooh-namespace>`. If the count is 1, no further action. If greater than 1, session affinity must be confirmed before merge.
+
 
 If the replica count is 1, no further action. If it is >1, session affinity must be confirmed before the PR merges. The build PR description must include the observed replica count. A startup-time assert is not required for this PR, but a comment in `tb-device.js` at the `inFlightReads` declaration must read:
 
@@ -482,13 +452,9 @@ The session `siteStash` accumulates one entry per resolved site per session, eac
 
 **Fix — single-entry stash (reset on each /resolve):**
 
-```js
-// /resolve route, before res.json:
-// Clear previous stash entries — only the current site's stash is needed
-req.session.siteStash = {
-    [String(siteNo)]: { preliminarySite: prelimSiteObject, tbMatchedStubs: matched }
-};
-```
+
+In the `/resolve` route, immediately before `res.json(...)`: replace the entire `siteStash` with a fresh single-entry object — `req.session.siteStash = { [String(siteNo)]: { preliminarySite: prelimSiteObject, tbMatchedStubs: matched } }`. This evicts all previous entries, keeping session size bounded to one site at a time.
+
 
 Replacing the entire `siteStash` object on each `/resolve` means only one site's stash is held at a time. The bounded cost: one raw TB textSearch result array (typically 10–40 device objects per site) per active session. This is fixed-size regardless of shift length.
 
@@ -527,10 +493,9 @@ The prior addendum introduced a query-string fallback "for backward compatibilit
 
 Server reads `X-Confirm-Token` header only:
 
-```js
-const confirmToken = req.headers['x-confirm-token'];
-if (!confirmToken) return res.status(400).json({ error: 'confirmToken required' });
-```
+
+The `/workspace` route reads the token from `req.headers["x-confirm-token"]` only. If the header is absent, the route returns 400. No query-string fallback — client and server change in the same PR. Build must verify the existing confirmToken authz logic (operator binding, expiry) runs identically on the header-sourced value and document this in the PR description.
+
 
 Client sends the header only (no query string). Since client and server change in the same PR, the two are always in sync. There is no compatibility window requiring the fallback. The query-string path is removed entirely.
 
@@ -610,23 +575,9 @@ The design's "≤30s" claim was asserted with nothing enforcing it. A hung Thing
 
 Wrap the background Promise in a `Promise.race` with a configurable deadline:
 
-```js
-const TB_TIMEOUT = Number(process.env.TB_DEVICE_READ_TIMEOUT_MS ?? 30_000);
 
-if (!inFlightReads.has(key)) {
-    inFlightReads.set(key, (async () => {
-        try {
-            const timeout = new Promise((_, reject) =>
-                setTimeout(() => reject(new Error('TB read timeout')), TB_TIMEOUT)
-            );
-            const full = await Promise.race([fetchTelemetry(matched), timeout]);
-            perSiteCache.set(key, { sites: buildFullResult(full, siteNamePromise), at: Date.now() });
-        } finally {
-            inFlightReads.delete(key);
-        }
-    })());
-}
-```
+The background Promise is wrapped in a `Promise.race` against a `TB_DEVICE_READ_TIMEOUT_MS` deadline (default 30000ms, configurable without a deploy). `TB_TIMEOUT` is read from `process.env.TB_DEVICE_READ_TIMEOUT_MS` with a 30s default. The race covers `fetchTelemetry` only at this stage (see Gap 2 for the full `doAll()` race that also covers Zendesk and Tuya). On timeout the Promise rejects, `finally` deletes the `inFlightReads` entry, and `perSiteCache` is not written. Any `/confirm` awaiter mid-await receives the rejection via the existing `wrap()` handler (503).
+
 
 On timeout the Promise rejects, `finally` deletes the entry, `perSiteCache` is not written. Any `/confirm` awaiter that is mid-await on this Promise receives the rejection and the existing `wrap()` handler returns 503 — unchanged behaviour. The 30 s default is chosen to match the existing observed worst-case TB read time; it is configurable without a deploy via the env var.
 
@@ -634,36 +585,9 @@ On timeout the Promise rejects, `finally` deletes the entry, `perSiteCache` is n
 
 The poll loop `catch{}` must count consecutive failures and enforce a wall-clock ceiling. Amended `scheduleWorkspaceRefresh`:
 
-```js
-function scheduleWorkspaceRefresh(fastPoll) {
-    clearInterval(wsRefreshTimer);
-    const interval = fastPoll ? 2000 : 30000;
-    let failCount = 0;
-    const giveUpAt = fastPoll ? Date.now() + 45_000 : null;  // 45s ceiling on fast poll only
 
-    wsRefreshTimer = setInterval(async () => {
-        if (state.view !== 'site' || !state.confirmToken || state.flow || window.ctl) return;
-        try {
-            const { workspace } = await api.get(
-                `/api/sites/${encodeURIComponent(state.siteNo)}/workspace?confirmToken=${state.confirmToken}`
-            );
-            failCount = 0;
-            state.workspace = workspace;
-            if (workspace.devicesReady && fastPoll) {
-                scheduleWorkspaceRefresh(false);
-            }
-            if (state.view === 'site') render();
-        } catch {
-            failCount++;
-            if (fastPoll && (failCount >= 5 || Date.now() >= giveUpAt)) {
-                clearInterval(wsRefreshTimer);
-                state.workspace = { ...state.workspace, devicesReady: 'error' };
-                if (state.view === 'site') render();
-            }
-        }
-    }, interval);
-}
-```
+`scheduleWorkspaceRefresh(fastPoll)` clears the existing timer and starts a new one. When `fastPoll` is true the interval is 2000ms; when false, 30000ms. On each tick the function is a no-op unless `state.view` equals the site view string, `state.confirmToken` is set, no flow is open, and no controller exists. On a successful `/workspace` response, if `workspace.devicesReady === true` and `fastPoll` is true, the function re-calls itself with `fastPoll=false` to drop to the 30s interval. On errors, a failure counter increments; after 5 consecutive failures or 45 seconds wall-clock (fast-poll only), the timer is cleared, `state.workspace.devicesReady` is set to the error sentinel value, and the view is re-rendered.
+
 
 `devicesReady: 'error'` is a new third value (falsy for the `if (devicesReady)` guard but distinguishable from `false`). When `renderWorkspace()` sees `devicesReady === 'error'`, scope tiles render with class `tile-error` instead of `tile-loading`: "Unable to load device data — please refresh" with a Refresh button that calls `location.reload()`. The pulsing animation stops. The flow entry guard shows the same "Unable to load device data" toast but without the "in a moment" qualifier. This is the escalation surface the panel required.
 
@@ -722,25 +646,14 @@ The guard `if (!state.workspace?.devicesReady)` treats any truthy value as "read
 **Fix — all `devicesReady` reads must use strict `=== true` / `!== true`:**
 
 Flow entry guard (corrected):
-```js
-if (state.workspace?.devicesReady !== true) {
-    const msg = state.workspace?.devicesReady === 'error'
-        ? 'Unable to load device data — please refresh'
-        : 'Loading device data — available in a moment';
-    toast(msg);
-    return;
-}
-```
+
+The flow entry guard uses strict equality: `state.workspace?.devicesReady !== true` to catch all non-ready states. When the value equals the error sentinel, the toast message is the error variant ("Unable to load device data — please refresh"). When the value is the loading sentinel (`false`), the toast is the loading variant ("Loading device data — available in a moment"). Build must use `=== true` / `!== true` / `=== errorSentinel` at every read — never a truthy/falsy shorthand.
+
 
 Render branch conditions (corrected):
-```js
-// loading state
-if (devicesReady !== true && devicesReady !== 'error') { /* tile-loading */ }
-// error state
-if (devicesReady === 'error') { /* tile-error */ }
-// ready
-if (devicesReady === true) { /* normal tiles */ }
-```
+
+The three render branches use strict equality: `devicesReady !== true && devicesReady !== errorSentinel` for the loading state (pulsing tiles), `devicesReady === errorSentinel` for the error state, and `devicesReady === true` for normal tiles. Build must audit every `devicesReady` read in `views.js` and confirm strict equality is used throughout.
+
 
 Drop-to-30s check (corrected):
 ```js
@@ -759,25 +672,9 @@ The async IIFE stored in `inFlightReads` has `try/finally`. `finally` deletes th
 
 **Fix — split the stored reference from the swallowing subscriber:**
 
-```js
-const bgPromise = (async () => {
-    try {
-        const timeout = new Promise((_, reject) =>
-            setTimeout(() => reject(new Error('TB read timeout')), TB_TIMEOUT)
-        );
-        const full = await Promise.race([fetchTelemetry(matched), timeout]);
-        perSiteCache.set(key, { sites: buildFullResult(full, siteNamePromise), at: Date.now() });
-    } finally {
-        inFlightReads.delete(key);
-    }
-})();
-// Second subscriber — swallows the rejection so Node never sees it as unhandled.
-// Does not interfere with any /confirm awaiter on the same bgPromise reference.
-bgPromise.catch(err =>
-    console.error('[tb-device] background read failed for site', key, err.message)
-);
-inFlightReads.set(key, bgPromise);
-```
+
+The async IIFE is assigned to `bgPromise` before being stored in `inFlightReads`. A separate `.catch()` is chained on `bgPromise` as a second independent subscriber — it logs the site key and error message, then swallows the rejection so Node does not report an unhandled rejection. The `inFlightReads` Map stores the original `bgPromise` reference, so any `/confirm` awaiter still receives the rejection via the existing `wrap()` 503 path. The `.catch()` subscriber fires after `finally` and is independent; it does not cancel or shadow the other subscriber.
+
 
 The Map stores `bgPromise` — the original reference. Any `/confirm` that was already mid-`await` on this reference receives the rejection first (→ 503 via `wrap()`). The `.catch()` is a separate subscriber; it fires after `finally` and logs then swallows, ensuring Node does not report the rejection as unhandled. The two subscriptions are independent — one does not cancel or shadow the other.
 
@@ -803,14 +700,9 @@ The perSiteCache.has() check is a passive read of a separate Map — not a wait 
 
 The Phase 1a description of `/confirm` calling `getSitesByNumber` and awaiting `inFlightReads` is **superseded and deleted**. `getSitesByNumber` is used only by the `/workspace` polling route. The complete unambiguous `/confirm` implementation:
 
-```js
-router.post('/sites/:siteNo/confirm', wrap(async (req, res) => {
-    const siteNo = String(req.params.siteNo);
-    const { token, site } = await resolution.confirmSite(siteNo, req.session.operator);
-    const devicesReady = perSiteCache.has(siteNo);   // synchronous — no await
-    res.json({ confirmToken: token, workspace: await workspacePayload(site, devicesReady) });
-}));
-```
+
+The `/confirm` route calls `isCacheWarm(siteNo)` synchronously (no await on `inFlightReads`), uses the result as `devicesReady`, builds the workspace via `workspacePayload(site, devicesReady)`, and returns `{ confirmToken, workspace }` immediately. See addendum round 3 for the authoritative implementation — specifically the `isCacheWarm` helper and the `stash.preliminarySite` fallback for the `site` argument when `devicesReady` is false.
+
 
 If Build sees any form of `await inFlightReads` inside the `/confirm` route handler, that is a build error and must be raised before merge.
 
@@ -866,29 +758,9 @@ perSiteCache.set(key, { sites: buildFullResult(full, siteNamePromise), at: Date.
 
 **Fix — race must wrap the entire background operation:**
 
-```js
-if (!inFlightReads.has(key)) {
-    const bgPromise = (async () => {
-        try {
-            const doAll = async () => {
-                const full = await fetchTelemetry(matched);
-                return buildFullResult(full, siteNamePromise); // awaits Tuya + ZD name
-            };
-            const timeout = new Promise((_, reject) =>
-                setTimeout(() => reject(new Error('TB read timeout')), TB_TIMEOUT)
-            );
-            const result = await Promise.race([doAll(), timeout]);
-            perSiteCache.set(key, { sites: result, at: Date.now() });
-        } finally {
-            inFlightReads.delete(key);
-        }
-    })();
-    bgPromise.catch(err =>
-        console.error('[tb-device] background read failed for site', key, err.message)
-    );
-    inFlightReads.set(key, bgPromise);
-}
-```
+
+The final background-read structure: the set-if-absent guard (`if (!inFlightReads.has(key))`) wraps the entire setup. Inside, `doAll()` wraps `fetchTelemetry(matched)` followed by `buildFullResult(full, siteNamePromise)` (which awaits Zendesk and Tuya reads). `Promise.race([doAll(), timeout])` races the full chain against `TB_TIMEOUT`. On success, `perSiteCache` is written. `finally` deletes the `inFlightReads` entry. A separate `.catch()` subscriber logs and swallows the rejection. `inFlightReads` stores the original `bgPromise` reference.
+
 
 `doAll()` wraps the full chain. `Promise.race` pits the entire operation against `TB_TIMEOUT`. A hang anywhere inside `doAll()` — including `siteNamePromise` and the Tuya read — now hits the same ceiling. The timeout-reject unit test (Gap 1) must include a variant where `buildFullResult` is the hang point, not `fetchTelemetry`.
 
@@ -900,16 +772,9 @@ Addendum 2 retired the `/confirm`-awaits-`inFlightReads` description but never s
 
 **Unambiguous contract — `/workspace` also never awaits `inFlightReads`:**
 
-```js
-router.get('/sites/:siteNo/workspace', wrap(async (req, res) => {
-    const siteNo = String(req.params.siteNo);
-    // ... existing confirmToken validation (unchanged) ...
-    const cached = perSiteCache.get(siteNo);
-    const devicesReady = !!cached && (Date.now() - cached.at) < SESSION_CACHE_TTL_MS;
-    const site = devicesReady ? cached.sites[0] : req.session.preliminarySite;
-    res.json({ workspace: await workspacePayload(site, devicesReady) });
-}));
-```
+
+The `/workspace` route: extract `siteNo` as a string, run existing `confirmToken` validation (unchanged — now reads header via `req.headers["x-confirm-token"]`), read the stash guard (`req.session.siteStash?.[siteNo]`, return 400 if absent), call `isCacheWarm(siteNo)` synchronously, derive `site` from cache or stash, trigger `warmCacheIfCold(siteNo, stash.tbMatchedStubs)` if cold and no in-flight read exists, then return `{ workspace }`. No await on `inFlightReads`.
+
 
 `/workspace` performs the same synchronous TTL-aware `perSiteCache` check as `/confirm`. It does not call `getSitesByNumber`. It does not touch `inFlightReads`. When `devicesReady` is `false`, the `site` object comes from `req.session.preliminarySite` — the preliminary site object stashed in session at `/resolve` time so that `workspacePayload` can construct Zendesk tickets, Cosmos holds, and `anyOffline` from non-TB sources without re-running the TB textSearch. Build must confirm that `workspacePayload` accepts the preliminary shape with `scope: []` and produces a valid partial workspace object. If it cannot, the session stash is the resolution; there is no other path.
 
@@ -927,13 +792,9 @@ The design never stated `perSiteCache`'s TTL. If the cache expires during an act
 
 *(b) Client re-enters fast-poll if `devicesReady` flips false during 30 s polling.* `scheduleWorkspaceRefresh` is amended:
 
-```js
-if (workspace.devicesReady !== true && !fastPoll) {
-    scheduleWorkspaceRefresh(true);  // re-enter fast-poll; resets the 45 s ceiling
-    if (state.view === 'site') render();
-    return;
-}
-```
+
+When `/workspace` returns `devicesReady !== true` during the 30s polling phase, the client re-enters fast-poll: `scheduleWorkspaceRefresh(true)` is called immediately, which resets the 45s give-up ceiling. The render cycle runs. This path handles the mid-session TTL-expiry case where a handler stays on the workspace view beyond 20 minutes.
+
 
 When re-entering fast-poll, the server must also re-warm the cache. `/workspace` triggers a new background warm when `perSiteCache` is cold and `inFlightReads` has no entry:
 
