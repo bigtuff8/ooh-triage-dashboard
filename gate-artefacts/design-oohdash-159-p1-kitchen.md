@@ -1,201 +1,179 @@
 <!-- gate:contract
-SECTION: Rev 4 in one paragraph (your decisions of 29 Oct)
-OOHDASH-159 now delivers two things in one release. First, the missed-P1 kitchen fix from revs 1 to 3: the "Is the kitchen needed for service right now?" question is asked before any route that has no P1. Second, an app-wide text key that you approved on 29 Oct, applied to every screen in every journey. The key: script in a green "Say to the customer" box; agent background in blue, with values from the site highlighted; a red warning directly above every button that logs a ticket or switches equipment, with a stronger P1 version; ticket text in its own dashed box; and one neutral after-action card for every outcome. The ticked lines become "What we know so far", which is also written onto the ticket. The connection-check banner is removed completely. The "What Lighthouse controls at this site" panel is kept and made accurate. OOHDASH-146 is paused; the decisions are recorded on its ticket so it rebases onto this key.
+SECTION: Rev 5 in one paragraph (your decisions of 29 Oct evening)
+Rev 5 reworks rev 4 from your mobile review. Agents never log anything any more: every call is saved automatically from the moment the site is confirmed, and published to the IoT Support Dashboard when the agent presses End call or Raise another issue, leaves the screen, or goes quiet for 20 minutes (E1). The override comes first in every journey that can raise a P1: the agent explains where the PowerPause panel is and how to press the override once, and a P1 is raised only if it doesn't work and the kitchen is needed now (J1). P1 and other ticket numbers open a new in-app ticket page instead of Zendesk, and the site's open-tickets panel shows tickets raised from this dashboard with a P1 badge and their status right now (A1). The full PowerPause guide is served by the app and linked from every override step (K1). The rest of your list is done everywhere it occurs, not just where you spotted it.
 
-SECTION: Interactive prototype and the all-screens comparison
-Two linked pages, both built from the app's own rendered screens: today's release (v1.6.5) and a working copy of this design, each run locally in test-data mode. Page 1 is the all-screens comparison: every screen in every journey (158 states), today next to rev 4, each piece of text tagged by its type in the key, with problems flagged. Page 2 is the click-through kitchen prototype for the four 159 scenarios. Links are in the body of this document and in the PR description.
+SECTION: What the agent sees now (the prototype)
+Two pages built from the app's own screens: today's release next to the rev 5 working copy, both run on test data. The kitchen click-through covers all four scenarios: override first, "something not on this list", and the timetable request that collects details before the ticket. The all-screens page shows every screen in every journey (206 states), today next to rev 5, with each piece of text tagged by its type. Links are in the body and the PR description. 26 click paths were tested through the prototype with no failures and no page errors.
 
-SECTION: The text key (applies to every screen)
-Script: a green box headed "🗣 Say to the customer", exactly one per step, read out word for word. Where the step asks the customer something, the question is the last line of the box, headed "Ask the customer:", and the answer buttons sit directly under it in the customer's words. Agent background: a blue box headed "ℹ For you (background, not to read out)". It is short and plain, never offers a choice, and is left out when it adds nothing. Any value taken from the site (equipment names, times, temperatures, ticket numbers) is highlighted wherever it appears. Ticket text: a dashed, uncoloured box headed "📄 What goes on the ticket (for the IoT team)". Warning: see the next section. After-action summary: one neutral white card with a dark header that says what happened and shows the ticket number, the same for a P1, a logged ticket or a closed note. The script carries on inside it in the green box. Red is used for nothing else except "this did NOT happen" failure messages. Site status banners (an active P1 on record, a heating timer running) become amber status strips.
+SECTION: E1: no logging step, the call record is automatic
+The server starts a call record when the site is confirmed. After every step the browser sends what we know so far and the notes. Ordinary outcomes create their ticket as soon as they are reached, so the reference can be read out; there is no "Log it" button and no "this logs a ticket" warning anywhere. Every outcome ends with one block: "When you press either button, this conversation is published to the IoT Support Dashboard as the complete record", then Raise another issue and End call. Either button, leaving the screen, or 20 minutes with no activity writes the record: as a comment on the issue's ticket, or as one ticket created already closed if no ticket was raised. It is written once only, however many of those happen. The red warning now appears only before an equipment switch, and the solid red version only before a P1.
 
-SECTION: When the red warning appears (your answer to Q2)
-A red warning sits directly above every button that logs a ticket and every button that switches equipment from here. It never appears after the action. The logging buttons are the record-outcome step on every journey and pub heating's Check and log. The switching buttons are the device control window's Send, pub heating's turn-on and turn-off durations, and the lighting and fan switches, which open the control window. Ordinary warning text: "Before you press: this logs a ticket for the IoT team." or "Before you press: this switches the [equipment] [on/off] at the site straight away." A P1 is one of these, and gets the stronger version within the same theme. The box is solid red with a white heading, "🚨 This raises a P1", followed by "It pages the on-duty manager straight away." The button itself is red and reads "Raise the P1". Every other logging button reads "Log it" or keeps its current journey label.
+SECTION: J1: the override first, everywhere a P1 can be raised
+Kitchen (every circuit: smart reachable, smart not reporting, older sites): the agent picks the equipment, then reads the override step. "There's a manual override on the PowerPause panel, usually by the kitchen distribution boards, behind the appliance, or on the ceiling. Every appliance we control has a Lighthouse label. Press the button for the fryer once; please don't hold it down." For fryers and bain-marie or gantries, it adds: "also press the green start button on the interlock panel". Then: "The override is logged and monitored, and our team checks it automatically the next working day." The customer's answers are "Yes, it's come on" (logged, no P1), "No, it hasn't come on" or "They can't find the panel" (then the service question; Yes raises the P1 behind the solid red warning), plus "the fuse board fixed it" where the circuit is meant to stay on, and "we need it at different times" where it is off on its timetable. Outside lighting and Contractor on site follow the same order. Fridges have no override (Lighthouse doesn't control them), and the Donkey Derby site has none that works, so those keep the direct P1.
 
-SECTION: What we know so far (replaces the ticked lines)
-The list at the top of each issue is renamed "What we know so far". It holds only two kinds of line, each with its own icon: 👤 what the customer told us (their answers), and 🔎 what the dashboard checked by itself. It is written in plain words with no codes or jargon. It never shows an outcome, action or decision before it has happened: lines such as "Business-critical during service — P1" and "Outcome: captured" are removed, because the after-action card shows the real outcome. The list is sent with the outcome and written onto the ticket as its own section, so the IoT team can see how the conclusion was reached. This is a small server addition: a new knownSoFar list on the outcome request, written as lines in the ticket transcript. It is not added to the P1 text message. All 52 existing lines are rewritten to this rule; the full table is in the body.
+SECTION: A1: tickets open in the app, never Zendesk
+The P1 banner no longer links to Zendesk. It shows "Ticket #45129: Being assessed by the IoT team", and the number opens a new browser tab with the in-app ticket page: subject, P1 badge, status right now, and what is on the ticket. The screen the agent is on never changes. Every other ticket number in the app does the same, including the after-action card, This call so far, Tonight, the timer banner and the admin P1 log. The "Open tickets for this site" panel now lists only tickets raised from this dashboard that are still open. P1s are shown first with a red P1 badge, and each shows its plain current status from the IoT team's ticket.
 
-SECTION: Connection-check banner removed (Q4)
-The red "Some Lighthouse equipment at this site is not responding / Run connection check / This step is optional" banner is removed from the site page completely. So are the "offline" and "router" search words that suggested a connection check. Heating and kitchen still divert to the connection questions automatically when their own equipment is offline, so no journey loses the check. This supersedes OOHDASH-146 D10, which kept a text-only banner.
+SECTION: The other changes (b to i), applied everywhere
+b: the equipment chooser says "From this site's equipment list" and highlights each name. A new answer, "Something not on this list", tells the customer that it isn't controlled by Lighthouse and to contact their service contractor; it is recorded and closed. c: customer answers have their own teal, rounded buttons under a "Customer's answer" label in every journey; action buttons stay purple. d: "repairs team" is now "service contractor" everywhere. f: the words to say come first and the "What happened" recap sits below them, saying what actually happened. "Call back and we'll escalate" is gone everywhere. g: the connection questions and their outcomes use the new colours. h: "logged as a priority" is replaced everywhere with "It's logged, and our IoT team picks it up the next working day." i: timetable requests (kitchen and fans) collect which equipment, which days and times, and once or every week before the ticket. The script says permanent changes need the pub's management, usually the Area Manager. The next screen is only the confirmation with the ticket number.
 
-SECTION: "What Lighthouse controls at this site" kept and fixed (Q5)
-The panel stays, with the same rows and tags, but each row now tells the truth. "Controllable from here" means a screen in this dashboard actually offers control of it AND the equipment can be reached now. Kitchen therefore shows "Monitored only", because no kitchen screen switches circuits. If the Lighthouse wall unit is offline, nothing at the site shows "Controllable from here"; the panel says "Can't be reached right now", the same for every row. A row whose equipment is all offline says "Not responding right now". Heating classes marked unproven, or switched off by a setting, are never "Controllable from here". Fridges and freezers are added ("Monitored only" where present). The two fixed rows that never change ("Internal lighting / sockets", "Boiler internals / PCB") are removed. The footnote changes from "Live from the device inventory" to "From this site's equipment list and its connection right now." The same corrected rule feeds the Something else question, so it stays consistent.
-
-SECTION: The kitchen P1 fix (revs 1 to 3, unchanged in behaviour)
-Fix 1, smart circuits not reporting: the service question is asked before the connection divert. Yes raises a P1, with no manual-button tip (D1). No goes to the connection questions as today. Fix 2, smart circuit reachable but off (verdicts A, C, D, off-unknown, including "Several / all of it"): the service question is asked before the circuit card. Yes raises a P1 that includes the manual-button tip (D2). No shows the circuit card as today. Fix 3, older sites with a circuit not reporting: the service question moves above the offline check. Yes raises a P1 with no manual-button tip, and No diverts to the connection questions. Same ooh_p1 path and paging (D4). Note: the smart-kitchen live read appears to be switched off in production today, so Fix 3 is the part that changes what agents see now. Fixes 1 and 2 take effect when the live read is enabled.
-
-SECTION: Kitchen scripts that flow from step to step
-Every kitchen step now has words to say that pick up from the last answer and lead into the next question. Service question, circuits not reporting: "I can see your [fryer and bain-marie] aren't connecting to us at the moment, so I can't see or switch them from here. Ask the customer: is the kitchen needed for service right now, with food being served or breakfast on?" Answers: "Yes, it's needed now" / "No, it can wait". P1 step, before pressing: "Thanks. As you need the kitchen now, I'm going to raise this as urgent with our on-call team." P1 after-action: "That's raised as urgent, reference [45129]. Someone from our on-call team will call you back shortly." For the reachable-but-off version, the after-action script adds: "In the meantime, you can press the manual control button on the front of the PowerPause unit once; it should bring the [bain-marie] on." The circuit cards keep rev 3's split, with "override" changed to "manual control button" (your D3 from 146). The full wording table is in the body.
-
-SECTION: What is not in this release (left for OOHDASH-146)
-146's wording rewrite of the other journeys stays with 146. That covers the D5 customer-answerable options, D6 closed notes, D8 kitchen one-off bookings and D9 customer details. In this release every screen gets the key's presentation and structure: the green script box, the "Ask the customer:" question line, blue info, the warnings, ticket text, the after-action card and What we know so far. Each journey's existing words move into the right box, with only these wording fixes: "caller" becomes "customer", and the ticked lines are rewritten. Scripts on non-kitchen screens are not rewritten to flow step to step; that is 146's job, now recorded on its ticket.
+SECTION: Cost, running in the background, and risk
+No AI or token cost: nothing here calls a language model. Zendesk use rises by at most one extra comment or closed ticket per call, on the existing account. The idle check is a timer inside the existing server: no window, no notification, no network traffic unless a call has actually gone quiet, and a microsecond scan once a minute otherwise. Two things need a hand before go-live: a new Cosmos container for call records (Spencer, five minutes), and agreement from the IoT team that closed contact-history tickets will appear on their dashboard. Risk: every journey's look changes again, so the all-screens dump is re-run and checked line by line before the test gate. P1 paging, control and ticket types are unchanged.
 
 SECTION: Tests
-Kept from revs 1 to 3: TF-159-01, 01b, 02, 02b and 03, plus one extra "No" click on TF-140-02, 04, 06, 07, 08 and 09. New for the key, as e2e checks on real screens: every confirm step shows the ticket box and a red warning directly above the button. A P1 confirm shows the P1 warning and a "Raise the P1" button. After recording, the neutral after-action card shows the ticket number and a green script box. No grey quote style remains anywhere (a whole-app check over the screen-dump states). No "What we know so far" line contains P1, Outcome or a ticket before recording. The site page has no connection-check banner. Scope panel unit tests: kitchen is "Monitored only" at site 8888, nothing is "Controllable from here" at site 6771 (wall unit offline), and fridges appear where present. Server unit test: knownSoFar lines appear in the ticket transcript and not in the P1 text. The prototype working copy ran the unit suite: 836 pass, 11 fail. Ten failures are tests asserting the old wording or the old panel rule, which the build updates on purpose: dark-fleet-heating (3), OOHDASH-144 card wording CW-1 and CW-2, outcome-callerwords D-10a (the separate "Recorded from the caller" line is dropped because the customer's words are now the first line of What we know so far), pub heating banned words PH-BW-2, OOHDASH-135 T1-4c and T1-5b, and refrigeration-deny. The eleventh, p1-log, already fails on main. Before the test gate, the orchestrator re-runs the all-screens dump and checks it line by line against this design.
+Unit tests on the rev 5 working copy: 854 run, 844 pass and 9 fail. Eight of the failures assert wording or panel rules that rev 4 and rev 5 changed on purpose; the build updates them. The ninth (p1-log) already fails on main. Six new call-record tests pass: idempotent finalise, append rather than duplicate, idle sweep, operator check, and closed-on-create. Three label tests were updated to the rev 5 words. The test scripts and data for the end-to-end run are in the body.
 
-SECTION: Risk
-It touches every journey's look, so the screen-dump comparison is the main safety net. Every state is re-captured and diffed before the test gate. The control logic, P1 paging and ticket types do not change. The server change is additive: a new optional field. Rollback is the usual image rollback. Straight quotes only in flows.js (v1.5.3 lesson).
-
-DECISION: Follow-up after "No", if the manual control button didn't work or the fuse board is fine | Skip the repeat question and log it for the morning (recommended) | Ask the service question again
-DECISION: Approve design and proceed to build? | Approve — proceed to build | Changes requested
+DECISION: Idle time before a call record is published automatically | 20 minutes (recommended) | 10 minutes | 30 minutes
+DECISION: Wording for who approves permanent timetable changes | "the pub's management, usually the Area Manager" (as designed) | "the Area Manager" | Something else (say in review)
+DECISION: Approve design rev 5 and proceed to build? | Approve, proceed to build | Changes requested
 -->
 
-# OOHDASH-159 Design rev 4: kitchen P1 fix + app-wide text key
+# OOHDASH-159 Design rev 5: override first, automatic call record, in-app tickets
 
-**All-screens comparison (today vs rev 4, every journey):** [OOHDASH-159-rev4-screens.html](../docs/project/mockups/OOHDASH-159-rev4-screens.html) · standalone https://home-desktop-jb-new.tail30d2e6.ts.net/review/oohdash-159-rev4-screens.html
-**Kitchen click-through prototype:** [OOHDASH-159-mockup.html](../docs/project/mockups/OOHDASH-159-mockup.html) · standalone https://home-desktop-jb-new.tail30d2e6.ts.net/review/oohdash-159-mockup.html
-**Analysis that led here (your questions a to h):** https://home-desktop-jb-new.tail30d2e6.ts.net/review/oohdash-159-text-key.html
+**Kitchen click-through prototype (rev 5):** [OOHDASH-159-mockup.html](../docs/project/mockups/OOHDASH-159-mockup.html) · standalone https://home-desktop-jb-new.tail30d2e6.ts.net/review/oohdash-159-mockup.html
+**All screens, today vs rev 5 (206 states):** [OOHDASH-159-rev5-screens.html](../docs/project/mockups/OOHDASH-159-rev5-screens.html) · standalone https://home-desktop-jb-new.tail30d2e6.ts.net/review/oohdash-159-rev5-screens.html
+**PowerPause override guide (served by the app at /guides/powerpause-contractor-info.html):** [powerpause-contractor-info.html](../docs/project/guides/powerpause-contractor-info.html)
+**Rev 4 for comparison:** [OOHDASH-159-rev4-screens.html](../docs/project/mockups/OOHDASH-159-rev4-screens.html)
 
-Date: 2026-10-29 · Discovery PR #182 (D1–D5) · Decisions of 29 Oct (Q1–Q7) below · Base: main 2ab9486 (v1.6.5)
+Date: 2026-10-29 · Discovery PR #182 · Rev 4 decisions Q1 to Q7 still stand except where rev 5 changes them (below) · Base: main v1.6.5
 
-## Decisions of 29 Oct
+## Your decisions of 29 Oct (evening)
 
-| # | Question | Your answer | In this design |
+| # | Your decision | What it supersedes | In this design |
 |---|---|---|---|
-| Q1 | Colour key | Approved; neutral after-action card | Script green, info blue, warning red, after-action neutral |
-| Q2 | When red appears | Before any ticket or switch of equipment; P1 a stronger subset | Warning above every log and switch button; solid-red P1 version with a red "Raise the P1" button |
-| Q3 | Ticked lines | "What we know so far" | 👤 customer answers and 🔎 dashboard checks only; written onto the ticket |
-| Q4 | Connection-check banner | Remove completely | Banner, button, hint and search words removed; automatic divert kept |
-| Q5 | Controls panel | Keep and fix | Truthful rule (see below) |
-| Q6 | Where the key lives | Deliver now in 159; record on 146 | App-wide in this release; 146 ticket updated (comment 41638) |
-| Q7 | P1 step | As Q6 | One P1 pattern, set here |
+| E1 | Logging is automatic on the server. A call record starts at site confirm and is finished by End call or Raise another issue, or automatically on leaving the screen or after an idle time. No agent "log" step. | Q2 "warning before any ticket" (rev 4 assumption) | No Log button or "this logs a ticket" warning anywhere. Red only before a switch; solid red only before a P1. Idle time proposed at 20 minutes. |
+| J1 | Override first, on all circuits (reachable, not reporting, older sites) and in every flow that can raise a P1. P1 only if it still won't come on. | D1 (no tip on offline P1), D2 (tip on reachable P1), and the rev 4 open decision on re-asking | One override step for every kitchen circuit; lighting and contractor in the same order; the old "In the meantime, press the button" tip on the P1 card is removed |
+| A1 | No Zendesk link. Ticket numbers open the in-app ticket view in a new tab. Site panel shows OOH-raised tickets with a P1 badge and plain status. | Rev 4 P1 banner link | New /ticket/:id page; every ticket number links to it; panel filtered to the ooh tag, P1 first |
+| K1 | The whole PowerPause Contractor Info guide, converted as-is, served by the app and linked from every override step | none | Copied to public/guides; "Show the override guide" on every override step, opens in a new tab |
 
-## The key, component by component
+Assumption to confirm: permanent timetable changes need approval from "the pub's management (usually the Area Manager)". The guide says "Changes to schedules must be authorised by the Area Manager". It is the second decision in the review.
 
-| Type | Look | Rules |
+## The kitchen journey, step by step (rev 5)
+
+| Step | What the agent sees | Customer's answers | Next |
+|---|---|---|---|
+| 1. Which equipment | Green script "Ask the customer: which piece of kitchen equipment is the problem?" and a blue dashed note: "From this site's equipment list. These are the kitchen circuits Lighthouse controls here; the names come from this site, not a fixed list." Names highlighted. Skipped when the site has one circuit. | each circuit by name · Several / all of it · Something not on this list | 2, 3 or 4 |
+| 2. Something not on this list | Blue: "Lighthouse only switches the kitchen equipment on this site's list: Fryer, Glass washer, Dishwasher, Pot wash and Bain-marie. Anything else in the kitchen (for example a grill, hot plate or oven that isn't listed) runs on its own supply." Green: "That isn't controlled by Lighthouse at your site, so I can't see it or switch it from here. Please contact your service contractor through your usual route." Field: "Which equipment is it?" | Continue | Closed record, reference read out |
+| 3. Power is on (on as expected, on outside hours, on but no power drawn) | Green: "The glass washer has power and is switched on at our end. If it still isn't working, it's most likely a fault with the appliance itself, so please contact your service contractor." | I'll call our service contractor · I still think it's your equipment | Closed record / step 5 |
+| 4. Override first (off, not reporting, older site) | Green: what we can see ("I can see your fryer is switched off", "...aren't connecting to us... The override on the PowerPause panel still works", "I can't see from here whether..."), then where the panel is, the Lighthouse label, press once and don't hold, the interlock green start button for fryers and bain-marie or gantries, and "logged and monitored, checked automatically the next working day". Blue: why it is off, what holding the button does, and the guide link. | Yes, it's come on · No, it hasn't come on · They can't find the panel · The fuse board had tripped; resetting it fixed it (meant-to-stay-on only) · It's fine, but we need it at different times (off on timetable, or older site) | Logged / 5 / logged / 6 |
+| 5. Service question | Green: "Sorry it hasn't come on. Ask the customer: is the kitchen needed for service right now, with food being served or breakfast on?" | Yes, it's needed now · No, it can wait | P1 confirm / logged for the next working day (not reporting: the connection questions) |
+| P1 confirm | Green: "Thanks. As you need the kitchen now and the override hasn't brought it on, I'm going to raise this as urgent with our on-call team." Ticket box. Solid red "This raises a P1". Red "Raise the P1" button. | none | After-action |
+| 6. Timetable request | Blue: what the timetable says now. Green: "I can't change the timetable from here tonight, but I'll pass exactly what you need to our IoT team. Permanent changes to the timetable need approval from the pub's management, usually the Area Manager." Ask: which equipment, which days and times, once or every week. Fields and answer buttons for each. If Continue is pressed with gaps, a red line asks for them. | equipment chips · Just this once · Every week (a permanent change) · Continue | Confirmation only: "That's with our IoT team, reference 45131. They'll contact you the next working day to arrange it." |
+
+## After-action layout (every outcome, every journey)
+
+| Order | Block | Example (override worked) |
 |---|---|---|
-| Script | Green box, "🗣 Say to the customer" | One per step. Read out word for word. A question to the customer is its last line, "Ask the customer: …", with answer buttons directly under it in the customer's words. Values from the site are highlighted. |
-| Agent background | Blue box, "ℹ For you (background, not to read out)" | Short, plain, never offers a choice. Left out when it adds nothing. Values from the site are highlighted. |
-| Ticket text | Dashed uncoloured box, "📄 What goes on the ticket (for the IoT team)" | Shown on every confirm step and in Check and log. Never styled as info or script. |
-| Warning | Red box directly above the button | Before every log and every switch. Never after the action. |
-| P1 warning | Solid red heading "🚨 This raises a P1" + red "Raise the P1" button | The only place a red button is used. |
-| After-action summary | White card, dark header "✔ [what happened]" with the ticket number | Same for every outcome type. The green script box carries on inside it. Then "Add another issue" / "End call". |
-| What we know so far | Small list, 👤 and 🔎 icons | Facts only, never an outcome before it happens. Sent to the ticket. |
-| Site status | Amber strip | Active P1 on record, timer running. No longer red. |
-| Failure | Red box | Only for "this did NOT happen" messages (couldn't log, couldn't switch). |
+| 1 | Green "Say to the customer" | "Great, that's it on. The override lasts until the next timetable change. It's logged, reference 45158, and our team checks it automatically the next working day." |
+| 2 | Neutral "What happened" card with the ticket number (new tab) | "Ticket created for the IoT team · Ticket #45158. Nothing was switched from here; the customer used the override on site. The IoT team checks it the next working day. On the ticket: Kitchen equipment on with the manual override" |
+| 3 | Notes box | "+ Add a note to ticket #45158" |
+| 4 | End-of-call block | "When you press either button, this conversation is published to the IoT Support Dashboard as the complete record. If you leave the screen, it is published automatically." · Raise another issue · End call |
 
-Implementation is shared code, so every journey changes together:
+Card headings say what actually happened: "Ticket created for the IoT team", "P1 raised", "Recorded and closed (contact history)", "Call recorded, nothing changed", "Not applied: ticket created for the IoT team", "Heating change saved to the ticket".
 
-- styles.css gets the new classes. The old grey italic `.script` quote is retired; all 18 uses become the green script box.
-- `finishOutcome` (the confirm step every journey uses) renders the ticket box, the warning and the button.
-- The `outcome*` helpers render the after-action card.
-- `renderFlow` and `doneLine` render What we know so far.
-- The P1 banner moves to amber.
-- views.js:187 (the offline banner) and the connectivity search keyword are removed.
-- control.js gets a warning above "Send to device".
-- Pub heating's duration buttons and Check and log submit get warnings.
-- routes/api.js gets the corrected panel rule, and the outcome route accepts `knownSoFar`.
+## Wording fixed across every journey
 
-## What we know so far: every line rewritten
+| Item | Where it was | Rev 5 |
+|---|---|---|
+| d: repairs | kitchen circuit cards (6 places), kitchen outcome, fridge query, Something else | "service contractor" |
+| f: call back and we'll escalate | aircon, Something else, kitchen, contractor, heating "no action" | removed; heating "no action" now says "call us again and we can set it" |
+| h: priority for the IoT team | connection outcomes (3), hot water, the ambiguous-site screen, the not-confirmed control outcome | "It's logged, and our IoT team picks it up the next working day." |
+| h: first thing | two pub heating scripts (controls not visible) | "the next working day" |
+| E1: log wording on buttons | "Log it", "Log it for the IoT team", "Log and escalate to IoT team", "Capture & escalate", "Check and log", "Log for the IoT helpdesk and finish", "Override done: log the call" | "Pass it to the IoT team", customer answers ("Yes, it's working again" / "No, it's still not working"), "Finish this issue", "Continue" |
+| c: customer answers | every journey's answer buttons, including heating area and need, pub heating need and zones, fridge, connection, contractor, timetable form | teal rounded buttons under "👤 Customer's answer" |
+| g: connection screens | amber, yellow and green alert boxes | blue background, green script, teal answers, neutral after-action card |
+| Pub heating "Check and log" screen | its own review-and-submit step with a red warning | removed; the summary is saved automatically and shown as the recap |
 
-| Today (where) | Rev 4 |
+## Server-side call record (E1)
+
+| Event | What happens | Idempotency |
+|---|---|---|
+| Site confirmed | A call record is created (call id returned to the browser). | one per confirm |
+| Each step | The browser sends the issue's key, journey, What we know so far and notes (fire and forget). | last write wins; frozen once finalised |
+| Outcome ticket created | The ticket is linked to the issue on the call record. | |
+| Raise another issue / Cancel issue | That issue is finalised: one "[OOH CALL RECORD]" comment on its ticket, or a closed call-record ticket if none. | issue marked finalised first; a repeat writes nothing |
+| End call / opening another site / going home | The whole call is finalised the same way; a call with no issue at all gets one closed record. | call status finalised; a repeat returns "already" |
+| Tab closed or navigated away | The browser sends a keepalive finalise ("left the screen"). | same as above |
+| 20 minutes with no activity | An in-process timer (once a minute) finalises the call ("no activity for 20 minutes"). | same as above |
+| Pod restart | Open calls are reloaded from the store and the timer finishes them. | same as above |
+
+Only the operator who started a call can add to it or finish it. Records are capped (20 issues, 30 lines each).
+
+## Cost and silent running (mandatory criteria)
+
+| Criterion | Assessment |
 |---|---|
-| Area: Bar/Restaurant (heating) | 👤 Area: Bar/Restaurant |
-| Need: Too cold / not working | 👤 The customer says: too cold or not working |
-| Choosing which zone / Turning heating on — Zone 2 — choose duration | removed (an action in progress, not a fact) |
-| Live read: device not reporting / no thermostat online / device offline | 🔎 The thermostat in this area isn't connecting to us |
-| Requested: warmer / cooler / turn heating off; Reported: heating not working | 👤 The customer wants it warmer / cooler / off; 👤 The customer says the heating isn't working |
-| Requested: warmer · system already calling for heat | 👤 The customer wants it warmer · 🔎 the heating is already asking for heat |
-| No action taken; Outcome: building-heat guidance; Outcome: captured (…) | removed (outcomes) |
-| Air conditioning — not controllable from the dashboard | 🔎 Air conditioning can't be changed from here |
-| Hot water - not on Lighthouse / boiler-side, not controllable | 🔎 Hot water isn't on Lighthouse here / 🔎 Hot water can't be changed from here |
-| The kitchen circuits are reachable. / (159) Some kitchen circuits aren't reporting. | 🔎 The kitchen equipment is connecting to us / 🔎 [Fryer and Bain-marie] aren't connecting to us |
-| Business-critical during service — P1; Not service-critical tonight | 👤 Kitchen needed for service now: yes / 👤 Kitchen needed for service now: no, it can wait |
-| Resolved with on-site override; Fuse board tripped — reset fixed it | 👤 It came on with the manual control button / 👤 The fuse board had tripped and resetting it fixed it |
-| Override did not work — business critical question; Fuse board fine — escalating | 👤 It didn't come on with the manual control button / 👤 The fuse board is fine and it's still off |
-| Site contacting repairs team; Caller still says it's our problem — … | 👤 The customer will call their repairs team / 👤 The customer still thinks it's our equipment |
-| Live read: external lighting device online / NOT responding / not on Lighthouse | 🔎 The outside lighting controller is connecting to us / isn't connecting to us / isn't on Lighthouse here |
-| Resolved via on-site override; Override did not resolve — P1 | 👤 The lights came on with the on-site switch / 👤 The lights are still off after the on-site switch |
-| Live read: extractor fans …; Captured: [note] | 🔎 The fan controller is connecting / isn't connecting to us; 👤 The customer needs: [note] |
-| Refrigeration is monitored-only on Lighthouse; Stock at risk — P1 | 🔎 Lighthouse watches fridge temperatures but doesn't control the fridges / 👤 Stock is at risk right now |
-| Connection check: [result]; Site restored power/connection | 🔎 [result in plain words] / 👤 The customer says it's back on |
-| Contractor: [name] — [need]; PowerPause override … guidance / procedure given / Donkey Derby exception | 👤 Contractor: [name], needs [need]; guidance lines removed (actions); 🔎 This site's manual control button doesn't work (Donkey Derby) |
-| Issue: "[words]"; Checked: [group] → …; Raised as a normal priority ticket; P1 Escalation chosen | 👤 The customer says: "[words]"; 🔎 [group]: controlled / monitored only / not on Lighthouse here; the last two are removed (outcomes) |
+| Tokens / AI cost | None. No language model is involved anywhere in this change. |
+| Recurring cost | Zendesk: at most one extra internal comment per issue, or one closed ticket for a call with no outcome; on the existing licence and API quota. Cosmos: one small document per call (under 5 KB) in a new container; negligible at OOH volumes (tens of calls a night). |
+| Unbounded scaling | None: records are capped per call and the idle timer scans an in-memory map. |
+| Background component | The idle timer runs inside the existing server process: no window, console, notification or separate service. It is unref'd so it never keeps the process alive. While idle it makes no network call and spends no money; it writes to Zendesk only when a call has genuinely gone quiet. |
+| Trade-off to accept | A closed "call record" ticket is created for calls that end with no outcome (for example the agent confirms a site and hangs up). This is contact history, as you asked; it adds a few closed tickets a night to the IoT Support Dashboard. |
 
-## Kitchen wording (159 screens)
+## Data dictionary (new and changed names)
 
-| Screen | What we know so far | Say to the customer | For you | Buttons |
-|---|---|---|---|---|
-| Service question, circuits not reporting (Fix 1, Fix 3) | 🔎 [Fryer and Bain-marie] aren't connecting to us | "I can see your [fryer and bain-marie] aren't connecting to us at the moment, so I can't see or switch them from here. Ask the customer: is the kitchen needed for service right now, with food being served or breakfast on?" | (none) | Yes, it's needed now / No, it can wait |
-| Service question, circuit reachable but off (Fix 2) | 🔎 [Bain-marie] is off | "I can see your [bain-marie] is switched off at the moment. Ask the customer: is the kitchen needed for service right now, with food being served or breakfast on?" | It's off because [its timetable has it off until 17:00 / it should have come on at 11:30 / it's meant to stay on]. | Yes, it's needed now / No, it can wait |
-| Service question, older site, all reachable | 🔎 The kitchen equipment is connecting to us | "Ask the customer: is the kitchen needed for service right now, with food being served or breakfast on?" | (none) | same |
-| P1, not reporting (before pressing) | + 👤 Kitchen needed for service now: yes | "Thanks. As you need the kitchen now, I'm going to raise this as urgent with our on-call team." | We can't see or switch [Fryer and Bain-marie] from here, so the on-call manager needs to call the site back. | Ticket box: "Kitchen equipment off during service — P1. Not reporting while the site is serving: Fryer, Bain-marie. No remote view or control possible; needs immediate IoT action." · P1 warning · [Raise the P1] |
-| P1, not reporting (after) | (same) | "That's raised as urgent, reference [45129]. Someone from our on-call team will call you back shortly." | (none) | After-action card "✔ P1 raised #45129 · The on-duty manager has been paged." · Add another issue / End call |
-| P1, reachable but off (before) | + 👤 Kitchen needed for service now: yes | as above | [Bain-marie] can be reached but is off; the on-call manager will call the site back. | Ticket box carries the plain-words reading ("Checked at 18:23: the bain-marie is off; its timetable has it off until 17:00") · P1 warning · [Raise the P1] |
-| P1, reachable but off (after) | (same) | "That's raised as urgent, reference [45130]. Someone from our on-call team will call you back shortly. In the meantime, you can press the manual control button on the front of the PowerPause unit once; it should bring the [bain-marie] on." | (none) | After-action card |
-| "No" (reachable but off) | + 👤 Kitchen needed for service now: no, it can wait | the circuit card's own script (rev 3 wording, "manual control button") | rev 3 "good to know" text, as blue info | rev 3 buttons |
-| "No" (not reporting) | + 👤 … no, it can wait | the connection questions, in the key | | |
-| Follow-up after "No" (recommended: no repeat) | + 👤 It didn't come on with the manual control button | "I've logged it for our IoT team to sort out first thing tomorrow." (after-action) | | Ticket box "Kitchen circuit off — not needed until later…" · ordinary warning · [Log it] |
+| Name | Where | Meaning | Retention / sensitivity |
+|---|---|---|---|
+| OohCallRecords | Cosmos container (new) | One document per call: callId, siteNo, siteName, operatorId, operatorName, startedAt, lastActivityAt, status (open or finalised), finalisedAt, finalReason, issues | Same as OohAuditLog. Holds the agent's name and the customer's words: internal only. |
+| callId | call record, /api/sites/:siteNo/confirm response, /api/outcomes body | "call-" plus a random id; identifies one call | none |
+| issueKey | browser flow state, call record, /api/outcomes body | "i1", "i2"... per issue within a call | none |
+| finalReason | call record | end-call, another-issue, left-screen, site-change, idle | none |
+| OOH_CALL_IDLE_MIN | environment | idle minutes before automatic finalise (default 20) | none |
+| ooh_call_record | Zendesk tag | marks a closed contact-history ticket created by the call record | none |
+| [OOH CALL RECORD] | Zendesk internal comment prefix | the published conversation | internal |
+| closeOnCreate | /api/outcomes body | create the ticket already solved (contact-history outcomes: not controlled here, referred to service contractor) | none |
+| isP1 | site tickets payload, /api/tickets/:id/view | ticket carries the ooh_p1 tag | none |
+| /ticket/:id | page route (new) | in-app ticket page, opened in a new tab | requires sign-in |
+| /api/tickets/:id/view | API (new) | subject, status (plain words), isP1, fromOoh, times, thread; never a Zendesk URL | requires sign-in |
+| /api/calls/:id/progress, /api/calls/:id/finalise | API (new) | call record updates; finalise reason must be one of end-call, another-issue, left-screen, site-change | requires sign-in; operator-bound |
+| kSel, ov, crit, kOn, kOther | kitchen flow state | chosen equipment, override answer, service answer, power-on answer, "not on the list" words | browser only |
+| schEq, schTimes, schKind, schMore | timetable request state (kitchen, fans) | equipment, days and times, once or permanent, anything else | written to the ticket |
+| /guides/powerpause-contractor-info.html | static file (new) | the PowerPause guide, as supplied, 9 pages | requires sign-in |
 
-## Controls panel: corrected rule
+## Test scripts and test data (for the end-to-end run after build)
 
-| Row | Controllable from here | Monitored only | Not responding right now | Not on Lighthouse here |
-|---|---|---|---|---|
-| Heating | A heating device is controllable from a screen (pub heating boost, or a thermostat class that is proven and switched on by its setting) and it is online | Heating device present but not controllable | Every heating device offline | None |
-| Hot water | Boiler panel can change hot water and is online | Hot water signal present | Panel offline | As today |
-| Kitchen equipment | Never (no kitchen screen switches circuits) | Kitchen circuits present | Every circuit offline | None |
-| Outside lighting / Extractor fans | A switch-capable circuit that is online and registered (the same test the switch button uses) | Present, not switchable | All offline | None |
-| Fridges and freezers (new) | Never | Present | All offline | None |
-| Whole site, wall unit offline | (every row) "Can't be reached right now" | | | |
+Test data: fixture sites 8889 (Fryer and Bain-marie not reporting; the build adds it to data/fixtures), 8888 (five smart circuits: Fryer should have come on, Bain-marie off on timetable, Dishwasher meant to stay on, Glass washer on, Pot wash on but no power), 6750 (older site, one circuit not reporting), 6832 (older site, two circuits connecting), 6749 and 6360 (outside lighting online and offline), 6851 (fans), 6771 (wall unit offline), 5198 (no wall unit), 6772 (one equipment group offline). Typed words: "The kitchen is dead". Timetable request: "Saturday, on from 10:00 for a breakfast event", every week.
 
-Removed rows: "Internal lighting / sockets", "Boiler internals / PCB" (they never change).
+| ID | Script | Expected |
+|---|---|---|
+| R5-01 | 8889: Kitchen, Several / all of it | Override step with "aren't connecting to us... The override on the PowerPause panel still works", the interlock line for both, the guide link; no P1 button |
+| R5-02 | R5-01, then "Yes, it's come on" | Ticket created at once (no button), green script quotes the reference, "What happened" card below, end-of-call block; no red anywhere |
+| R5-03 | R5-01, "No, it hasn't come on", "Yes, it's needed now", Raise the P1 | Solid red P1 warning before; after: P1 raised, ticket ooh_p1, recap below the script; no "press the button in the meantime" tip |
+| R5-04 | R5-01, "No, it hasn't come on", "No, it can wait" | Connection questions in the new colours with teal answers |
+| R5-05 | 8888: Fryer, "They can't find the panel", "Yes" | P1 confirm step, "we can't use the override" |
+| R5-06 | 8888: Bain-marie, "we need it at different times", Continue with nothing filled | Red line asking for days and times and once or every week; no ticket |
+| R5-07 | R5-06 filled in, Every week, Continue | Confirmation only, reference, "next working day", "check it with your management first"; ticket detail holds all four answers |
+| R5-08 | 8888: Something not on this list, "the grill", Continue | Ticket created solved, "Recorded and closed", service contractor script |
+| R5-09 | 8888: Glass washer, "I'll call our service contractor" | Closed record; "service contractor" |
+| R5-10 | 6832: R5-02 then Raise another issue; then End call | Ticket gets exactly one [OOH CALL RECORD] comment per issue; a second End call writes nothing |
+| R5-11 | 6832: confirm site, start Kitchen, close the tab | One closed call-record ticket with What we know so far and "the agent left the screen" |
+| R5-12 | Set OOH_CALL_IDLE_MIN=1, confirm site, wait 2 minutes | Call record published with "no activity" |
+| R5-13 | Site with an active P1 (fixture ticket with ooh_p1) | Banner shows ticket number and status, no Zendesk link; clicking opens /ticket/N in a new tab; the site page stays put |
+| R5-14 | Open tickets panel at a site with OOH and non-OOH tickets | Only OOH-raised open tickets, P1 first with badge, plain status line |
+| R5-15 | Whole-app text scan of the screen dump | None of: "repairs", "call back and", "ring back", "as a priority", "logs a ticket", "Log it", "Capture &", "Add another issue", "manual control button", "zendesk" |
+| R5-16 | Every answer set in every journey | Under a "Customer's answer" label, teal style |
+| R5-17 | 6749: lights, "No, they're still off" | Override instruction and guide link came first; P1 confirm step after |
+| R5-18 | Contractor at 6832: Yes, Tongou, "Yes, it's come on" | Logged, no P1; "No, it hasn't come on" raises the P1 |
 
-## Tests
+Carried from rev 4 and still required: TF-159 kitchen e2e tests (rewritten for the override-first order), the whole-app screen dump diff before the test gate, and the panel's PH-BW-2b and REFRIG-DENY-b checks. The rev 4 panel asked for a pre-build check of the live-read switch: in this codebase it is the TUYA_READ_ENABLED environment variable, not a feature-flag store, and it must be read from the deployment and recorded on the build ticket.
 
-Listed in the contract above. Unchanged from rev 3: TF-159-01, 01b, 02, 02b, 03 (site 8889 added to fixtures), TF-140 "No" clicks.
+## How the customer-experience aims are met
 
-## Risk
+| Aim (discovery and your reviews) | Where you can see it |
+|---|---|
+| A P1 is never missed when the kitchen is needed for service | Scenario 1 and 3: override fails, Yes, P1 confirm |
+| A P1 is never raised when the customer can fix it themselves | Override step on every circuit; lighting and contractor too |
+| The agent always has words to say | Every step and every outcome starts with the green script |
+| The agent never has to decide to log | No log button anywhere; end-of-call block |
+| The ticket number is always shown | "What happened" card, P1 banner, open-tickets panel, call so far |
+| Clear what came from the site | "From this site's equipment list" note and highlighted names |
+| The agent knows which buttons are the customer's answers | Teal answers under "Customer's answer" |
+| No dead end on "not urgent" | Timetable request collects first; confirmation after |
 
-Listed in the contract above.
+## Open flags for build
 
-*Design by ooh-triage-dashboard-R1-mvtv1w9k · 2026-10-29 (revs 1 to 3 by mvrygaux)*
+1. A new Cosmos container, OohCallRecords, must exist in production before release (the app role cannot create it). Until it exists the call record still works in memory but is not durable across a restart.
+2. The IoT team should confirm they are happy to see closed "call record" tickets (tag ooh_call_record) on their dashboard.
+3. Known and not changed here: the "sent, waiting to confirm" control outcome now says plainly when its ticket failed to save, instead of claiming it was logged.
+4. Fixture times in the prototype (00:00, 23:59) are test data, not real timetables.
 
-
----
-
-## Rework addendum — round 1 (design/committee)
-
-### Panel verdicts addressed
-
-**Critical-thinker — five concerns raised within a single verdict**
-
-**Concern 1: "Appears to be switched off" is not confirmed.**
-The phrase "appears to be switched off" was drawn from the orchestrator's screen dump, not a direct flag-store query. The design now imposes a hard pre-build gate: before build begins, the tech lead must query the project's feature-flag store for `kitchen_live_read` and record the exact value (enabled/disabled, and the scope — global, per-environment, per-site) on the build ticket. Build cannot start until that record exists on the ticket. The contract section on the kitchen P1 fix is amended accordingly: "Fix 3 is the part that changes what agents see *if the live read is confirmed disabled in production today*."
-
-**Concern 2: Fixes 1 and 2 ship dormant with no re-validation trigger.**
-The design now requires a linked blocking sub-ticket, **OOHDASH-159-LR-ENABLE**, to be created at build time. That ticket carries the activation checklist: (a) enable `kitchen_live_read` in a staging environment, (b) re-run TF-159-01 and TF-159-02 against staging, (c) tech lead signs off both passing. The flag must not be enabled in production until OOHDASH-159-LR-ENABLE is closed. The test-scripts deliverable is updated to include these two tests explicitly under the "activation" label, so the tester knows they are deferred, not dropped.
-
-**Concern 3: The 158-state comparison rests on a single manual diff.**
-The test-scripts deliverable now includes a **mechanical snapshot-diff step** as the first gate before the human review. The step: replay all fixture-driven test journeys against the build branch, capture the rendered text content of each of the 158 states, hash each, and diff against a committed baseline. Any hash that changes outside the intended-change list (the ten deliberate failures plus the banner removal) fails the CI step and blocks the test gate. The human screen-dump review runs second, against whatever the script did not catch. This makes the human pass a second check, not the sole check.
-
-**Concern 4: PH-BW-2 and refrigeration-deny are listed as intentionally failing without per-test guard verification.**
-Both are behavioural guards, not cosmetic renames, so closing them as "intentionally failing" is not sufficient. The design adds two new mandatory assertions that must **pass** before the test gate:
-
-- **PH-BW-2b**: run the banned-word regex over the new pub-heating wording strings (duration screen and Check-and-log screen). Assert zero matches. This verifies the new wording is clean before PH-BW-2 is retired as a wording-only failure.
-- **REFRIG-DENY-b**: on the refrigeration deny screen, assert that a P1 warning element and a red "Raise the P1" button are present. This confirms the deny/escalation path is intact under the new wording before refrigeration-deny is retired.
-
-Neither PH-BW-2 nor refrigeration-deny may be marked done until their -b sibling passes.
-
-**Concern 5: Controls panel per-render read cost and flaky-read behaviour not stated.**
-The "reachable right now" rule adds one live device-API read per row per page load. Design decisions, stated explicitly:
-
-- **Read count and parallelism**: typically 4 rows per site; all reads are issued in parallel (`Promise.all`), so wall-clock cost is a single request round-trip (~30 ms on a healthy connection), not 4 × 30 ms in series.
-- **Timeout and failure behaviour**: each read carries a 3-second timeout. A row whose read does not resolve within 3 seconds shows "Can't be reached right now" — the same string as a confirmed offline device. The agent sees the conservative result (unreachable assumed) rather than a stale optimistic one. This is by design.
-- **Loading state**: the panel renders immediately; each row shows a small spinner while its read is in flight and updates in place when it resolves. The page is not blocked.
-- **LLM/token cost**: nil — these are device-API reads, not LLM calls.
-- **Named trade-off**: at sites where the Lighthouse device API is itself unreliable (not the equipment — the API), rows will persistently show "Can't be reached right now" even when the equipment is functional. The panel will understate controllability at those sites. This is the deliberate conservative default; the operator should know it means panel accuracy tracks device-API reliability, not just equipment state.
-
----
-
-### Summary of additions
-
-Five additions, one per concern:
-
-1. **Pre-build flag-confirmation gate.** Build cannot start until the tech lead has queried `kitchen_live_read` from the flag store and recorded the exact value on the build ticket. "Appears to be" is removed from the design contract.
-
-2. **Activation/validation plan for Fixes 1 and 2.** A blocking sub-ticket (OOHDASH-159-LR-ENABLE) is required at build time. TF-159-01 and TF-159-02 must pass in staging with the flag enabled before the sub-ticket closes and before the flag goes live in production. The test-scripts deliverable names these tests under the "activation" label.
-
-3. **Mechanical snapshot-diff step added to the test gate.** A fixture-replay script captures all 158 rendered states, hashes each, and diffs against a committed baseline in CI. Any unexpected hash change fails the step and blocks the test gate. The human screen-dump review runs second.
-
-4. **PH-BW-2b and REFRIG-DENY-b added as mandatory passing assertions.** PH-BW-2b runs the banned-word regex over the new pub-heating wording and asserts zero matches. REFRIG-DENY-b asserts the deny screen still contains a P1 warning and a red "Raise the P1" button. Both must pass before the corresponding intentional failures are closed.
-
-5. **Controls panel read cost and failure behaviour stated in the design.** Four parallel reads, 3-second timeout, conservative "Can't be reached right now" fallback, no LLM cost, ~30 ms wall-clock added. The trade-off — panel understates controllability at sites with unreliable device APIs — is named for the operator to accept.
+*Design rev 5 by ooh-triage-dashboard-R1-mvu3frog (design doer) · 2026-10-29 · revs 1 to 3 by mvrygaux, rev 4 by mvtv1w9k*
