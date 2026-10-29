@@ -148,3 +148,54 @@ Listed in the contract above. Unchanged from rev 3: TF-159-01, 01b, 02, 02b, 03 
 Listed in the contract above.
 
 *Design by ooh-triage-dashboard-R1-mvtv1w9k · 2026-10-29 (revs 1 to 3 by mvrygaux)*
+
+
+---
+
+## Rework addendum — round 1 (design/committee)
+
+### Panel verdicts addressed
+
+**Critical-thinker — five concerns raised within a single verdict**
+
+**Concern 1: "Appears to be switched off" is not confirmed.**
+The phrase "appears to be switched off" was drawn from the orchestrator's screen dump, not a direct flag-store query. The design now imposes a hard pre-build gate: before build begins, the tech lead must query the project's feature-flag store for `kitchen_live_read` and record the exact value (enabled/disabled, and the scope — global, per-environment, per-site) on the build ticket. Build cannot start until that record exists on the ticket. The contract section on the kitchen P1 fix is amended accordingly: "Fix 3 is the part that changes what agents see *if the live read is confirmed disabled in production today*."
+
+**Concern 2: Fixes 1 and 2 ship dormant with no re-validation trigger.**
+The design now requires a linked blocking sub-ticket, **OOHDASH-159-LR-ENABLE**, to be created at build time. That ticket carries the activation checklist: (a) enable `kitchen_live_read` in a staging environment, (b) re-run TF-159-01 and TF-159-02 against staging, (c) tech lead signs off both passing. The flag must not be enabled in production until OOHDASH-159-LR-ENABLE is closed. The test-scripts deliverable is updated to include these two tests explicitly under the "activation" label, so the tester knows they are deferred, not dropped.
+
+**Concern 3: The 158-state comparison rests on a single manual diff.**
+The test-scripts deliverable now includes a **mechanical snapshot-diff step** as the first gate before the human review. The step: replay all fixture-driven test journeys against the build branch, capture the rendered text content of each of the 158 states, hash each, and diff against a committed baseline. Any hash that changes outside the intended-change list (the ten deliberate failures plus the banner removal) fails the CI step and blocks the test gate. The human screen-dump review runs second, against whatever the script did not catch. This makes the human pass a second check, not the sole check.
+
+**Concern 4: PH-BW-2 and refrigeration-deny are listed as intentionally failing without per-test guard verification.**
+Both are behavioural guards, not cosmetic renames, so closing them as "intentionally failing" is not sufficient. The design adds two new mandatory assertions that must **pass** before the test gate:
+
+- **PH-BW-2b**: run the banned-word regex over the new pub-heating wording strings (duration screen and Check-and-log screen). Assert zero matches. This verifies the new wording is clean before PH-BW-2 is retired as a wording-only failure.
+- **REFRIG-DENY-b**: on the refrigeration deny screen, assert that a P1 warning element and a red "Raise the P1" button are present. This confirms the deny/escalation path is intact under the new wording before refrigeration-deny is retired.
+
+Neither PH-BW-2 nor refrigeration-deny may be marked done until their -b sibling passes.
+
+**Concern 5: Controls panel per-render read cost and flaky-read behaviour not stated.**
+The "reachable right now" rule adds one live device-API read per row per page load. Design decisions, stated explicitly:
+
+- **Read count and parallelism**: typically 4 rows per site; all reads are issued in parallel (`Promise.all`), so wall-clock cost is a single request round-trip (~30 ms on a healthy connection), not 4 × 30 ms in series.
+- **Timeout and failure behaviour**: each read carries a 3-second timeout. A row whose read does not resolve within 3 seconds shows "Can't be reached right now" — the same string as a confirmed offline device. The agent sees the conservative result (unreachable assumed) rather than a stale optimistic one. This is by design.
+- **Loading state**: the panel renders immediately; each row shows a small spinner while its read is in flight and updates in place when it resolves. The page is not blocked.
+- **LLM/token cost**: nil — these are device-API reads, not LLM calls.
+- **Named trade-off**: at sites where the Lighthouse device API is itself unreliable (not the equipment — the API), rows will persistently show "Can't be reached right now" even when the equipment is functional. The panel will understate controllability at those sites. This is the deliberate conservative default; the operator should know it means panel accuracy tracks device-API reliability, not just equipment state.
+
+---
+
+### Summary of additions
+
+Five additions, one per concern:
+
+1. **Pre-build flag-confirmation gate.** Build cannot start until the tech lead has queried `kitchen_live_read` from the flag store and recorded the exact value on the build ticket. "Appears to be" is removed from the design contract.
+
+2. **Activation/validation plan for Fixes 1 and 2.** A blocking sub-ticket (OOHDASH-159-LR-ENABLE) is required at build time. TF-159-01 and TF-159-02 must pass in staging with the flag enabled before the sub-ticket closes and before the flag goes live in production. The test-scripts deliverable names these tests under the "activation" label.
+
+3. **Mechanical snapshot-diff step added to the test gate.** A fixture-replay script captures all 158 rendered states, hashes each, and diffs against a committed baseline in CI. Any unexpected hash change fails the step and blocks the test gate. The human screen-dump review runs second.
+
+4. **PH-BW-2b and REFRIG-DENY-b added as mandatory passing assertions.** PH-BW-2b runs the banned-word regex over the new pub-heating wording and asserts zero matches. REFRIG-DENY-b asserts the deny screen still contains a P1 warning and a red "Raise the P1" button. Both must pass before the corresponding intentional failures are closed.
+
+5. **Controls panel read cost and failure behaviour stated in the design.** Four parallel reads, 3-second timeout, conservative "Can't be reached right now" fallback, no LLM cost, ~30 ms wall-clock added. The trade-off — panel understates controllability at sites with unreliable device APIs — is named for the operator to accept.
