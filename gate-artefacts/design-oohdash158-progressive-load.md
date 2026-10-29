@@ -233,3 +233,152 @@ No new daemon, watcher, or scheduled task. The `inFlightReads` Map runs inside a
 ---
 
 *Design by ooh-triage-dashboard-R1 · OOHDASH-158 · 2026-10-29*
+
+
+---
+
+## Rework addendum — round 1 (design/draft)
+
+### Panel verdicts addressed
+
+**critical-thinker — readiness signal conflates done/succeeded/never-started**
+
+The panel is correct. `devicesReady = !inFlightReads.has(key)` is wrong because a rejected background read deletes its own entry in `finally`, leaving the Map empty while `perSiteCache` is never written. The `/workspace` poll then returns `devicesReady: true` against an absent cache entry, unlocking scope tiles with no device data behind them.
+
+**Corrected readiness signal — replaces all instances in the design above:**
+
+```js
+// /confirm (routes/api.js line ~119):
+const devicesReady = perSiteCache.has(String(siteNo));
+
+// /workspace (routes/api.js line ~124):
+const devicesReady = perSiteCache.has(String(req.params.siteNo));
+```
+
+`perSiteCache` is only written on a successful `fetchTelemetry` settlement. A failed or timed-out read never writes the cache, so `devicesReady` stays `false` and the client continues polling until either the cache warms or the client reaches its give-up threshold (see Issue 3 below). This closes the false-ready path entirely.
+
+---
+
+**critical-thinker — `classifyDevice(name, profile, {})` kind-equivalence is unverified**
+
+The design asserted, without verification, that calling `classifyDevice` with empty telemetry returns the same `kind` as calling it with full telemetry. If any code path in `classifyDevice` branches on a telemetry field to resolve ambiguous device kinds, the preliminary `deviceSummary` shown on the confirm gate will differ from the settled count the workspace eventually renders. The handler reads one count, watches it silently change, and cannot trust either.
+
+**Design position — Build must verify before implementing the preliminary summary:**
+
+Build must inspect `classifyDevice()` and establish whether any branch condition reads from the telemetry argument. Two outcomes:
+
+| Finding | Design response |
+|---|---|
+| Telemetry does NOT influence `kind` | Preliminary `deviceSummary` string is safe to show. Confirm gate shows e.g. "On Lighthouse: 3 heating zones" as designed. |
+| Telemetry DOES influence `kind` for any device type present on this installation | Preliminary `deviceSummary` must be suppressed. Confirm gate shows "Checking devices…" in its place. The settled workspace renders the real summary after `devicesReady: true`. The confirm gate string is never a count that will later contradict itself. |
+
+The safer default — if Build is uncertain — is to suppress the preliminary summary and show "Checking devices…". A wrong count shown confidently is worse than an honest placeholder. Build may not assume equivalence; it must confirm it.
+
+---
+
+**critical-thinker — no timeout bounds `fetchTelemetry` or the `inFlightReads` entry; client `catch{}` is entirely silent**
+
+The design's "≤30s" claim was asserted with nothing enforcing it. A hung ThingsBoard connection holds the `inFlightReads` entry indefinitely and `perSiteCache` never warms. With `perSiteCache.has()` now as the readiness gate, `devicesReady` stays `false` forever. The client poll's bare `catch{}` swallowed every failure silently, leaving the handler staring at loading tiles with no indication anything is wrong.
+
+**Server-side: fetchTelemetry timeout**
+
+Wrap the background Promise in a `Promise.race` with a configurable deadline:
+
+```js
+const TB_TIMEOUT = Number(process.env.TB_DEVICE_READ_TIMEOUT_MS ?? 30_000);
+
+if (!inFlightReads.has(key)) {
+    inFlightReads.set(key, (async () => {
+        try {
+            const timeout = new Promise((_, reject) =>
+                setTimeout(() => reject(new Error('TB read timeout')), TB_TIMEOUT)
+            );
+            const full = await Promise.race([fetchTelemetry(matched), timeout]);
+            perSiteCache.set(key, { sites: buildFullResult(full, siteNamePromise), at: Date.now() });
+        } finally {
+            inFlightReads.delete(key);
+        }
+    })());
+}
+```
+
+On timeout the Promise rejects, `finally` deletes the entry, `perSiteCache` is not written. Any `/confirm` awaiter that is mid-await on this Promise receives the rejection and the existing `wrap()` handler returns 503 — unchanged behaviour. The 30 s default is chosen to match the existing observed worst-case TB read time; it is configurable without a deploy via the env var.
+
+**Client-side: give-up / escalation state**
+
+The poll loop `catch{}` must count consecutive failures and enforce a wall-clock ceiling. Amended `scheduleWorkspaceRefresh`:
+
+```js
+function scheduleWorkspaceRefresh(fastPoll) {
+    clearInterval(wsRefreshTimer);
+    const interval = fastPoll ? 2000 : 30000;
+    let failCount = 0;
+    const giveUpAt = fastPoll ? Date.now() + 45_000 : null;  // 45s ceiling on fast poll only
+
+    wsRefreshTimer = setInterval(async () => {
+        if (state.view !== 'site' || !state.confirmToken || state.flow || window.ctl) return;
+        try {
+            const { workspace } = await api.get(
+                `/api/sites/${encodeURIComponent(state.siteNo)}/workspace?confirmToken=${state.confirmToken}`
+            );
+            failCount = 0;
+            state.workspace = workspace;
+            if (workspace.devicesReady && fastPoll) {
+                scheduleWorkspaceRefresh(false);
+            }
+            if (state.view === 'site') render();
+        } catch {
+            failCount++;
+            if (fastPoll && (failCount >= 5 || Date.now() >= giveUpAt)) {
+                clearInterval(wsRefreshTimer);
+                state.workspace = { ...state.workspace, devicesReady: 'error' };
+                if (state.view === 'site') render();
+            }
+        }
+    }, interval);
+}
+```
+
+`devicesReady: 'error'` is a new third value (falsy for the `if (devicesReady)` guard but distinguishable from `false`). When `renderWorkspace()` sees `devicesReady === 'error'`, scope tiles render with class `tile-error` instead of `tile-loading`: "Unable to load device data — please refresh" with a Refresh button that calls `location.reload()`. The pulsing animation stops. The flow entry guard shows the same "Unable to load device data" toast but without the "in a moment" qualifier. This is the escalation surface the panel required.
+
+The give-up ceiling is 45 seconds from confirm (≥ the 30s server timeout plus one or two poll cycles for propagation). On the slow 30s poll, no ceiling applies — a transient failure is recovered on the next cycle, consistent with the existing behaviour today.
+
+**Test additions required (amends the test plan in the design above):**
+
+| New test case | Assertion |
+|---|---|
+| Server TB timeout | Mock `fetchTelemetry` to hang >30s; assert `perSiteCache` is not written; assert `/workspace` returns `devicesReady: false` after the timeout fires |
+| Client give-up state | Simulate 5 consecutive `/workspace` poll failures; assert tiles switch to `tile-error` class; assert poll timer is cleared; assert Refresh button is present |
+| Client error floor guard | With `devicesReady: 'error'`, click a tile; assert toast shows "Unable to load device data" (not "in a moment" variant) |
+
+---
+
+**critical-thinker — concurrent same-site resolves unconditionally overwrite the `inFlightReads` entry**
+
+If two `/resolve` requests for the same `siteNo` arrive concurrently, the second call's `inFlightReads.set(key, promise2)` overwrites `promise1`. When `promise1`'s `finally` fires it calls `inFlightReads.delete(key)`, clearing `promise2`'s registration. `promise2`'s settlement still writes `perSiteCache`, but the entry is already gone; any `/confirm` that arrived between `promise1.delete` and `promise2.delete` finds `!inFlightReads.has(key)` and (under the old readiness check) would have seen false-ready.
+
+Under the corrected readiness check (`perSiteCache.has()`), the false-ready window is closed — but the orphaned Promise and the spurious `delete` are still a latent hazard if any future logic re-reads `inFlightReads` directly.
+
+**Fix — set-if-absent (replaces the unconditional set in the design above):**
+
+```js
+if (!inFlightReads.has(key)) {
+    inFlightReads.set(key, (async () => { /* ... */ })());
+}
+```
+
+The first caller wins. The second `/resolve` call returns its own preliminary stubs from the same textSearch result (identical data, since both went through the same code path), and the first caller's background Promise settles `perSiteCache` as normal. No `delete` from one Promise can clear another's registration.
+
+---
+
+### Summary of additions
+
+Four correctness changes are added to the design:
+
+**1. Readiness signal corrected.** `devicesReady` is now gated on `perSiteCache.has(key)` in both `/confirm` and `/workspace`. This closes the false-ready path where a failed telemetry read deleted its own `inFlightReads` entry and left the Map empty while `perSiteCache` was unwritten — the previous `!inFlightReads.has()` check incorrectly treated that state as ready.
+
+**2. `classifyDevice` kind-equivalence made a Build gate, not an assumption.** Build must verify whether any branch in `classifyDevice()` reads telemetry fields. If telemetry influences `kind` for any device type present on this installation, the preliminary `deviceSummary` is suppressed and the confirm gate shows "Checking devices…" instead. The safer default is suppression; Build may not assume equivalence without inspection.
+
+**3. Server timeout + client give-up state specified.** `fetchTelemetry` is wrapped in a `Promise.race` with a 30s deadline (configurable via `TB_DEVICE_READ_TIMEOUT_MS`). On expiry the Promise rejects, `inFlightReads` entry is deleted, `perSiteCache` is not written. Client-side: after 5 consecutive poll failures or 45 seconds wall-clock (whichever comes first), the fast poll cancels and scope tiles transition to a `tile-error` state showing "Unable to load device data — please refresh" with a Refresh button. The silent `catch{}` is replaced by a failure counter and a ceiling. Three new test cases are added to cover these paths.
+
+**4. Concurrent same-site resolves use set-if-absent.** `inFlightReads.set(key, …)` is guarded by `if (!inFlightReads.has(key))`, so the first caller's Promise registration cannot be overwritten by a concurrent second `/resolve` for the same site. This prevents one Promise's `finally`-delete from orphaning another's registration.
