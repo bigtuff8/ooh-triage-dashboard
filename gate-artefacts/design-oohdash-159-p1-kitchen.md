@@ -1,194 +1,150 @@
 <!-- gate:contract
-SECTION: Interactive prototype — click through the real screens
-The prototype is ../docs/project/mockups/OOHDASH-159-mockup.html, embedded in this review. It is built from the real OOH Dashboard screens, captured by running the app twice: once on today's code and once on a working copy of the proposed change. Every screen is the app's own output, not a drawing. A "Live today / Proposed" switch shows the before and after for four scenarios. 1: Kirsty's call, a Tuya site with the kitchen not reporting. 2: a Tuya site with a circuit reachable but off (Bain-marie, Fryer, Dishwasher, Several). 3: an older site with the kitchen not reporting. 4: an older site with the kitchen reachable, which is unchanged. Screens that differ from today are outlined in amber and marked "New or changed screen". A decision switch shows both answers to the open decision below. The same page is also published as its own web page at https://home-desktop-jb-new.tail30d2e6.ts.net/review/oohdash-159-mockup.html for viewing outside the PR.
+SECTION: Rev 4 in one paragraph (your decisions of 29 Oct)
+OOHDASH-159 now delivers two things in one release. First, the missed-P1 kitchen fix from revs 1 to 3: the "Is the kitchen needed for service right now?" question is asked before any route that has no P1. Second, an app-wide text key that you approved on 29 Oct, applied to every screen in every journey. The key: script in a green "Say to the customer" box; agent background in blue, with values from the site highlighted; a red warning directly above every button that logs a ticket or switches equipment, with a stronger P1 version; ticket text in its own dashed box; and one neutral after-action card for every outcome. The ticked lines become "What we know so far", which is also written onto the ticket. The connection-check banner is removed completely. The "What Lighthouse controls at this site" panel is kept and made accurate. OOHDASH-146 is paused; the decisions are recorded on its ticket so it rebases onto this key.
 
-SECTION: Rev 2 — Record outcome warns that it raises a P1 (James review)
-From James's prototype review: before an agent records a P1, the confirm step must say plainly that recording raises a P1. Every P1 confirm step now shows a red notice under the outcome summary: "This raises a P1. Recording this outcome logs an urgent P1 ticket in the IoT Support dashboard, which pages the on-duty manager straight away." The button reads "Record outcome and raise P1" instead of "Record outcome". All P1 outcomes in the dashboard share this one confirm step (heating, hot water, lighting, kitchen, Something else), so the warning applies to every P1, consistently. Non-P1 outcomes keep the plain "Record outcome" button. The button test id (record-outcome) does not change. The notice has its own test id (p1-confirm-warning). One new e2e assertion: a P1 confirm step shows the warning and the new button label, and a captured (non-P1) confirm step does not.
+SECTION: Interactive prototype and the all-screens comparison
+Two linked pages, both built from the app's own rendered screens: today's release (v1.6.5) and a working copy of this design, each run locally in test-data mode. Page 1 is the all-screens comparison: every screen in every journey (158 states), today next to rev 4, each piece of text tagged by its type in the key, with problems flagged. Page 2 is the click-through kitchen prototype for the four 159 scenarios. Links are in the body of this document and in the PR description.
 
-SECTION: Rev 3 — circuit cards separate guidance from the words to say (James review)
-From James's prototype review: the kitchen circuit cards mixed notes for the agent with words to say to the customer in one quoted block. Every live circuit card (should have come on, on as expected, scheduled off, no schedule, on but no power, always-on, on outside hours, schedule unreadable) is now split using the dashboard's existing standard from OOHDASH-144. First the reading in the headline. Then "Good to know (for you, not the customer)": what the reading means and what to do next. Then "Say to the customer": plain words the agent can read out. Two small wording fixes on the same cards: the "ON as expected" headline no longer shows "until ?" when there is no next off time, and the "Caller still says it's our problem" button now says "Customer". The flow, buttons and outcomes do not change. Test ids are kept.
+SECTION: The text key (applies to every screen)
+Script: a green box headed "🗣 Say to the customer", exactly one per step, read out word for word. Where the step asks the customer something, the question is the last line of the box, headed "Ask the customer:", and the answer buttons sit directly under it in the customer's words. Agent background: a blue box headed "ℹ For you (background, not to read out)". It is short and plain, never offers a choice, and is left out when it adds nothing. Any value taken from the site (equipment names, times, temperatures, ticket numbers) is highlighted wherever it appears. Ticket text: a dashed, uncoloured box headed "📄 What goes on the ticket (for the IoT team)". Warning: see the next section. After-action summary: one neutral white card with a dark header that says what happened and shows the ticket number, the same for a P1, a logged ticket or a closed note. The script carries on inside it in the green box. Red is used for nothing else except "this did NOT happen" failure messages. Site status banners (an active P1 on record, a heating timer running) become amber status strips.
 
-SECTION: What this design changes
-One file of product code (public/js/flows.js, the kitchen flow only) plus tests and one new fixture site. The caller is asked "Is the kitchen needed for service right now?" BEFORE the dashboard sends the call down a path that has no P1. A "Yes" raises a P1 straight away. A "No" carries on exactly as today. Three gaps are closed in one PR (D3 + D5): live-mode offline circuits, live-mode reachable-but-off circuits (verdicts A, C, D and off-unknown), and legacy-mode offline circuits. Same ooh_p1 P1 path and IoT Support Dashboard paging as every other P1 (D4). No server, infrastructure or ticket-type changes.
+SECTION: When the red warning appears (your answer to Q2)
+A red warning sits directly above every button that logs a ticket and every button that switches equipment from here. It never appears after the action. The logging buttons are the record-outcome step on every journey and pub heating's Check and log. The switching buttons are the device control window's Send, pub heating's turn-on and turn-off durations, and the lighting and fan switches, which open the control window. Ordinary warning text: "Before you press: this logs a ticket for the IoT team." or "Before you press: this switches the [equipment] [on/off] at the site straight away." A P1 is one of these, and gets the stronger version within the same theme. The box is solid red with a white heading, "🚨 This raises a P1", followed by "It pages the on-duty manager straight away." The button itself is red and reads "Raise the P1". Every other logging button reads "Log it" or keeps its current journey label.
 
-SECTION: Fix 1 — live mode, circuits not reporting (Kirsty's call)
-In live-mode stage 0, the offline list is still worked out first, but it no longer diverts straight away. If any circuit is not reporting and the service question has not been answered, the screen asks it. A new shared block at the top of stage 1 handles the answer, and legacy mode uses the same block (Fix 3). "Yes" raises a P1 at once. The P1 card names the circuits that are not reporting, says the site is serving, and does NOT mention the override button (D1, because the device cannot be reached). "No" diverts to the connectivity check exactly as today. If every circuit is reporting, the question is not asked at stage 0 and the circuit picker shows as today.
+SECTION: What we know so far (replaces the ticked lines)
+The list at the top of each issue is renamed "What we know so far". It holds only two kinds of line, each with its own icon: 👤 what the customer told us (their answers), and 🔎 what the dashboard checked by itself. It is written in plain words with no codes or jargon. It never shows an outcome, action or decision before it has happened: lines such as "Business-critical during service — P1" and "Outcome: captured" are removed, because the after-action card shows the real outcome. The list is sent with the outcome and written onto the ticket as its own section, so the IoT team can see how the conclusion was reached. This is a small server addition: a new knownSoFar list on the outcome request, written as lines in the ticket transcript. It is not added to the P1 text message. All 52 existing lines are rewritten to this rule; the full table is in the body.
 
-SECTION: Fix 2 — live mode, circuit reachable but off
-In live-mode stage 1, before the verdict card is drawn, the dashboard checks the chosen circuit's verdict. For "Several / all of it", it checks every circuit. If any of them is off (verdict A, C, D or off-unknown) and the service question has not been answered, the screen asks it. "Yes" raises a P1 at once, using the live fact line for that circuit. This P1 card DOES include the override tip (D2): the PowerPause override button on the front of the unit is safe to press while the team calls back. "No" shows the verdict card and override guidance exactly as today. Circuits that are ON (verdicts B, E, B-outside, B-unscheduled) are not asked. Those are appliance faults routed to the site's repairs team, as today.
+SECTION: Connection-check banner removed (Q4)
+The red "Some Lighthouse equipment at this site is not responding / Run connection check / This step is optional" banner is removed from the site page completely. So are the "offline" and "router" search words that suggested a connection check. Heating and kitchen still divert to the connection questions automatically when their own equipment is offline, so no journey loses the check. This supersedes OOHDASH-146 D10, which kept a text-only banner.
 
-SECTION: Fix 3 — legacy mode, circuits not reporting
-On legacy (non-Tuya) sites, the service question moves above the offline check. Today it is asked only when every circuit is reachable, so it is now asked on every legacy kitchen call. "Yes" raises a P1. If any circuit is not reporting, the P1 card has no override tip (D1). If every circuit is reachable, the P1 card is unchanged. "No" with a circuit not reporting diverts to the connectivity check as today. "No" with every circuit reachable gives the same captured ticket as today. The not-reporting check is shared with Fix 1. It runs before the existing outcome step and uses the same offline test as stage 0. The live-mode fallback route (live state could not be read) is not an offline case, so its behaviour does not change.
+SECTION: "What Lighthouse controls at this site" kept and fixed (Q5)
+The panel stays, with the same rows and tags, but each row now tells the truth. "Controllable from here" means a screen in this dashboard actually offers control of it AND the equipment can be reached now. Kitchen therefore shows "Monitored only", because no kitchen screen switches circuits. If the Lighthouse wall unit is offline, nothing at the site shows "Controllable from here"; the panel says "Can't be reached right now", the same for every row. A row whose equipment is all offline says "Not responding right now". Heating classes marked unproven, or switched off by a setting, are never "Controllable from here". Fridges and freezers are added ("Monitored only" where present). The two fixed rows that never change ("Internal lighting / sockets", "Boiler internals / PCB") are removed. The footnote changes from "Live from the device inventory" to "From this site's equipment list and its connection right now." The same corrected rule feeds the Something else question, so it stays consistent.
 
-SECTION: The new question uses the existing wording and buttons
-The question, both buttons and their test ids (kitchen-critical, kitchen-notcritical) are copied word for word from the existing legacy question. The operator sees one familiar question, never a new one. On the live-mode screens the buttons record the answer and keep the live circuit data, so "No" returns to the live verdict card and not to the legacy captured ticket.
+SECTION: The kitchen P1 fix (revs 1 to 3, unchanged in behaviour)
+Fix 1, smart circuits not reporting: the service question is asked before the connection divert. Yes raises a P1, with no manual-button tip (D1). No goes to the connection questions as today. Fix 2, smart circuit reachable but off (verdicts A, C, D, off-unknown, including "Several / all of it"): the service question is asked before the circuit card. Yes raises a P1 that includes the manual-button tip (D2). No shows the circuit card as today. Fix 3, older sites with a circuit not reporting: the service question moves above the offline check. Yes raises a P1 with no manual-button tip, and No diverts to the connection questions. Same ooh_p1 path and paging (D4). Note: the smart-kitchen live read appears to be switched off in production today, so Fix 3 is the part that changes what agents see now. Fixes 1 and 2 take effect when the live read is enabled.
 
-SECTION: Follow-up steps after the caller has already said "No"
-Today, "Override didn't work" (A, C, off-unknown) and "Fuse board is fine / still off" (D) re-ask the service question. After this change the caller has already answered "No" at that point. The recommended design skips the repeat and goes straight to a captured ticket for the IoT team: "Kitchen circuit off — not needed until later", naming the circuit, what failed and the live reading. The script is "I've logged it for the IoT team to sort out first thing tomorrow." "Caller still says it's our problem" (B and E) keeps asking, because the question was never asked on those routes. See the decision below.
+SECTION: Kitchen scripts that flow from step to step
+Every kitchen step now has words to say that pick up from the last answer and lead into the next question. Service question, circuits not reporting: "I can see your [fryer and bain-marie] aren't connecting to us at the moment, so I can't see or switch them from here. Ask the customer: is the kitchen needed for service right now, with food being served or breakfast on?" Answers: "Yes, it's needed now" / "No, it can wait". P1 step, before pressing: "Thanks. As you need the kitchen now, I'm going to raise this as urgent with our on-call team." P1 after-action: "That's raised as urgent, reference [45129]. Someone from our on-call team will call you back shortly." For the reachable-but-off version, the after-action script adds: "In the meantime, you can press the manual control button on the front of the PowerPause unit once; it should bring the [bain-marie] on." The circuit cards keep rev 3's split, with "override" changed to "manual control button" (your D3 from 146). The full wording table is in the body.
 
-SECTION: P1 card text
-Both new P1 outcomes keep the existing subject "Kitchen equipment off during service — P1" and the text-message summary "Kitchen equipment off during service", so the IoT team sees one consistent P1 type. Offline card: detail says which circuits are not reporting while the site is serving, and that the IoT team needs to act now. The script is "I've raised an urgent P1 ticket for this site and someone will call you back shortly." with no override mention. Reachable-but-off card: the detail gives the circuit, its live reading and its schedule. The script adds "In the meantime, the override button on the front of the PowerPause unit is safe to use — pressing it once should bring the circuit on." The ticket number is shown on the card as today.
+SECTION: What is not in this release (left for OOHDASH-146)
+146's wording rewrite of the other journeys stays with 146. That covers the D5 customer-answerable options, D6 closed notes, D8 kitchen one-off bookings and D9 customer details. In this release every screen gets the key's presentation and structure: the green script box, the "Ask the customer:" question line, blue info, the warnings, ticket text, the after-action card and What we know so far. Each journey's existing words move into the right box, with only these wording fixes: "caller" becomes "customer", and the ticked lines are rewritten. Scripts on non-kitchen screens are not rewritten to flow step to step; that is 146's job, now recorded on its ticket.
 
 SECTION: Tests
-New: TF-159-01 live offline + Yes gives outcome-p1 with no override text. New: TF-159-02 live verdict C (bain-marie, site 8888) + Yes gives outcome-p1 with override text. New: TF-159-03 legacy offline (fixture site 6750) + Yes gives outcome-p1. Also in the PR: offline + No still reaches the connectivity flow, and verdict C + No still shows the verdict card. TF-159-01 needs a new fixture site, 8889, with one Tuya kitchen circuit reporting offline. Fixture site 8888 has no offline circuit, and adding one there would change every TF-140 test. Existing TF-140-02, 04, 06, 07, 08 and 09 reach verdicts A, D or C, so each gets one extra "No" click before its current assertions. Their assertions do not change. Unit tests are unaffected because the client flow has no unit tests.
+Kept from revs 1 to 3: TF-159-01, 01b, 02, 02b and 03, plus one extra "No" click on TF-140-02, 04, 06, 07, 08 and 09. New for the key, as e2e checks on real screens: every confirm step shows the ticket box and a red warning directly above the button. A P1 confirm shows the P1 warning and a "Raise the P1" button. After recording, the neutral after-action card shows the ticket number and a green script box. No grey quote style remains anywhere (a whole-app check over the screen-dump states). No "What we know so far" line contains P1, Outcome or a ticket before recording. The site page has no connection-check banner. Scope panel unit tests: kitchen is "Monitored only" at site 8888, nothing is "Controllable from here" at site 6771 (wall unit offline), and fridges appear where present. Server unit test: knownSoFar lines appear in the ticket transcript and not in the P1 text. The prototype working copy ran the unit suite: 836 pass, 11 fail. Ten failures are tests asserting the old wording or the old panel rule, which the build updates on purpose: dark-fleet-heating (3), OOHDASH-144 card wording CW-1 and CW-2, outcome-callerwords D-10a (the separate "Recorded from the caller" line is dropped because the customer's words are now the first line of What we know so far), pub heating banned words PH-BW-2, OOHDASH-135 T1-4c and T1-5b, and refrigeration-deny. The eleventh, p1-log, already fails on main. Before the test gate, the orchestrator re-runs the all-screens dump and checks it line by line against this design.
 
 SECTION: Risk
-P1 volume rises on purpose, but only where the caller says service is happening now (R3, accepted in discovery). Calls that are not urgent gain one question on reachable-but-off circuits and on every legacy kitchen call. The override route is otherwise unchanged. There is no server change, so release rollback is the usual image rollback. Before the test gate, the orchestrator dumps the real screen text for every new state and diffs it against this design (standing rule after OOHDASH-144).
+It touches every journey's look, so the screen-dump comparison is the main safety net. Every state is re-captured and diffed before the test gate. The control logic, P1 paging and ticket types do not change. The server change is additive: a new optional field. Rollback is the usual image rollback. Straight quotes only in flows.js (v1.5.3 lesson).
 
-DECISION: Follow-up after "Override didn't work" / "Fuse board is fine" when the caller already said "No" | Skip the repeat question — go straight to the captured ticket (recommended) | Ask the service question again — things may have changed during the call
+DECISION: Follow-up after "No", if the manual control button didn't work or the fuse board is fine | Skip the repeat question and log it for the morning (recommended) | Ask the service question again
 DECISION: Approve design and proceed to build? | Approve — proceed to build | Changes requested
 -->
 
-# OOHDASH-159 Design — P1 missed: kitchen off during active service
+# OOHDASH-159 Design rev 4: kitchen P1 fix + app-wide text key
 
-**Interactive prototype (real screens):** [OOHDASH-159-mockup.html](../docs/project/mockups/OOHDASH-159-mockup.html), embedded in this review.
-**Standalone copy:** https://home-desktop-jb-new.tail30d2e6.ts.net/review/oohdash-159-mockup.html
+**All-screens comparison (today vs rev 4, every journey):** [OOHDASH-159-rev4-screens.html](../docs/project/mockups/OOHDASH-159-rev4-screens.html) · standalone https://home-desktop-jb-new.tail30d2e6.ts.net/review/oohdash-159-rev4-screens.html
+**Kitchen click-through prototype:** [OOHDASH-159-mockup.html](../docs/project/mockups/OOHDASH-159-mockup.html) · standalone https://home-desktop-jb-new.tail30d2e6.ts.net/review/oohdash-159-mockup.html
+**Analysis that led here (your questions a to h):** https://home-desktop-jb-new.tail30d2e6.ts.net/review/oohdash-159-text-key.html
 
-**Date:** 2026-10-28
-**Status:** Design — awaiting gate approval
-**Discovery:** PR #182 (merged 2026-10-28) — James decisions D1–D5 binding
-**Scope:** `public/js/flows.js` kitchen flow only, plus e2e tests and one fixture site. No server, infra or ticket-type changes.
+Date: 2026-10-29 · Discovery PR #182 (D1–D5) · Decisions of 29 Oct (Q1–Q7) below · Base: main 2ab9486 (v1.6.5)
 
----
+## Decisions of 29 Oct
 
-## Rev 3 — circuit cards: "Good to know" split from "Say to the customer"
+| # | Question | Your answer | In this design |
+|---|---|---|---|
+| Q1 | Colour key | Approved; neutral after-action card | Script green, info blue, warning red, after-action neutral |
+| Q2 | When red appears | Before any ticket or switch of equipment; P1 a stronger subset | Warning above every log and switch button; solid-red P1 version with a red "Raise the P1" button |
+| Q3 | Ticked lines | "What we know so far" | 👤 customer answers and 🔎 dashboard checks only; written onto the ticket |
+| Q4 | Connection-check banner | Remove completely | Banner, button, hint and search words removed; automatic divert kept |
+| Q5 | Controls panel | Keep and fix | Truthful rule (see below) |
+| Q6 | Where the key lives | Deliver now in 159; record on 146 | App-wide in this release; 146 ticket updated (comment 41638) |
+| Q7 | P1 step | As Q6 | One P1 pattern, set here |
 
-James's review found that the circuit cards mixed agent guidance and customer wording in one quoted block. Every live circuit card in `verdictCard` (flows.js ~1940) now uses the dashboard's existing OOHDASH-144 blocks, in this order: the reading (headline), **ℹ Good to know (for you, not the customer)** (`gtk-block`), then **🗣 Say to the customer** (`say-block`). Then come the buttons and the live reading, as today.
+## The key, component by component
 
-| Card | Good to know (agent) | Say to the customer |
+| Type | Look | Rules |
 |---|---|---|
-| A — should have come on | It should have come on at [time] but hasn't started; one press of the PowerPause override brings it on. | "Your [circuit] should have come on at [time] but it hasn't started by itself. There's an override button on the front of the PowerPause unit. Press it once and it should come on straight away." |
-| B / always-on / on outside hours — on as expected | Power is reaching it; if it isn't working it's the appliance, so the site's repairs team. | "The [circuit] has power and is switched on at our end. If it still isn't working, it's most likely a fault with the appliance itself, so please contact your repairs team." |
-| C — scheduled off | Normal: scheduled off until [time]; the override brings it on early and it goes back to normal at the next change. | "The [circuit] is off because it's scheduled to be off at this time. It's due to come on at [time]. If you need it now, press the override button on the front of the PowerPause unit once and it will come on early. It'll go back to its normal times after that." |
-| D — no schedule, off | Meant to stay on; off suggests a trip, so check the fuse board first. | "The [circuit] is meant to stay on all the time, so it may have tripped. Could you check the fuse board first? If everything looks fine there, let me know and I'll pass it to our IoT team." |
-| E — on, no power drawn | On at our end but drawing nothing; tripped or switched off at the unit, so an appliance fault for the repairs team. | "The [circuit] has power at our end, but the appliance isn't drawing any. Please check it hasn't been switched off on the appliance itself. If it's switched on and still won't work, it's a fault with the appliance, so please contact your repairs team." |
-| Schedule unreadable, off | The schedule can't be read, so we can't tell if off is expected; the override brings it on. | "I can see the [circuit] is off, but I can't see its schedule right now. Press the override button on the front of the PowerPause unit once and it should come on straight away." |
+| Script | Green box, "🗣 Say to the customer" | One per step. Read out word for word. A question to the customer is its last line, "Ask the customer: …", with answer buttons directly under it in the customer's words. Values from the site are highlighted. |
+| Agent background | Blue box, "ℹ For you (background, not to read out)" | Short, plain, never offers a choice. Left out when it adds nothing. Values from the site are highlighted. |
+| Ticket text | Dashed uncoloured box, "📄 What goes on the ticket (for the IoT team)" | Shown on every confirm step and in Check and log. Never styled as info or script. |
+| Warning | Red box directly above the button | Before every log and every switch. Never after the action. |
+| P1 warning | Solid red heading "🚨 This raises a P1" + red "Raise the P1" button | The only place a red button is used. |
+| After-action summary | White card, dark header "✔ [what happened]" with the ticket number | Same for every outcome type. The green script box carries on inside it. Then "Add another issue" / "End call". |
+| What we know so far | Small list, 👤 and 🔎 icons | Facts only, never an outcome before it happens. Sent to the ticket. |
+| Site status | Amber strip | Active P1 on record, timer running. No longer red. |
+| Failure | Red box | Only for "this did NOT happen" messages (couldn't log, couldn't switch). |
 
-Also on these cards: the "ON as expected" headline reads "Schedule: on since [time]" when there is no next off time (it showed "until ?"), and "Caller still says it's our problem" becomes "Customer still says it's our problem" (button and call-trail line). Test ids are unchanged.
+Implementation is shared code, so every journey changes together:
 
----
+- styles.css gets the new classes. The old grey italic `.script` quote is retired; all 18 uses become the green script box.
+- `finishOutcome` (the confirm step every journey uses) renders the ticket box, the warning and the button.
+- The `outcome*` helpers render the after-action card.
+- `renderFlow` and `doneLine` render What we know so far.
+- The P1 banner moves to amber.
+- views.js:187 (the offline banner) and the connectivity search keyword are removed.
+- control.js gets a warning above "Send to device".
+- Pub heating's duration buttons and Check and log submit get warnings.
+- routes/api.js gets the corrected panel rule, and the outcome route accepts `knownSoFar`.
 
-## Rev 2 — the P1 confirm step says it raises a P1
+## What we know so far: every line rewritten
 
-James's prototype review found the flow lacking: on the P1 routes, "Record outcome" gave no sign that pressing it raises a P1. The change is in `finishOutcome` (flows.js ~268), the confirm step every outcome passes through. When the outcome is a P1 (payload type `escalate-p1`, which every `outcomeP1` call sets):
+| Today (where) | Rev 4 |
+|---|---|
+| Area: Bar/Restaurant (heating) | 👤 Area: Bar/Restaurant |
+| Need: Too cold / not working | 👤 The customer says: too cold or not working |
+| Choosing which zone / Turning heating on — Zone 2 — choose duration | removed (an action in progress, not a fact) |
+| Live read: device not reporting / no thermostat online / device offline | 🔎 The thermostat in this area isn't connecting to us |
+| Requested: warmer / cooler / turn heating off; Reported: heating not working | 👤 The customer wants it warmer / cooler / off; 👤 The customer says the heating isn't working |
+| Requested: warmer · system already calling for heat | 👤 The customer wants it warmer · 🔎 the heating is already asking for heat |
+| No action taken; Outcome: building-heat guidance; Outcome: captured (…) | removed (outcomes) |
+| Air conditioning — not controllable from the dashboard | 🔎 Air conditioning can't be changed from here |
+| Hot water - not on Lighthouse / boiler-side, not controllable | 🔎 Hot water isn't on Lighthouse here / 🔎 Hot water can't be changed from here |
+| The kitchen circuits are reachable. / (159) Some kitchen circuits aren't reporting. | 🔎 The kitchen equipment is connecting to us / 🔎 [Fryer and Bain-marie] aren't connecting to us |
+| Business-critical during service — P1; Not service-critical tonight | 👤 Kitchen needed for service now: yes / 👤 Kitchen needed for service now: no, it can wait |
+| Resolved with on-site override; Fuse board tripped — reset fixed it | 👤 It came on with the manual control button / 👤 The fuse board had tripped and resetting it fixed it |
+| Override did not work — business critical question; Fuse board fine — escalating | 👤 It didn't come on with the manual control button / 👤 The fuse board is fine and it's still off |
+| Site contacting repairs team; Caller still says it's our problem — … | 👤 The customer will call their repairs team / 👤 The customer still thinks it's our equipment |
+| Live read: external lighting device online / NOT responding / not on Lighthouse | 🔎 The outside lighting controller is connecting to us / isn't connecting to us / isn't on Lighthouse here |
+| Resolved via on-site override; Override did not resolve — P1 | 👤 The lights came on with the on-site switch / 👤 The lights are still off after the on-site switch |
+| Live read: extractor fans …; Captured: [note] | 🔎 The fan controller is connecting / isn't connecting to us; 👤 The customer needs: [note] |
+| Refrigeration is monitored-only on Lighthouse; Stock at risk — P1 | 🔎 Lighthouse watches fridge temperatures but doesn't control the fridges / 👤 Stock is at risk right now |
+| Connection check: [result]; Site restored power/connection | 🔎 [result in plain words] / 👤 The customer says it's back on |
+| Contractor: [name] — [need]; PowerPause override … guidance / procedure given / Donkey Derby exception | 👤 Contractor: [name], needs [need]; guidance lines removed (actions); 🔎 This site's manual control button doesn't work (Donkey Derby) |
+| Issue: "[words]"; Checked: [group] → …; Raised as a normal priority ticket; P1 Escalation chosen | 👤 The customer says: "[words]"; 🔎 [group]: controlled / monitored only / not on Lighthouse here; the last two are removed (outcomes) |
 
-- A red notice sits under the outcome summary: **"🚨 This raises a P1.** Recording this outcome logs an urgent P1 ticket in the IoT Support dashboard, which pages the on-duty manager straight away."
-- The button reads **"Record outcome and raise P1"**.
+## Kitchen wording (159 screens)
 
-All P1s share this step, so the warning appears on every P1 across the dashboard, not only the kitchen ones. Non-P1 outcomes are unchanged. The test id `record-outcome` is kept, so existing tests still find the button; the notice carries `p1-confirm-warning`. One new e2e check: a P1 confirm step shows the notice and the new label, and a captured confirm step does not.
+| Screen | What we know so far | Say to the customer | For you | Buttons |
+|---|---|---|---|---|
+| Service question, circuits not reporting (Fix 1, Fix 3) | 🔎 [Fryer and Bain-marie] aren't connecting to us | "I can see your [fryer and bain-marie] aren't connecting to us at the moment, so I can't see or switch them from here. Ask the customer: is the kitchen needed for service right now, with food being served or breakfast on?" | (none) | Yes, it's needed now / No, it can wait |
+| Service question, circuit reachable but off (Fix 2) | 🔎 [Bain-marie] is off | "I can see your [bain-marie] is switched off at the moment. Ask the customer: is the kitchen needed for service right now, with food being served or breakfast on?" | It's off because [its timetable has it off until 17:00 / it should have come on at 11:30 / it's meant to stay on]. | Yes, it's needed now / No, it can wait |
+| Service question, older site, all reachable | 🔎 The kitchen equipment is connecting to us | "Ask the customer: is the kitchen needed for service right now, with food being served or breakfast on?" | (none) | same |
+| P1, not reporting (before pressing) | + 👤 Kitchen needed for service now: yes | "Thanks. As you need the kitchen now, I'm going to raise this as urgent with our on-call team." | We can't see or switch [Fryer and Bain-marie] from here, so the on-call manager needs to call the site back. | Ticket box: "Kitchen equipment off during service — P1. Not reporting while the site is serving: Fryer, Bain-marie. No remote view or control possible; needs immediate IoT action." · P1 warning · [Raise the P1] |
+| P1, not reporting (after) | (same) | "That's raised as urgent, reference [45129]. Someone from our on-call team will call you back shortly." | (none) | After-action card "✔ P1 raised #45129 · The on-duty manager has been paged." · Add another issue / End call |
+| P1, reachable but off (before) | + 👤 Kitchen needed for service now: yes | as above | [Bain-marie] can be reached but is off; the on-call manager will call the site back. | Ticket box carries the plain-words reading ("Checked at 18:23: the bain-marie is off; its timetable has it off until 17:00") · P1 warning · [Raise the P1] |
+| P1, reachable but off (after) | (same) | "That's raised as urgent, reference [45130]. Someone from our on-call team will call you back shortly. In the meantime, you can press the manual control button on the front of the PowerPause unit once; it should bring the [bain-marie] on." | (none) | After-action card |
+| "No" (reachable but off) | + 👤 Kitchen needed for service now: no, it can wait | the circuit card's own script (rev 3 wording, "manual control button") | rev 3 "good to know" text, as blue info | rev 3 buttons |
+| "No" (not reporting) | + 👤 … no, it can wait | the connection questions, in the key | | |
+| Follow-up after "No" (recommended: no repeat) | + 👤 It didn't come on with the manual control button | "I've logged it for our IoT team to sort out first thing tomorrow." (after-action) | | Ticket box "Kitchen circuit off — not needed until later…" · ordinary warning · [Log it] |
 
----
+## Controls panel: corrected rule
 
-## The principle
+| Row | Controllable from here | Monitored only | Not responding right now | Not on Lighthouse here |
+|---|---|---|---|---|
+| Heating | A heating device is controllable from a screen (pub heating boost, or a thermostat class that is proven and switched on by its setting) and it is online | Heating device present but not controllable | Every heating device offline | None |
+| Hot water | Boiler panel can change hot water and is online | Hot water signal present | Panel offline | As today |
+| Kitchen equipment | Never (no kitchen screen switches circuits) | Kitchen circuits present | Every circuit offline | None |
+| Outside lighting / Extractor fans | A switch-capable circuit that is online and registered (the same test the switch button uses) | Present, not switchable | All offline | None |
+| Fridges and freezers (new) | Never | Present | All offline | None |
+| Whole site, wall unit offline | (every row) "Can't be reached right now" | | | |
 
-Ask "Is the kitchen needed for service **right now**?" **before** the dashboard sends the call down a route that has no P1. A "Yes" is a P1 straight away. A "No" behaves exactly as today. That is the one rule applied in all three places.
+Removed rows: "Internal lighting / sockets", "Boiler internals / PCB" (they never change).
 
-| Situation | Before | After — "Yes" | After — "No" |
-|---|---|---|---|
-| Live (Tuya), any circuit not reporting | Straight to connectivity, no P1 (Kirsty, #51205) | P1, **no** override tip (D1) | Connectivity, as today |
-| Live, chosen circuit reachable but off (A / C / D / off-unknown) | Override advice; P1 only after override fails | P1 **with** override tip (D2) | Verdict card + override, as today |
-| Live, circuit ON (B / E / B-outside / B-unscheduled) | Repairs advice | Not asked — unchanged | Not asked — unchanged |
-| Legacy, any circuit not reporting | Straight to connectivity, no P1 | P1, **no** override tip (D1) | Connectivity, as today |
-| Legacy, all reachable | Service question → P1 / captured | Unchanged | Unchanged |
+## Tests
 
----
-
-## Fix 1 — Live mode, circuits not reporting (`flows.js` ~1864–1868)
-
-Today: in live-mode stage 0, `offlineDevices` is worked out (circuits whose Tuya verdict is `offline`). If any exist, the flow immediately switches `f.cat` to `connectivity` and hands over to the connectivity flow.
-
-Change: keep working out `offlineDevices`. If any exist and `f.data.crit` is not yet set, return the service question (existing wording, existing `kitchen-critical` / `kitchen-notcritical` buttons). The answer goes through `flowStep`, which moves to stage 1. A new shared block, the "not-reporting outcome", handles the answer. It is described under Fix 3 because legacy mode uses it too.
-
-If no circuit is offline, stage 0 is unchanged and the picker or single-circuit auto-select runs as today.
-
-## Fix 2 — Live mode, circuit reachable but off (`flows.js` ~1950–2085)
-
-Today: stage 1 shows `verdictCard` for the chosen circuit. For verdicts A, C and off-unknown the card offers "Sorted with the override" / "Override didn't work". For D it offers the fuse-board check. The service question appears only after one of those fails.
-
-Change: after the follow-up (`_kitchenOutcome`) handling and the legacy-crit handling, and before the verdict card is drawn, work out the "off" circuits:
-
-- single circuit: the chosen device, if its verdict is `A`, `C`, `D` or `off-unknown`;
-- "Several / all of it": every live circuit with one of those verdicts.
-
-If at least one is off and `f.data.crit` is not set, return the service question. Its buttons set `crit` but **keep** `_liveKs`. The existing post-failure buttons clear `_liveKs`, and copying them here would wrongly send a "No" to the legacy captured ticket.
-
-- `crit` = 1: `outcomeP1` with the reachable wording. The detail carries `tuyaFactLine` for the off circuit(s).
-- `crit` = 0: draw the verdict card as today. Nothing else changes.
-
-ON verdicts (B, E, B-outside, B-unscheduled) skip the question. Those routes are appliance faults for the site's repairs team, and their "Caller still says it's our problem" button keeps asking the question as today.
-
-## Fix 3 — Legacy mode, circuits not reporting (`flows.js` ~1852–1861)
-
-Today: `off` is true when any kitchen circuit is not online, and it diverts to connectivity before the service question. The question is asked only when all circuits are reachable.
-
-Change: in legacy stage 0, ask the service question first, whatever the reachability. The doneLine reads "Some kitchen circuits aren't reporting." or "The kitchen circuits are reachable." to match.
-
-**Shared not-reporting outcome (Fixes 1 and 3).** This is a new block at the very top of `stage >= 1`, before the legacy and live stage-1 branches. It runs when `f.data.crit` is set and the site has a kitchen circuit not reporting. The test is the same as stage 0 uses: on a live site, any Tuya verdict `offline`; on a legacy site, any circuit with `online` false. The block must sit there because neither stage-0 route stores `_liveKs` before asking. Without it, the answer would fall into the legacy branch, which does not know about offline circuits.
-
-- `crit` = 1: `outcomeP1` with the offline wording (below). No override tip.
-- `crit` = 0: set `f.cat` to `connectivity`, reset the stage, and hand over to the connectivity flow. This is today's divert, one question later.
-
-When every circuit is reporting, the block does nothing. The existing legacy branch then gives today's P1 or captured ticket, unchanged. The live fallback route (verdict `fallback`) also lands in the legacy branch. It is untouched, because a fallback circuit is not an offline one: stage 0 has already caught every offline circuit.
-
----
-
-## Follow-up after "No" (decision)
-
-Once the caller has said "No", "Override didn't work" and "Fuse board is fine / still off" would ask the same question again. The recommended design reads the answer already given and goes straight to a captured ticket (`kitchen-powerpause`), with no repeat question:
-- Subject: "Kitchen circuit off — not needed until later".
-- Detail: "[circuit] is off and the on-site override didn't bring it on (or: the fuse board is fine). The customer doesn't need it for service until later." followed by the live reading.
-- Script: "I've logged it for the IoT team to sort out first thing tomorrow."
-
-The call trail shows "Not needed for service right now", then "Override did not work" or "Fuse board is fine". The alternative keeps the repeat question, in case the situation changed during the call. James to choose.
-
----
-
-## P1 card text
-
-Both outcomes keep the subject **"Kitchen equipment off during service — P1"** and the SMS summary **"Kitchen equipment off during service"** (`p1Summary`). They use the same `ooh_p1` route, with no new tag (D4). The ticket number is shown as today.
-
-**Offline (Fix 1, Fix 3):**
-- Detail: "Kitchen circuits not reporting while the site is actively serving: [circuit names]. No remote view or control possible; needs immediate IoT action."
-- Script: "I've raised an urgent P1 ticket for this site and someone will call you back shortly."
-
-**Reachable but off (Fix 2):**
-- Detail: "Kitchen circuit off while the site is actively serving." followed by the live fact line (relay state, schedule state, read time).
-- Script: "I've raised an urgent P1 ticket for this site and someone will call you back shortly. In the meantime, the override button on the front of the PowerPause unit is safe to use — pressing it once should bring the circuit on."
-
----
-
-## Prototype — how it was built
-
-The prototype was not drawn. The app ran locally in fixture mode twice, once on today's code and once on a throwaway working copy of the change described here. A script then clicked every kitchen button on four fixture sites and saved each real screen. The prototype replays those screens, so every word and button is exactly what the build would show. The working copy is not committed. The build re-implements it under review.
-
-Prototype fixture notes: new site 8889 has two Tuya circuits (Fryer, Bain-marie), both not reporting, with `online` false as a dead gateway would show. Site names are fictional in the prototype.
-
----
-
-## Tests (`tests/tuya-kitchen-flow.spec.js` plus a legacy spec)
-
-| ID | Set-up | Click path | Expect |
-|---|---|---|---|
-| TF-159-01 | New fixture site 8889 — one Tuya kitchen circuit, `tuyaFixture.online` false (verdict `offline`) | Kitchen tile → Yes | `outcome-p1`; card text has no "override" |
-| TF-159-01b | Site 8889 | Kitchen tile → No | connectivity flow shown, no P1 |
-| TF-159-02 | Site 8888 bain-marie (verdict C) | Picker → Bain-marie → Yes | `outcome-p1`; card text includes the PowerPause override line |
-| TF-159-02b | Site 8888 bain-marie | Picker → Bain-marie → No | `kitchen-verdict` card as today |
-| TF-159-03 | Fixture site 6750 (legacy, circuit offline) | Kitchen tile → Yes | `outcome-p1`; no override line |
-
-Existing TF-140-02 (A), 04 (D), 06 (C), 07 (all → top verdict A), 08 (A → override-ok) and 09 (D → fuse-fail) each gain one "No" click before their current assertions. TF-140-03 and 05 (B, E) are unchanged. TF-140-09's either/or assertion becomes a strict `outcome-captured` if the recommended follow-up option is chosen.
-
-Why a new site, 8889: fixture site 8888 has five reachable circuits that every TF-140 test depends on. An offline circuit there would put every TF-140 test through the offline P1 route.
-
----
+Listed in the contract above. Unchanged from rev 3: TF-159-01, 01b, 02, 02b, 03 (site 8889 added to fixtures), TF-140 "No" clicks.
 
 ## Risk
 
-- P1 volume goes up on purpose, but only when the caller confirms service is happening now. R3 was accepted at discovery.
-- Calls that are not urgent gain one extra question on reachable-but-off circuits and on every legacy kitchen call. That is cheap compared with a missed P1.
-- The client file is the only product change. Rollback is the usual image rollback.
-- v1.5.3 lesson: `flows.js` must use straight quotes. A curly quote shipped a SyntaxError before. The build runs the full e2e suite, and CI must be green before merge.
-- Screen-text diff before the test gate: every new state's real text is dumped and checked against this design.
+Listed in the contract above.
 
----
-
-*Design by ooh-triage-dashboard-R1-mvrygaux · 2026-10-28*
+*Design by ooh-triage-dashboard-R1-mvtv1w9k · 2026-10-29 (revs 1 to 3 by mvrygaux)*
