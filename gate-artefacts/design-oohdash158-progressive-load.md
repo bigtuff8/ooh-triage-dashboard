@@ -442,6 +442,124 @@ Three correctness fixes are added in this addendum.
 
 **3. Readiness check made consistent across both routes.** `/confirm` previously used a bare `perSiteCache.has()` (no TTL) while `/workspace` used a TTL-aware check. An expired cache entry caused contradictory `devicesReady` signals within the same poll cycle. Both routes now use an identical TTL-aware `isCacheWarm()` helper. A unit test is added: expired-cache scenario must return `devicesReady: false` from both routes.
 
+---
+
+## Rework addendum — round 4 (design/committee)
+
+### Panel verdicts addressed
+
+**critical-thinker — anyOffline/degraded/boostAvailable telemetry dependency unverified**
+
+The design asserted these fields are telemetry-independent without verifying it. If any of them derives from TB device online/offline status or device telemetry, the partial workspace shown during `devicesReady:false` will display a confident-but-wrong value (e.g. "no devices offline" when we simply have not read the devices yet).
+
+**Build gate — same pattern as classifyDevice:**
+
+Build must inspect `workspacePayload()` field by field and classify each as telemetry-independent or telemetry-dependent:
+
+| Field | Expected source | If telemetry-dependent |
+|---|---|---|
+| `tickets` | Zendesk — telemetry-independent | N/A |
+| `activeP1Tickets` | Zendesk — telemetry-independent | N/A |
+| `boostAvailable` | Cosmos boost holds — telemetry-independent | N/A |
+| `anyOffline` | UNCERTAIN — Build must verify | Show `null`; header renders no indicator |
+| `degraded` | UNCERTAIN — Build must verify | Show `null`; header renders no indicator |
+
+Any field Build finds to be telemetry-dependent must return `null` when called with the preliminary site shape, and `renderWorkspace()` must render `null` for those fields as a neutral non-assertion (no indicator — not "everything OK", not "error"). Build must document its findings in the PR description before merge; if it cannot verify, the safe default is `null`.
+
+---
+
+**critical-thinker — workspacePayload preliminary-shape fallback is circular**
+
+Gap-3 stated "if workspacePayload cannot accept the preliminary shape, the session stash is the resolution" — which is circular because the stash IS the preliminary site object. The concrete specification:
+
+When `devicesReady` is `false`, `workspacePayload(stash.preliminarySite, false)` must produce a valid partial workspace object. The preliminary site object is structurally identical to `perSiteCache.sites[0]` except that device-telemetry fields are absent or zeroed. Build must confirm `workspacePayload` does not throw on this input by running it against a fixture preliminary site before implementing the routes. If any field access throws (e.g. because the preliminary shape is missing a property workspacePayload reads), that property must be given a safe default in the preliminary site object at construction time. There is no other fallback. The session stash does not provide an alternative site shape — it IS the preliminary site.
+
+---
+
+**critical-thinker — siteStash grows unbounded; zero-recurring-cost claim incomplete**
+
+The session `siteStash` accumulates one entry per resolved site per session, each holding the raw TB matched-stubs array (potentially dozens of device records). No eviction is defined. Over a long shift a handler resolving many sites leaves growing session state, risking cookie size limits or session store bloat.
+
+**Fix — single-entry stash (reset on each /resolve):**
+
+```js
+// /resolve route, before res.json:
+// Clear previous stash entries — only the current site's stash is needed
+req.session.siteStash = {
+    [String(siteNo)]: { preliminarySite: prelimSiteObject, tbMatchedStubs: matched }
+};
+```
+
+Replacing the entire `siteStash` object on each `/resolve` means only one site's stash is held at a time. The bounded cost: one raw TB textSearch result array (typically 10–40 device objects per site) per active session. This is fixed-size regardless of shift length.
+
+The cost section is amended: "Session state adds one raw TB textSearch result per active session (reset on each site resolve), bounded by the TB device count for a single site."
+
+If a handler has two tabs open for two different sites simultaneously, the second `/resolve` clears the first tab's stash. The first tab then gets a 400 on its next `/workspace` poll, enters the give-up/error state, and the handler must refresh that tab. This is the accepted behaviour for single-slot-per-session — consistent with the single-replica topology constraint already stated.
+
+---
+
+**technical — spec has multiple superseded versions; Build must not use stale body text**
+
+The design body plus four rework addendums contain three superseded versions of the readiness check alone. Build implementing from the wrong version would reintroduce the false-ready bug.
+
+**Spec precedence — authoritative version of each superseded item:**
+
+| Item | Authoritative version | Supersedes |
+|---|---|---|
+| Readiness check | `isCacheWarm(siteNo)` — addendum round 3 | Body `!inFlightReads.has()` and addendum-1 `perSiteCache.has()` |
+| `/confirm` await behaviour | No await on inFlightReads, ever — addendum round 2 | Phase 1a body description of getSitesByNumber call |
+| `/workspace` implementation | Gap-3 implementation (addendum round 1, committee) | Body description of /workspace using getSitesByNumber |
+| Session stash shape | Two-key `{ preliminarySite, tbMatchedStubs }`, single-entry — addendum rounds 2 and 4 | Body and any earlier single-key description |
+| Background Promise shape | Full `doAll()` race — addendum round 1, committee Gap 2 | Addendum-1 `Promise.race([fetchTelemetry, timeout])` only |
+| `.catch()` placement | Separate subscriber on bgPromise — addendum round 2 | Any try/catch-only description |
+
+Build must read the addendums in round order and treat the latest version of each item as the contract. The design body is the narrative context, not the implementation spec where an addendum has amended it.
+
+**Additionally:** Build must add a note in the PR that the re-warm path fires `doAll()` from `/resolve`-time stashed TB stubs. Those stubs reflect the textSearch result at resolve time. If a handler leaves the workspace open for >20 minutes and the cache expires, the re-warm uses stubs that may not reflect devices added or removed since. This is accepted behaviour for a triage tool — the handler is on an active call — and does not require a guard, but must be documented in the build PR for future reference.
+
+---
+
+**security — confirmToken query-string fallback must be removed in the same PR**
+
+The prior addendum introduced a query-string fallback "for backward compatibility during deployment" and deferred removal to a cleanup commit. The security lens correctly identifies this as a risk: the fallback silently becomes permanent if the cleanup is skipped.
+
+**Revised approach — no fallback; client and server change in the same PR:**
+
+Server reads `X-Confirm-Token` header only:
+
+```js
+const confirmToken = req.headers['x-confirm-token'];
+if (!confirmToken) return res.status(400).json({ error: 'confirmToken required' });
+```
+
+Client sends the header only (no query string). Since client and server change in the same PR, the two are always in sync. There is no compatibility window requiring the fallback. The query-string path is removed entirely.
+
+Build must verify that the existing `confirmToken` validation logic — which binds the token to the session operator — is unchanged by this move. The validation must still read the token value and run the same expiry and operator-match checks that run today, regardless of whether the token arrived in a query string or a header. Build must confirm this in the PR description before merge: "confirmToken header validation runs the same authz checks as the prior query-string validation; no authz regression."
+
+---
+
+**compliance — BLOCK flag, no findings**
+
+No findings were raised. Acknowledged; no actionable change.
+
+---
+
+### Summary of additions
+
+Six items are addressed in this addendum.
+
+**1. anyOffline/degraded/boostAvailable made a Build gate.** Build must audit `workspacePayload()` field by field. Fields confirmed telemetry-independent are included normally. Fields found to be telemetry-dependent must return `null` when built from the preliminary shape, and the header renders a neutral non-assertion. Build documents its findings in the PR description.
+
+**2. workspacePayload preliminary-shape contract made concrete.** `workspacePayload(stash.preliminarySite, false)` is the only path; there is no alternative fallback shape. Build must run the function against a fixture preliminary site before implementing the routes and add safe defaults to the preliminary site constructor for any property that would cause a throw.
+
+**3. siteStash eviction specified.** The stash is reset to a new single-entry object on each `/resolve`, replacing any previous entries. Only one site's raw stubs are held per session at any time. The bounded cost (one raw TB device array per active session) is documented in the cost section. A handler with two simultaneous tabs loses the first tab's stash on the second resolve; that tab enters the give-up/error state on its next /workspace poll.
+
+**4. Spec precedence table added.** A precedence table names the authoritative version of each item that has a superseded earlier version. Build must not implement from the design body where an addendum has amended it. The re-warm staleness caveat (>20-min re-warm uses /resolve-time stubs) is added as a documented build-PR note.
+
+**5. confirmToken fallback removed; single-PR delivery.** The query-string fallback is dropped. Server reads the header only; client sends the header only; both change in the same PR with no compatibility window. Build must confirm the existing authz checks are applied identically to the header-delivered token and document this in the PR description.
+
+**6. Compliance lens acknowledged with no actionable items.**
+
 
 ---
 
