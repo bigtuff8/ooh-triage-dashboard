@@ -177,3 +177,49 @@ Carried from rev 4 and still required: TF-159 kitchen e2e tests (rewritten for t
 4. Fixture times in the prototype (00:00, 23:59) are test data, not real timetables.
 
 *Design rev 5 by ooh-triage-dashboard-R1-mvu3frog (design doer) · 2026-10-29 · revs 1 to 3 by mvrygaux, rev 4 by mvtv1w9k*
+
+
+---
+
+## Rework addendum — round 1 (design/draft)
+
+### Panel verdicts addressed
+
+**Critical-thinker — Idle sweep cannot distinguish a live call from an abandoned one**
+
+The concern is correct: a 20-minute cap on inactivity fires on step submissions, but during a real P1 the agent may spend 25 minutes on the phone while the customer hunts the PowerPause panel — no step is submitted, the tab is open, and the sweep finalises mid-call. The fix is a browser heartbeat, not a longer timer. While the tab is open and visible, the browser sends `POST /api/calls/:id/heartbeat` every two minutes; the server writes `lastHeartbeatAt` to the call record in Cosmos (a single field update, no token cost). The idle sweep checks `lastHeartbeatAt`, not `lastActivityAt`. A call is only a candidate for finalisation when no heartbeat has arrived for longer than the idle threshold — meaning the tab is closed, navigated away, or the browser has crashed. A live call with the agent waiting on the customer generates a heartbeat every two minutes and is never swept. The tab-closed finalisation path already exists (`visibilitychange` → keepalive `finalise`); the heartbeat is its complement for the stay-open case.
+
+If a call is swept in error (heartbeat gap caused by a network drop, say), the same-operator resume path handles recovery: on returning to the same site, if a finalised call record is found for the same operator within the last two hours, the agent is offered "Continue this call" before a new record is created. This caps the cost of any mis-finalisation.
+
+The data dictionary additions for this are in the summary below.
+
+**Critical-thinker — Idle-timer correctness depends on in-memory state under multiple replicas**
+
+The concern is correct: if two replicas both hold an in-memory call map with different `lastActivityAt` values (because round-robin routing split the progress writes), the replica that received fewer writes will see a stale timestamp and may finalise a live call. The fix follows directly from the heartbeat design above: the sweep does not use in-memory `lastActivityAt` at all for the finalise decision. For each candidate call (any call whose in-memory `lastHeartbeatAt` is absent or stale), the sweep does one Cosmos point-read to fetch the durable `lastHeartbeatAt` before deciding. Only if Cosmos also shows the threshold exceeded does it finalise. At OOH volumes (tens of concurrent calls at most) this is one lightweight read per candidate per minute — negligible. The finalise write uses a conditional patch (`IF status = open AND lastHeartbeatAt < :threshold`) so two replicas racing cannot both finalise the same call. This design is safe at any replica count and requires no single-replica constraint.
+
+**Critical-thinker — In-app ticket status view assumes a stable, translatable Zendesk status vocabulary**
+
+The concern is correct: if a Zendesk status is renamed, a ticket is merged into another, or the ticket is deleted, the plain-status line either shows a raw untranslated value or breaks. The `GET /api/tickets/:id/view` endpoint must implement explicit fallbacks for every failure mode:
+
+| Condition | What Zendesk returns | Plain status shown |
+|---|---|---|
+| Known status: new, open, pending, hold, solved, closed | 200 with known status | Mapped phrase (e.g. "Being assessed by the IoT team", "Waiting for more information", "Resolved") |
+| Unknown or renamed status | 200 with unrecognised value | "Being handled by the IoT team" |
+| Ticket merged (target ticket survives; merged ticket gets status `closed` + `merged` tag) | 200, status `closed`, tag `merged` | "Merged with another ticket — being handled by the IoT team" |
+| Ticket deleted | 404 | "Ticket no longer available" |
+| Zendesk API error or timeout | 4xx / 5xx / timeout | "Status unavailable — check Zendesk if this is urgent" |
+| Call record linked to a ticket that was later re-tagged or split | Any of the above | Same fallbacks; the endpoint never surfaces a raw Zendesk status string to the UI |
+
+The mapping table above is added to the data dictionary as the `ticketStatusMap` contract. Build must treat any value outside the left column as the "unknown status" fallback — the mapping is a closed list, not a catch-all `toString()`. The IoT team should be made aware (open flag 5 below) that renaming a status in Zendesk will degrade in-app display to the generic phrase until the map is updated in code; this is a one-line change and does not require a design revision.
+
+---
+
+### Summary of additions
+
+Three concrete additions resolve the block:
+
+**1. Browser heartbeat and same-operator resume** (addresses idle-sweep verdict and partially the replica verdict). The browser sends a lightweight keepalive to `/api/calls/:id/heartbeat` every two minutes while the tab is open and visible. The server writes `lastHeartbeatAt` to the Cosmos call record. The idle sweep reads `lastHeartbeatAt` from Cosmos (not from memory) and only finalises when that durable timestamp is beyond the threshold. If a call is swept in error, the same-operator resume prompt on returning to the same site within two hours prevents lost work. New data-dictionary entries: `lastHeartbeatAt` (call record field, timestamp of most recent heartbeat); `/api/calls/:id/heartbeat` (POST, sign-in and operator-bound); `sameOperatorResume` (boolean flag in `/api/sites/:siteNo/confirm` response, true when a recent finalised record exists for the operator).
+
+**2. Durable-state idle sweep with conditional write** (addresses the multi-replica verdict fully). The sweep performs a Cosmos point-read per candidate call before finalising, and uses a conditional patch to prevent double-finalisation under concurrent replicas. No in-memory timestamp is trusted for the finalise decision. Design is safe at any replica count.
+
+**3. Ticket status fallback map** (addresses the status-vocabulary verdict). The `ticketStatusMap` is defined as a closed mapping from Zendesk status values to plain-English phrases, with explicit entries for merged tickets, deleted tickets, API failures, and unknown values. The API never surfaces a raw Zendesk status to the UI. A new open flag (5) asks the IoT team to notify the development team if any Zendesk status is renamed, so the map can be updated.
