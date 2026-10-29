@@ -234,6 +234,120 @@ No new daemon, watcher, or scheduled task. The `inFlightReads` Map runs inside a
 
 *Design by ooh-triage-dashboard-R1 · OOHDASH-158 · 2026-10-29*
 
+---
+
+## Rework addendum — round 2 (design/committee)
+
+### Panel verdicts addressed
+
+**critical-thinker — session stash is a single unkeyed slot; write point never specified; warmCacheIfCold shape unverified**
+
+Three related findings, one root fix. The design introduced `req.session.preliminarySite` across multiple addendums but never specified: (a) where it is written, (b) that it is keyed by siteNo to prevent cross-site overwrite, or (c) that `warmCacheIfCold` needs the raw TB matched-stubs array — not the processed preliminary site object — to re-fire `fetchTelemetry`.
+
+**Fix — two-key session stash, keyed by siteNo, written in `/resolve`:**
+
+The session stash is written once, in the `/resolve` route, immediately before `res.json(...)`:
+
+```js
+// routes/api.js — /resolve route, immediately before res.json:
+req.session.siteStash = req.session.siteStash || {};
+req.session.siteStash[String(siteNo)] = {
+    preliminarySite: prelimSiteObject,   // processed site object — same shape as perSiteCache.sites[0]
+    tbMatchedStubs:  matched             // raw TB textSearch result array — input to fetchTelemetry
+};
+```
+
+`prelimSiteObject` is the preliminary site object already being returned by `fetchLiveSitesByNumber` at `/resolve` time. `matched` is the TB textSearch result array, available in the same code path before `fetchTelemetry` is deferred. Both must be serialisable (no circular refs, no Promises).
+
+`/workspace` reads the stash with a siteNo guard before using either field:
+
+```js
+const stash = req.session.siteStash?.[String(siteNo)];
+if (!stash) return res.status(400).json({ error: 'No prior resolve for this site in session.' });
+const site = devicesReady ? cached.sites[0] : stash.preliminarySite;
+if (!devicesReady && !inFlightReads.has(siteNo)) {
+    warmCacheIfCold(siteNo, stash.tbMatchedStubs);  // raw stubs — not the preliminary site object
+}
+```
+
+`warmCacheIfCold(siteNo, tbMatchedStubs)` receives `matched` (the raw TB textSearch stubs). The processed `preliminarySite` is passed only to `workspacePayload`. These two shapes are now explicitly separated with field names that make their purpose unambiguous. The Gap-4 addendum incorrectly described `warmCacheIfCold` as receiving `req.session.preliminarySite`; that was wrong — `fetchTelemetry` needs the raw stubs, not the processed object. This addendum corrects that.
+
+Build must confirm that `matched` is captured in a local variable before the deferred Promise IIFE is created in `fetchLiveSitesByNumber`, so it is still accessible at the session-write point in the `/resolve` route.
+
+---
+
+**technical — same session-stash findings; cost note on mid-session re-warm**
+
+The siteNo guard and shape-verification findings are resolved by the two-key stash above.
+
+The cost section stated "zero recurring cost" without acknowledging that the Gap-4 re-warm can trigger a full TB read on TTL expiry. Corrected statement: the only case where a re-warm fires is when `perSiteCache` expires (after SESSION_CACHE_TTL_MS, default 20 minutes) and the handler is still actively polling. In normal use this does not occur — a typical OOH call resolves well under 20 minutes. In the rare case it does, a single re-warm fires at most once per 20-minute window, costing one extra TB read (~15s) — the same as the initial load, not a recurring charge. The cost is bounded and does not scale with usage volume; it scales only with active-session duration beyond 20 minutes. The cost section in the design body is amended accordingly.
+
+---
+
+**security — confirmToken in GET query string; single-slot cross-site**
+
+The single-slot cross-site concern is resolved by the siteNo-keyed stash.
+
+The `confirmToken` query-string concern is addressed as a design change: move `confirmToken` to a request header on every `/workspace` poll call. This removes it from access logs, referer headers, and browser history.
+
+Client change in `views.js` (`scheduleWorkspaceRefresh`):
+
+```js
+const { workspace } = await api.get(
+    `/api/sites/${encodeURIComponent(state.siteNo)}/workspace`,
+    { headers: { 'X-Confirm-Token': state.confirmToken } }
+);
+```
+
+Server change in `routes/api.js` (`/workspace` route):
+
+```js
+const confirmToken = req.headers['x-confirm-token'] ?? req.query.confirmToken;
+```
+
+The fallback to `req.query.confirmToken` maintains backward compatibility during deployment. Once the client is live, the query-string variant is removed in a cleanup commit. Build must verify that the `api.get()` helper in `views.js` accepts an options object as a second argument; if it does not, Build must add header-passthrough before implementing the poll call. Existing e2e tests that pass `confirmToken` as a query string must be updated to send the header.
+
+---
+
+**integration — two incompatible shapes in one slot; write point unspecified; session TTL; timeout env var naming**
+
+The two-shape and write-point findings are resolved by the two-key stash above.
+
+*Session store TTL alignment:* The minimum required session lifetime is SESSION_CACHE_TTL_MS (default 20 minutes). If the Express session store has a shorter TTL, the siteStash is lost before `perSiteCache` expires and the `/workspace` re-warm loses its data source. Build must confirm the configured session TTL is at least SESSION_CACHE_TTL_MS before merge, or raise this as a deployment blocker. A startup-time log warning if session TTL < SESSION_CACHE_TTL_MS is recommended.
+
+*TB_DEVICE_READ_TIMEOUT_MS scope:* After the Gap-2 race fix, this env var bounds the full `doAll()` chain — including Zendesk (siteNamePromise) and Tuya reads inside `buildFullResult` — not TB reads alone. Renaming would require a K8s secret update via Spencer, so the name is kept. Build must add a code comment at the read site:
+
+```js
+// TB_DEVICE_READ_TIMEOUT_MS: bounds the full background read chain (TB telemetry,
+// Zendesk name lookup, and Tuya reads) via doAll(). Named for the dominant path
+// but applies to all three services. Tune with care.
+const TB_TIMEOUT = Number(process.env.TB_DEVICE_READ_TIMEOUT_MS ?? 30_000);
+```
+
+A note in the release checklist must document that tuning this var affects all three services.
+
+---
+
+**compliance — BLOCK flag, no findings**
+
+No findings were raised by the compliance lens. Acknowledged; no actionable change.
+
+---
+
+### Summary of additions
+
+Five specification gaps are closed in this addendum.
+
+**1. Two-key, siteNo-keyed session stash specified.** A single `preliminarySite` slot is replaced by `req.session.siteStash[siteNo]`, holding two explicitly named fields: `preliminarySite` (processed site object, for workspacePayload) and `tbMatchedStubs` (raw TB textSearch array, for warmCacheIfCold). The write occurs once in `/resolve`, immediately before `res.json`. No previous addendum named the write point or field names; this addendum states both as Build gate items.
+
+**2. siteNo validation guard added to `/workspace`.** The route reads `req.session.siteStash?.[siteNo]` and returns 400 if absent. Cross-site cross-wiring (two tabs, same session) is structurally impossible — each site's stash is keyed by its own siteNo.
+
+**3. warmCacheIfCold signature corrected.** The helper takes `(siteNo, tbMatchedStubs)` — the raw TB textSearch array, not the processed preliminary site object. The Gap-4 addendum incorrectly used `req.session.preliminarySite` as the second argument; that would have passed the wrong shape to `fetchTelemetry`. The two shapes now have distinct names and live in distinct session fields.
+
+**4. confirmToken moved to X-Confirm-Token request header.** The token is removed from the `/workspace` GET query string and sent as a header on every poll call, with a query-string fallback for backward compatibility. Build must update the `api.get()` helper and the e2e confirmToken tests.
+
+**5. Session TTL alignment and timeout env var scope documented.** Minimum required session TTL is stated as SESSION_CACHE_TTL_MS (20 min); Build must verify before merge. TB_DEVICE_READ_TIMEOUT_MS receives a code comment listing all three services it bounds; a release checklist note is added.
+
 
 ---
 
