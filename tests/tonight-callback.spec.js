@@ -138,7 +138,7 @@ test.describe('tonight & callback', () => {
         await expect(banner).toContainText('not responding');
         await expect(page.locator('[data-testid="offline-banner-optional-hint"]')).toBeVisible();
         await banner.locator('button:has-text("Run connection check")').click();
-        await expect(page.locator('[data-testid="connectivity-alert"]')).toContainText('gateway at this site is offline');
+        await expect(page.locator('[data-testid="connectivity-alert"]')).toContainText("Lighthouse wall unit at this site isn't connecting to us");
         const connPostPromise = page.waitForRequest(r => r.url().includes('/api/outcomes') && r.method() === 'POST');
         await page.locator('[data-testid="connectivity-stilldead"]').click(); // E1: auto-submits for non-P1
         await connPostPromise;
@@ -179,7 +179,7 @@ test.describe('tonight & callback', () => {
         await page.locator('[data-testid="other-check"]').click();
         await page.locator('[data-testid="scope-fridge"]').click(); // E1: outcomeScope auto-submits for non-P1
         const outcome = page.locator('[data-testid="outcome-scope"]');
-        await expect(outcome).toContainText('Not on Lighthouse at this site');
-        await expect(outcome).toContainText(/ticket #\d+ \(scope-only\)/);
+        await expect(outcome).toContainText("Lighthouse doesn't control this here");
+        await expect(outcome).toContainText(/Ticket #\d+/);
     });
 });
