@@ -60,7 +60,7 @@ test('reason guard: stage-0 text wins; blank/whitespace is no reason; placeholde
 test('choice step: labels exact; P1 disabled when no reason, enabled with stage-0 text', () => {
     const blocked = c.otherP1Choice({ data: { qraw: '' } });
     assert.match(blocked, />P1 Escalation</);
-    assert.match(blocked, />Raise a Normal Priority ticket</);
+    assert.match(blocked, />Not urgent: pass it to the IoT team</); // OOHDASH-159 rev 5 (E1 no log wording)
     assert.match(blocked, /data-testid="other-p1" onclick="raiseOtherP1\(\)" disabled aria-disabled="true"/);
     assert.match(blocked, /data-testid="other-p1-reason"/);
     const open = c.otherP1Choice({ data: { qraw: 'Leak' } });

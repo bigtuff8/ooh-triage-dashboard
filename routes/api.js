@@ -21,6 +21,7 @@ import * as audit from '../services/audit.js';
 import * as metrics from '../services/metrics.js';
 import * as liveness from '../services/liveness.js';
 import * as notices from '../services/notices.js';
+import * as callRecord from '../services/call-record.js';
 import { zoneTimetable } from '../services/schedule.js';
 
 const router = Router();
@@ -118,7 +119,13 @@ router.get('/sites/:siteNo/resolve', wrap(async (req, res) => {
 
 router.post('/sites/:siteNo/confirm', wrap(async (req, res) => {
     const { token, site } = await resolution.confirmSite(req.params.siteNo, req.session.operator);
-    res.json({ confirmToken: token, workspace: await workspacePayload(site) });
+    // OOHDASH-159 rev 5 (E1): the call record starts here; the agent never has a "log it" step.
+    // Part 2b: check for a same-operator resume before starting a new call.
+    const resume = callRecord.sameOperatorResume(req.session.operator.id, site.siteNo);
+    const callId = resume
+        ? resume.callId
+        : callRecord.startCall({ operator: req.session.operator, siteNo: site.siteNo, siteName: site.siteName });
+    res.json({ confirmToken: token, callId, sameOperatorResume: resume || null, workspace: await workspacePayload(site) });
 }));
 
 router.get('/sites/:siteNo/workspace', wrap(async (req, res) => {
@@ -156,41 +163,66 @@ function hasHotWaterSignal(site) {
     return site.devices.some(d => d.hotWaterCapable || d.telemetry?.hotWater != null);
 }
 
-// D10: kitchen/lighting/fan flip from hard-'mon' to capability-driven 'ctl' when a device of that
-// kind actually exposes the `switch` command (Tuya single-gang). Presence-driven — the tile lights
-// up to controllable with NO code change once a switch-capable device appears in live inventory,
-// and honestly stays 'mon' where the kind is present but not switchable (e.g. tb-rulechain fans).
-const switchControllable = (s, kind) => s.devices.some(d =>
-    d.kind === kind && (registry.capabilitiesFor(d.deviceType)?.commands || []).includes('switch'));
+// OOHDASH-159 rev 4 ("What Lighthouse controls at this site", corrected rule). "Controllable from here"
+// means a screen in this dashboard actually offers control AND the equipment can be reached now.
+// Lighting/fans: the same test the switch button uses (canSwitch in public/js/flows.js): the `switch`
+// command, online, and registered (registered !== false). Kitchen is never 'ctl' (no kitchen screen
+// switches circuits). Fridges are monitor-only. Levels: ctl | mon | not-lighthouse | none, plus the
+// overlays 'offline' (every device of that kind is offline) and 'unreachable' (the site wall unit is
+// offline, so nothing present at the site can be reached) applied by scopeLevelFor().
+const canSwitchDevice = d => (d.capabilities && d.capabilities.length ? d.capabilities : (registry.capabilitiesFor(d.deviceType)?.commands || [])).includes('switch')
+    && !!d.online && d.registered !== false;
+const switchControllable = (s, kind) => s.devices.some(d => d.kind === kind && canSwitchDevice(d));
+const isBoilerPanelDevice = d => d.deviceType === 'boiler-panel' || d.deviceType === 'boilerControl';
+const hotWaterDevices = s => s.devices.filter(d => d.hotWaterCapable || d.telemetry?.hotWater != null || d.kind === 'hotwater'
+    || (s.boilerControl?.present && isBoilerPanelDevice(d)));
 
 export const SCOPE_GROUPS = [
-    // OOHDASH-135 Item 4: heating scope is now DEVICE-driven (d.controllable on the effective
-    // device list built by workspacePayload's Level-A gate). boilerControl.heatingControllable
-    // is no longer the deciding factor — that was evaluated before the effective-controllable
-    // was computed, producing a stale result for dark fleets and flag-gated device classes.
-    // Step 1: any heating device with effective controllable=true → 'ctl'
-    // Step 2: any heating device present → 'mon'
-    // Step 3: no heating devices → 'none'
-    { key: 'heating', label: 'Heating', level: s => s.devices.some(d => d.kind === 'heating' && d.controllable) ? 'ctl' : s.devices.some(d => d.kind === 'heating') ? 'mon' : 'none' },
-    // OOHDASH-135 Item 6: four-step hotwater scope evaluation.
-    // Step 1: DHW controllable via boilerControl or iT500-dhw → 'ctl'.
-    // Step 2: hot-water signal device present → 'mon'.
-    // Step 3: pure-heating site (heating device present, no boilerControl, no DHW device) → 'not-lighthouse'.
-    //   Hot water exists at the site but is not on Lighthouse. CT3 (accepted inference): electric-only
-    //   or genuinely no-DHW sites also land here and show 'not-lighthouse' (false-positive accepted over
-    //   false-negative silence; Track 2 W5-A classifier enables finer discrimination).
-    // Step 4: no heating or DHW device at all → 'none'.
-    { key: 'hotwater', label: 'Hot water', level: s =>
-        hasControllableDhw(s) ? 'ctl' :
+    // Heating: 'ctl' only when a controllable heating device (proven class, enabled by its setting —
+    // the effective `controllable` from workspacePayload's Level-A gate) is ONLINE. Pub heating boost
+    // is handled in workspacePayload (heatingBoostControllable, also needs an online panel).
+    { key: 'heating', label: 'Heating', kinds: s => s.devices.filter(d => d.kind === 'heating'),
+        level: s => s.devices.some(d => d.kind === 'heating' && d.controllable && d.online) ? 'ctl' : s.devices.some(d => d.kind === 'heating') ? 'mon' : 'none' },
+    // OOHDASH-135 Item 6: four-step hotwater scope evaluation (unchanged), except 'ctl' now also needs
+    // the boiler panel to be online.
+    { key: 'hotwater', label: 'Hot water', kinds: hotWaterDevices, level: s =>
+        hasControllableDhw(s) && (s.devices.some(d => isBoilerPanelDevice(d) && d.online) || !s.devices.some(isBoilerPanelDevice)) ? 'ctl' :
+        hasControllableDhw(s) ? 'mon' :
         hasHotWaterSignal(s) ? 'mon' :
         (s.devices.some(d => d.kind === 'heating') && !s.boilerControl?.present && !s.devices.some(d => d.deviceType === 'salus-it500-dhw')) ? 'not-lighthouse' :
         'none' },
-    { key: 'kitchen', label: 'Kitchen equipment', level: s => switchControllable(s, 'kitchen') ? 'ctl' : s.devices.some(d => d.kind === 'kitchen') ? 'mon' : 'none' },
-    { key: 'lighting', label: 'External lighting', level: s => switchControllable(s, 'lighting') ? 'ctl' : s.devices.some(d => d.kind === 'lighting') ? 'mon' : 'none' },
-    { key: 'fan', label: 'Extractor fans', level: s => switchControllable(s, 'fan') ? 'ctl' : s.devices.some(d => d.kind === 'fan') ? 'mon' : 'none' },
-    { key: 'electrics', label: 'Internal lighting / sockets', level: () => 'none' },
-    { key: 'boiler', label: 'Boiler internals / PCB', level: () => 'none' }
+    { key: 'kitchen', label: 'Kitchen equipment', kinds: s => s.devices.filter(d => d.kind === 'kitchen'),
+        level: s => s.devices.some(d => d.kind === 'kitchen') ? 'mon' : 'none' },
+    { key: 'lighting', label: 'External lighting', kinds: s => s.devices.filter(d => d.kind === 'lighting'),
+        level: s => switchControllable(s, 'lighting') ? 'ctl' : s.devices.some(d => d.kind === 'lighting') ? 'mon' : 'none' },
+    { key: 'fan', label: 'Extractor fans', kinds: s => s.devices.filter(d => d.kind === 'fan'),
+        level: s => switchControllable(s, 'fan') ? 'ctl' : s.devices.some(d => d.kind === 'fan') ? 'mon' : 'none' },
+    { key: 'fridge', label: 'Fridges and freezers', kinds: s => s.devices.filter(d => d.kind === 'fridge'),
+        level: s => s.devices.some(d => d.kind === 'fridge') ? 'mon' : 'none' }
 ];
+
+// Server twin of public/js/flows.js siteConnectivityAnchor (keep in lock-step): the LoRaWAN hub is the
+// device whose normalised name has a segment exactly equal to `lwgateway`; >1 → first by sorted name.
+function _scopeNormaliseName(name) {
+    return String(name || '').toLowerCase().replace(/\([^)]*\)/g, ' ').replace(/_/g, '-').replace(/\s+/g, ' ').trim();
+}
+export function scopeConnectivityAnchor(devices) {
+    const nm = d => _scopeNormaliseName(d && (d.name != null ? d.name : d.deviceId));
+    const candidates = (devices || []).filter(d => nm(d).split(/[-\s]+/).filter(Boolean).includes('lwgateway'));
+    if (!candidates.length) return null;
+    return [...candidates].sort((a, b) => { const na = nm(a), nb = nm(b); return na < nb ? -1 : na > nb ? 1 : 0; })[0];
+}
+
+/** One scope row's level after the reachability overlays. `base` is the row's own level. */
+export function scopeLevelFor(g, site, base) {
+    const level = base != null ? base : g.level(site);
+    if (level === 'none' || level === 'not-lighthouse') return level;
+    const anchor = scopeConnectivityAnchor(site.devices);
+    if (anchor && !anchor.online) return 'unreachable';
+    const own = g.kinds ? g.kinds(site) : [];
+    if (own.length && own.every(d => !d.online)) return 'offline';
+    return level;
+}
 
 async function workspacePayload(site) {
     const t0 = Date.now();
@@ -217,11 +249,8 @@ async function workspacePayload(site) {
     // The two excluded rows ('electrics', 'boiler') are hardcoded-none and add no triage value for C&B.
     // Non-C&B sites (hotels, FHI) continue to show all 7 rows unchanged.
     // subBrand is NOT used — it does not exist in TB (live verified 2026-10-09, 7 sites).
-    const CB_SCOPE_KEYS = ['heating', 'hotwater', 'kitchen', 'lighting', 'fan'];
-    const isCandB = !!(site.boilerControl?.present);
-    const scopeGroups = isCandB
-        ? SCOPE_GROUPS.filter(g => CB_SCOPE_KEYS.includes(g.key))
-        : SCOPE_GROUPS;
+    // OOHDASH-159 rev 4: the two fixed rows are removed for every site, so every site gets the same rows.
+    const scopeGroups = SCOPE_GROUPS;
     // OOHDASH-114-F1: safe default for boilerControl when field is absent (legacy fixture sites, bridge path).
     // OOHDASH-136: dhwOverride added with visible:false so flows.js never throws on a missing key.
     const defaultBc = { present: false, isV1: false, isV2: false, heatingControllable: false, dhwControllable: false, deviceId: null, dhwOverride: { visible: false, hiddenReason: 'no-panel', panelVersion: null, panelLastSeenMs: null, mode: null, untilMs: null, confirmedAtMs: null, decodedAtMs: null, unreadableReason: null } };
@@ -265,7 +294,9 @@ async function workspacePayload(site) {
     // DHW-only sites (boilerControl.present but no heating.zones) remain "Monitored only" for Heating.
     const heatingBoostControllable = (boostAvailable.on || boostAvailable.off)
         && site.boilerControl?.present
-        && (site.boilerControl?.heating?.zones?.length ?? 0) > 0;
+        && (site.boilerControl?.heating?.zones?.length ?? 0) > 0
+        // OOHDASH-159 rev 4: and the panel can be reached now.
+        && site.devices.some(d => d.kind === 'heating' && d.online);
 
     // OOHDASH-144: inject timetable data into boilerControl zones.
     // In live mode, zoneTimetable() is computed inside tb-device.js from SHARED_SCOPE attributes and
@@ -290,8 +321,8 @@ async function workspacePayload(site) {
         site: { siteNo: site.siteNo, siteName: site.siteName, nameUnverified: site.nameUnverified, accountId: site.accountId, brand: site.brand, address: site.address, callsLast30Days: site.callsLast30Days },
         devices: effectiveDevices,
         scope: scopeGroups.map(g => {
-            if (g.key === 'heating' && heatingBoostControllable) return { key: g.key, label: g.label, level: 'ctl' };
-            return { key: g.key, label: g.label, level: g.level(siteWithEffective) };
+            const base = (g.key === 'heating' && heatingBoostControllable) ? 'ctl' : g.level(siteWithEffective);
+            return { key: g.key, label: g.label, level: scopeLevelFor(g, siteWithEffective, base) };
         }),
         anyOffline: site.devices.some(d => !d.online),
         tickets,
@@ -454,11 +485,28 @@ function friendlyHold(iso) {
  * Control outcomes get the full site→zone→read→dispatch→sync→hold trail from the control action;
  * non-control outcomes get the shorter site→detail trail. Every line carries an HH:MM timestamp.
  */
-export function buildOutcomeTranscript({ action, type, siteNo, siteName, detail, holdText, outcomeTime }) {
+/**
+ * OOHDASH-159 rev 4: "What we know so far" sent by the client. Strings only, at most 30 items of at most
+ * 200 characters each; anything else is dropped. Written to the ticket transcript only — never to the P1
+ * text message (p1Summary) or the audit log.
+ */
+export function sanitiseKnownSoFar(raw) {
+    if (!Array.isArray(raw)) return [];
+    return raw
+        .filter(x => typeof x === 'string')
+        .map(x => x.replace(/[\r\n\t]+/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 200))
+        .filter(Boolean)
+        .slice(0, 30);
+}
+
+export function buildOutcomeTranscript({ action, type, siteNo, siteName, detail, holdText, outcomeTime, knownSoFar }) {
     const steps = [];
+    const known = sanitiseKnownSoFar(knownSoFar);
+    const pushKnown = t => known.forEach(k => steps.push({ time: hhmm(t), text: `Known so far: ${k}` }));
     if (action) {
         const t0 = action.dispatchedAt || outcomeTime;
         steps.push({ time: hhmm(t0), text: `Site selected: ${action.siteName || siteName || 'unknown'} (${action.siteNo || siteNo})` });
+        pushKnown(t0);
         if (action.zone) steps.push({ time: hhmm(t0), text: `Zone: ${action.zone}` });
         if (action.previousValue != null) steps.push({ time: hhmm(t0), text: `Live read: ${action.attribute} = ${action.previousValue}` });
         steps.push({ time: hhmm(t0), text: `Dispatched value: ${action.attribute} → ${action.value}${action.previousValue != null ? ` (was ${action.previousValue})` : ''}` });
@@ -470,6 +518,7 @@ export function buildOutcomeTranscript({ action, type, siteNo, siteName, detail,
         if (action.hold?.revertAt) steps.push({ time: hhmm(action.settledAt || t0), text: `Hold: until ${friendlyHold(action.hold.revertAt)}` });
     } else {
         steps.push({ time: hhmm(outcomeTime), text: `Site selected: ${siteName || 'unknown'} (${siteNo})` });
+        pushKnown(outcomeTime);
         if (detail) steps.push({ time: hhmm(outcomeTime), text: detail });
         if (holdText) steps.push({ time: hhmm(outcomeTime), text: holdText });
     }
@@ -482,7 +531,7 @@ export function buildOutcomeTranscript({ action, type, siteNo, siteName, detail,
 
 router.post('/outcomes', wrap(async (req, res) => {
     const op = req.session.operator;
-    const { type, siteNo, siteName, subject, detail, callerWords, OohCaptureClass, actionId, holdText, p1Summary, additionalNotes, appendToHoldId, holdIds, actions: actionLines, relatedToTicketId } = req.body;
+    const { type, siteNo, siteName, subject, detail, callerWords, OohCaptureClass, actionId, holdText, p1Summary, additionalNotes, appendToHoldId, holdIds, actions: actionLines, relatedToTicketId, knownSoFar, callId, issueKey, closeOnCreate } = req.body;
     if (!type || !siteNo || !subject || !detail) {
         return res.status(400).json({ error: 'type, siteNo, subject and detail are required' });
     }
@@ -512,6 +561,7 @@ router.post('/outcomes', wrap(async (req, res) => {
         }
 
         const summary = [
+            ...sanitiseKnownSoFar(knownSoFar).map(k => `Known so far: ${k}`),
             subject && `Summary: ${subject}`,
             detail && `What we found: ${detail}`,
             ...(Array.isArray(actionLines) ? actionLines.map(l => `Action: ${l}`) : []),
@@ -519,6 +569,7 @@ router.post('/outcomes', wrap(async (req, res) => {
         ].filter(Boolean).join('\n');
         await zendesk.addIssueSummaryComment(holdDoc.ticketId, `[OOH ISSUE SUMMARY] Added by ${op.name}:\n${summary}`);
         await audit.logAction({ actionType: type, operator: op, siteNo, detail: subject, outcome: 'appended', ticketId: holdDoc.ticketId });
+        if (callId) callRecord.recordProgress(callId, op.id, { issueKey, outcome: subject, ticketId: holdDoc.ticketId, knownSoFar: sanitiseKnownSoFar(knownSoFar) });
         return res.json({ ticket: { id: holdDoc.ticketId }, appended: true });
     }
 
@@ -527,7 +578,7 @@ router.post('/outcomes', wrap(async (req, res) => {
     // F001 — build the timestamped [TRG] transcript from the control action (if any) + context.
     const action = actionId ? control.getAction(actionId) : null;
     const outcomeTime = new Date().toISOString();
-    const transcript = buildOutcomeTranscript({ action, type, siteNo, siteName, detail, holdText, outcomeTime });
+    const transcript = buildOutcomeTranscript({ action, type, siteNo, siteName, detail, holdText, outcomeTime, knownSoFar });
 
     const ticket = await zendesk.createOutcomeTicket({
         operator: op, siteNo, siteName, subject,
@@ -538,8 +589,12 @@ router.post('/outcomes', wrap(async (req, res) => {
         priority: isP1 ? 'urgent' : 'normal',
         extraTags: isP1 ? ['ooh_p1'] : [],
         // OOHDASH-119: additional notes ride alongside but are NOT written to the P1 SMS or audit log.
-        additionalNotes: additionalNotes || null
+        additionalNotes: additionalNotes || null,
+        // OOHDASH-159 rev 5: equipment Lighthouse doesn't control here → contact-history record created closed.
+        status: (!isP1 && (type === 'scope-only' || closeOnCreate)) ? 'solved' : undefined
     });
+    // OOHDASH-159 rev 5 (E1): link the ticket to its issue so the call record is appended, not duplicated.
+    if (callId) callRecord.recordProgress(callId, op.id, { issueKey, outcome: subject, ticketId: ticket.id, knownSoFar: sanitiseKnownSoFar(knownSoFar) });
 
     // §9.2: if the client re-submitted after an append-refused, cite the earlier ticket in an
     // internal comment so the IoT helpdesk can link the two records.
@@ -619,6 +674,70 @@ router.get('/callback/:siteNo', wrap(async (req, res) => {
 router.post('/tickets/:id/followup', wrap(async (req, res) => {
     if (!req.body.date) return res.status(400).json({ error: 'date is required' });
     res.json(await zendesk.setFollowUpDate(req.params.id, req.body.date));
+}));
+
+/* ---------------- OOHDASH-159 rev 5 (E1): call record ---------------- */
+router.post('/calls/:id/progress', wrap(async (req, res) => {
+    const { issueKey, cat, knownSoFar, notes } = req.body || {};
+    const ok = callRecord.recordProgress(req.params.id, req.session.operator.id, { issueKey, cat, knownSoFar, notes });
+    if (ok === null) {
+        // 409: unknown issue arrived on a finalised record from the same operator within 2h (Part 2c).
+        return res.status(409).json({ reason: 'call-already-finalised', callId: req.params.id });
+    }
+    res.json({ ok: !!ok });
+}));
+
+// Part 2a: heartbeat — 403 on operator mismatch (same IDOR class as ticket-view).
+router.post('/calls/:id/heartbeat', wrap(async (req, res) => {
+    const ok = await callRecord.heartbeat(req.params.id, req.session.operator.id);
+    if (ok === null) return res.status(403).json({ error: 'Forbidden' });
+    res.json({ ok: !!ok });
+}));
+
+// Part 2c: reopen — 403 on operator mismatch, 410 if expired.
+router.post('/calls/:id/reopen', wrap(async (req, res) => {
+    const r = await callRecord.reopen(req.params.id, req.session.operator.id);
+    if (!r.ok) {
+        if (r.error === 'forbidden') return res.status(403).json({ error: 'Forbidden' });
+        if (r.error === 'expired') return res.status(410).json({ error: 'Call expired' });
+        return res.status(404).json({ error: 'Call not found' });
+    }
+    res.json(r);
+}));
+
+const FINAL_REASONS = ['end-call', 'another-issue', 'left-screen', 'site-change'];
+router.post('/calls/:id/finalise', wrap(async (req, res) => {
+    const { reason, issueKey, knownSoFar, notes, cat } = req.body || {};
+    if (!FINAL_REASONS.includes(reason)) return res.status(400).json({ error: 'reason must be one of ' + FINAL_REASONS.join(', ') });
+    // The last step's progress rides on the finalise request (the keepalive request on leaving the screen).
+    if (issueKey) callRecord.recordProgress(req.params.id, req.session.operator.id, { issueKey, cat, knownSoFar, notes });
+    const r = await callRecord.finalise(req.params.id, req.session.operator.id, { reason, issueKey });
+    if (!r.ok) return res.status(404).json({ error: 'Call not found' });
+    res.json(r);
+}));
+
+/* ---------------- OOHDASH-159 rev 5 (A1): in-app ticket page data, Part 2d IDOR scoping ---------------- */
+router.get('/tickets/:id/view', wrap(async (req, res) => {
+    const ticketId = req.params.id;
+    const operatorId = req.session.operator.id;
+    // Layer 1: ticket must carry the ooh tag. Fail-closed on any Zendesk error (403, never 500).
+    let tags;
+    try {
+        tags = await zendesk.getTicketTags(ticketId);
+    } catch (err) {
+        return res.status(403).json({ error: 'Forbidden' });
+    }
+    if (!tags.includes('ooh')) return res.status(403).json({ error: 'Forbidden' });
+    // Layer 2: ticket must be owned by this operator's call record OR match confirmed site.
+    const hasTicket = callRecord.operatorHasTicket(ticketId, operatorId);
+    const confirmedSite = callRecord.confirmedSiteForOperator(operatorId);
+    // We need the ticket's siteNo for the site-match check — zendesk.ticketView includes it.
+    const ticketData = await zendesk.ticketView(ticketId);
+    const ticketSite = ticketData && ticketData.siteNo ? String(ticketData.siteNo) : null;
+    if (!hasTicket && (!confirmedSite || !ticketSite || confirmedSite !== ticketSite)) {
+        return res.status(403).json({ error: 'Forbidden' });
+    }
+    res.json({ ticket: ticketData });
 }));
 
 router.get('/tickets/:id/thread', wrap(async (req, res) => {

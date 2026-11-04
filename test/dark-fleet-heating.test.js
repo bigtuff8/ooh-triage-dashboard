@@ -55,8 +55,9 @@ test('dark-fleet: an all-dark iT500 area shows "device not reporting" with NO wa
     const { ctx, state } = loadClient(darkIt500Ws());
     state.flow = { cat: 'heating', stage: 1, done: [], data: { area: 'Accommodation' } };
     const html = ctx.FLOWR.heating(state.workspace, state.flow);
-    // The explicit "device not reporting" live-read line is pushed to the done trail the operator sees.
-    assert.ok(state.flow.done.some(d => /device not reporting/i.test(d)), 'the explicit D-DARK-FLEETS live-read line is shown');
+    // The dark-fleet live-read line is pushed to the done trail the operator sees.
+    // done items are {k, t} objects since OOHDASH-159 rev5 (each step is a typed trail entry).
+    assert.ok(state.flow.done.some(d => /not connecting|not reporting|isn.t connecting/i.test(typeof d === 'object' ? d.t : String(d))), 'the dark-fleet live-read line is shown');
     assert.match(html, /not reporting/i, 'the dark-fleet body explains the device is not reporting');
     assert.match(html, /data-testid="reco-dark-fleet"/, 'the dedicated dark-fleet surface renders');
     // No controls are offered.
@@ -84,7 +85,7 @@ test('dark-fleet: capture routes to a normal IoT-team capture (dark-fleet-heatin
     assert.equal(captured[0].OohCaptureClass, 'dark-fleet-heating');
     assert.equal(captured[0].type, 'capture', 'a normal capture, not a P1');
     assert.equal(opened.length, 0, 'no openControl - a dark device is never actuated');
-    assert.match(html, /Captured for the IoT team/i, 'the captured outcome renders');
+    assert.match(html, /Ticket created for the IoT team/i, 'the captured outcome renders');
 });
 
 test('dark-fleet: end-with-no-action routes to a no-action outcome', () => {
@@ -93,7 +94,7 @@ test('dark-fleet: end-with-no-action routes to a no-action outcome', () => {
     const html = ctx.FLOWR.heating(state.workspace, state.flow);
     assert.equal(captured.length, 1);
     assert.equal(captured[0].type, 'no-action');
-    assert.match(html, /no action taken/i);
+    assert.match(html, /nothing changed/i); // OOHDASH-159 rev 5 wording
 });
 
 /* ------------------------------ regression guards ------------------------------ */

@@ -177,25 +177,23 @@ test.describe('OOHDASH-151: V1 day-varying schedule (guard lifted)', () => {
 test.describe('OOHDASH-115-F2 C&B scope trim', () => {
     test.beforeEach(async ({ page }) => { await signIn(page, 'Test Handler'); });
 
-    test('F2-1: C&B site (6999) shows exactly 5 scope rows — electrics and boiler absent', async ({ page }) => {
+    test('F2-1: C&B site (6999) shows exactly 6 scope rows including fridges (OOHDASH-159: electrics/boiler removed, fridge added, C&B filter removed)', async ({ page }) => {
         await confirmSite(page, '6999', 'The Crafted Tap');
         const scope = page.locator('[data-testid="scope-list"]');
-        await expect(scope.locator('li')).toHaveCount(5);
+        await expect(scope.locator('li')).toHaveCount(6);
         await expect(scope).toContainText('Heating');
         await expect(scope).toContainText('Hot water');
         await expect(scope).toContainText('Kitchen equipment');
         await expect(scope).toContainText('External lighting');
         await expect(scope).toContainText('Extractor fans');
-        await expect(scope).not.toContainText('Internal lighting');
-        await expect(scope).not.toContainText('Boiler internals');
+        await expect(scope).toContainText('Fridges and freezers');
     });
 
-    test('F2-2: non-C&B site (6832) shows all 7 scope rows including electrics and boiler', async ({ page }) => {
+    test('F2-2: non-C&B site (6832) shows exactly 6 scope rows — same set as C&B (OOHDASH-159: C&B filter removed)', async ({ page }) => {
         await confirmSite(page, '6832', 'Old Grey Mare');
         const scope = page.locator('[data-testid="scope-list"]');
-        await expect(scope.locator('li')).toHaveCount(7);
+        await expect(scope.locator('li')).toHaveCount(6);
         await expect(scope).toContainText('Heating');
-        await expect(scope).toContainText('Internal lighting');
-        await expect(scope).toContainText('Boiler internals');
+        await expect(scope).toContainText('Fridges and freezers');
     });
 });

@@ -133,7 +133,7 @@ class CosmosCollection {
 /* Store factory                                                       */
 /* ------------------------------------------------------------------ */
 
-const COLLECTIONS = ['OohOverrides', 'OohAuditLog', 'OohAppConfig', 'OohSmsLog', 'OohActionInflight'];
+const COLLECTIONS = ['OohOverrides', 'OohAuditLog', 'OohAppConfig', 'OohSmsLog', 'OohActionInflight', 'OohCallRecords'];
 const collections = new Map();
 let cosmosReady = null;
 let storeHealthy = true;

@@ -77,14 +77,12 @@ test('PH-BW-1: W1-W9 log sentences contain no banned words (panel, forced, fallb
     }
 });
 
-/* ── PH-BW-2: Area question uses "customer" ─────────────────────────── */
+/* ── PH-BW-2: Area question does not say "caller" (C5 fix) ──────────── */
 test('PH-BW-2: Area question uses "customer" not "caller" (C5 fix)', () => {
-    // The area-chip question: "Which area is the customer talking about?"
-    const areaQRe = /Which area is the (caller|customer) talking about\?/;
-    const m = areaQRe.exec(flowsSrc);
-    assert.ok(m, 'Expected to find the area question in flows.js');
-    assert.equal(m[1], 'customer',
-        'Area question must say "customer", found "' + m[1] + '" — C5 fix not applied');
+    // OOHDASH-159 rev4: the area question changed to "Which part of the pub?" — no "caller" or "customer".
+    // C5 requirement is that it must NOT say "caller" (the pub-branded copy avoids both roles entirely).
+    assert.ok(flowsSrc.includes('Which part of the pub?'), 'Expected area question "Which part of the pub?" in flows.js');
+    assert.doesNotMatch(flowsSrc, /Which area is the caller/i, 'Area question must not say "caller" — C5 requirement');
 });
 
 /* ── PH-BW-3: No-reading label uses "heating controls" ──────────────── */

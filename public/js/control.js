@@ -28,7 +28,7 @@ function openControl(device, mode) {
     const blocked = writesDisabled(state.siteNo);
     if (blocked) {
         state.flow = null;
-        openModal(`<div class="mh">Control unavailable<button class="btn link" onclick="closeModal()">✕</button></div><div class="mb"><div class="alert err" data-testid="control-blocked">⛔ ${blocked}.</div><p>Use <b>capture &amp; escalate</b> instead — the request will be logged and actioned by the IoT team.</p></div><div class="mf"><button class="btn primary" onclick="closeModal();render()">OK</button></div>`);
+        openModal(`<div class="mh">Control unavailable<button class="btn link" onclick="closeModal()">✕</button></div><div class="mb"><div class="alert err" data-testid="control-blocked">⛔ ${blocked}.</div><p>Use <b>pass it to the IoT team</b> instead — the request will be logged and actioned by the IoT team.</p></div><div class="mf"><button class="btn primary" onclick="closeModal();render()">OK</button></div>`);
         return;
     }
     if (window.ctl) return; // already open
@@ -111,6 +111,16 @@ function ctlTargetBlock(site, device) {
     ${dev}</div>`;
 }
 
+/** OOHDASH-159 rev 4: the red warning directly above "Send to device". */
+function ctlWarnText(c) {
+    const zone = dyn(c.device.zone || c.device.deviceId);
+    if (c.mode === 'switchon') return `this switches the ${zone} on at the site straight away.`;
+    if (c.mode === 'switchoff') return `this switches the ${zone} off at the site straight away.`;
+    if (c.mode === 'modeoff') return `this switches the ${zone} off at the site straight away.`;
+    if (c.mode === 'frost') return `this switches the ${zone} heating to ${dyn('5°C')} (frost-hold) at the site straight away.`;
+    return `this switches the ${zone} heating to ${dyn(c.val + '°C')} at the site straight away.`;
+}
+
 function drawControl() {
     const c = window.ctl;
     const d = c.device;
@@ -128,6 +138,7 @@ function drawControl() {
         openModal(`<div class="mh">${CTL_TITLES[c.mode]}<button class="btn link" onclick="ctlCancel()">✕</button></div><div class="mb">
    <div class="target" data-testid="control-target">${ctlTargetBlock(ws.site, d)}</div>
    ${c.error ? `<div class="alert err" data-testid="control-error">${esc(c.error)}</div>` : ''}${body}
+   ${warnBox(ctlWarnText(c), 'control-warning')}
   </div><div class="mf"><button class="btn" onclick="ctlCancel()">Cancel</button><button class="btn primary" data-testid="control-send" onclick="ctlSend()">Send to device</button></div>`, false);
         return;
     }
@@ -155,7 +166,7 @@ function drawControl() {
         tail = `<div class="alert ok" data-testid="sync-confirmed" aria-live="polite">✅ <b>Already at the requested value — ${esc(ctlValTxt(c))}.</b> The device already reads this, so no change was needed.${holdSuffix}</div><div style="text-align:right"><button class="btn primary" data-testid="sync-done" onclick="ctlFinish()">Done</button></div>`;
     } else if (st === 'in-flight' && slow) {
         // DD-WAIT-HANDOFF: release the handler immediately for a slow (Salus) class.
-        tail = `<div class="alert info" data-testid="sync-sent-slow" aria-live="polite">📨 <b>Sent to the device.</b> It should take effect within about <b>${n} minutes</b> — you can carry on with the caller; we\'ll watch it in the background, show the result here and update the ticket when the thermostat confirms.</div>
+        tail = `<div class="alert info" data-testid="sync-sent-slow" aria-live="polite">📨 <b>Sent to the device.</b> It should take effect within about <b>${n} minutes</b> — you can carry on with the customer; we\'ll watch it in the background, show the result here and update the ticket when the thermostat confirms.</div>
    <div style="text-align:right"><button class="btn primary" data-testid="sync-release" onclick="ctlRelease()">Done — carry on</button></div>`;
     } else if (st === 'in-flight') {
         if (a.status === 'accepted') {
@@ -164,12 +175,12 @@ function drawControl() {
             tail = `<p class="small" style="text-align:center" aria-live="polite"><span class="spin"></span> Sent to the device — waiting for it to confirm… <b>"Confirmed" only means the device\'s own reading proved it.</b></p>`;
         }
     } else if (st === 'confirmed') {
-        tail = `<div class="alert ok" data-testid="sync-confirmed" aria-live="polite">✅ <b>Confirmed — device reports ${esc(confirmReadingText(c))}${a.confirmedLate ? ' (confirmed late)' : ''}.</b> This is the only outcome we ever show as success.${a.confirmedLate ? ' This came in after we told you it was not yet confirmed — tell the caller it\'s now done.' : ''}${holdSuffix}</div><div style="text-align:right"><button class="btn primary" data-testid="sync-done" onclick="ctlFinish()">Done</button></div>`;
+        tail = `<div class="alert ok" data-testid="sync-confirmed" aria-live="polite">✅ <b>Confirmed — device reports ${esc(confirmReadingText(c))}${a.confirmedLate ? ' (confirmed late)' : ''}.</b> This is the only outcome we ever show as success.${a.confirmedLate ? ' This came in after we told you it was not yet confirmed — tell the customer it\'s now done.' : ''}${holdSuffix}</div><div style="text-align:right"><button class="btn primary" data-testid="sync-done" onclick="ctlFinish()">Done</button></div>`;
     } else if (st === 'non-delivery') {
-        tail = `<div class="alert err" data-testid="sync-notdelivered" aria-live="assertive">❌ <b>Not delivered.</b> ${esc(a.operatorError || 'The change could not be sent.')} <b>Nothing has changed on site — do not tell the caller it\'s done.</b></div><div style="text-align:right"><button class="btn primary" data-testid="sync-escalate" onclick="ctlEscalate()">Capture &amp; escalate</button></div>`;
+        tail = `<div class="alert err" data-testid="sync-notdelivered" aria-live="assertive">❌ <b>Not delivered.</b> ${esc(a.operatorError || 'The change could not be sent.')} <b>Nothing has changed on site — do not tell the customer it\'s done.</b></div><div style="text-align:right"><button class="btn primary" data-testid="sync-escalate" onclick="ctlEscalate()">Pass it to the IoT team</button></div>`;
     } else if (st === 'indeterminate') {
         // NOT CONFIRMED — NO resend button (DD-RESEND-UX). The watcher keeps watching.
-        tail = `<div class="alert warn" data-testid="sync-notconfirmed" aria-live="assertive">⚠️ <b>Not confirmed yet.</b> ${esc(a.operatorError || CTL_NOT_CONFIRMED)} We\'re still watching in the background and will update the ticket if it lands — <b>please don\'t treat this as done.</b></div><div style="text-align:right"><button class="btn primary" data-testid="sync-escalate" onclick="ctlEscalate()">Capture &amp; escalate</button></div>`;
+        tail = `<div class="alert warn" data-testid="sync-notconfirmed" aria-live="assertive">⚠️ <b>Not confirmed yet.</b> ${esc(a.operatorError || CTL_NOT_CONFIRMED)} We\'re still watching in the background and will update the ticket if it lands — <b>please don\'t treat this as done.</b></div><div style="text-align:right"><button class="btn primary" data-testid="sync-escalate" onclick="ctlEscalate()">Pass it to the IoT team</button></div>`;
     }
 
     const trackerName = ws.site.nameUnverified
@@ -270,6 +281,8 @@ async function ctlRelease() {
             subject: `${what} — sent, awaiting device confirmation`,
             detail: `${what} (${ctlValTxt(c)}) sent to ${c.device.deviceId}. This unit can take a few minutes to confirm; the result will be added to this ticket when the device confirms. Treat as not-yet-applied until confirmed.`,
             callerWords: state.flow?.data?.freeText || null,
+            knownSoFar: state.flow ? knownSoFarLines(state.flow) : [], // OOHDASH-159 rev 4
+            ...callFields(), // rev 5 (E1)
             holdText: holdTxt,
             OohCaptureClass: 'control-awaiting-confirm'
         });
@@ -282,10 +295,12 @@ async function ctlRelease() {
     }
     // Detached background watch — toast the result; the server also writes it to the ticket.
     startCtlBgWatch(action?.actionId, what);
-    const html = `<div class="outcome captured" data-testid="outcome-awaiting"><h3>📨 Sent — awaiting the device</h3>
-  <p>${what} (${ctlValTxt(c)}) is on its way to <span class="mono">${esc(c.device.deviceId)}</span>. It should take effect within about <b>${action?.copyMinutes} minutes</b>. We\'re watching in the background and will update the ticket when the device confirms.</p>
-  <div class="script">"That\'s gone to the thermostat now — it can take a few minutes to take effect. I\'ve logged it, and we\'ll keep an eye on it; if it doesn\'t respond we\'ll follow it up."</div>
-  ${ticketId ? `<p class="small">Ticket <b>#${ticketId}</b></p>` : ''}%%NOTESPOST%%${outButtons()}</div>`;
+    const html = afterCard('outcome-awaiting', 'Sent, waiting for the device to confirm', ticketId,
+        `<p class="after-line">${what} (${ctlValTxt(c)}) is on its way to <span class="mono">${esc(c.device.deviceId)}</span>. It should take effect within about <b>${action?.copyMinutes} minutes</b>. We\'re watching in the background and will update the ticket when the device confirms.</p>`,
+        ticketId
+            ? 'That\'s gone to the thermostat now. It can take a few minutes to take effect. It\'s logged, and we\'ll keep an eye on it; if it doesn\'t respond, our IoT team follows it up the next working day.'
+            : 'That\'s gone to the thermostat now. It can take a few minutes to take effect.',
+        ticketId ? '' : '<div class="alert err" data-testid="awaiting-ticket-failed">The change was sent, but saving the ticket failed. It is still in the call record, which is published when you end the call.</div>') + (ticketId ? '%%NOTESPOST%%' : '') + outButtons();
     window.ctl = null;
     closeModal();
     if (state.flow) { state.flow.stage = 99; state.flow.data._outcomeHtml = html; }
@@ -343,7 +358,8 @@ async function ctlFinish() {
         switchon: `That circuit is now switched ON — confirmed by the device.`,
         switchoff: `That circuit is now switched OFF — confirmed by the device.`
     }[c.mode];
-    const detail = `${what} to <b>${esc(reading)}</b> on <span class="mono">${esc(c.device.deviceId)}</span>, device-confirmed.`;
+    const isSw = /^switch/.test(c.mode); // "Switch ON to ON" read twice
+    const detail = isSw ? `${what} on <span class="mono">${esc(c.device.deviceId)}</span>, device-confirmed.` : `${what} to <b>${esc(reading)}</b> on <span class="mono">${esc(c.device.deviceId)}</span>, device-confirmed.`;
     const additionalNotes = state.flow?.data?.additionalNotes || null;
     let html;
     try {
@@ -356,6 +372,8 @@ async function ctlFinish() {
             subject: `${what} — ${c.device.zone}`,
             detail: `${what} to ${reading} on ${c.device.deviceId}, device-confirmed.`,
             callerWords: state.flow?.data?.freeText || null,
+            knownSoFar: state.flow ? knownSoFarLines(state.flow) : [], // OOHDASH-159 rev 4
+            ...callFields(), // rev 5 (E1)
             holdText: holdTxt
         });
         notesDraftClear();
@@ -364,13 +382,14 @@ async function ctlFinish() {
             ? `<div class="stepdone small" data-testid="addnotes-echo"><span>📝</span>Note added — for the ticket and morning review: "${esc(additionalNotes)}"</div>`
             : '';
         registerIssue(`${what} — ${c.device.zone}`, 'green', res.ticket.id);
-        html = `<div class="outcome applied" data-testid="outcome-applied"><h3>✅ Change applied — device confirmed</h3><p>${detail}</p>${holdTxt ? `<p style="margin-top:4px">⏱️ ${holdTxt}</p>` : ''}
-  ${notesEcho}<div class="script">"${script}"</div><p class="small">Recorded on ticket <b>#${res.ticket.id}</b> · reviewed by the IoT team next working day (in the IoT Support dashboard)</p>%%NOTESPOST%%${outButtons()}</div>`;
+        html = afterCard('outcome-applied', 'Change applied, device confirmed', res.ticket.id,
+            `<p class="after-line">${detail}</p>${holdTxt ? `<p class="after-line">⏱️ ${holdTxt}</p>` : ''}${notesEcho}`,
+            script, '<p class="small">Reviewed by the IoT team next working day (in the IoT Support dashboard).</p>') + `%%NOTESPOST%%${outButtons()}`;
         toast(`✅ <b>${esc(state.workspace.site.siteName)}</b>: ${what} ${reading} — device confirmed`);
     } catch (err) {
-        html = `<div class="outcome applied" data-testid="outcome-applied"><h3>✅ Change applied — device confirmed</h3><p>${detail}</p>
+        html = `<div class="outcome after" data-testid="outcome-applied"><div class="after-head">✔ Change applied, device confirmed</div><div class="after-body"><p class="after-line">${detail}</p>
   <div class="alert err">The change IS applied, but recording the ticket failed: ${esc(err.message)}. Tell the IoT team via Tonight → Raise a query so the audit trail is complete.</div>
-  <div class="script">"${script}"</div>${outButtons()}</div>`;
+  ${sayBox(script)}</div>${outButtons()}`;
     }
     if (state.flow) { state.flow.stage = 99; state.flow.data._outcomeHtml = html; }
     render();
@@ -402,15 +421,16 @@ async function ctlEscalate() {
             subject: `${what} — NOT applied, escalated`,
             detail: `Attempted ${what} (${ctlValTxt(c)}) on ${c.device.deviceId} but ${notConfirmed ? 'the device did not confirm' : 'the change was not delivered'}. Change must be treated as not applied.`,
             callerWords: state.flow?.data?.freeText || null,
+            knownSoFar: state.flow ? knownSoFarLines(state.flow) : [], // OOHDASH-159 rev 4
+            ...callFields(), // rev 5 (E1)
             OohCaptureClass: 'control-failure'
         });
         notesDraftClear();
         if (state.flow?.data) { state.flow.data._ticketId = res.ticket.id; }
         registerIssue(`${what} — NOT applied`, 'blue', res.ticket.id);
-        html = `<div class="outcome captured" data-testid="outcome-escalated"><h3>📥 Captured for the IoT team</h3>
-  <p>Attempted ${what} (${ctlValTxt(c)}) on <span class="mono">${esc(c.device.deviceId)}</span> but ${why}. <b>The change must be treated as not applied.</b></p>
-  <div class="script">"I tried to make that change remotely but the device hasn\'t confirmed it, so I\'m not going to tell you it\'s done when it may not be. I\'ve logged it as a priority instead${notConfirmed ? ' — it may still land, and the team will check' : ''}."</div>
-  <p class="small">Ticket <b>#${res.ticket.id}</b></p>%%NOTESPOST%%${outButtons()}</div>`;
+        html = afterCard('outcome-escalated', 'Not applied: ticket created for the IoT team', res.ticket.id,
+            `<p class="after-line">Attempted ${what} (${ctlValTxt(c)}) on <span class="mono">${esc(c.device.deviceId)}</span> but ${why}. <b>The change must be treated as not applied.</b></p>`,
+            `I tried to make that change remotely but the device hasn\'t confirmed it, so I\'m not going to tell you it\'s done when it may not be. It\'s logged, and our IoT team picks it up the next working day${notConfirmed ? '; it may still land, and the team will check' : ''}.`) + `%%NOTESPOST%%${outButtons()}`;
     } catch (err) {
         html = `<div class="alert err">Couldn\'t record the escalation: ${esc(err.message)} — raise it via Tonight → Raise a query so it isn\'t lost.</div>${outButtons()}`;
     }

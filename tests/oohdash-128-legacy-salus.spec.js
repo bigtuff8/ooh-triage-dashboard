@@ -81,9 +81,8 @@ test.describe('OOHDASH-128 legacy bare-salus load', () => {
         await expect(page.locator('[data-testid="need-cool"]')).toHaveCount(0);
         await expect(page.locator('[data-testid="need-off"]')).toHaveCount(0);
 
-        // Capture and record outcome.
+        // Capture outcome (E1: dark-capture auto-submits for non-P1).
         await page.locator('[data-testid="dark-capture"]').click();
-        await page.locator('[data-testid="record-outcome"]').click();
 
         const outcome = page.locator('[data-testid="outcome-captured"]');
         await expect(outcome).toBeVisible();

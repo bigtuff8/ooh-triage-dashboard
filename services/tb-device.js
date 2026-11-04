@@ -1076,8 +1076,8 @@ export function dhwOverrideOutcome(dhwOverride, nowMs) {
             state: 'cant-confirm',
             headline: "Hot water override: can't confirm",
             explanation: ago
-                ? `The boiler panel last reported ${ago}, so we can't tell whether the hot water is overridden. Don't tell the caller it is on or off; log it and escalate as normal.`
-                : "The boiler panel isn't reporting, so we can't tell whether the hot water is overridden. Don't tell the caller it is on or off; log it and escalate as normal.",
+                ? `The boiler panel last reported ${ago}, so we can't tell whether the hot water is overridden. Don't tell the customer it is on or off; log it and escalate as normal.`
+                : "The boiler panel isn't reporting, so we can't tell whether the hot water is overridden. Don't tell the customer it is on or off; log it and escalate as normal.",
             script: "I can't see the current hot water setting from here right now, so I'll log it for the team to check.",
             ticketSentence: `Hot water override at time of call: could not be confirmed (${reason}).`
         };
@@ -1158,15 +1158,15 @@ export function dhwOverrideOutcome(dhwOverride, nowMs) {
         const ago = _dhwFmtAgo(panelLastSeenMs, nowMs);
         const reason = ago ? `last reported ${ago}` : "isn't reporting";
         explanation = ago
-            ? `The boiler panel last reported ${ago}, so we can't tell whether the hot water is overridden. Don't tell the caller it is on or off; log it and escalate as normal.`
-            : "The boiler panel isn't reporting, so we can't tell whether the hot water is overridden. Don't tell the caller it is on or off; log it and escalate as normal.";
+            ? `The boiler panel last reported ${ago}, so we can't tell whether the hot water is overridden. Don't tell the customer it is on or off; log it and escalate as normal.`
+            : "The boiler panel isn't reporting, so we can't tell whether the hot water is overridden. Don't tell the customer it is on or off; log it and escalate as normal.";
         ticketSentence = `Hot water override at time of call: could not be confirmed (${reason}).`;
     } else if (effectiveReason === 'not-reconfirmed') {
-        explanation = "The boiler panel hasn't re-confirmed its hot water override recently, so we can't tell whether it is still in place. Don't tell the caller it is on or off; log it and escalate as normal.";
+        explanation = "The boiler panel hasn't re-confirmed its hot water override recently, so we can't tell whether it is still in place. Don't tell the customer it is on or off; log it and escalate as normal.";
         ticketSentence = "Hot water override at time of call: could not be confirmed (panel hasn't re-confirmed recently).";
     } else {
         // not-a-number, implausible, decode-error, or unspecified
-        explanation = "The boiler panel's hot water override reading doesn't make sense right now, so we can't tell whether it is overridden. Don't tell the caller it is on or off; log it and escalate as normal.";
+        explanation = "The boiler panel's hot water override reading doesn't make sense right now, so we can't tell whether it is overridden. Don't tell the customer it is on or off; log it and escalate as normal.";
         ticketSentence = "Hot water override at time of call: could not be confirmed (reading doesn't make sense).";
     }
     return {

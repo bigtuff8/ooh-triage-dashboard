@@ -9,6 +9,7 @@
  * missing secrets (see validateConfig).
  */
 
+import * as callRecord from './services/call-record.js';
 import 'dotenv/config';
 import express from 'express';
 import rateLimit from 'express-rate-limit';
@@ -141,6 +142,14 @@ app.use('/api', (req, res) => res.status(404).json({ error: 'Unknown API route' 
 
 /* ---------------- static frontend + SPA fallback (authenticated) ---------------- */
 
+// Explicit auth guard on the PowerPause guide — must be BEFORE the generic static handler
+// so the guard is enforced regardless of static-middleware ordering changes (K1 / plan §4.2).
+app.get('/guides/:file', requireAuth, (req, res) => {
+    const file = req.params.file;
+    if (!/^[a-zA-Z0-9_-]+\.html$/.test(file)) return res.status(404).json({ error: 'Not found' });
+    res.sendFile(join(__dirname, 'public', 'guides', file));
+});
+
 app.use(requireAuth, express.static(join(__dirname, 'public')));
 app.get('*', requireAuth, (req, res) => {
     // SPA fallback serves the shell for page routes only — a missing asset is a 404,
@@ -178,6 +187,9 @@ async function start() {
     } catch (err) {
         console.error(`[CONTROL] in-flight resume failed at boot: ${err.message}`);
     }
+    // OOHDASH-159 rev 5 (E1): finalise call records left idle (silent in-process timer, no tokens).
+    await callRecord.resumeOpenCalls();
+    callRecord.startIdleSweeper();
     startLivenessMonitor(); // F010 — producer business-liveness self-check (no-overnight-activity)
     // Stream A / OOHDASH-19 runtime boot guard (§6.1): if writes are enabled but the refrigeration
     // switch-deny is missing from this image, keep writes LOCKED (via killswitch latch) and log hard.

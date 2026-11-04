@@ -30,7 +30,7 @@ function vHome() {
    <h2>Who\'s calling?</h2>
    <p class="sub" style="margin-bottom:14px">Ask for the <b>house number</b> (4 digits) — or search by pub name. Use ↑ ↓ and Enter to pick.</p>
    <div class="searchwrap"><input id="sq" data-testid="site-search" placeholder="e.g. 6832 or Old Grey Mare" autocomplete="off"><div id="sres"></div></div>
-   <p class="small" style="margin-top:12px">Caller ringing back about an earlier issue? <button class="btn link" onclick="go('callback')">Use Callback Lookup →</button></p>
+   <p class="small" style="margin-top:12px">Customer ringing back about an earlier issue? <button class="btn link" onclick="go('callback')">Use Callback Lookup →</button></p>
   </div>
   <div class="card">
    <h3>Recent calls tonight (yours)</h3>
@@ -44,6 +44,7 @@ function vHome() {
 
 /* ------------------------ resolution + workspace (§3.2, F004) ------------------------ */
 async function openSite(siteNo) {
+    if (state.call && state.call.id) callFinalise('site-change'); // OOHDASH-159 rev 5 (E1)
     state.view = 'site';
     state.siteNo = siteNo;
     state.pendingSite = null;
@@ -77,11 +78,11 @@ function renderAmbiguous() {
     $('#view').innerHTML = `<div class="content narrow"><div class="card" style="border-color:var(--warning)" data-testid="ambiguous-card">
    <h2>⚠️ House ID ${esc(a.siteNo)} is ambiguous</h2>
    <p class="sub" style="margin:8px 0">This ID matches more than one site (${a.matches.map(m => `<b>${esc(m.siteName)}</b>`).join(' and ')}). To protect against changing the wrong site, remote control is blocked for ambiguous IDs.</p>
-   <div class="script">"I can\'t safely make changes for this site number tonight — I\'ll log this for the IoT team as a priority and they\'ll pick it up."</div>
+   ${sayBox('I can\'t safely make changes for this site number tonight — It\'s logged, and our IoT team picks it up the next working day.')}
 
    ${notesField({ id: 'addnotes-amb' })}
    <div style="margin-top:10px">
-    <button class="btn primary" data-testid="ambiguous-capture" onclick="ambiguousCapture()">Capture &amp; escalate to IoT</button>
+    <button class="btn primary" data-testid="ambiguous-capture" onclick="ambiguousCapture()">Pass it to the IoT team</button>
     <button class="btn" onclick="go('home')" style="margin-left:8px">Search again</button>
    </div>
   </div></div>`;
@@ -114,7 +115,7 @@ function renderConfirmGate() {
    ${siteSubline(s)}
    ${unverifiedNotice(s)}
    <p style="margin:10px 0 4px">${esc(s.deviceSummary)}</p>
-   <div class="script">"Can I just confirm — you\'re calling from <b>${esc(s.siteName)}</b>, site number <b>${esc(s.siteNo)}</b>?"</div>
+   ${sayBox('', `can I just confirm, you\'re calling from ${dyn(s.siteName)}, site number ${dyn(s.siteNo)}?`)}
 
    <div style="display:flex;gap:10px;margin-top:16px">
     <button class="btn primary big" data-testid="confirm-site" onclick="confirmSite()">✓ This is the right site</button>
@@ -124,10 +125,11 @@ function renderConfirmGate() {
 
 async function confirmSite() {
     try {
-        const { confirmToken, workspace } = await api.post(`/api/sites/${encodeURIComponent(state.siteNo)}/confirm`);
+        const { confirmToken, workspace, callId } = await api.post(`/api/sites/${encodeURIComponent(state.siteNo)}/confirm`);
         state.confirmToken = confirmToken;
         state.workspace = workspace;
-        state.call = { issues: [] };
+        // OOHDASH-159 rev 5 (E1): the server started the call record when the site was confirmed.
+        state.call = { id: callId || null, issues: [] };
         if (!state.recent.some(r => r.siteNo === workspace.site.siteNo)) {
             state.recent.unshift({ siteNo: workspace.site.siteNo, siteName: workspace.site.siteName, t: now() });
             state.recent = state.recent.slice(0, 5);
@@ -168,7 +170,11 @@ async function refreshWorkspace() {
 // at `mon` ("monitored / not adjustable from here") rather than the generic
 // "Monitored only", so a combi observed-but-not-controllable reads honestly and
 // never as a bare "Not on Lighthouse here". `ctl` still flips on live presence.
+// OOHDASH-159 rev 4: 'offline' (every device of that kind offline) and 'unreachable' (the site wall unit
+// is offline, so nothing at the site can be reached) are new truthful levels.
 function scopeTag(g) {
+    if (g.level === 'unreachable') return '<span class="tag amber">Can\'t be reached right now</span>';
+    if (g.level === 'offline') return '<span class="tag amber">Not responding right now</span>';
     if (g.level === 'ctl') return '<span class="tag green">Controllable from here</span>';
     if (g.level === 'mon') {
         return g.key === 'hotwater'
@@ -185,7 +191,7 @@ function renderWorkspace() {
     const s = ws.site;
     const flowHtml = state.flow ? renderFlow() : `
    ${ws.anyOffline ? `<div class="alert err" data-testid="offline-banner" style="display:flex;flex-direction:column;gap:6px;margin:0 0 10px"><div style="display:flex;align-items:center;gap:10px">📡 <b>Some Lighthouse equipment at this site is not responding.</b><button class="btn" style="margin-left:auto" onclick="startFlow('connectivity')">Run connection check</button></div><p class="small" data-testid="offline-banner-optional-hint" style="margin:0">This step is optional — you can go straight to the issue.</p></div>` : ''}
-   ${ws.degraded ? `<div class="alert warn" data-testid="degraded-banner">⚠️ Live reads are unavailable — flows will capture &amp; escalate rather than make changes.</div>` : ''}
+   ${ws.degraded ? `<div class="alert warn" data-testid="degraded-banner">⚠️ Live reads are unavailable — flows will pass issues to the IoT team rather than make changes.</div>` : ''}
    <div class="card">
    ${callSoFar()}
    <h3>What is the customer reporting?</h3>
@@ -207,7 +213,7 @@ function renderWorkspace() {
   <div>
    <div class="card tight"><h3>What Lighthouse controls at this site</h3><ul class="scopelist" data-testid="scope-list">
     ${ws.scope.map(g => `<li><span${g.level === 'none' ? ' style="color:var(--text-disabled)"' : ''}>${esc(g.label)}</span>${scopeTag(g)}</li>`).join('')}
-   </ul><p class="small" style="margin-top:6px">Live from the device inventory — use it to answer "isn\'t that you?"</p></div>
+   </ul><p class="small" style="margin-top:6px" data-testid="scope-footnote">From this site\'s equipment list and its connection right now.</p></div>
    <div class="card tight"><h3>Open tickets for this site</h3>${siteTickets(ws)}</div>
   </div></div></div>`;
     if (!state.flow) $('#iq')?.focus();
@@ -216,7 +222,7 @@ function renderWorkspace() {
 function callSoFar() {
     if (!state.call || !state.call.issues.length) return '';
     return `<div class="callsofar" data-testid="call-so-far"><b>This call so far:</b> ${state.call.issues.map(i =>
-        `<span class="tag ${i.cls}" style="margin:0 4px 0 6px">${esc(i.label)}</span>${i.ticket ? `<span class="small">#${i.ticket}</span>` : ''}`).join(' ')}</div>`;
+        `<span class="tag ${i.cls}" style="margin:0 4px 0 6px">${esc(i.label)}</span>${i.ticket ? `<span class="small">${tktLink(i.ticket)}</span>` : ''}`).join(' ')}</div>`;
 }
 
 // OOHDASH-117 F4a — P1 escalation banner (safety-critical pre-triage signal)
@@ -224,10 +230,9 @@ function renderP1Banner(ws) {
     const tickets = ws.activeP1Tickets;
     if (!tickets || tickets.length === 0) return '';
     const first = tickets[0];
-    const linkHtml = first.zendeskUrl
-        ? ` <a href="${esc(first.zendeskUrl)}" target="_blank" rel="noopener" style="color:inherit;font-weight:600;text-decoration:underline">View ticket #${esc(String(first.id))}</a>`
-        : '';
-    return `<div class="alert err p1-banner" data-testid="p1-escalation-banner" style="display:flex;align-items:flex-start;gap:10px;margin:0 0 10px">
+    // OOHDASH-159 rev 5 (A1): OOH agents can't open Zendesk. The ticket number opens the in-app ticket page in a new tab.
+    const linkHtml = ` Ticket ${tktLink(first.id, 'p1-banner-ticket')}: ${esc(first.status?.agent || '')}.`;
+    return `<div class="statusstrip p1-banner" data-testid="p1-escalation-banner" style="display:flex;align-items:flex-start;gap:10px">
   <span style="font-size:1.2em;flex-shrink:0">🚨</span>
   <div><b>Active P1 escalation on record for this site — review before advising.</b>${linkHtml}${tickets.length > 1 ? ` <span class="small">(${tickets.length} active P1 tickets)</span>` : ''}</div>
 </div>`;
@@ -279,18 +284,18 @@ function renderBoostHoldBanner(ws) {
         } else if (phase === 'done') {
             var r = _holdBannerResult[h.id] || {};
             var tkt = (r.hold || {}).ticketId;
-            var tktStr = tkt ? ' Noted on ticket #' + tkt + '.' : '';
-            stateHtml = '<div class="hb-row alert ok" style="margin:0"><span class="hb-state">✅ ' + zLabel + ' is back to normal.' + esc(tktStr) + ' ' +
+            var tktStr = tkt ? ' Noted on ticket ' + tktLink(tkt) + '.' : '';
+            stateHtml = '<div class="hb-row alert ok" style="margin:0"><span class="hb-state">✅ ' + zLabel + ' is back to normal.' + tktStr + ' ' +
                 '<span class="say" style="display:inline;background:none;border:none;padding:0;font-size:inherit">Say to the customer: "That\'s done. Your heating is back on its normal timetable."</span>' +
                 '</span><button class="btn" onclick="holdBannerDismiss(\'' + h.id + '\')">Dismiss</button></div>';
         } else if (phase === 'pending') {
             var tkt2 = ((_holdBannerResult[h.id] || {}).hold || {}).ticketId;
-            var tktStr2 = tkt2 ? ' on ticket #' + tkt2 : '';
-            stateHtml = '<div class="hb-row alert warn" style="margin:0"><span class="hb-state">⏳ We\'ve asked the heating to go back to normal, but the controls haven\'t confirmed yet. We\'ll keep trying. If the heating doesn\'t switch off in the next few minutes, the IoT helpdesk is alerted automatically' + esc(tktStr2) + '.</span></div>';
+            var tktStr2 = tkt2 ? ' on ticket ' + tktLink(tkt2) : '';
+            stateHtml = '<div class="hb-row alert warn" style="margin:0"><span class="hb-state">⏳ We\'ve asked the heating to go back to normal, but the controls haven\'t confirmed yet. We\'ll keep trying. If the heating doesn\'t switch off in the next few minutes, the IoT helpdesk is alerted automatically' + tktStr2 + '.</span></div>';
         } else if (phase === 'changed') {
             var tkt3 = ((_holdBannerResult[h.id] || {}).hold || {}).ticketId;
-            var tktStr3 = tkt3 ? ' Logged on ticket #' + tkt3 + ' for the IoT helpdesk to check.' : '';
-            stateHtml = '<div class="hb-row alert warn" style="margin:0"><span class="hb-state">⚠ Someone has changed ' + zLabel + ' at the heating controls since we did, so we\'ve left it as it is.' + esc(tktStr3) + '</span><button class="btn" onclick="holdBannerDismiss(\'' + h.id + '\')">Dismiss</button></div>';
+            var tktStr3 = tkt3 ? ' It is on ticket ' + tktLink(tkt3) + ' for the IoT helpdesk to check the next working day.' : '';
+            stateHtml = '<div class="hb-row alert warn" style="margin:0"><span class="hb-state">⚠ Someone has changed ' + zLabel + ' at the heating controls since we did, so we\'ve left it as it is.' + tktStr3 + '</span><button class="btn" onclick="holdBannerDismiss(\'' + h.id + '\')">Dismiss</button></div>';
         } else if (phase === 'finished') {
             stateHtml = '<div class="hb-row"><span class="hb-state">This had already finished. Refreshing…</span></div>';
         } else if (phase === 'error') {
@@ -372,13 +377,16 @@ function holdBannerConfirmYes(id, zone) {
 // `deviceBoard` table were removed. Device state is triage-question-led — it surfaces ONLY as a
 // high-assurance Q&A outcome (the flow reachability conclusions), never as a standing readout.
 
+// OOHDASH-159 rev 5 (A1): open tickets raised from this dashboard, P1s first with a badge, and the plain current
+// status from the IoT team's ticket. Each opens the in-app ticket page in a new tab.
 function siteTickets(ws) {
-    if (!ws.tickets.length) return '<p class="small">No tickets in the last 90 days.</p>';
-    return ws.tickets.map(t =>
-        `<div class="stepdone" style="cursor:pointer" onclick="openTicketDrawer(${t.id})"><span class="tag ${t.visit ? 'amber' : t.status.raw === 'open' ? 'blue' : 'violet'}">${esc(t.status.agent)}</span> <span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:13px">${esc(t.subject)}</span> <span class="small">#${t.id}</span></div>`).join('');
+    if (!ws.tickets.length) return '<p class="small" data-testid="site-tickets-empty">No open tickets raised from this dashboard.</p>';
+    return '<p class="small" style="margin:-4px 0 4px">Raised from this dashboard, with their status right now.</p>' + ws.tickets.map(t =>
+        `<div class="stepdone siteticket" data-testid="site-ticket"><a class="tktrow" href="/ticket/${encodeURIComponent(String(t.id))}" target="_blank" rel="noopener" title="Opens the ticket in a new tab">${t.isP1 ? '<span class="tag red" data-testid="site-ticket-p1">P1</span> ' : ''}<span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:13px">${esc(t.subject)}</span> <span class="small">#${esc(String(t.id))}</span></a><div class="small" data-testid="site-ticket-status">${esc(t.status.agent)}</div></div>`).join('');
 }
 
 function endCall() {
+    callFinalise('end-call'); // OOHDASH-159 rev 5 (E1): publishes the whole call record
     notesDraftClear(); // OOHDASH-119: clear the sessionStorage draft at explicit end-of-call
     clearInterval(wsRefreshTimer);
     state.flow = null;
@@ -407,9 +415,9 @@ function drawerShell(ticketId, cbTicket, threadHtml) {
     return `<div class="dh">Ticket #${ticketId}<button class="btn link" onclick="state.drawer=null;paintDrawer()">✕</button></div><div class="db">
   ${cbTicket ? `<p><b>${esc(cbTicket.subject)}</b></p>
   <p class="small" style="margin-bottom:10px">Opened ${esc(cbTicket.createdFriendly)} · <span class="tag blue">${esc(cbTicket.status.agent)}</span></p>
-  <h3>Read to the caller</h3><div class="script" data-testid="caller-script">"${esc(cbTicket.script)}"</div>
-  ${cbTicket.visit ? '<div class="alert warn" data-testid="chargeable-warning">⚠️ <b>Engineer visit involved</b> — remind the caller: if the fault turns out not to be Lighthouse equipment, the visit may be chargeable.</div>' : ''}
-  <h3 style="margin-top:14px">Caller expects an update by…</h3>
+  ${sayBox(esc(cbTicket.script), '', { testid: 'caller-script' })}
+  ${cbTicket.visit ? '<div class="alert warn" data-testid="chargeable-warning">⚠️ <b>Engineer visit involved</b> — remind the customer: if the fault turns out not to be Lighthouse equipment, the visit may be chargeable.</div>' : ''}
+  <h3 style="margin-top:14px">Customer expects an update by…</h3>
   <div style="display:flex;gap:8px;margin-bottom:14px"><input type="date" id="fud" style="border:1.5px solid var(--border);border-radius:6px;padding:7px 10px"><button class="btn" onclick="saveFollowUp(${ticketId})">Save follow-up</button></div>` : ''}
   <h3>Notes &amp; feedback thread</h3>
   <p class="small" style="margin-bottom:8px">Shared with the IoT team — replies made in the IoT Support dashboard appear here.</p>
@@ -462,7 +470,7 @@ async function pickCallbackSite(siteNo) {
         state.cb.data = await api.get(`/api/callback/${encodeURIComponent(siteNo)}`);
     } catch (err) {
         state.cb.error = err.degraded
-            ? 'Zendesk is unreachable — take the caller\'s details and start a new call to capture the issue; it will be logged as soon as connectivity returns.'
+            ? 'Zendesk is unreachable — take the customer\'s details and start a new call to capture the issue; it will be logged as soon as connectivity returns.'
             : err.message;
     }
     render();
@@ -477,7 +485,7 @@ function cbTickets() {
         `<button class="${tab === k ? 'on' : ''}" onclick="state.cb.tab='${k}';render()">${l}<span class="cnt">${tickets[k].length}</span></button>`).join('')}</div>
   ${list.length ? list.map(t =>
         `<div class="stepdone" style="cursor:pointer" onclick='openTicketDrawer(${t.id}, findCbTicket(${t.id}))'><span class="tag ${t.visit ? 'amber' : 'blue'}">${esc(t.status.agent)}</span><span style="flex:1">${esc(t.subject)}</span><span class="small">#${t.id} · ${esc(t.updatedFriendly)}</span></div>`).join('')
-        : `<p class="small" style="padding:8px 0" data-testid="callback-empty">No tickets for this site in the last 90 days — if the caller insists they rang, take details and <button class="btn link" onclick="openSite('${esc(state.cb.siteNo)}')">start a new call</button>.</p>`}
+        : `<p class="small" style="padding:8px 0" data-testid="callback-empty">No tickets for this site in the last 90 days — if the customer insists they rang, take details and <button class="btn link" onclick="openSite('${esc(state.cb.siteNo)}')">start a new call</button>.</p>`}
  </div>`;
 }
 
@@ -531,7 +539,7 @@ function paintTonight() {
     <td>${a.siteName ? `<b>${esc(a.siteName)}</b> <span class="mono">${esc(a.siteNo || '')}</span>` : '—'}</td>
     <td>${esc(a.operatorName)}</td><td>${esc(a.detail)}</td>
     <td>${OUTCOME_CHIP[a.outcome] || esc(a.outcome || '')}</td>
-    <td>${a.ticketId ? `<button class="btn link" style="padding:0" onclick="openTicketDrawer(${a.ticketId})">#${a.ticketId}</button>` : '—'}</td></tr>`).join('')}</table>`
+    <td>${a.ticketId ? `${tktLink(a.ticketId)}` : '—'}</td></tr>`).join('')}</table>`
         : `<p class="small" style="padding:10px 0" data-testid="tonight-empty">${q ? 'No activity matching that filter tonight.' : 'No activity yet tonight.'}</p>`}
    <p class="small" style="margin-top:10px">The IoT team\'s morning review (mark-as-reviewed, P1 acknowledgements, feedback) happens in the <b>IoT Support dashboard</b>, which receives all of this automatically.</p>
   </div></div>`;
@@ -542,7 +550,7 @@ function raiseQuery() {
   <p class="sub" style="margin-bottom:10px">For anything older than tonight, or anything you\'re unsure about — this goes straight onto a ticket for the team.</p>
 
   <div class="formrow"><label>Site (if known)</label><input id="qsite" data-testid="query-site" placeholder="e.g. 6832"></div>
-  <div class="formrow"><label>Your query</label><textarea id="qtxt" data-testid="query-text" rows="3" placeholder="e.g. Caller says they rang two nights ago about fryers — can\'t see it tonight"></textarea></div>
+  <div class="formrow"><label>Your query</label><textarea id="qtxt" data-testid="query-text" rows="3" placeholder="e.g. Customer says they rang two nights ago about fryers — can\'t see it tonight"></textarea></div>
 
   ${notesField({ id: 'addnotes-q' })}
  </div><div class="mf"><button class="btn" onclick="closeModal()">Cancel</button><button class="btn primary" data-testid="query-send" onclick="sendQuery()">Send query</button></div></div>`);
@@ -621,7 +629,7 @@ function paintAdmin() {
   </div>
   <div class="card"><h3>P1 escalation log</h3>
    ${a.sms.length ? `<table class="tbl">${a.sms.map(sl =>
-        `<tr><td>${esc(new Date(sl.dispatchedAt).toLocaleString('en-GB', { weekday: 'short', hour: '2-digit', minute: '2-digit' }))}</td><td><b>${esc(sl.siteName)}</b> <span class="mono">${esc(sl.siteNo)}</span></td><td>Raised with ooh_p1 tag · IoT Support Dashboard pages the manager</td><td><a href="${esc(sl.OohP1EscalationLink)}" target="_blank" rel="noopener">#${sl.ticketId}</a></td><td>${sl.OohP1AckAt ? `<span class="tag green">ack ${esc(new Date(sl.OohP1AckAt).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }))}</span>` : `<button class="btn link" onclick="ackP1('${sl.id}')">Mark acknowledged</button>`}</td></tr>`).join('')}</table>` : '<p class="small">No P1 escalations raised yet.</p>'}
+        `<tr><td>${esc(new Date(sl.dispatchedAt).toLocaleString('en-GB', { weekday: 'short', hour: '2-digit', minute: '2-digit' }))}</td><td><b>${esc(sl.siteName)}</b> <span class="mono">${esc(sl.siteNo)}</span></td><td>Raised with ooh_p1 tag · IoT Support Dashboard pages the manager</td><td>${tktLink(sl.ticketId)}</td><td>${sl.OohP1AckAt ? `<span class="tag green">ack ${esc(new Date(sl.OohP1AckAt).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }))}</span>` : `<button class="btn link" onclick="ackP1('${sl.id}')">Mark acknowledged</button>`}</td></tr>`).join('')}</table>` : '<p class="small">No P1 escalations raised yet.</p>'}
   </div>
   <div class="card"><h3>Capability &amp; guardrail registry <span class="tag grey">read-only mirror of server registry</span></h3>
    <table class="tbl" data-testid="admin-registry"><tr><th>Device type</th><th>Allowed commands</th><th>Ranges (app policy)</th></tr>

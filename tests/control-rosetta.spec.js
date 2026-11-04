@@ -73,8 +73,7 @@ test.describe('OOHDASH-123 Rosetta three-outcome', () => {
         await expect(page.locator('[data-testid="hw-boost-yes"]')).toHaveCount(0);   // boost chip removed
         await expect(page.locator('.tag.green')).toHaveCount(0);                      // no "controllable" tag
         await page.locator('[data-testid="hw-capture"]').click();
-        await page.locator('[data-testid="record-outcome"]').click();
-        await expect(page.locator('[data-testid="outcome-captured"]')).toContainText('Captured for the IoT team');
+        await expect(page.locator('[data-testid="outcome-captured"]')).toContainText('Ticket created for the IoT team');
     });
 
     test('J8 device already at the requested value — honest no-write success (API)', async ({ page }) => {

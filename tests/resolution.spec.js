@@ -72,7 +72,7 @@ test.describe('F004 resolution', () => {
         await confirmSite(page, '6832', 'Old Grey Mare');
         const scope = page.locator('[data-testid="scope-list"]');
         await expect(scope).toContainText('Heating');
-        await expect(scope).toContainText('Controllable from here');
+        await expect(scope).toContainText('Monitored only');
         await expect(scope).toContainText('Not on Lighthouse here');
         await expect(page.locator('.tag.amber:has-text("calls this month")')).toContainText('2 calls');
     });
@@ -109,7 +109,7 @@ test.describe('F004 resolution', () => {
             await expect(banner).toBeVisible();
             await expect(banner).toContainText('Active P1 escalation on record for this site');
             await expect(banner).toContainText('review before advising');
-            await expect(banner.locator('a')).toContainText('View ticket #49001');
+            await expect(banner.locator('a')).toContainText('#49001');
             await expect(page.locator('[data-testid="category-tiles"]')).toBeVisible();
         });
 

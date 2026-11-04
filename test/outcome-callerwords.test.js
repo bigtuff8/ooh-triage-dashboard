@@ -122,14 +122,19 @@ test('callerWords: an outcome from a tile-started flow with typed text populates
         'the carried typed words (incl. quotes/apostrophes) reach callerWords on the /api/outcomes body');
 });
 
-test('D-10a card echo: the outcome card echoes the typed words when present, esc-quoted (real finishOutcome)', async () => {
-    const { ctx, state } = loadClient(WS, { realFinishOutcome: true });
+test('D-10a card echo: caller words go into the payload but NOT a separate echo element (rev4 — words are in knownSoFar)', async () => {
+    // OOHDASH-159 rev4: the visual echo element was removed because the caller words are already
+    // the first entry in "What we know so far" (knownSoFar on the POST payload). The agent can see
+    // the words in the ticket itself, so a duplicate card echo is unnecessary and was removed.
+    const { ctx, state, posts } = loadClient(WS, { realFinishOutcome: true });
     state.smartEntryText = 'stock is warming in the freezer';
     ctx.startTileFlow('fridge');
     const html = await driveRealScopeOutcome(ctx, state, WS);
-    assert.match(html, /data-testid="outcome-callerwords"/, 'the card carries the caller-words echo element');
-    assert.match(html, /Recorded from the caller: "stock is warming in the freezer"/,
-        'the card echoes the exact typed words');
+    // Words are in the POST payload (callerWords field), not the card HTML.
+    assert.ok(posts.length >= 1, 'at least one outcome was posted');
+    assert.equal(posts[0].callerWords, 'stock is warming in the freezer', 'caller words reach the API payload');
+    // No visual echo element in the outcome card (rev4 intentional removal).
+    assert.doesNotMatch(html, /data-testid="outcome-callerwords"/, 'no separate echo element in the card (rev4 removed it)');
 });
 
 test('D-10a card echo: NO empty-quote artefact when the handler used a tile without typing anything (real finishOutcome)', async () => {
