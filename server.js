@@ -9,6 +9,7 @@
  * missing secrets (see validateConfig).
  */
 
+import * as callRecord from './services/call-record.js';
 import 'dotenv/config';
 import express from 'express';
 import rateLimit from 'express-rate-limit';
@@ -178,6 +179,9 @@ async function start() {
     } catch (err) {
         console.error(`[CONTROL] in-flight resume failed at boot: ${err.message}`);
     }
+    // OOHDASH-159 rev 5 (E1): finalise call records left idle (silent in-process timer, no tokens).
+    await callRecord.resumeOpenCalls();
+    callRecord.startIdleSweeper();
     startLivenessMonitor(); // F010 — producer business-liveness self-check (no-overnight-activity)
     // Stream A / OOHDASH-19 runtime boot guard (§6.1): if writes are enabled but the refrigeration
     // switch-deny is missing from this image, keep writes LOCKED (via killswitch latch) and log hard.

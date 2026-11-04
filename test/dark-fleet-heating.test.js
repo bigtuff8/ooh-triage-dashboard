@@ -84,7 +84,7 @@ test('dark-fleet: capture routes to a normal IoT-team capture (dark-fleet-heatin
     assert.equal(captured[0].OohCaptureClass, 'dark-fleet-heating');
     assert.equal(captured[0].type, 'capture', 'a normal capture, not a P1');
     assert.equal(opened.length, 0, 'no openControl - a dark device is never actuated');
-    assert.match(html, /Captured for the IoT team/i, 'the captured outcome renders');
+    assert.match(html, /Ticket created for the IoT team/i, 'the captured outcome renders');
 });
 
 test('dark-fleet: end-with-no-action routes to a no-action outcome', () => {
@@ -93,7 +93,7 @@ test('dark-fleet: end-with-no-action routes to a no-action outcome', () => {
     const html = ctx.FLOWR.heating(state.workspace, state.flow);
     assert.equal(captured.length, 1);
     assert.equal(captured[0].type, 'no-action');
-    assert.match(html, /no action taken/i);
+    assert.match(html, /nothing changed/i); // OOHDASH-159 rev 5 wording
 });
 
 /* ------------------------------ regression guards ------------------------------ */

@@ -311,7 +311,7 @@ function buildTrgBody({ operator, summary, callerWords, outcomeType, transcript,
  * and the full timestamped action transcript (the ticket requester is the API service account,
  * so identity always lives in the comment body).
  */
-export async function createOutcomeTicket({ operator, siteNo, siteName, subject, summary, transcript = [], detail, callerWords, outcomeType, priority = 'normal', extraTags = [], additionalNotes: rawNotes }) {
+export async function createOutcomeTicket({ operator, siteNo, siteName, subject, summary, transcript = [], detail, callerWords, outcomeType, priority = 'normal', extraTags = [], additionalNotes: rawNotes, status: createStatus }) {
     const summaryLine = summary || subject || detail || 'OOH outcome';
     const defaultTime = hhmm(new Date().toISOString());
     // If no structured transcript was supplied but a detail string exists, keep at least one step
@@ -336,7 +336,7 @@ export async function createOutcomeTicket({ operator, siteNo, siteName, subject,
 
     if (!live()) {
         const t = {
-            id: fixtureSeq++, siteNo, subject, title, status: 'new', custom_status_id: 11404223315612,
+            id: fixtureSeq++, siteNo, subject, title, status: createStatus || 'new', custom_status_id: createStatus === 'solved' ? 25999068372252 : 11404223315612,
             priority, created_at: new Date().toISOString(), updated_at: new Date().toISOString(),
             tags: [config.zendesk.oohTag, ...extraTags], visit: false,
             custom_fields: [categoryField],
@@ -356,6 +356,8 @@ export async function createOutcomeTicket({ operator, siteNo, siteName, subject,
             subject: title,
             comment: { body: buildBody(dataQualityNote), public: false },
             priority,
+            // OOHDASH-159 rev 5: contact-history records (call records, "not controlled here") are created already solved.
+            ...(createStatus ? { status: createStatus } : {}),
             tags: [config.zendesk.oohTag, ...extraTags],
             custom_fields: customFields
         }
@@ -675,8 +677,36 @@ export async function callbackLookup(siteNo) {
  * Recent OOH tickets for the Site Workspace side panel (last 4).
  */
 export async function ticketsForSite(siteNo) {
+    // OOHDASH-159 rev 5 (A1): only tickets raised from this dashboard (oohTag), still open, P1s first.
     const { tickets } = await callbackLookup(siteNo);
-    return tickets.recent.slice(0, 4);
+    const ooh = tickets.recent.filter(t => (t.tags || []).includes(config.zendesk.oohTag) && !['solved', 'closed'].includes(t.status.raw));
+    const isP1 = t => (t.tags || []).includes('ooh_p1');
+    return ooh.map(t => ({ ...t, isP1: isP1(t) })).sort((a, b) => Number(b.isP1) - Number(a.isP1)).slice(0, 6);
+}
+
+/**
+ * OOHDASH-159 rev 5 (A1): the in-app ticket page (/ticket/:id, opened in a new tab). OOH agents have
+ * no Zendesk access, so this is their only view: subject, plain current status, P1 badge, and the
+ * OOH/TRG thread. Never returns a Zendesk URL.
+ */
+export async function ticketView(ticketId) {
+    const id = Number(ticketId);
+    let t;
+    if (!live()) {
+        t = fixtureTickets.find(x => x.id === id);
+        if (!t) throw Object.assign(new Error('Ticket not found'), { status: 404 });
+    } else {
+        t = (await zd('GET', `/tickets/${id}.json`)).ticket;
+    }
+    const statusInfo = STATUS_TRANSLATIONS[t.custom_status_id] || { name: t.status, agent: t.status, caller: 'Our team is handling this.' };
+    const tags = Array.isArray(t.tags) ? t.tags : [];
+    const thread = await getFeedbackThread(id).catch(() => []);
+    return {
+        id, subject: t.title || t.subject, status: { raw: t.status, agent: statusInfo.agent, caller: statusInfo.caller },
+        isP1: tags.includes('ooh_p1'), fromOoh: tags.includes(config.zendesk.oohTag),
+        createdFriendly: friendlyTimeElapsed(t.created_at), updatedFriendly: friendlyTimeElapsed(t.updated_at),
+        thread: thread.map(c => ({ at: c.at, text: translateComment(c.body) }))
+    };
 }
 
 /**
