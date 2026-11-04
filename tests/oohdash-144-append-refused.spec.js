@@ -79,10 +79,6 @@ async function reachWrapUpAfterBoost(page) {
     const m = autologText.match(/ticket\s*#(\d+)/i);
     const ticketId = m ? m[1] : null;
 
-    // Navigate to Check and log.
-    await page.locator('[data-testid="bp-finish-notes"]').click();
-    await expect(page.locator('[data-testid="wrap-submit"]')).toBeVisible({ timeout: 5000 });
-
     return ticketId;
 }
 
@@ -95,15 +91,9 @@ test.describe('OOHDASH-144 C3-D1 — append-refused recovery', () => {
     /* ── AR-1..4: full end-to-end append-refused → new-ticket ─────────────── */
     test('AR-1..4: 409 append-refused shows new-ticket button; clicking it submits with relatedToTicketId', async ({ page }) => {
         await confirmSite(page, FIXTURE_SITE, 'Test Boiler Panel V1 (Heating)');
-        const earlierTicketId = await reachWrapUpAfterBoost(page);
 
-        // Determine whether the submit button is the append path ("Add to ticket #N").
-        // If no ticket was auto-logged (Zendesk fixture unavailable), the test still runs but
-        // the relatedToTicketId assertion is skipped.
-        const submitLabel = await page.locator('[data-testid="wrap-submit"]').textContent();
-        const isAppendPath = /Add to ticket #/.test(submitLabel || '');
-
-        // --- Intercept the outcomes endpoint ---
+        // --- Intercept BEFORE reachWrapUpAfterBoost and bp-finish-notes click ---
+        // OOHDASH-159 rev 5 (E1): bp-finish-notes auto-submits; route must be in place first.
         let outcomeCallCount = 0;
         let capturedSecondBody = null;
 
@@ -127,8 +117,11 @@ test.describe('OOHDASH-144 C3-D1 — append-refused recovery', () => {
             }
         });
 
+        const earlierTicketId = await reachWrapUpAfterBoost(page);
+
         // Trigger the first submit (will be intercepted with 409).
-        await page.locator('[data-testid="wrap-submit"]').click();
+        // E1: bp-finish-notes auto-submits immediately — route already set up above.
+        await page.locator('[data-testid="bp-finish-notes"]').click();
 
         // AR-1: error message visible; new-ticket button shown; no "Try again" button.
         await expect(page.locator('[data-testid="wrap-error"]')).toBeVisible({ timeout: 5000 });

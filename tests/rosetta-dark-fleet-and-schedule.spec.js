@@ -25,7 +25,7 @@ test.describe('OOHDASH-123 dark-fleet copy + PowerPause schedule', () => {
         await expect(reco).toContainText('not reporting');
 
         // The explicit live-read line the operator sees.
-        await expect(page.locator('.flowbody')).toContainText('device not reporting');
+        await expect(page.locator('.flowbody')).toContainText('device is not reporting');
 
         // No controls are offered, and it is NOT the generic gateway connectivity branch.
         await expect(page.locator('[data-testid="need-warm"]')).toHaveCount(0);
@@ -34,8 +34,7 @@ test.describe('OOHDASH-123 dark-fleet copy + PowerPause schedule', () => {
         await expect(page.locator('[data-testid="connectivity-alert"]')).toHaveCount(0);
 
         // Capture routes to a normal IoT-team capture (offline, no controls - the unchanged outcome).
-        await page.locator('[data-testid="dark-capture"]').click();
-        await page.locator('[data-testid="record-outcome"]').click();
+        await page.locator('[data-testid="dark-capture"]').click(); // E1: auto-submits for non-P1
         await expect(page.locator('[data-testid="outcome-captured"]')).toBeVisible();
         await expect(page.locator('[data-testid="outcome-captured"]')).toContainText('not reporting');
     });
@@ -44,17 +43,17 @@ test.describe('OOHDASH-123 dark-fleet copy + PowerPause schedule', () => {
         await confirmSite(page, '7002', 'Power Pause Inn');
         await page.locator('[data-testid="tile-kitchen"]').click();
 
-        // Circuit is online, so the flow proceeds to the deciding question (not the connectivity divert).
-        await page.locator('[data-testid="kitchen-notcritical"]').click();
+        // J1: override step appears first; schedule text surfaces here for the operator
+        await expect(page.locator('.flowbody')).toContainText("based on the device's stored schedule");
+        await expect(page.locator('.flowbody')).toContainText('next change to on at 06:30 tomorrow');
 
-        // The decoded schedule is already visible on the confirm step; record the outcome to finish.
-        await expect(page.locator('[data-testid="confirm-step"]')).toContainText("based on the device's stored schedule");
-        await page.locator('[data-testid="record-outcome"]').click();
+        // No panel available — proceed to service question
+        await page.locator('[data-testid="kitchen-no-panel"]').click();
+        // E1: kitchen-notcritical auto-submits for non-P1
+        await page.locator('[data-testid="kitchen-notcritical"]').click();
 
         const outcome = page.locator('[data-testid="outcome-captured"]');
         await expect(outcome).toBeVisible();
-        // The decoded next-scheduled-change surfaces, labelled per DD-SCHED-DISPLAY.
-        await expect(outcome).toContainText("based on the device's stored schedule");
-        await expect(outcome).toContainText('next change to on at 06:30 tomorrow');
+        await expect(outcome).toContainText(/Ticket #\d+/);
     });
 });

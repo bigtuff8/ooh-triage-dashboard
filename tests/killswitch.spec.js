@@ -48,9 +48,7 @@ test.describe.serial('F016 kill-switch', () => {
         await h.locator('[data-testid="tile-other"]').click();
         await h.locator('[data-testid="other-text"]').pressSequentially('needs logging during kill switch', { delay: 20 });
         await h.locator('[data-testid="other-capture"]').click();
-        await h.locator('[data-testid="other-normal"]').click(); // OOHDASH-134: Capture -> normal priority
-        // OOHDASH-119: confirm step required before POST fires
-        await h.locator('[data-testid="record-outcome"]').click();
+        await h.locator('[data-testid="other-normal"]').click(); // E1: auto-submits for non-P1
         await expect(h.locator('[data-testid="outcome-captured"]')).toContainText(/Ticket #\d+/);
 
         // Re-enable and confirm the banner clears

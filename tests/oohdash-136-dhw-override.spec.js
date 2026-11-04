@@ -141,13 +141,7 @@ test.describe('OOHDASH-136 DHW override card', () => {
         await expect(page.locator('[data-testid="hw-dhw-override"]')).toBeVisible();
 
         await page.locator('[data-testid="hw-capture"]').click();
-
-        // finishOutcome shows a confirm step first — check the ticket sentence in the detail,
-        // then click "Record outcome" to fire the POST and reach outcome-captured.
-        const confirmStep = page.locator('[data-testid="confirm-step"]');
-        await expect(confirmStep).toBeVisible();
-        await expect(confirmStep).toContainText('Auto (on schedule)');
-        await page.locator('[data-testid="record-outcome"]').click();
+        // E1: hw-capture auto-submits for non-P1
 
         const outcome = page.locator('[data-testid="outcome-captured"]');
         await expect(outcome).toBeVisible();

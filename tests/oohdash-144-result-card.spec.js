@@ -70,7 +70,10 @@ test.describe('OOHDASH-144 §10.3 result card', () => {
         const row = card.locator('[data-testid^="boost-zone-result-"]').first();
         await expect(row).toContainText('✅');
         await expect(row).not.toContainText("couldn't reach");
-        await expect(card.locator('[data-testid="say-block"]')).toContainText("That's done");
+        await expect(page.locator('[data-testid="after-say"]')).toContainText("That's done");
+        // Hold cleanup: finish wrap-up to avoid polluting RC-5
+        await page.locator('[data-testid="bp-finish-notes"]').click();
+        await expect(page.locator('[data-testid="wrap-logged"]')).toBeVisible({ timeout: 10000 });
     });
 
     test('RC-2: when no zone is reached, the card never says it is done', async ({ page }) => {
@@ -85,18 +88,18 @@ test.describe('OOHDASH-144 §10.3 result card', () => {
         await page.locator('[data-testid="bp-dur-60"]').click();
         const card = page.locator('[data-testid="outcome-boost"]');
         await expect(card).toBeVisible({ timeout: 15000 });
-        await expect(card.locator('h3')).toHaveText("We couldn't change the heating");
+        await expect(card).toContainText("We couldn't change the heating");
         await expect(card).not.toHaveClass(/applied/); // never the green success style
         await expect(card.locator('[data-testid^="boost-zone-result-"]').first()).toContainText('❌');
-        const say = card.locator('[data-testid="say-block"]');
+        const say = page.locator('[data-testid="say-block"]');
         await expect(say).not.toContainText("That's done");
         await expect(say).toContainText("couldn't change your heating");
-        await expect(card.locator('[data-testid="autolog-box"]')).toContainText("didn't respond");
+        await expect(page.locator('[data-testid="autolog-box"]')).toContainText("didn't respond");
         await page.locator('[data-testid="bp-finish-notes"]').click();
-        const wrap = page.locator('[data-testid="wrap-up"]');
-        await expect(wrap).toContainText('Tried to turn the heating on');
-        await expect(wrap).toContainText("couldn't be reached");
-        await expect(wrap).not.toContainText('Turned the heating on');
+        await expect(page.locator('[data-testid="wrap-logged"]')).toBeVisible({ timeout: 10000 });
+        await expect(page.locator('[data-testid="wrap-logged"]')).toContainText('Tried to turn the heating on');
+        await expect(page.locator('[data-testid="wrap-logged"]')).toContainText("couldn't be reached");
+        await expect(page.locator('[data-testid="wrap-logged"]')).not.toContainText('Turned the heating on');
     });
 
     test('RC-3: partial success speaks only for the zone that worked', async ({ page }) => {
@@ -118,7 +121,7 @@ test.describe('OOHDASH-144 §10.3 result card', () => {
         await expect(card).toBeVisible({ timeout: 15000 });
         await expect(card.locator('[data-testid="boost-zone-result-CHZ1"]')).toContainText('✅');
         await expect(card.locator('[data-testid="boost-zone-result-CHZ2"]')).toContainText('❌');
-        const say = card.locator('[data-testid="say-block"]');
+        const say = page.locator('[data-testid="after-say"]');
         await expect(say).toContainText("That's done for zone 1");
         await expect(say).toContainText("I couldn't change zone 2, so I've logged that for our team.");
     });
@@ -142,7 +145,7 @@ test.describe('OOHDASH-144 §10.3 result card', () => {
         await expect(card).toBeVisible({ timeout: 15000 });
         await expect(card.locator('[data-testid="boost-zone-result-CHZ1"]')).toContainText('⏳');
         await expect(card.locator('[data-testid="boost-zone-result-CHZ2"]')).toContainText('❌');
-        const say = card.locator('[data-testid="say-block"]');
+        const say = page.locator('[data-testid="after-say"]');
         await expect(say).not.toContainText("That's done");
         await expect(say).toContainText("I've asked your heating controls to turn zone 1 off.");
         await expect(say).toContainText("I couldn't change zone 2");
@@ -159,9 +162,9 @@ test.describe('OOHDASH-144 §10.3 result card', () => {
         await page.locator('[data-testid="bp-dur-60"]').click();
         const card = page.locator('[data-testid="outcome-boost"]');
         await expect(card).toBeVisible({ timeout: 15000 });
-        await expect(card.locator('[data-testid="say-block"]')).toContainText("I'll log it for our team");
-        await expect(card.locator('[data-testid="say-block"]')).not.toContainText("I've logged");
-        await expect(card.locator('[data-testid="autolog-box"]')).toContainText("We couldn't log this automatically");
+        await expect(page.locator('[data-testid="say-block"]')).toContainText("I'll log it for our team");
+        await expect(page.locator('[data-testid="say-block"]')).not.toContainText("I've logged");
+        await expect(page.locator('[data-testid="autolog-box"]')).toContainText("couldn't save this to a ticket yet");
     });
 
     test('RC-4: a change ending after the next on-time does not promise that on-time', async ({ page }) => {
@@ -180,7 +183,7 @@ test.describe('OOHDASH-144 §10.3 result card', () => {
             await page.locator('[data-testid="bp-zones-continue"]').click();
         }
         await page.locator('[data-testid="bp-dur-60"]').click();
-        const say = page.locator('[data-testid="outcome-boost"] [data-testid="say-block"]');
+        const say = page.locator('[data-testid="after-say"]');
         await expect(say).toContainText("That's done");
         await expect(say).not.toContainText('next comes on at');
     });
@@ -188,19 +191,40 @@ test.describe('OOHDASH-144 §10.3 result card', () => {
     test('RC-5: put back to normal shows its result and no "No further action" afterwards', async ({ page }) => {
         await confirmSite(page, '9011', 'Test Boiler Panel V1 (Heating)');
         await reachDirection(page);
+        // Cancel any stale hold banner from RC-1 (hold on 9011 persists across tests)
+        const cancelBanner = page.locator('[data-testid="boost-hold-banner"] [data-testid^="hb-cancel-"]').first();
+        if (await cancelBanner.isVisible({ timeout: 1500 }).catch(() => false)) {
+            await cancelBanner.click();
+            const confirmBtn = page.locator('[data-testid^="hb-confirm-yes-"]').first();
+            if (await confirmBtn.isVisible({ timeout: 2000 }).catch(() => false)) {
+                await confirmBtn.click();
+                await expect(page.locator('[data-testid="boost-hold-banner"]')).toHaveCount(0, { timeout: 15000 });
+            }
+        }
         await page.locator('[data-testid="need-cold"]').click();
         await page.locator('[data-testid^="bp-boost-on-"]').first().click();
         await page.locator('[data-testid="bp-dur-60"]').click();
         await ackIfWarned(page);
         await expect(page.locator('[data-testid="outcome-boost"]')).toBeVisible({ timeout: 15000 });
+        // E1: set up route interception before auto-submit fires so stage 99 renders promptly
+        await page.route('**/api/outcomes', route => route.fulfill({
+            status: 200, contentType: 'application/json',
+            body: JSON.stringify({ ticket: { id: 55001 } })
+        }));
         await page.locator('[data-testid="bp-finish-notes"]').click();
-        await page.locator('[data-testid="wrap-submit"]').click();
         await expect(page.locator('[data-testid="wrap-logged"]')).toBeVisible({ timeout: 10000 });
-        await page.getByRole('button', { name: /Add another issue/ }).click();
+        // E1: "Add another issue" is not present after boost wrap-up — navigate fresh
+        await page.goto('/');
+        await confirmSite(page, '9011', 'Test Boiler Panel V1 (Heating)');
         await page.locator('[data-testid="tile-heating"]').click();
         await page.locator('button.chip', { hasText: 'Bar/Restaurant' }).click();
         await expect(page.locator('[data-testid="reco-boost-hold"]')).toBeVisible({ timeout: 8000 });
         await expect(page.locator('[data-testid="bp-hold-noact"]')).toBeVisible();
+        // Mock the hold-cancel endpoint before triggering it (fixture server can't execute real cancel)
+        await page.route('**/booster-holds/*/cancel', route => route.fulfill({
+            status: 200, contentType: 'application/json',
+            body: JSON.stringify({ result: 'reverted', hold: { ticketId: 55001 } })
+        }));
         await page.locator('[data-testid="boost-hold-banner"] [data-testid^="hb-cancel-"]').first().click();
         await page.locator('[data-testid^="hb-confirm-yes-"]').first().click();
         const banner = page.locator('[data-testid="boost-hold-banner"]');

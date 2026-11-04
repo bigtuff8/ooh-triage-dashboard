@@ -99,14 +99,13 @@ test.describe('OOHDASH-82 heating area model', () => {
         const shortcut = page.locator('[data-testid="aircon-shortcut"]');
         await expect(shortcut).toBeVisible();
         await shortcut.click();
-        // OOHDASH-119: shortcut now shows confirm step; must click Record outcome to fire POST
-        await page.locator('[data-testid="record-outcome"]').click();
+        // E1: aircon-shortcut auto-submits for non-P1
 
         const req = await postClass;
         expect(JSON.parse(req.postData())).toMatchObject({ type: 'capture', OohCaptureClass: 'aircon-referral' });
 
         const captured = page.locator('[data-testid="outcome-captured"]');
-        await expect(captured).toContainText('Captured for the IoT team');
+        await expect(captured).toContainText('Ticket created for the IoT team');
         await expect(captured).toContainText(/Ticket #\d+/);
         await expect(captured).toContainText('next working day');
         // No control affordance anywhere in the referral (aircon is never actuated).
@@ -126,14 +125,13 @@ test.describe('OOHDASH-82 heating area model', () => {
         const postClass = page.waitForRequest(req =>
             req.url().includes('/api/outcomes') && req.method() === 'POST');
         await suggest.click();
-        // OOHDASH-119: suggestion now shows confirm step; must click Record outcome to fire POST
-        await page.locator('[data-testid="record-outcome"]').click();
+        // E1: suggest-aircon auto-submits for non-P1
 
         const req = await postClass;
         expect(JSON.parse(req.postData())).toMatchObject({ type: 'capture', OohCaptureClass: 'aircon-referral' });
 
         const captured = page.locator('[data-testid="outcome-captured"]');
-        await expect(captured).toContainText('Captured for the IoT team');
+        await expect(captured).toContainText('Ticket created for the IoT team');
         await expect(captured).toContainText(/Ticket #\d+/);
         await expect(page.locator('[data-testid="control-send"]')).toHaveCount(0);
         await expect(page.locator('[data-testid="need-warm"]')).toHaveCount(0);
