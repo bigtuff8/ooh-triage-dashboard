@@ -17,7 +17,7 @@ jobs:
     # REQUIRED CHECK. This is the gate: it carries test/interlock-stream-a.test.js, which refuses
     # a WRITES_DISABLED=false manifest unless a Stream A observed-live sign-off backs it.
     name: unit tests
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
@@ -44,7 +44,7 @@ jobs:
     # the same class of stale-harness drift against the OOHDASH-72 log-mode honesty copy. All fixed
     # in OOHDASH-109; the suite is green on a clean main, so e2e now gates like the unit check.
     name: e2e (playwright)
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
