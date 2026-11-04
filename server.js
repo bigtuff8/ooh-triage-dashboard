@@ -142,6 +142,14 @@ app.use('/api', (req, res) => res.status(404).json({ error: 'Unknown API route' 
 
 /* ---------------- static frontend + SPA fallback (authenticated) ---------------- */
 
+// Explicit auth guard on the PowerPause guide — must be BEFORE the generic static handler
+// so the guard is enforced regardless of static-middleware ordering changes (K1 / plan §4.2).
+app.get('/guides/:file', requireAuth, (req, res) => {
+    const file = req.params.file;
+    if (!/^[a-zA-Z0-9_-]+\.html$/.test(file)) return res.status(404).json({ error: 'Not found' });
+    res.sendFile(join(__dirname, 'public', 'guides', file));
+});
+
 app.use(requireAuth, express.static(join(__dirname, 'public')));
 app.get('*', requireAuth, (req, res) => {
     // SPA fallback serves the shell for page routes only — a missing asset is a 404,

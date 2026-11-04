@@ -120,8 +120,12 @@ router.get('/sites/:siteNo/resolve', wrap(async (req, res) => {
 router.post('/sites/:siteNo/confirm', wrap(async (req, res) => {
     const { token, site } = await resolution.confirmSite(req.params.siteNo, req.session.operator);
     // OOHDASH-159 rev 5 (E1): the call record starts here; the agent never has a "log it" step.
-    const callId = callRecord.startCall({ operator: req.session.operator, siteNo: site.siteNo, siteName: site.siteName });
-    res.json({ confirmToken: token, callId, workspace: await workspacePayload(site) });
+    // Part 2b: check for a same-operator resume before starting a new call.
+    const resume = callRecord.sameOperatorResume(req.session.operator.id, site.siteNo);
+    const callId = resume
+        ? resume.callId
+        : callRecord.startCall({ operator: req.session.operator, siteNo: site.siteNo, siteName: site.siteName });
+    res.json({ confirmToken: token, callId, sameOperatorResume: resume || null, workspace: await workspacePayload(site) });
 }));
 
 router.get('/sites/:siteNo/workspace', wrap(async (req, res) => {
@@ -676,7 +680,29 @@ router.post('/tickets/:id/followup', wrap(async (req, res) => {
 router.post('/calls/:id/progress', wrap(async (req, res) => {
     const { issueKey, cat, knownSoFar, notes } = req.body || {};
     const ok = callRecord.recordProgress(req.params.id, req.session.operator.id, { issueKey, cat, knownSoFar, notes });
-    res.json({ ok });
+    if (ok === null) {
+        // 409: unknown issue arrived on a finalised record from the same operator within 2h (Part 2c).
+        return res.status(409).json({ reason: 'call-already-finalised', callId: req.params.id });
+    }
+    res.json({ ok: !!ok });
+}));
+
+// Part 2a: heartbeat — 403 on operator mismatch (same IDOR class as ticket-view).
+router.post('/calls/:id/heartbeat', wrap(async (req, res) => {
+    const ok = await callRecord.heartbeat(req.params.id, req.session.operator.id);
+    if (ok === null) return res.status(403).json({ error: 'Forbidden' });
+    res.json({ ok: !!ok });
+}));
+
+// Part 2c: reopen — 403 on operator mismatch, 410 if expired.
+router.post('/calls/:id/reopen', wrap(async (req, res) => {
+    const r = await callRecord.reopen(req.params.id, req.session.operator.id);
+    if (!r.ok) {
+        if (r.error === 'forbidden') return res.status(403).json({ error: 'Forbidden' });
+        if (r.error === 'expired') return res.status(410).json({ error: 'Call expired' });
+        return res.status(404).json({ error: 'Call not found' });
+    }
+    res.json(r);
 }));
 
 const FINAL_REASONS = ['end-call', 'another-issue', 'left-screen', 'site-change'];
@@ -690,9 +716,28 @@ router.post('/calls/:id/finalise', wrap(async (req, res) => {
     res.json(r);
 }));
 
-/* ---------------- OOHDASH-159 rev 5 (A1): in-app ticket page data ---------------- */
+/* ---------------- OOHDASH-159 rev 5 (A1): in-app ticket page data, Part 2d IDOR scoping ---------------- */
 router.get('/tickets/:id/view', wrap(async (req, res) => {
-    res.json({ ticket: await zendesk.ticketView(req.params.id) });
+    const ticketId = req.params.id;
+    const operatorId = req.session.operator.id;
+    // Layer 1: ticket must carry the ooh tag. Fail-closed on any Zendesk error (403, never 500).
+    let tags;
+    try {
+        tags = await zendesk.getTicketTags(ticketId);
+    } catch (err) {
+        return res.status(403).json({ error: 'Forbidden' });
+    }
+    if (!tags.includes('ooh')) return res.status(403).json({ error: 'Forbidden' });
+    // Layer 2: ticket must be owned by this operator's call record OR match confirmed site.
+    const hasTicket = callRecord.operatorHasTicket(ticketId, operatorId);
+    const confirmedSite = callRecord.confirmedSiteForOperator(operatorId);
+    // We need the ticket's siteNo for the site-match check — zendesk.ticketView includes it.
+    const ticketData = await zendesk.ticketView(ticketId);
+    const ticketSite = ticketData && ticketData.siteNo ? String(ticketData.siteNo) : null;
+    if (!hasTicket && (!confirmedSite || !ticketSite || confirmedSite !== ticketSite)) {
+        return res.status(403).json({ error: 'Forbidden' });
+    }
+    res.json({ ticket: ticketData });
 }));
 
 router.get('/tickets/:id/thread', wrap(async (req, res) => {

@@ -58,8 +58,8 @@ test('precision at the payload: fryer + cellar cooling + cellar light coexist co
     const cellarLight = mapTbDevice({ name: 'gk-6261-cellar-light-1', type: 'gatewayDevice', telemetry: { switch_1: true } });
     const site = { devices: [fryer, cellarCooling, cellarLight] };
 
-    assert.equal(kitchenTile(site), 'ctl', 'the genuine fryer keeps the Kitchen tile controllable');
-    assert.equal(lightingTile(site), 'ctl', 'the cellar light keeps the Lighting tile controllable');
+    assert.equal(kitchenTile(site), 'mon', 'the fryer makes the Kitchen tile mon (OOHDASH-159: kitchen is monitor-only, P1 path handles emergencies)');
+    assert.equal(lightingTile(site), 'mon', 'the cellar light is offline in this fixture so Lighting is mon (canSwitchDevice requires online)');
     assert.equal(cellarCooling.deviceType, 'refrigeration');
     assert.deepEqual(capsFor(cellarCooling.deviceType), [], 'the cellar cooling unit exposes no capabilities');
     assert.equal(fryer.deviceType, 'tuya');

@@ -110,7 +110,10 @@ function callIssuePayload() {
 /** Sent after every step. Fire and forget: the record never blocks the agent. */
 function callProgress() {
     if (!state.call || !state.call.id || !state.flow) return;
-    api.post('/api/calls/' + encodeURIComponent(state.call.id) + '/progress', callIssuePayload()).catch(() => {});
+    const id = state.call.id;
+    api.post('/api/calls/' + encodeURIComponent(id) + '/progress', callIssuePayload()).catch(err => {
+        if (err.status === 409) showCallReopenBanner(id);
+    });
 }
 /**
  * Finalises the issue ('another-issue') or the whole call ('end-call', 'left-screen', 'site-change').
@@ -129,7 +132,52 @@ function callFinalise(reason, keepalive) {
     }
     return api.post('/api/calls/' + encodeURIComponent(id) + '/finalise', body).catch(() => null);
 }
-if (typeof window !== 'undefined' && typeof window.addEventListener === 'function') window.addEventListener('pagehide', () => { if (state.call && state.call.id) callFinalise('left-screen', true); });
+// Only finalise on actual unload (persisted=true means bfcache — the page is kept alive).
+if (typeof window !== 'undefined' && typeof window.addEventListener === 'function') window.addEventListener('pagehide', (ev) => { if (!ev.persisted && state.call && state.call.id) callFinalise('left-screen', true); });
+
+// Part 2b: heartbeat — keep the server-side idle timer alive while the agent is on screen.
+// Runs every 2 minutes regardless of visibilityState (tab focus is not required).
+let _hbTimer = null;
+function startHeartbeat() {
+    if (_hbTimer) return;
+    if (typeof setInterval === 'undefined') return;
+    _hbTimer = setInterval(() => {
+        if (!state.call || !state.call.id) return;
+        fetch('/api/calls/' + encodeURIComponent(state.call.id) + '/heartbeat', {
+            method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, body: '{}'
+        }).catch(() => {});
+    }, 120000);
+    if (_hbTimer && _hbTimer.unref) _hbTimer.unref();
+}
+if (typeof window !== 'undefined') startHeartbeat();
+
+/** Part 2c: 409 recovery banner — the call was auto-closed while the agent was still on screen. */
+function showCallReopenBanner(callId) {
+    if (document.querySelector('[data-testid="call-reopen-banner"]')) return; // already shown
+    const bar = document.createElement('div');
+    bar.className = 'alert warn';
+    bar.setAttribute('data-testid', 'call-reopen-banner');
+    bar.innerHTML = '<b>Your call record was automatically closed</b> (no activity for a while). ' +
+        '<button class="btn small" onclick="reopenCall(\'' + encodeURIComponent(callId) + '\',this.closest(\'[data-testid=call-reopen-banner]\'))">Continue this call</button> ' +
+        '<button class="btn small" onclick="this.closest(\'[data-testid=call-reopen-banner]\').remove()">Dismiss</button>';
+    const view = typeof $ !== 'undefined' && $('[data-testid="workspace"]');
+    if (view) view.prepend(bar); else { const v = document.getElementById('view'); if (v) v.prepend(bar); }
+}
+async function reopenCall(encodedId, banner) {
+    const id = decodeURIComponent(encodedId);
+    try {
+        const res = await api.post('/api/calls/' + encodeURIComponent(id) + '/reopen');
+        if (res && res.ok) {
+            if (!state.call) state.call = { id, issues: [] };
+            else state.call.id = id;
+            if (banner) banner.remove();
+        } else {
+            toast('Could not continue the call record: ' + esc((res && res.error) || 'unknown error'));
+        }
+    } catch (err) {
+        toast('Could not continue the call record: ' + esc(err.message));
+    }
+}
 
 /** A ticket number that opens the in-app ticket page in a NEW tab (A1). Never a Zendesk link. */
 function tktLink(id, testid) {

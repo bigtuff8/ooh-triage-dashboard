@@ -55,8 +55,9 @@ test('dark-fleet: an all-dark iT500 area shows "device not reporting" with NO wa
     const { ctx, state } = loadClient(darkIt500Ws());
     state.flow = { cat: 'heating', stage: 1, done: [], data: { area: 'Accommodation' } };
     const html = ctx.FLOWR.heating(state.workspace, state.flow);
-    // The explicit "device not reporting" live-read line is pushed to the done trail the operator sees.
-    assert.ok(state.flow.done.some(d => /device not reporting/i.test(d)), 'the explicit D-DARK-FLEETS live-read line is shown');
+    // The dark-fleet live-read line is pushed to the done trail the operator sees.
+    // done items are {k, t} objects since OOHDASH-159 rev5 (each step is a typed trail entry).
+    assert.ok(state.flow.done.some(d => /not connecting|not reporting|isn.t connecting/i.test(typeof d === 'object' ? d.t : String(d))), 'the dark-fleet live-read line is shown');
     assert.match(html, /not reporting/i, 'the dark-fleet body explains the device is not reporting');
     assert.match(html, /data-testid="reco-dark-fleet"/, 'the dedicated dark-fleet surface renders');
     // No controls are offered.

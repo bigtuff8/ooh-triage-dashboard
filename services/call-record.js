@@ -29,6 +29,7 @@ import { collection } from './store.js';
 export const DEFAULT_IDLE_MIN = 20;
 const SWEEP_EVERY_MS = 60 * 1000;
 const MAX_ISSUES = 20;
+const MAX_CALL_HOURS = 8; // hard cap: finalise regardless of heartbeat after this many hours
 
 const calls = new Map(); // callId -> record (single replica: k8s/deployment.yaml replicas: 1)
 let sweeper = null;
@@ -62,7 +63,7 @@ export function startCall({ operator, siteNo, siteName, nowMs }) {
         id: 'call-' + randomUUID(),
         siteNo: String(siteNo), siteName: siteName || null,
         operatorId: operator?.id || null, operatorName: operator?.name || 'OOH',
-        startedAt: t, lastActivityAt: t, status: 'open', finalisedAt: null, finalReason: null,
+        startedAt: t, lastActivityAt: t, lastHeartbeatAt: t, status: 'open', finalisedAt: null, finalReason: null,
         issues: {}
     };
     calls.set(rec.id, rec);
@@ -83,7 +84,17 @@ function ownCall(callId, operatorId) {
  */
 export function recordProgress(callId, operatorId, { issueKey, cat, knownSoFar, notes, outcome, ticketId, nowMs } = {}) {
     const rec = ownCall(callId, operatorId);
-    if (!rec || rec.status !== 'open') return false;
+    if (!rec) return false;
+    if (rec.status !== 'open') {
+        // Part 2c 409 trigger: an unknown issue arrived on a finalised record from the same operator.
+        // If the issueKey is already on the record → silent 200 (return true).
+        // If it's new → signal 409 (return null) so the caller returns 409 Conflict.
+        if (issueKey) {
+            const known = !!rec.issues[clean(issueKey, 40)];
+            return known ? true : null;
+        }
+        return false;
+    }
     const t = nowMs || Date.now();
     rec.lastActivityAt = t;
     if (issueKey) {
@@ -108,7 +119,8 @@ export function buildCallRecordText(rec, issue, reason, nowMs) {
         'another-issue': 'the agent pressed Raise another issue',
         'left-screen': 'the agent left the screen',
         'idle': 'no activity for ' + Math.round(idleMs() / 60000) + ' minutes',
-        'site-change': 'the agent opened a different site'
+        'site-change': 'the agent opened a different site',
+        'max-lifetime': 'the call exceeded the maximum duration (' + MAX_CALL_HOURS + ' hours)'
     }[reason] || 'the call was closed';
     const lines = ['[OOH CALL RECORD] Published automatically by the OOH Dashboard.'];
     lines.push(`Site: ${rec.siteName || 'unknown'} (${rec.siteNo}) · Agent: ${rec.operatorName}`);
@@ -139,6 +151,83 @@ async function writeIssue(rec, issue, reason, nowMs) {
     });
     if (issue) issue.ticketId = t.id;
     return { ticketId: t.id, appended: false };
+}
+
+/**
+ * Updates lastHeartbeatAt — called by the browser every 2 minutes while a call is open.
+ * Returns false when the call is unknown, not this operator's, or already finalised.
+ */
+export async function heartbeat(callId, operatorId) {
+    const rec = ownCall(callId, operatorId);
+    if (!rec || rec.status !== 'open') return false;
+    rec.lastHeartbeatAt = Date.now();
+    rec.lastActivityAt = rec.lastHeartbeatAt;
+    await persist(rec);
+    return true;
+}
+
+/** Returns resume info if the same operator has an open/recently-finalised call at this site. */
+export function sameOperatorResume(operatorId, siteNo) {
+    const TWO_HOURS = 2 * 60 * 60 * 1000;
+    const now = Date.now();
+    for (const rec of calls.values()) {
+        if (rec.operatorId !== operatorId) continue;
+        if (String(rec.siteNo) !== String(siteNo)) continue;
+        if (rec.status === 'open') return { callId: rec.id, canResume: true };
+        // Recently finalised within 2 hours — offer to reopen
+        if (rec.status === 'finalised' && rec.finalisedAt && now - rec.finalisedAt < TWO_HOURS) {
+            return { callId: rec.id, canResume: true, wasFinalised: true };
+        }
+    }
+    return null;
+}
+
+/**
+ * Re-opens a finalised call record so queued browser writes can replay.
+ * Returns { ok, error? }.
+ */
+export async function reopen(callId, operatorId) {
+    // Check in-memory first
+    let rec = calls.get(callId);
+    if (!rec) {
+        // May have been swept and removed from memory — try Cosmos
+        try {
+            const col = await collection('OohCallRecords');
+            rec = await col.get(callId);
+            if (rec) calls.set(rec.id, rec);
+        } catch (_) { /* Cosmos unavailable; can only reopen in-memory calls */ }
+    }
+    if (!rec) return { ok: false, error: 'unknown-call' };
+    if (operatorId && rec.operatorId && rec.operatorId !== operatorId) return { ok: false, error: 'forbidden' };
+    const TWO_HOURS = 2 * 60 * 60 * 1000;
+    if (rec.finalisedAt && Date.now() - rec.finalisedAt > TWO_HOURS) return { ok: false, error: 'expired' };
+    rec.status = 'open';
+    rec.finalisedAt = null;
+    rec.finalReason = null;
+    rec.lastHeartbeatAt = Date.now();
+    rec.lastActivityAt = rec.lastHeartbeatAt;
+    calls.set(rec.id, rec);
+    await persist(rec);
+    return { ok: true };
+}
+
+/** Returns the operatorId for the given ticketId, or null if not found. */
+export function operatorHasTicket(ticketId, operatorId) {
+    for (const rec of calls.values()) {
+        if (rec.operatorId !== operatorId) continue;
+        for (const iss of Object.values(rec.issues || {})) {
+            if (iss.ticketId === Number(ticketId)) return true;
+        }
+    }
+    return false;
+}
+
+/** Returns the confirmed siteNo for the operator's current open call, or null. */
+export function confirmedSiteForOperator(operatorId) {
+    for (const rec of calls.values()) {
+        if (rec.operatorId === operatorId && rec.status === 'open') return rec.siteNo;
+    }
+    return null;
 }
 
 /**
@@ -182,9 +271,31 @@ export async function finalise(callId, operatorId, { reason, issueKey, nowMs } =
 export async function sweepIdle(nowMs) {
     const t = nowMs || Date.now();
     const limit = idleMs();
+    const hardCap = MAX_CALL_HOURS * 60 * 60 * 1000;
     const done = [];
     for (const rec of [...calls.values()]) {
-        if (rec.status === 'open' && t - rec.lastActivityAt > limit) {
+        if (rec.status !== 'open') continue;
+        // Hard lifetime cap: finalise regardless of heartbeat after MAX_CALL_HOURS.
+        if (t - rec.startedAt > hardCap) {
+            await finalise(rec.id, null, { reason: 'max-lifetime', nowMs: t });
+            done.push(rec.id);
+            continue;
+        }
+        // Durable sweep: use Cosmos lastHeartbeatAt, not in-memory lastActivityAt.
+        // Fail-safe: if the Cosmos read fails for any reason, skip this candidate — never fall
+        // back to in-memory, which would lose the ETag race guard.
+        let durableTs = null;
+        try {
+            const col = await collection('OohCallRecords');
+            const durable = await col.get(rec.id);
+            if (durable) durableTs = durable.lastHeartbeatAt || durable.lastActivityAt;
+        } catch (err) {
+            console.warn(`[CALL] sweep: Cosmos read failed for ${rec.id}, skipping this tick: ${err.message}`);
+            continue;
+        }
+        // If Cosmos has no record yet (new call, persist hasn't landed) fall back to in-memory.
+        const checkTs = durableTs !== null ? durableTs : rec.lastHeartbeatAt || rec.lastActivityAt;
+        if (t - checkTs > limit) {
             await finalise(rec.id, null, { reason: 'idle', nowMs: t });
             done.push(rec.id);
         }

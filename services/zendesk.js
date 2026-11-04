@@ -215,6 +215,11 @@ function oneLine(str) {
     return String(str ?? '').replace(/\s+/g, ' ').trim();
 }
 
+/** Escapes embedded triple-backtick sequences so they cannot form unintended code fences. */
+function escFence(s) {
+    return String(s == null ? '' : s).replace(/```/g, '\\`\\`\\`');
+}
+
 /** Local Europe/London HH:MM for a transcript timestamp (matches the consumer step regex). */
 export function hhmm(iso) {
     try {
@@ -285,7 +290,7 @@ function sanitizeOutcomeCode(outcomeType) {
 function buildTrgBody({ operator, summary, callerWords, outcomeType, transcript, defaultTime, dataQualityNote, additionalNotes }) {
     const lines = [`[TRG] ${oneLine(summary).slice(0, 180)}`];
     lines.push(`Operator: ${oneLine(operator?.name) || 'OOH'} (OOH)`);
-    if (callerWords) lines.push(`Caller's words: "${oneLine(callerWords)}"`);
+    if (callerWords) lines.push(`Caller's words: "${escFence(oneLine(callerWords))}"`);
     lines.push(`Outcome: ${sanitizeOutcomeCode(outcomeType)}`);
 
     const steps = (Array.isArray(transcript) ? transcript : []).filter(s => s && s.text);
@@ -299,7 +304,7 @@ function buildTrgBody({ operator, summary, callerWords, outcomeType, transcript,
     // OOHDASH-119 E1: notes appear as the final timed transcript step (after the loop) so the IoT
     // step regex (`^\s*(\d{1,2}:\d{2})\s*[|–—-]\s*(.+?)`) picks them up in the detail view.
     if (additionalNotes) {
-        lines.push(`${defaultTime} | Additional notes from OOH agent: "${additionalNotes}"`);
+        lines.push(`${defaultTime} | Additional notes from OOH agent: "${escFence(additionalNotes)}"`);
     }
     if (dataQualityNote) lines.push('', dataQualityNote);
     return lines.join('\n');
@@ -431,7 +436,7 @@ async function addInternalComment(ticketId, body) {
  * Plain-text internal comment; no HTML. Caller must escape any user-supplied content.
  */
 export async function addIssueSummaryComment(ticketId, body) {
-    return addInternalComment(ticketId, body);
+    return addInternalComment(ticketId, escFence(body));
 }
 
 /**
@@ -488,7 +493,7 @@ export async function createBoostTicket({ operator, callerWords, siteNo, siteNam
         `[TRG] OOH Boost: ${zoneLabel} heating ${dirUpper} until ${revertTime}`,
         `Operator: ${oneLine(operator?.name) || 'OOH'} (OOH)`
     ];
-    if (callerWords) lines.push(`Caller's words: "${oneLine(callerWords)}"`);
+    if (callerWords) lines.push(`Caller's words: "${escFence(oneLine(callerWords))}"`);
     lines.push(`Outcome: boiler-boost`);
     lines.push('');
     lines.push(`Panel version: ${panelVersion?.toUpperCase() || 'unknown'}`);
@@ -586,6 +591,18 @@ const STATUS_TRANSLATIONS = {
 // Engineer-visit statuses always carry the chargeable-visit warning
 const VISIT_STATUS_IDS = [25999081650076, 25999056633884];
 
+// Closed fallback: never exposes raw Zendesk status to agents.
+const STATUS_FALLBACK = { name: 'Being handled', agent: 'Being handled by the IoT team', caller: 'Our team is handling this.' };
+
+function statusInfo(t) {
+    if (STATUS_TRANSLATIONS[t.custom_status_id]) return STATUS_TRANSLATIONS[t.custom_status_id];
+    // Merged ticket detection
+    if (t.status === 'closed' && Array.isArray(t.tags) && t.tags.includes('merged')) {
+        return { name: 'Merged', agent: 'Merged with another ticket — being handled by the IoT team', caller: 'This was merged with another issue and our team are handling it.' };
+    }
+    return STATUS_FALLBACK;
+}
+
 function friendlyTimeElapsed(dateStr) {
     const mins = Math.floor((Date.now() - new Date(dateStr).getTime()) / 60000);
     if (mins < 5) return 'just now';
@@ -639,8 +656,7 @@ export async function callbackLookup(siteNo) {
 
     const groups = { active: [], recent: [], closed: [] };
     for (const t of rawTickets) {
-        const statusInfo = STATUS_TRANSLATIONS[t.custom_status_id] ||
-            { name: t.status, agent: t.status, caller: 'Our team is handling this.' };
+        const info = statusInfo(t);
         const comments = live()
             ? (await zd('GET', `/tickets/${t.id}/comments.json`, null, { sort_order: 'desc' }).catch(() => ({ comments: [] }))).comments || []
             : [...(t.comments || [])].reverse();
@@ -648,7 +664,7 @@ export async function callbackLookup(siteNo) {
         const enriched = {
             id: t.id,
             subject: t.subject,
-            status: { raw: t.status, name: statusInfo.name, agent: statusInfo.agent, caller: statusInfo.caller },
+            status: { raw: t.status, name: info.name, agent: info.agent, caller: info.caller },
             tags: Array.isArray(t.tags) ? t.tags : [],
             updatedAt: t.updated_at ?? null,
             zendeskUrl: live()
@@ -657,7 +673,7 @@ export async function callbackLookup(siteNo) {
             createdFriendly: friendlyTimeElapsed(t.created_at),
             updatedFriendly: friendlyTimeElapsed(t.updated_at),
             visit,
-            script: buildCallerScript(t, statusInfo) + (visit ? ' A visit may be involved — if the fault isn’t Lighthouse equipment, the visit may be chargeable.' : ''),
+            script: buildCallerScript(t, info) + (visit ? ' A visit may be involved — if the fault isn’t Lighthouse equipment, the visit may be chargeable.' : ''),
             timeline: comments.slice(0, 6).map(c => ({
                 at: c.created_at,
                 atFriendly: friendlyTimeElapsed(c.created_at),
@@ -696,17 +712,36 @@ export async function ticketView(ticketId) {
         t = fixtureTickets.find(x => x.id === id);
         if (!t) throw Object.assign(new Error('Ticket not found'), { status: 404 });
     } else {
-        t = (await zd('GET', `/tickets/${id}.json`)).ticket;
+        try {
+            t = (await zd('GET', `/tickets/${id}.json`)).ticket;
+        } catch (err) {
+            if (err.response?.status === 404) throw Object.assign(new Error('Ticket not found'), { status: 404 });
+            throw Object.assign(new Error('Status not available right now'), { status: 503 });
+        }
     }
-    const statusInfo = STATUS_TRANSLATIONS[t.custom_status_id] || { name: t.status, agent: t.status, caller: 'Our team is handling this.' };
+    const info = statusInfo(t);
     const tags = Array.isArray(t.tags) ? t.tags : [];
     const thread = await getFeedbackThread(id).catch(() => []);
+    // siteNo is included for IDOR site-match check in api.js
+    const siteNo = t.siteNo || null;
     return {
-        id, subject: t.title || t.subject, status: { raw: t.status, agent: statusInfo.agent, caller: statusInfo.caller },
+        id, subject: t.title || t.subject, siteNo,
+        status: { raw: t.status, agent: info.agent, caller: info.caller },
         isP1: tags.includes('ooh_p1'), fromOoh: tags.includes(config.zendesk.oohTag),
         createdFriendly: friendlyTimeElapsed(t.created_at), updatedFriendly: friendlyTimeElapsed(t.updated_at),
         thread: thread.map(c => ({ at: c.at, text: translateComment(c.body) }))
     };
+}
+
+/** Returns the tag array for a ticket. Used by the IDOR ooh-tag check in api.js (fail-closed). */
+export async function getTicketTags(ticketId) {
+    const id = Number(ticketId);
+    if (!live()) {
+        const t = fixtureTickets.find(x => x.id === id);
+        return Array.isArray(t?.tags) ? t.tags : [];
+    }
+    const data = await zd('GET', `/tickets/${id}/tags.json`);
+    return Array.isArray(data.tags) ? data.tags : [];
 }
 
 /**

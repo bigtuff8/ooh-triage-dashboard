@@ -44,7 +44,7 @@ function heating(z1, z2, extra) {
 }
 function strip(s) {
     return String(s || '').replace(/<[^>]+>/g, ' ')
-        .replace('🗣 Say to the customer', '').replace('ℹ Good to know (for you, not the customer)', '')
+        .replace('🗣 Say to the customer', '').replace('ℹ Good to know (for you, not the customer)', '').replace('ℹ For you (background, not to read out)', '')
         .replace(/\s+/g, ' ').trim();
 }
 
@@ -62,7 +62,7 @@ const CASES = {
 
 const WITH = {
     W1: ["We can't see the pub heating right now",
-        "I can't see your heating controls from here at the moment, so I'll log it for our team to check first thing.",
+        "I can't see your heating controls from here at the moment, so I'll log it for our team to check the next working day.",
         "The heating controls last reported 5 hours ago. Don't tell the customer whether the heating is on or off."],
     W2: ['The heating controls are asking the boiler for heat',
         "Our controls are asking your boiler for heat right now, so they're doing their job. The problem is most likely the boiler itself or the radiators, so please call your heating engineer. I'll log tonight's call.",
