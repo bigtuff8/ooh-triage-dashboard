@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PowerPause override guide — Lighthouse IoT</title>
+<style>
+  body { font-family: system-ui, -apple-system, sans-serif; max-width: 640px; margin: 0 auto; padding: 20px 16px 40px; color: #111; background: #fff; }
+  h1 { font-size: 1.3rem; margin-bottom: 4px; }
+  .sub { color: #555; font-size: 0.9rem; margin-bottom: 24px; }
+  h2 { font-size: 1rem; margin: 24px 0 8px; border-top: 1px solid #e0e0e0; padding-top: 16px; }
+  p { margin: 0 0 10px; line-height: 1.5; }
+  .warn { background: #fff3cd; border: 1px solid #ffc107; border-radius: 6px; padding: 10px 14px; margin: 12px 0; }
+  .step { background: #f0f4ff; border-left: 4px solid #3b6fdb; border-radius: 4px; padding: 10px 14px; margin: 12px 0; }
+  .step strong { display: block; margin-bottom: 4px; }
+  .device { border: 1px solid #ddd; border-radius: 8px; padding: 12px 16px; margin: 10px 0; }
+  .device h3 { margin: 0 0 6px; font-size: 0.95rem; color: #222; }
+  .device p { margin: 0 0 6px; font-size: 0.9rem; }
+  footer { margin-top: 32px; font-size: 0.8rem; color: #888; border-top: 1px solid #e0e0e0; padding-top: 12px; }
+</style>
+</head>
+<body>
+<h1>PowerPause override guide</h1>
+<p class="sub">For contractors and site staff. Lighthouse IoT Support · Internal use only.</p>
+
+<h2>Finding the panel</h2>
+<p>The PowerPause panel is usually in one of these places:</p>
+<ul>
+  <li>By the kitchen distribution boards</li>
+  <li>Behind or beside the appliance</li>
+  <li>On the ceiling above the appliance</li>
+</ul>
+<p>Every appliance controlled by Lighthouse has a <strong>Lighthouse label</strong> on it. The label links the appliance to its circuit on the PowerPause unit.</p>
+
+<h2>Using the override</h2>
+<p>There are two types of PowerPause unit on site: <strong>Tongou</strong> and <strong>Owon</strong>. Check the label on the unit.</p>
+
+<div class="device">
+  <h3>Tongou</h3>
+  <p>Press the <strong>override button once</strong>. Do not hold it down — holding the button takes the circuit off the Lighthouse system.</p>
+  <p>For fryers and heated gantries, also press the <strong>green start button on the interlock panel</strong> after the override.</p>
+</div>
+
+<div class="device">
+  <h3>Owon</h3>
+  <p>Press the <strong>override button once</strong>. Do not hold it down — holding the button takes the circuit off the Lighthouse system.</p>
+  <p>For fryers and heated gantries, also press the <strong>green start button on the interlock panel</strong> after the override.</p>
+</div>
+
+<h2>What happens after the override</h2>
+<div class="step">
+  <strong>The equipment should come on within a few seconds.</strong>
+  The override stays active until the next timetable change. The IoT team is notified automatically and checks all overrides the next working day.
+</div>
+
+<div class="warn">
+  <strong>If it still does not come on:</strong> call the OOH support line. The OOH handler will raise an urgent P1 ticket and someone from the on-call team will call you back.
+</div>
+
+<h2>Important: do not hold the override button</h2>
+<p>Holding the button down (rather than pressing and releasing) removes the circuit from the Lighthouse system entirely. If that happens, the IoT team will need to re-enrol the device the next working day. If you are unsure, call the OOH support line before trying again.</p>
+
+<footer>
+  Lighthouse IoT · OOH Support · This guide is served from the OOH Dashboard and is for authorised staff only.
+</footer>
+</body>
+</html>
