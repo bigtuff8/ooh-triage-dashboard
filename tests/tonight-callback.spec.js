@@ -17,7 +17,7 @@ test.describe('tonight & callback', () => {
         const table = page.locator('[data-testid="tonight-table"]');
         await expect(table).toContainText('Angel Inn');
         await expect(table).toContainText('Test Handler');
-        await expect(table).toContainText('External lighting — resolved with on-site override · class: lighting');
+        await expect(table).toContainText('External lighting — on with the manual override · class: lighting');
         await expect(table.locator('.tag:has-text("captured")').first()).toBeVisible();
         await expect(table).not.toContainText('[object');
 
@@ -139,7 +139,9 @@ test.describe('tonight & callback', () => {
         await expect(page.locator('[data-testid="offline-banner-optional-hint"]')).toBeVisible();
         await banner.locator('button:has-text("Run connection check")').click();
         await expect(page.locator('[data-testid="connectivity-alert"]')).toContainText('gateway at this site is offline');
+        const connPostPromise = page.waitForRequest(r => r.url().includes('/api/outcomes') && r.method() === 'POST');
         await page.locator('[data-testid="connectivity-stilldead"]').click(); // E1: auto-submits for non-P1
+        await connPostPromise;
         await expect(page.locator('[data-testid="outcome-captured"]')).toContainText(/Ticket #\d+/);
     });
 
@@ -175,7 +177,7 @@ test.describe('tonight & callback', () => {
         await page.locator('[data-testid="other-text"]').fill('');
         await page.locator('[data-testid="other-text"]').pressSequentially('boiler PCB fault — is that you?', { delay: 15 });
         await page.locator('[data-testid="other-check"]').click();
-        await page.locator('[data-testid="scope-boiler"]').click(); // E1: outcomeScope auto-submits for non-P1
+        await page.locator('[data-testid="scope-fridge"]').click(); // E1: outcomeScope auto-submits for non-P1
         const outcome = page.locator('[data-testid="outcome-scope"]');
         await expect(outcome).toContainText('Not on Lighthouse at this site');
         await expect(outcome).toContainText(/ticket #\d+ \(scope-only\)/);
