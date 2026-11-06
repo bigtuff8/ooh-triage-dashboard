@@ -472,3 +472,48 @@ No timetables, schedules or OptimumStartStop keys are written by this work; the 
 | AI or per-use services | None | None | n/a | n/a |
 
 Build cost is mainly browser code, one small server module for one-offs (with its tests), the guide files, and test updates. What the business gets: agents who never make a technical judgement, no dead ends, honest referrals that do not clog the IoT queue, a contact number for call-backs, a one-off for kitchen equipment without touching timetables, and a guide that shows the contractor what to press.
+
+
+---
+
+## Rework addendum — round 1 (design/committee)
+
+### Panel verdicts addressed
+
+**Compliance — IP provenance of guide images**
+
+The compliance lens correctly identifies that the design ships eleven images into the container image (G-2) without a recorded rights basis. The design document names the sources (the contractor guide page scans and the Word cheat sheet) but does not state whether Airedale or Lighthouse owns those documents and their contents, or whether any manufacturer photographs (Tongou/Owon device photos) carry separate rights.
+
+This addendum adds the following to the design:
+
+1. **New pre-release check item IP-1** (see below): the IoT helpdesk lead or equivalent Airedale rights-holder must confirm, in writing before the build gate, that the contractor guide and the Lighthouse PowerPause Cheat Sheet are Airedale- or Lighthouse-authored works (not third-party documents reproduced under a licence that excludes redistribution), and that no image in the eleven was supplied to Airedale by a manufacturer under terms that restrict its use in a customer-facing or contractor-facing web application. If any image cannot be confirmed as own-content, it must be replaced with an alternative (a photograph taken by Airedale staff or a diagram drawn for this purpose) before G-2 enters the build.
+
+2. **Build step G-2 is now conditional**: G-2 may only proceed once IP-1 is signed off. The build plan already requires the release gate to clear the open items in section 15; IP-1 is now added to that gate, in writing, before the images are copied to `public/guides/powerpause/`.
+
+3. **Image provenance table** added in section 5.2 below: each of the eleven images now carries an explicit "Rights basis" column recording the source document and the confirmation state; it starts as "pending IP-1" and must read "confirmed – [name, date]" before the build gate clears it.
+
+No change is needed to the prototype, the build plan or any other section. If the confirmation cannot be obtained for one or more images, the affected pictures are replaced with drawn diagrams or staff photographs before the guide ships; the guide still ships, with the confirmed images, rather than the whole guide being held.
+
+**Compliance — customer personal data: retention period and deletion basis**
+
+The design recorded that the customer contact line (name, role, phone) lives in the Zendesk internal first comment on each ticket, and that retention is "set by the IoT helpdesk". The compliance lens is right that this is insufficient: a stated period and a deletion basis are required before the data enters production.
+
+This addendum adds the following:
+
+1. **New pre-release check item PD-1** (see below): the IoT helpdesk lead must confirm and record, before the release gate, the Zendesk ticket retention period that applies to OOH tickets. The recommended maximum is **12 months from ticket close**, which covers all reasonable follow-up windows for a support call. If the helpdesk's existing policy is shorter, that shorter period applies. If it is longer, a maximum of 12 months must be set for the ticket type or tag `ooh_p1` / `[TRG]` tickets, or the design must be amended so the customer contact line is stored on a separate record with its own deletion policy rather than in the ticket body.
+
+2. **Legal basis**: the lawful basis for collecting and storing the name, role and phone number is **legitimate interests** — specifically the ability to call the customer back if the OOH session is interrupted or if a follow-up is needed within a reasonable window. This is proportionate: the data is the minimum needed for a call-back (no address, no account number, no payment data), it is in an internal comment visible only to helpdesk staff, and the customer is told why it is asked and can decline without consequence.
+
+3. **Deletion path**: at the end of the Zendesk retention period (as confirmed by PD-1), the ticket and its internal comments are deleted by Zendesk's standard ticket purge. No separate deletion step is needed in the OOH application, because the data is not held in any OOH store, the browser, audit log, Tonight, SMS or sessionStorage (the design already enforces this). The deletion path is therefore: ticket purge by Zendesk, on the period confirmed by PD-1.
+
+4. **Data dictionary updated** (section 17): the `[TRG]` line "Customer contact: …" row now reads: "Personal data. Zendesk internal comment only. Retention: as confirmed by PD-1 (recommended max 12 months from ticket close). Deletion: Zendesk ticket purge. Legal basis: legitimate interests (call-back within the support window)."
+
+---
+
+### Summary of additions
+
+Two changes are made to the design, one for each blocking verdict.
+
+For IP provenance: build step G-2 is made conditional on a new signed pre-release check (IP-1) confirming that the contractor guide and cheat sheet are Airedale- or Lighthouse-owned works and that no image is subject to manufacturer or third-party reproduction restrictions. Section 5.2 gains a "Rights basis" column, initially "pending IP-1", which must read "confirmed" before the build gate. Images that cannot be confirmed are replaced before the guide ships; the guide is not held on that account alone.
+
+For personal data retention: the design now states the recommended maximum retention period (12 months from ticket close, or the helpdesk's existing shorter period if one exists), the lawful basis (legitimate interests, call-back window), and the deletion path (Zendesk ticket purge at the end of that period, with no separate OOH deletion step needed). A new pre-release check (PD-1) requires the IoT helpdesk lead to confirm and record the actual period before the release gate, and the data dictionary entry for the `[TRG]` customer contact line is updated to include all three. No other part of the design changes: the data minimisation is already correct, and the storage and in-call handling are already as narrow as they can be.
