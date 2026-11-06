@@ -1,0 +1,120 @@
+[
+ {
+  "id": "K8888",
+  "site": "8888",
+  "cat": "kitchen",
+  "text": "The fryer will not come on",
+  "max": 70
+ },
+ {
+  "id": "K6832",
+  "site": "6832",
+  "cat": "kitchen",
+  "text": "The kitchen is dead",
+  "max": 40
+ },
+ {
+  "id": "K8888-gw-B-unscheduled",
+  "site": "8888",
+  "cat": "kitchen",
+  "text": "The glass washer will not work",
+  "setup": "()=>{const d=state.workspace.devices.find(x=>x.deviceId==='gk-8888-glasswasher-1');d.tuya.verdict='B-unscheduled';}",
+  "prefix": [
+   "Glass washer"
+  ],
+  "max": 14
+ },
+ {
+  "id": "K8888-gw-B-outside",
+  "site": "8888",
+  "cat": "kitchen",
+  "text": "The glass washer will not work",
+  "setup": "()=>{const d=state.workspace.devices.find(x=>x.deviceId==='gk-8888-glasswasher-1');d.tuya.verdict='B-outside';}",
+  "prefix": [
+   "Glass washer"
+  ],
+  "max": 14
+ },
+ {
+  "id": "K8888-gw-off-unknown",
+  "site": "8888",
+  "cat": "kitchen",
+  "text": "The glass washer will not work",
+  "setup": "()=>{const d=state.workspace.devices.find(x=>x.deviceId==='gk-8888-glasswasher-1');d.tuya.verdict='off-unknown';}",
+  "prefix": [
+   "Glass washer"
+  ],
+  "max": 14
+ },
+ {
+  "id": "K8888-gw-fallback",
+  "site": "8888",
+  "cat": "kitchen",
+  "text": "The glass washer will not work",
+  "setup": "()=>{const d=state.workspace.devices.find(x=>x.deviceId==='gk-8888-glasswasher-1');d.tuya.verdict='fallback';}",
+  "prefix": [
+   "Glass washer"
+  ],
+  "max": 14
+ },
+ {
+  "id": "K-none",
+  "site": "6832",
+  "cat": "kitchen",
+  "text": "The fryer will not come on",
+  "setup": "()=>{state.workspace.devices=state.workspace.devices.filter(d=>d.kind!=='kitchen');}",
+  "max": 6
+ },
+ {
+  "id": "L6749",
+  "site": "6749",
+  "cat": "lighting",
+  "text": "Car park lights are off",
+  "max": 25
+ },
+ {
+  "id": "L6360",
+  "site": "6360",
+  "cat": "lighting",
+  "text": "Car park lights are off",
+  "max": 20
+ },
+ {
+  "id": "L6961",
+  "site": "6961",
+  "cat": "lighting",
+  "text": "Car park lights are off",
+  "max": 20
+ },
+ {
+  "id": "L-none",
+  "site": "6832",
+  "cat": "lighting",
+  "text": "Car park lights are off",
+  "setup": "()=>{state.workspace.devices=state.workspace.devices.filter(d=>d.kind!=='lighting');}",
+  "max": 6
+ },
+ {
+  "id": "FAN6851",
+  "site": "6851",
+  "cat": "fan",
+  "text": "Need the fans on late",
+  "max": 25
+ },
+ {
+  "id": "FAN-switch",
+  "site": "6851",
+  "cat": "fan",
+  "text": "Need the fans on late",
+  "setup": "()=>{const d=state.workspace.devices.find(d=>d.kind==='fan');d.capabilities=['switch'];d.registered=true;d.telemetry=Object.assign({},d.telemetry,{switch_1:true});}",
+  "max": 20
+ },
+ {
+  "id": "FAN-none",
+  "site": "6832",
+  "cat": "fan",
+  "text": "Need the fans on late",
+  "setup": "()=>{state.workspace.devices=state.workspace.devices.filter(d=>d.kind!=='fan');}",
+  "max": 6
+ }
+]
