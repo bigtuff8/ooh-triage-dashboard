@@ -1,0 +1,3 @@
+[{"id":"CT6832","site":"6832","cat":"contractor","text":"","max":40},
+ {"id":"CT-dd","site":"6832","cat":"contractor","text":"","setup":"()=>{state.workspace.site.siteNo='6786';}","max":25},
+ {"id":"BP9001","site":"9001","cat":"heating","text":"The pub is cold","max":40}]

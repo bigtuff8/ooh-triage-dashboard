@@ -1,0 +1,170 @@
+[
+ {
+  "id": "HW-nodhw",
+  "site": "6832",
+  "cat": "hotwater",
+  "text": "No hot water in the kitchen",
+  "setup": "()=>{state.workspace.boilerControl={dhwOverride:{visible:false}};}",
+  "max": 6
+ },
+ {
+  "id": "HW-auto",
+  "site": "6832",
+  "cat": "hotwater",
+  "text": "No hot water in the kitchen",
+  "setup": "()=>{const v={\"mode\":\"auto\"};const now=Date.now();state.workspace.boilerControl={dhwOverride:{visible:true,mode:v.mode,panelLastSeenMs:now+(v.lastSeen||-60000),untilMs:v.untilMs!=null?now+v.untilMs:null,confirmedAtMs:v.confirmedAt!=null?now+v.confirmedAt:null,unreadableReason:v.unreadableReason||null}};}",
+  "max": 6
+ },
+ {
+  "id": "HW-auto-ended",
+  "site": "6832",
+  "cat": "hotwater",
+  "text": "No hot water in the kitchen",
+  "setup": "()=>{const v={\"mode\":\"on-until\",\"untilMs\":-1800000};const now=Date.now();state.workspace.boilerControl={dhwOverride:{visible:true,mode:v.mode,panelLastSeenMs:now+(v.lastSeen||-60000),untilMs:v.untilMs!=null?now+v.untilMs:null,confirmedAtMs:v.confirmedAt!=null?now+v.confirmedAt:null,unreadableReason:v.unreadableReason||null}};}",
+  "max": 6
+ },
+ {
+  "id": "HW-on-until",
+  "site": "6832",
+  "cat": "hotwater",
+  "text": "No hot water in the kitchen",
+  "setup": "()=>{const v={\"mode\":\"on-until\",\"untilMs\":5400000};const now=Date.now();state.workspace.boilerControl={dhwOverride:{visible:true,mode:v.mode,panelLastSeenMs:now+(v.lastSeen||-60000),untilMs:v.untilMs!=null?now+v.untilMs:null,confirmedAtMs:v.confirmedAt!=null?now+v.confirmedAt:null,unreadableReason:v.unreadableReason||null}};}",
+  "max": 6
+ },
+ {
+  "id": "HW-off-until",
+  "site": "6832",
+  "cat": "hotwater",
+  "text": "No hot water in the kitchen",
+  "setup": "()=>{const v={\"mode\":\"off-until\",\"untilMs\":7200000};const now=Date.now();state.workspace.boilerControl={dhwOverride:{visible:true,mode:v.mode,panelLastSeenMs:now+(v.lastSeen||-60000),untilMs:v.untilMs!=null?now+v.untilMs:null,confirmedAtMs:v.confirmedAt!=null?now+v.confirmedAt:null,unreadableReason:v.unreadableReason||null}};}",
+  "max": 6
+ },
+ {
+  "id": "HW-on-v1",
+  "site": "6832",
+  "cat": "hotwater",
+  "text": "No hot water in the kitchen",
+  "setup": "()=>{const v={\"mode\":\"on-v1\",\"confirmedAt\":-300000};const now=Date.now();state.workspace.boilerControl={dhwOverride:{visible:true,mode:v.mode,panelLastSeenMs:now+(v.lastSeen||-60000),untilMs:v.untilMs!=null?now+v.untilMs:null,confirmedAtMs:v.confirmedAt!=null?now+v.confirmedAt:null,unreadableReason:v.unreadableReason||null}};}",
+  "max": 6
+ },
+ {
+  "id": "HW-off-v1",
+  "site": "6832",
+  "cat": "hotwater",
+  "text": "No hot water in the kitchen",
+  "setup": "()=>{const v={\"mode\":\"off-v1\",\"confirmedAt\":-300000};const now=Date.now();state.workspace.boilerControl={dhwOverride:{visible:true,mode:v.mode,panelLastSeenMs:now+(v.lastSeen||-60000),untilMs:v.untilMs!=null?now+v.untilMs:null,confirmedAtMs:v.confirmedAt!=null?now+v.confirmedAt:null,unreadableReason:v.unreadableReason||null}};}",
+  "max": 6
+ },
+ {
+  "id": "HW-cc-stale",
+  "site": "6832",
+  "cat": "hotwater",
+  "text": "No hot water in the kitchen",
+  "setup": "()=>{const v={\"mode\":\"auto\",\"lastSeen\":-10800000};const now=Date.now();state.workspace.boilerControl={dhwOverride:{visible:true,mode:v.mode,panelLastSeenMs:now+(v.lastSeen||-60000),untilMs:v.untilMs!=null?now+v.untilMs:null,confirmedAtMs:v.confirmedAt!=null?now+v.confirmedAt:null,unreadableReason:v.unreadableReason||null}};}",
+  "max": 6
+ },
+ {
+  "id": "HW-cc-notreconf",
+  "site": "6832",
+  "cat": "hotwater",
+  "text": "No hot water in the kitchen",
+  "setup": "()=>{const v={\"mode\":\"on-v1\",\"confirmedAt\":-3000000};const now=Date.now();state.workspace.boilerControl={dhwOverride:{visible:true,mode:v.mode,panelLastSeenMs:now+(v.lastSeen||-60000),untilMs:v.untilMs!=null?now+v.untilMs:null,confirmedAtMs:v.confirmedAt!=null?now+v.confirmedAt:null,unreadableReason:v.unreadableReason||null}};}",
+  "max": 6
+ },
+ {
+  "id": "HW-cc-decode",
+  "site": "6832",
+  "cat": "hotwater",
+  "text": "No hot water in the kitchen",
+  "setup": "()=>{const v={\"mode\":\"cant-confirm\",\"unreadableReason\":\"decode-error\"};const now=Date.now();state.workspace.boilerControl={dhwOverride:{visible:true,mode:v.mode,panelLastSeenMs:now+(v.lastSeen||-60000),untilMs:v.untilMs!=null?now+v.untilMs:null,confirmedAtMs:v.confirmedAt!=null?now+v.confirmedAt:null,unreadableReason:v.unreadableReason||null}};}",
+  "max": 6
+ },
+ {
+  "id": "HW-nlh",
+  "site": "6360",
+  "cat": "hotwater",
+  "text": "No hot water in the kitchen",
+  "setup": null,
+  "max": 6
+ },
+ {
+  "id": "FR6851",
+  "site": "6851",
+  "cat": "fridge",
+  "text": "Freezer alarm going off",
+  "max": 25
+ },
+ {
+  "id": "CN6832",
+  "site": "6832",
+  "cat": "connectivity",
+  "start": "banner",
+  "max": 25
+ },
+ {
+  "id": "CN7004",
+  "site": "7004",
+  "cat": "connectivity",
+  "text": "Nothing is working",
+  "max": 15
+ },
+ {
+  "id": "CN-devoff",
+  "site": "7004",
+  "cat": "connectivity",
+  "text": "The bar is freezing",
+  "setup": "()=>{const h=state.workspace.devices.find(d=>d.kind==='heating');if(h)h.online=false;}",
+  "setup2": "()=>{state.flow.data.from='heating';render();}",
+  "max": 15
+ },
+ {
+  "id": "CN5198",
+  "site": "5198",
+  "cat": "connectivity",
+  "text": "Rooms are cold",
+  "setup2": "()=>{state.flow.data.from='heating';render();}",
+  "max": 15
+ },
+ {
+  "id": "CN6771",
+  "site": "6771",
+  "cat": "connectivity",
+  "text": "Nothing is working",
+  "max": 20
+ },
+ {
+  "id": "CN6772",
+  "site": "6772",
+  "cat": "connectivity",
+  "text": "Boiler not working",
+  "max": 20
+ },
+ {
+  "id": "CN6773",
+  "site": "6773",
+  "cat": "connectivity",
+  "text": "Boiler not working",
+  "max": 20
+ },
+ {
+  "id": "O6832",
+  "site": "6832",
+  "cat": "other",
+  "text": "Cellar cooler alarm going off",
+  "max": 40
+ },
+ {
+  "id": "AC6218",
+  "site": "6218",
+  "cat": "aircon",
+  "text": "Aircon in the function room is blowing warm",
+  "max": 8
+ },
+ {
+  "id": "AC-none",
+  "site": "6832",
+  "cat": "aircon",
+  "text": "Aircon is blowing warm",
+  "max": 8
+ }
+]
