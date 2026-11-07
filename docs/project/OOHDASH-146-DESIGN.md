@@ -4,7 +4,7 @@ PHASE: design
 SECTION: What this design does
 It applies one agent-screen standard to every flow in the OOH Dashboard, so a call handler always reads one clear script, asks the customer a plain question, and finishes with a ticket number. The prototype IS the live product (version 1.6.6, which already contains the OOHDASH-159 changes) with only the 146 changes applied on top. Every screen you click is the real live screen, captured from the running app, unless this document lists it as changed. Revision 4 adds your decision D13, the universal risk question.
 SECTION: What changed in revision 4
-Your decision D13 is built in. Every flow now asks the same question, word for word: "Is there an immediate risk to trade or to anyone's health and safety?" with Yes and No answers. It replaces the kitchen "is the kitchen needed for service" question, the fridge "is stock at risk" question and the Something else "is it urgent" question, and it is now the only way to a P1 (an urgent ticket that texts the IoT team's on-call agent straight away). The prototype grew from 298 to 388 screens: 80 screens now show the question, 46 P1 confirm screens carry the new mandatory comment box, and the rest are unchanged from revision 3. Nothing else about the design changed.
+Revision 4 added your decision D13, the universal risk question (details in the next section). Revision 4.1 applies your answers of 2026-11-07: the guide-picture rights check IP-1 is closed (rights confirmed); customer contact details on a ticket are kept until an agent removes them by hand (PD-1); and the PowerPause guide is now a faithful copy of the Word document "Lighthouse PowerPause Contractor Info.docx", with its text, phone number and pictures exactly as in the document. The prototype has 388 screens: 80 show the question and 46 P1 confirm screens carry the mandatory comment box. Nothing else changed.
 SECTION: The universal risk question
 Yes goes to the live P1 confirm step, with one new thing: a box labelled "Why is this urgent? (required, goes on the P1 ticket)". The red Raise the P1 button stays greyed out until the agent has typed at least ten real characters, and the server refuses a P1 with an empty comment as well. The comment is written into the P1 ticket, never into the subject. No gives the normal ticket for the next working day, in the live wording ("It's logged, reference N, and our IoT team picks it up the next working day"), or the live closed note where Lighthouse does not control the equipment. A P1 means the ticket is tagged ooh_p1; when it reaches the IoT Support Dashboard, that dashboard texts the IoT team's on-call agent, who deals with it immediately. The OOH Dashboard itself sends no text message (OOHDASH-153).
 SECTION: Where the question sits and what it replaces
@@ -14,18 +14,18 @@ SECTION: What 146 still changes compared with live
 SECTION: Decisions amended in revisions 3 and 4
 From revision 3: D3 (call it a manual control button) is superseded, live says "manual override" and that stays; D9 never blocks, the customer details are asked after the site is confirmed. From revision 4: D13 changes D6 and D7. The fridge is now a P1 only through the universal question, not by its own stock-at-risk rule. Hot water was "never a P1" and can now be one if the customer answers Yes. The contractor rule "calls are always treated as urgent" is replaced: the engineer is helped with the override first, and a P1 is raised only when there is an immediate risk. Everything else from D1 to D12 stands, and 159 decision J1 (self-help first, then a ticket for the next working day) is kept.
 SECTION: PowerPause guide pictures
-The live guide shows no device pictures because the page was published without its picture files. The revised guide puts eleven pictures in the right places with descriptions for screen readers: the three panel types, the Lighthouse label, both override buttons close up, the interlock panel and start buttons, and the contactor manual switch. One picture (the label) is the original from the Word cheat sheet; the others are cut from the page scans of the contractor guide. Pictures are about 570 KB in total and served from the existing signed-in guide route. Their use is held until the rights check IP-1 is signed off, as recorded in the rework addendum at the end.
+The live guide showed no device pictures because the page was published without its picture files and rewritten as text only. You said the guide already exists and should simply be copied from the Word document. The source is "Lighthouse PowerPause Contractor Info.docx" (Remote Monitoring, Greene King, Flaming Grills, Phase 2 Sites, Engineer Information). The guide is now that document word for word, in the same order: all 12 pictures (11 in the body and the header logo), the support phone number 023 814 0228, the Tongou and Owon wording, the fire-up and fire-down table and the contactor override section (you asked for that section to stay). Nothing is refined or reworded. The pictures add about 1.2 MB of static files and no running cost. The rights check IP-1 is closed on your confirmation. The contractor-on-site flow improvements (asking override versus something else, choosing the device, reading and emailing the instructions) are the backlog story OOHDASH-163 and are out of scope here.
 SECTION: How it was checked
 The real app was run in fixture mode and a script clicked every button on every flow, saving each screen. The prototype is built from those captures. A second script then read the text of every prototype screen and compared it line by line with the live screen it came from: 77 screens are identical, 140 differ and each difference maps to an item in the list, 171 are new in 146 and each maps to an item, and there are 0 unexplained differences. A click test pressed 3307 buttons on the 388 screens with no errors and no dead buttons. For D13 the script proved three more things: every ticket screen is reached only from the question or is on the list of problems resolved on the call (none left over); every P1 confirm screen is reached only from the question; and on all 45 P1 confirm screens the Raise the P1 button stays disabled for an empty comment, spaces only, nine characters or a cleared box, and enables only for real content.
 SECTION: Your checks still open
-Revision 4 adds seven things for you to look at, all marked in section 15. First, hot water can now be a P1, which reverses D7 (Q8). Second, "every flow" includes the equipment Lighthouse does not control; the on-call agent cannot fix that, only call back (Q9). Third, the contractor "always urgent" rule is gone (Q10). Fourth, a failed kitchen one-off switch-off no longer raises a P1 by itself, because nobody is on a call to ask the question; this is a safety trade-off for you to decide (Q11). Fifth, the screens say "the on-duty manager" where you said "on-call agent" (Q12). Sixth, planned timetable requests and fan requests now ask the question too, which adds one click (Q13). Seventh, the new ticket subject list needs the IoT helpdesk lead's agreement (R1). The earlier open items stand: Sam Day on the contractor "override worked" ticket, the handler briefing note, the guide's phone number, and the guide rights check IP-1 and the retention check PD-1 from the rework addendum.
+Revision 4 left six things for you, all marked in section 15, and they are still open. First, hot water can now be a P1, which reverses D7 (Q8). Second, "every flow" includes the equipment Lighthouse does not control; the on-call agent cannot fix that, only call back (Q9). Third, the contractor "always urgent" rule is gone (Q10). Fourth, a failed kitchen one-off switch-off no longer raises a P1 by itself, because nobody is on a call to ask the question; this is a safety trade-off for you to decide (Q11). Fifth, the screens say "the on-duty manager" where you said "on-call agent" (Q12). Sixth, planned timetable requests and fan requests now ask the question too, which adds one click (Q13). Also still to do: the IoT helpdesk lead agrees the new ticket subject list (R1), Sam Day on the contractor "override worked" ticket (Q1), and the handler briefing note. Closed by your answers: IP-1 (rights confirmed), PD-1 (kept until an agent removes it), the guide phone number and Tongou/Owon wording (as per the Word document, Q5 and Q6) and the contactor section (kept, Q7).
 SECTION: Cost, background running and going back
-No AI or per-use costs. D13 is browser code and one server check, with nothing running in the background. The only cost is a few seconds: one extra click on tickets that were already being raised, and one typed sentence on a P1. The kitchen one-off reuses the dashboard's existing revert timer that already runs silently inside the server; nothing new runs on any computer and no screen, window or notification appears while it waits. It is behind a switch that starts off. The guide pictures add about 570 KB of static files to the container image and no running cost. Rollback is a revert of the release; cancel any booked one-offs first.
-DECISION: Approve revision 4 of the design and proceed to build? | Approve - proceed to build | Block - needs changes
-DETAIL: Revision 4 changes the prototype and this document only; the live app is untouched. Section 15 lists the open items Q8 to Q13; none blocks the build, but Q9 and Q11 are your calls on safety and scope.
+No AI or per-use costs. D13 is browser code and one server check, with nothing running in the background. The only cost is a few seconds: one extra click on tickets that were already being raised, and one typed sentence on a P1. The kitchen one-off reuses the dashboard's existing revert timer that already runs silently inside the server; nothing new runs on any computer and no screen, window or notification appears while it waits. It is behind a switch that starts off. The guide pictures add about 1.2 MB of static files to the container image and no running cost. Rollback is a revert of the release; cancel any booked one-offs first.
+DECISION: Approve revision 4.1 of the design and proceed to build? | Approve - proceed to build | Block - needs changes
+DETAIL: Revision 4.1 changes the prototype, the guide copy and this document only; the live app is untouched. Section 15 lists the open items Q8 to Q13; none blocks the build, but Q9 and Q11 are your calls on safety and scope.
 -->
 
-# OOHDASH-146 Design: the agent-screen standard for every flow (revision 4: universal risk question, on live v1.6.6)
+# OOHDASH-146 Design: the agent-screen standard for every flow (revision 4.1: universal risk question and faithful guide, on live v1.6.6)
 
 Date: 2026-11-07 · Base: origin/main `916f6e3` (v1.6.6, includes OOHDASH-159) · Discovery: PR #162 (D1 to D4) · Your UI review of PR #178 (D5 to D12) · Your drift review of 2026-11-05 (items A1 to C6b, "implement your recommendations") · Your decision D13 of 2026-11-07 (the universal risk question)
 
@@ -40,7 +40,8 @@ Date: 2026-11-07 · Base: origin/main `916f6e3` (v1.6.6, includes OOHDASH-159) �
 | C. Mandatory comment | Every P1 confirm screen has "Why is this urgent? (required, goes on the P1 ticket)". The button is disabled until it has at least 10 real characters; the server refuses an empty one. Section 2A.1 and section 6 (B19 to B21). |
 | D. Placement | Self-help first (159 J1), question when the problem is still not resolved on the call, none where it was resolved, and before every closed note. Section 2A.3. |
 | E. Prototype and checks | 388 screens (was 298). The screen-text diff still has 0 unexplained differences, the click test found no dead buttons or errors, and three new D13 checks pass (section 4). |
-| F. Everything else | Unchanged from revision 3, including the rework addendum at the end. |
+| F. Revision 4.1 (your answers of 2026-11-07) | IP-1 closed (rights confirmed), so build step G-2 is unconditional. PD-1 decided: customer contact data stays on the Zendesk ticket until an agent removes it by hand (no fixed period). The PowerPause guide is a faithful copy of the Word document "Lighthouse PowerPause Contractor Info.docx" (section 5). The contactor-override section stays. Q5, Q6 and Q7 are closed. OOHDASH-163 (contractor-on-site flow improvements) is the follow-on story, out of scope. |
+| G. Everything else | Unchanged from revision 3, including the rework addendum at the end (now read with the 4.1 notes in it). |
 
 ### 1A. Earlier: what changed in revision 3 (kept for the record)
 
@@ -50,7 +51,7 @@ Date: 2026-11-07 · Base: origin/main `916f6e3` (v1.6.6, includes OOHDASH-159) �
 | B. Genuine 146 changes kept | Kitchen one-off (D8), Something else (D5, D11), connection-check button removed with the divert kept (D10), "caller" becomes "customer" (B4), hot water closed note (D7), not-on-Lighthouse closed notes (D6), thermostat heating questions (D12), plain control-window wording (D2), Tonight chips, glossary. Each is restyled to the live look. |
 | C. Your decisions | C1 "manual override" kept. C2 "I still think it's your equipment" kept. C3 fridge P1 only for stock at risk, as live, flagged for you. C4 customer details non-blocking. C5 "service contractor" everywhere. C6a boiler-panel screens added. C6b the call-record recovery banner is left as live and is not drawn. |
 | D. Grammar | Live says "can't show whether them are on" and "has the kitchen — pot wash and kitchen — fryers come on?" on multi-circuit kitchens. New wording: "can't show whether they are on" and "have the kitchen — pot wash and kitchen — fryers come on?". |
-| E. Guide pictures | The PowerPause guide gets its pictures, in the right places, with descriptions (section 5). |
+| E. Guide pictures | The PowerPause guide gets its pictures (section 5; replaced in revision 4.1 by a faithful copy of the Word document). |
 
 ## 2. Decisions
 
@@ -248,44 +249,36 @@ Not drawn, left as live: the call-record recovery banner (C6b); the transient "S
 | D13: P1 button disabled until the comment has real content | checked on 45 screens; failures: 0; clicking it empty stays on the confirm step: true |
 | Scenario-only screens (reached by the Screen picker, not by clicking from the first call screen) | 222 |
 
-## 5. PowerPause guide: pictures in the right places (new scope, E)
+## 5. PowerPause guide: a faithful copy of the Word document (revision 4.1)
 
 ### 5.1 What is wrong today
 
-Live serves `public/guides/powerpause-contractor-info.html`, a text-only page written for 159. The pictures from the original documents never reached it: the nine page scans it was designed around sit in `docs/project/guides/powerpause/` and are not under `public/`, and the container image copies only `public/`. So the contractor flow says "The guide has photos of the panels and both buttons", and the guide has none.
+Live serves `public/guides/powerpause-contractor-info.html`, a text-only page written for 159. The device pictures from the original Word document never reached it, and the page was reworded rather than copied.
 
-### 5.2 Design
+### 5.2 Design: copy the document, change nothing
 
-Same text and structure as the live guide, plus pictures, so a contractor can recognise the panel and the right button before touching anything. Pictures sit full width on a phone and two across on a wide screen, on a white card so they read in dark mode, each with a one-line caption and a longer description for screen readers.
+Your instruction: the guide exists already, just copy the Word document. The source is **"Lighthouse PowerPause Contractor Info.docx"** (in the Remote Monitoring - General library: Customer Sites, Greene King, Flaming Grills, Phase 2 Sites, Engineer Information; file dated 16 April 2026). It was found after the cheat sheet turned out to hold only the label and the logo. The page is built from the document's own XML by `docs/project/oohdash-146/build-guide.mjs`, so nothing is retyped:
 
-| # | Picture | File | Where it sits | Source |
-|---|---|---|---|---|
-| 1 | A kitchen PowerPause panel on the wall | `kitchen-powerpause-panel.jpg` | Finding the panel | Contractor guide page 4 (cut out) |
-| 2 | A ceiling panel (13A sockets still below it) | `ceiling-panel.jpg` | Finding the panel | Contractor guide page 6 |
-| 3 | A bar panel with labelled circuits | `bar-panel.jpg` | Finding the panel | Contractor guide page 7 |
-| 4 | The blue Lighthouse PowerPause label | `lighthouse-label.jpg` | After "Every appliance has a label" | **Original image from "Lighthouse PowerPause Cheat Sheet.docx"** (the only picture in that document apart from the logo) |
-| 5 | Tongou units with the override button marked | `tongou-override-photo.jpg` | Using the override, Tongou | Contractor guide page 2 |
-| 6 | Tongou close-up with arrow ("press once, do not hold") | `override-single-phase.jpg` | Using the override, Tongou | Contractor guide page 8 |
-| 7 | Owon meter with the override button marked | `owon-override-photo.jpg` | Using the override, Owon | Contractor guide page 2 |
-| 8 | Owon close-up with arrow | `override-three-phase.jpg` | Using the override, Owon | Contractor guide page 8 |
-| 9 | Interlock panel, ON light and START for gantry and fryers | `interlock-panel.jpg` | Fryers and heated gantries: the start button | Contractor guide page 5 |
-| 10 | A second style of interlock panel (ENABLED and ON) | `interlock-start-buttons.jpg` | Same section | Contractor guide page 1 |
-| 11 | Contactor with its manual switch marked | `contactor-manual-button.jpg` | If the PowerPause itself is faulty | Contractor guide page 9 |
+- Text, headings, bullets and order are exactly the document's, including its wording ("Tongou & Owon", "Bain Maire", "Power Pause", "Baine Marie") and its own spelling. Nothing is corrected or refined.
+- The support line is the document's: E: iot@airedale-group.co.uk, T: 023 814 0228. This closes Q5.
+- Tongou and Owon are described exactly as the document does: the two override pictures with their captions, and "Single Phase Appliances" and "Three Phase Appliances" as separate headings under "Manual Override Button". The page adds no statement that pairs one device with one phase. This closes Q6, as per the Word document.
+- The fire-up and fire-down table is copied as a real table (21 rows, 6 columns).
+- The "Contactor Override" section is kept, as you asked. This closes Q7. Improvements to the contractor flow (ask override or something else, choose the device, read the instructions, email them to the engineer) are story OOHDASH-163 and are out of scope.
+- All **12 pictures** in the document are included (the Word file holds image1 to image12), placed by following the document's own picture references. Body pictures, in the document's places: the interlock panel, Tongou, Owon, the Lighthouse label, example kitchen panel, example interlock panel, example ceiling panel, example bar panel, single phase button, three phase button and the contactor. The twelfth is the page-header logo (the header repeats on every Word page, so it is shown once at the top). The contactor picture is stored in the document as a Windows metafile (EMF) that browsers cannot show, so it was converted to PNG without any change to the picture. Pictures are only reduced in file size (largest side 900 pixels); each has a plain description for screen readers.
+- Total picture weight about 1.2 MB; no running cost.
 
-The Word cheat sheet is the non-contractor version; it holds one picture (the label) and the logo, so ten of the eleven pictures are cut from the contractor guide's page scans (1075 by 1521 pixels), which are the only place those photos exist in the project files. They are re-sized to at most 900 pixels wide and saved as JPEG at 82 percent quality: 13 to 78 KB each, 524 KB in total, against 980 KB for the nine full page scans. The "Tongou is single-phase, Owon is three-phase" pairing is read from page 8 of the contractor guide and is flagged for confirmation (Q6). Added text: a short "If the PowerPause itself is faulty: the contactor" section from page 9 of the contractor guide (flag Q7), and the support email. No phone number is added, because the documents disagree (flag Q5).
-
-Everything else in the guide text is unchanged. The prototype of the revised guide is `docs/project/oohdash-146/guide/powerpause-contractor-info.html` (pictures beside it); the standalone single-file copy for review is `oohdash-146-powerpause-guide.html`.
+The review copy is `docs/project/mockups/oohdash-146-powerpause-guide.html` (pictures inside the file) and the build copy is `docs/project/oohdash-146/guide/powerpause-contractor-info.html` with its pictures in `guide/powerpause/`.
 
 ### 5.3 Build instruction
 
 | # | Do |
 |---|---|
 | G-1 | Copy `docs/project/oohdash-146/guide/powerpause-contractor-info.html` over `public/guides/powerpause-contractor-info.html`. |
-| G-2 | Copy the eleven files in `docs/project/oohdash-146/guide/powerpause/*.jpg` to `public/guides/powerpause/`. Do not copy `images.json`. |
-| G-3 | No code change to `server.js`: the picture URLs are `/guides/powerpause/<name>.jpg`, two path segments, so the existing `/guides/:file` route (single `.html` file only) does not match them and they fall through to `express.static(public)`, which is already behind `requireAuth`. The Dockerfile already copies all of `public/`. |
+| G-2 | Copy the twelve picture files in `docs/project/oohdash-146/guide/powerpause/` (`doc-*.jpg` and `doc-*.png`) to `public/guides/powerpause/`. **Unconditional: IP-1 is closed (rights confirmed by James, 2026-11-07).** |
+| G-3 | No code change to `server.js`: the picture URLs are `/guides/powerpause/<name>.jpg or .png`, two path segments, so the existing `/guides/:file` route (single `.html` file only) does not match them and they fall through to `express.static(public)`, which is already behind `requireAuth`. The Dockerfile already copies all of `public/`. |
 | G-4 | Remove the now-unused `docs/project/guides/powerpause/page-*.jpg` and `docs/project/guides/powerpause-contractor-info.html` (the nine page scans stay as source material under `docs/`; they are never served). Keep them if the team wants the originals. |
-| G-5 | Add `test/guide-pictures.test.js` and a Playwright check (section 9): signed in, the guide returns 200 and every `img` has a non-zero natural width; signed out, a picture URL is refused like the page; every `img` has an `alt` of 20 or more characters; no picture over 100 KB. |
-| G-6 | Cost: static files only, about 524 KB added to the image, no running cost. Nothing polls, nothing runs in the background. |
+| G-5 | Add `test/guide-pictures.test.js` and a Playwright check (section 9): signed in, the guide returns 200 and every `img` has a non-zero natural width; signed out, a picture URL is refused like the page; every `img` has an `alt` of 20 or more characters; no picture over 300 KB; the page contains the phone number 023 814 0228 and no other support number. |
+| G-6 | Cost: static files only, about 1.2 MB added to the image, no running cost. Nothing polls, nothing runs in the background. |
 
 ## 6. Build plan (file by file, against origin/main 916f6e3)
 
@@ -483,9 +476,11 @@ A small display function, `tonightChip(a)` and `tonightWhat(a)`; no stored data 
 | Q2 | Which solved status should closed notes use. | Live already creates closed tickets; recommended: the same status. IoT helpdesk lead confirms; not blocking. |
 | Q3 | Should customer details later move to Zendesk requester or custom fields. | Recommended no for this release. |
 | Q4 | **Fridge stock at risk is a P1 (live), reversing the 146 D6 wording that fridges are never a P1.** | **Resolved by D13 (revision 4):** a fridge is a P1 only through the universal question; "stock at risk" is one kind of immediate risk to trade. |
-| Q5 | The support phone number differs between documents: the Word cheat sheet says 023 8144 0228, the contractor guide says 023 814 0228, and the label says +44 (0)23 814 0228. The P1 failure screen uses 023 814 0228 (from the 146 failure-path design). | Confirm the right number before the guide or the failure screen carries one. |
-| Q6 | The guide pairs Tongou with single-phase and Owon with three-phase. | Read from page 8 of the contractor guide; Sam Day to confirm. |
-| Q7 | The guide's contactor-override section (page 9 of the contractor guide) tells a contractor how to run an appliance when the PowerPause is faulty. | It is in the original; confirm it should be in the signed-in guide. |
+| Q5 | The support phone number differs between documents: the Word cheat sheet says 023 8144 0228, the contractor guide says 023 814 0228, and the label says +44 (0)23 814 0228. The P1 failure screen uses 023 814 0228 (from the 146 failure-path design). | **Closed (revision 4.1).** As per the Word document: 023 814 0228. The P1 failure screen keeps the same number. |
+| Q6 | The guide pairs Tongou with single-phase and Owon with three-phase. | **Closed (revision 4.1).** As per the Word document: no pairing statement is added. |
+| Q7 | The guide's contactor-override section (page 9 of the contractor guide) tells a contractor how to run an appliance when the PowerPause is faulty. | **Closed (revision 4.1).** Kept; improvements are story OOHDASH-163, out of scope. |
+| IP-1 | Rights to use the guide pictures. | **Closed (revision 4.1):** you confirmed the rights on 2026-11-07. Build step G-2 is unconditional. |
+| PD-1 | Retention of the customer contact line in Zendesk. | **Decided (revision 4.1):** kept until an agent removes it by hand. No fixed period (replaces the 12 month recommendation). Deletion path: an agent removes the line from the ticket in Zendesk. |
 | Q8 | **D13 reverses D7: hot water can now be a P1.** D7 said hot water is never a P1 because Lighthouse has no hot water control. You said every flow asks the question, so it does. | Applied as you directed. Check that a hot water P1 is wanted: the on-call agent can only call back and advise. |
 | Q9 | **D13 on equipment Lighthouse does not control (D6/D7 closed notes, fridges, hot water, "not on Lighthouse here", radiators and appliance faults).** You said every flow. Yes raises a P1 so the on-call agent can call back immediately, but the on-call team cannot fix that equipment. | Applied as you directed, with the Say telling the customer to contact their own service contractor as well. Please confirm. The alternative is No-only on those paths (closed note, no P1). |
 | Q10 | **The contractor rule "calls are always treated as urgent" is gone.** An engineer waiting on site is now a P1 only if the customer answers Yes. | Applied for consistency. Sam Day may want to confirm the rule for contractors. |
@@ -585,7 +580,7 @@ A small display function, `tonightChip(a)` and `tonightWhat(a)`; no stored data 
 8. Thermostat 6832 (16 against 20): "It's not working": "Are the radiators in that area warm?"
 9. Control window: "Make it warmer", Send: plain wording; block `/api/outcomes` and press "Done, carry on": "Try logging again", never "I've logged it".
 10. Block `/api/outcomes` and raise a P1: "The P1 has NOT been raised", no ticket number; allow and retry.
-11. Open the guide from the override screen: eleven pictures load, each with its description.
+11. Open the guide from the override screen: twelve pictures load, each with its description; the text matches the Word document, with the phone number 023 814 0228.
 12. For every other flow (lighting 6749 "still off", fans, hot water, air conditioning, heating "cold radiators", contractor "something else" and "hasn't come on", a closed note such as "Something not on this list", site not identified): confirm the exact question appears before the ticket, the P1 button is disabled until the comment is filled, and a P1 cannot be raised without it (try with the box empty, with spaces only and with nine characters).
 13. Search every screen above for the LEX-146 and D5-146 word lists: none.
 
@@ -617,13 +612,15 @@ No timetables, schedules or OptimumStartStop keys are written by this work; the 
 | One-off steps when due | 2 to 4 device writes and reads per booking, one ticket, a few comments | Only when there is work | Results appear only in the ticket, Tonight and alerts | Bounded per booking |
 | Browser control watcher | Unchanged: one status call every 15 seconds for up to 95 minutes after a slow thermostat change, inside the open tab only | Unchanged; D4 removes its repeated pop-up | Only the single "not confirmed yet" pop-up | Improved |
 | Universal risk question and P1 comment (D13) | Browser code, one shared helper and one server check on the existing outcome route | None | n/a | No AI or per-use cost. Adds one click to tickets that were already raised and one typed sentence to a P1 (a few seconds). Not a poll or a background job. |
-| Guide pictures | Static files served on request | None | n/a | About 524 KB added to the image |
+| Guide pictures | Static files served on request | None | n/a | About 1.2 MB added to the image |
 | Prototype and diff tooling | Run by hand on a developer machine | None | n/a | Nothing in production |
 | AI or per-use services | None | None | n/a | n/a |
 
 Build cost is mainly browser code, one small server module for one-offs (with its tests), the guide files, and test updates. What the business gets: agents who never make a technical judgement, no dead ends, honest referrals that do not clog the IoT queue, a contact number for call-backs, a one-off for kitchen equipment without touching timetables, and a guide that shows the contractor what to press.
 
 ## Rework addendum — round 1 (design/committee)
+
+**Revision 4.1 update (2026-11-07), which takes precedence over the two blocks below.** IP-1 is closed: James confirmed the picture rights, build step G-2 is unconditional, and the "Rights basis" column is read as "confirmed by James, 2026-11-07" (the guide is now a faithful copy of the Word document, section 5). PD-1 is decided by James: customer contact data on the Zendesk ticket is kept until an agent removes it manually, with no fixed retention period; the 12 month recommendation below is replaced. The deletion path is an agent removing the customer contact line from the ticket in Zendesk. The legal basis (legitimate interests, call-back) and the data minimisation below are unchanged.
 
 ### Panel verdicts addressed
 
@@ -653,7 +650,7 @@ This addendum adds the following:
 
 3. **Deletion path**: at the end of the Zendesk retention period (as confirmed by PD-1), the ticket and its internal comments are deleted by Zendesk's standard ticket purge. No separate deletion step is needed in the OOH application, because the data is not held in any OOH store, the browser, audit log, Tonight, SMS or sessionStorage (the design already enforces this). The deletion path is therefore: ticket purge by Zendesk, on the period confirmed by PD-1.
 
-4. **Data dictionary updated** (section 17): the `[TRG]` line "Customer contact: …" row now reads: "Personal data. Zendesk internal comment only. Retention: as confirmed by PD-1 (recommended max 12 months from ticket close). Deletion: Zendesk ticket purge. Legal basis: legitimate interests (call-back within the support window)."
+4. **Data dictionary updated** (section 17): the `[TRG]` line "Customer contact: …" row now reads: "Personal data. Zendesk internal comment only. Retention: as confirmed by PD-1 (James decision: kept until an agent removes it manually; no fixed period). Deletion: Zendesk ticket purge. Legal basis: legitimate interests (call-back within the support window)."
 
 ---
 

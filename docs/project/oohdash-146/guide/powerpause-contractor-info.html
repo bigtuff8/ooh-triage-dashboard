@@ -1,134 +1,51 @@
 <!DOCTYPE html>
-<html lang="en">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>PowerPause override guide — Lighthouse IoT</title>
-<style>
-  :root { --bg:#fff; --text:#111; --muted:#555; --line:#e0e0e0; --warn-bg:#fff3cd; --warn-line:#ffc107; --step-bg:#f0f4ff; --step-line:#3b6fdb; --card:#fff; }
-  @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --bg:#14171d; --text:#e7eaf0; --muted:#9aa3b2; --line:#2b313c; --warn-bg:#3a3110; --warn-line:#b8921a; --step-bg:#17233d; --step-line:#6f98ee; --card:#1e232c; } }
-  :root[data-theme="dark"] { --bg:#14171d; --text:#e7eaf0; --muted:#9aa3b2; --line:#2b313c; --warn-bg:#3a3110; --warn-line:#b8921a; --step-bg:#17233d; --step-line:#6f98ee; --card:#1e232c; }
-  body { font-family: system-ui, -apple-system, 'Segoe UI', sans-serif; max-width: 680px; margin: 0 auto; padding: 20px 16px 40px; color: var(--text); background: var(--bg); }
-  h1 { font-size: 1.3rem; margin-bottom: 4px; }
-  .sub { color: var(--muted); font-size: 0.9rem; margin-bottom: 24px; }
-  h2 { font-size: 1rem; margin: 24px 0 8px; border-top: 1px solid var(--line); padding-top: 16px; }
-  p { margin: 0 0 10px; line-height: 1.5; }
-  .warn { background: var(--warn-bg); border: 1px solid var(--warn-line); border-radius: 6px; padding: 10px 14px; margin: 12px 0; }
-  .step { background: var(--step-bg); border-left: 4px solid var(--step-line); border-radius: 4px; padding: 10px 14px; margin: 12px 0; }
-  .step strong { display: block; margin-bottom: 4px; }
-  .device { border: 1px solid var(--line); border-radius: 8px; padding: 12px 16px; margin: 10px 0; }
-  .device h3 { margin: 0 0 6px; font-size: 0.95rem; }
-  .device p { margin: 0 0 6px; font-size: 0.9rem; }
-  figure { margin: 12px 0; background: var(--card); border: 1px solid var(--line); border-radius: 8px; padding: 8px; }
-  figure img { display: block; width: 100%; height: auto; border-radius: 4px; background: #fff; }
-  figure.narrow { max-width: 420px; }
-  figcaption { font-size: 0.85rem; color: var(--muted); margin-top: 6px; }
-  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
-  @media (max-width: 560px) { .grid2 { grid-template-columns: 1fr; } }
-  footer { margin-top: 32px; font-size: 0.8rem; color: var(--muted); border-top: 1px solid var(--line); padding-top: 12px; }
-</style>
-</head>
-<body>
-<h1>PowerPause override guide</h1>
-<p class="sub">For contractors and site staff. Lighthouse IoT Support · Internal use only.</p>
-
-<h2>Finding the panel</h2>
-<p>The PowerPause panel is usually in one of these places:</p>
-<ul>
-  <li>By the kitchen distribution boards</li>
-  <li>Behind or beside the appliance</li>
-  <li>On the ceiling above the appliance</li>
-</ul>
-<p>These are three real panels, so you know what to look for.</p>
-<figure>
-  <img src="powerpause/kitchen-powerpause-panel.jpg" width="779" height="734" loading="lazy" alt="A kitchen PowerPause panel: a grey wall-mounted box with a clear front. Inside are two rows of small modules, each with a label underneath, and a few blue and green lights.">
-  <figcaption>A kitchen panel, on the wall by the distribution boards.</figcaption>
-</figure>
-<div class="grid2">
-  <figure>
-    <img src="powerpause/ceiling-panel.jpg" width="633" height="844" loading="lazy" alt="A PowerPause panel fixed to the ceiling, with a small label reading Power Pause Panel 3. Wires and 13A sockets sit below it.">
-    <figcaption>A ceiling panel. The 13A sockets below it are still there, for isolation and testing.</figcaption>
-  </figure>
-  <figure>
-    <img src="powerpause/bar-panel.jpg" width="645" height="860" loading="lazy" alt="A PowerPause panel behind the bar, labelled Glasswasher 2, Coffeemachine 1 and Glasswasher 1, with a blue light on each module.">
-    <figcaption>A bar panel, with each circuit labelled (glasswashers and coffee machine).</figcaption>
-  </figure>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Lighthouse PowerPause – Contractor Version</title><style>:root{--bg:#fff;--text:#111;--muted:#555;--line:#d9d9d9;--card:#fff}@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#14171d;--text:#e7eaf0;--muted:#9aa3b2;--line:#2b313c;--card:#fff}}:root[data-theme="dark"]{--bg:#14171d;--text:#e7eaf0;--muted:#9aa3b2;--line:#2b313c;--card:#fff}body{font-family:system-ui,-apple-system,"Segoe UI",sans-serif;max-width:760px;margin:0 auto;padding:20px 16px 48px;color:var(--text);background:var(--bg);line-height:1.5}h1{font-size:1.35rem}h2{font-size:1.05rem;margin:26px 0 8px;border-top:1px solid var(--line);padding-top:14px}h3{font-size:.98rem;margin:16px 0 6px}ul{margin:0 0 10px;padding-left:22px}figure{margin:12px 0;background:var(--card);border:1px solid var(--line);border-radius:6px;padding:8px;color:#111;text-align:center}figure img{max-width:100%;max-height:560px;width:auto;height:auto}figcaption{font-size:.9rem;margin-top:6px;text-align:left}.pair{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:12px}.tw{overflow-x:auto}table{border-collapse:collapse;width:100%;font-size:.88rem}th,td{border:1px solid var(--line);padding:4px 6px;text-align:left}th{background:rgba(127,127,127,.15)}</style></head><body><main>
+<figure><img src="powerpause/doc-0-header-logo.png" width="432" height="129" alt="Lighthouse logo with the slogan, from the page header of the Word document"></figure>
+<h1>Lighthouse PowerPause – Smart Appliance Control – Contractor Version</h1>
+<p>PowerPause is part of the Lighthouse IoT roll-out. It makes sure kitchen appliances aren’t switched on too early or left running too late, saving energy and reducing costs.</p>
+<h2>How It Works</h2>
+<ul><li>Appliances are switched on/off automatically at agreed times.</li><li>Times are set in line with the pub’s operating hours.</li><li>Changes to schedules must be authorised by the Area Manager.</li><li>Ad-hoc exceptions (e.g. football matches, TV events, festive hours) should be raised with the Pub Support Team, who will coordinate with the Area Manager.</li></ul>
+<h2>Safety Interlock Appliances (Fryers &amp; Gantries)</h2>
+<ul><li>Controlled via the interlock panel in the kitchen.</li><li>Green light ON → Appliance available to use.</li><li>Press the green button → You’ll hear the contactor click and the appliance powers up.</li></ul>
+<figure><img src="powerpause/doc-1-interlock-panel.jpg" width="849" height="1132" alt="Safety interlock panel: the green light and the green start button for fryers and gantries"></figure>
+<h2>All Devices connected to Power Pause</h2>
+<ul><li>Controlled through Power Pause panel (pictured below)</li><li>Appliances have agreed schedules with Greene King (attached underneath)</li><li>2 different devices (Tongou &amp; Owon)</li><li>Both devices have an override switch (for contractor use only)</li></ul>
+<div class="pair">
+<figure><img src="powerpause/doc-2-tongou.png" width="454" height="488" alt="Tongou device on the PowerPause panel, with the override button marked"><figcaption><b>Override button for Tongou device</b><br>(Press this button once, do not hold down this will remove from the system)<br><b>Tongou (On)</b></figcaption></figure>
+<figure><img src="powerpause/doc-3-owon.png" width="356" height="266" alt="Owon meter on the PowerPause panel, with the override button marked"><figcaption><b>Override button for Owon device</b><br>(Press this button once, do not hold down this will remove from the system)<br><b>Owon Meter (On)</b></figcaption></figure>
 </div>
-<p>Every appliance controlled by Lighthouse has a <strong>Lighthouse label</strong> on it. The label links the appliance to its circuit on the PowerPause unit.</p>
-<figure class="narrow">
-  <img src="powerpause/lighthouse-label.jpg" width="767" height="493" loading="lazy" alt="The blue PowerPause label: Lighthouse and Greene King logos, the words Power Pause, a short explanation that the power is controlled automatically by site opening hours, a QR code, and the Lighthouse support email and phone number.">
-  <figcaption>The label to look for. It carries the Lighthouse support email and phone number.</figcaption>
-</figure>
-
-<h2>Using the override</h2>
-<p>There are two types of PowerPause unit on site: <strong>Tongou</strong> and <strong>Owon</strong>. Check the label on the unit.</p>
-
-<div class="device">
-  <h3>Tongou (single-phase appliances)</h3>
-  <p>Press the <strong>override button once</strong>. Do not hold it down: holding the button takes the circuit off the Lighthouse system.</p>
-  <p>For fryers and heated gantries, also press the <strong>green start button on the interlock panel</strong> after the override.</p>
-  <figure>
-    <img src="powerpause/tongou-override-photo.jpg" width="750" height="336" loading="lazy" alt="Three blue Tongou units side by side in a panel. A box marks the round power button on the left-hand unit with the note: press this button once, do not hold down.">
-    <figcaption>Tongou units in a panel. The marked round button is the override.</figcaption>
-  </figure>
-  <figure class="narrow">
-    <img src="powerpause/override-single-phase.jpg" width="735" height="490" loading="lazy" alt="Close-up of a single Tongou unit with a red arrow pointing at the round teal power button and the words: press once to override until the next time schedule. Do not hold down the button.">
-    <figcaption>Close-up. Press once to override until the next timetable change.</figcaption>
-  </figure>
-</div>
-
-<div class="device">
-  <h3>Owon (three-phase appliances)</h3>
-  <p>Press the <strong>override button once</strong>. Do not hold it down: holding the button takes the circuit off the Lighthouse system.</p>
-  <p>For fryers and heated gantries, also press the <strong>green start button on the interlock panel</strong> after the override.</p>
-  <figure>
-    <img src="powerpause/owon-override-photo.jpg" width="890" height="368" loading="lazy" alt="An Owon power meter with relay inside a panel box, with a green light on. A box marks the small round power button near the bottom with the note: press this button once, do not hold down.">
-    <figcaption>An Owon meter in its box. The marked button is the override.</figcaption>
-  </figure>
-  <figure class="narrow">
-    <img src="powerpause/override-three-phase.jpg" width="700" height="555" loading="lazy" alt="Close-up of an Owon power meter with relay and a red arrow pointing at the round power button, with the words: press once to override until the next time schedule. Do not hold down the button.">
-    <figcaption>Close-up. Press once to override until the next timetable change.</figcaption>
-  </figure>
-</div>
-
-<h2>Fryers and heated gantries: the start button</h2>
-<p>Fryers and heated gantries (bain-marie units) also have a safety interlock panel in the kitchen. After the override, press the green start button for that appliance. You will hear the contactor click and the appliance powers up. A lit green light means the appliance is available to use.</p>
-<div class="grid2">
-  <figure>
-    <img src="powerpause/interlock-panel.jpg" width="791" height="757" loading="lazy" alt="A safety interlock panel with two rows. The top row, heated gantry, and the bottom row, fryers, each have a lit green ON light and a green START button.">
-    <figcaption>The interlock panel: an ON light and a START button for the heated gantry and for the fryers.</figcaption>
-  </figure>
-  <figure>
-    <img src="powerpause/interlock-start-buttons.jpg" width="307" height="280" loading="lazy" alt="A smaller interlock panel with a 400V warning sticker and two rows of green buttons, marked enabled and on, for the heated gantry and the fryers.">
-    <figcaption>Another style of interlock panel (marked ENABLED and ON).</figcaption>
-  </figure>
-</div>
-
-<h2>What happens after the override</h2>
-<div class="step">
-  <strong>The equipment should come on within a few seconds.</strong>
-  The override stays active until the next timetable change. The IoT team is notified automatically and checks all overrides the next working day.
-</div>
-
-<div class="warn">
-  <strong>If it still does not come on:</strong> call the OOH support line. The OOH handler will raise an urgent P1 ticket and someone from the on-call team will call you back.
-</div>
-
-<h2>If the PowerPause itself is faulty: the contactor</h2>
-<p>If the PowerPause is faulty and the pub needs the appliance to run, either power the coil on the contactor or, where there is one, use the contactor's manual ON button. Then report it to the Lighthouse team.</p>
-<figure class="narrow">
-  <img src="powerpause/contactor-manual-button.jpg" width="740" height="430" loading="lazy" alt="A Tongou contactor with a red arrow pointing at its manual control switch, labelled manual contactor control.">
-  <figcaption>The manual switch on the contactor.</figcaption>
-</figure>
-
-<h2>Important: do not hold the override button</h2>
-<p>Holding the button down (rather than pressing and releasing) removes the circuit from the Lighthouse system entirely. If that happens, the IoT team will need to re-enrol the device the next working day. If you are unsure, call the OOH support line before trying again.</p>
-
-<h2>Report problems to Lighthouse</h2>
-<p>Email <a href="mailto:iot@airedale-group.co.uk">iot@airedale-group.co.uk</a>.</p>
-
-<footer>
-  Lighthouse IoT · OOH Support · This guide is served from the OOH Dashboard and is for authorised staff only.
-</footer>
-</body>
-</html>
+<p>If you need to override the PowerPause for maintenance purposes, locate the PowerPause panel usually located by the kitchen distribution boards, behind the appliance or mounted on the ceiling.</p>
+<h2>Look for This Label</h2>
+<ul><li>Every appliance controlled by PowerPause will have this label attached:</li></ul>
+<figure><img src="powerpause/doc-4-label.png" width="767" height="493" alt="The Lighthouse PowerPause label that is attached to every controlled appliance"></figure>
+<h2>Lighthouse Support</h2>
+<p>For any help or schedule adjustments, contact the Lighthouse IoT Support Team:</p>
+<p>E: iot@airedale-group.co.uk</p>
+<p>T: 023 814 0228</p>
+<h2>Which Appliances Are We Controlling</h2>
+<ul><li>Supply &amp; Extract Fans</li><li>Merry Chefs</li><li>Fryers</li><li>Grills</li><li>Griddles</li><li>Bain Maire / Heated Gantry / Super Pass</li><li>Dishwashers</li><li>Glasswasher</li><li>Carveries</li><li>Combi Ovens</li><li>Coffee Machines</li><li>Outside Lights</li><li>External Heaters / Jumbrellas</li></ul>
+<h2>Agreed Fire Up Fire Down times (based on serving hours)</h2>
+<div class="tw"><table><tbody><tr><th scope="col">Equipment</th><th scope="col">Closed</th><th scope="col">Operating</th><th scope="col">Serving</th><th scope="col">Operating</th><th scope="col">Closed</th></tr><tr><td>Glasswasher-1</td><td>Off</td><td>-30mins</td><td>On</td><td>On</td><td>+1 hr</td></tr><tr><td>Glasswasher-2</td><td>Off</td><td>On</td><td>On</td><td>On</td><td>+1 hr</td></tr><tr><td>Dishwasher-1</td><td>Off</td><td>On</td><td>On</td><td>On</td><td>Off</td></tr><tr><td>Supply Fan</td><td>Off</td><td>On</td><td>-45mins</td><td>+30mins</td><td>Off</td></tr><tr><td>Extract Fan</td><td>Off</td><td>Off</td><td>-45mins</td><td>+30mins</td><td>Off</td></tr><tr><td>Salamander Grills</td><td>Off</td><td>Off</td><td>-30mins</td><td>+30mins</td><td>Off</td></tr><tr><td>Heated Gantry with Baine Marie</td><td>Off</td><td>Off</td><td>-20mins</td><td>+30mins</td><td>Off</td></tr><tr><td>Heated Gantry</td><td>Off</td><td>Off</td><td>On</td><td>+30mins</td><td>Off</td></tr><tr><td>Chargrill (Electric)</td><td>Off</td><td>Off</td><td>-30mins</td><td>+30mins</td><td>Off</td></tr><tr><td>Chargrill (Gas)</td><td>Off</td><td>Off</td><td>-45mins</td><td>+30mins</td><td>Off</td></tr><tr><td>Griddle 1</td><td>Off</td><td>Off</td><td>-30mins</td><td>+30mins</td><td>Off</td></tr><tr><td>Griddle 2</td><td>Off</td><td>Off</td><td>-15mins</td><td>+30mins</td><td>Off</td></tr><tr><td>Fryer 1</td><td>Off</td><td>Off</td><td>-15 mins</td><td>+30mins</td><td>Off</td></tr><tr><td>Fryer 2 (Linked to Fryer 1)</td><td>Off</td><td>Off</td><td>-15 mins</td><td>+30mins</td><td>Off</td></tr><tr><td>Hot Cabinet</td><td>Off</td><td>Off</td><td>-15 mins</td><td>+30mins</td><td>Off</td></tr><tr><td>Merry Chef</td><td>Off</td><td>Off</td><td>-10mins</td><td>+30mins</td><td>Off</td></tr><tr><td>Jumbrella/External Heater</td><td>Off</td><td>On</td><td>On</td><td>+30mins</td><td>Off</td></tr><tr><td>Outside Lights</td><td>Off</td><td>On</td><td>On</td><td>On</td><td>+1 hr</td></tr><tr><td>Heat Lamps</td><td>Off</td><td>Off</td><td>On</td><td>Off</td><td>Off</td></tr><tr><td>CoffeeMachine</td><td>Off</td><td>-15mins</td><td>On</td><td>On</td><td>Off</td></tr></tbody></table></div>
+<h2>Example Kitchen PowerPause Panel</h2>
+<figure><img src="powerpause/doc-5-kitchen-panel.jpg" width="900" height="1200" alt="Example kitchen PowerPause panel"></figure>
+<h2>Example Interlock Panel</h2>
+<figure><img src="powerpause/doc-6-interlock-panel.jpg" width="900" height="1200" alt="Example interlock panel for the bain-marie, heated gantries and fryers, with its start button"></figure>
+<p>This is a safety interlock panel for the bainemarie/heated gantries and the fryers. Press the start button to enable the contactor</p>
+<h2>Example Ceiling Panel</h2>
+<figure><img src="powerpause/doc-7-ceiling-panel.jpg" width="900" height="1200" alt="Example ceiling PowerPause panel"></figure>
+<p><b>Please note on the ceiling and back of appliance panel the existing 13A sockets still exists for isolation and for IR testing.</b></p>
+<h2>Example Bar Panel</h2>
+<figure><img src="powerpause/doc-8-bar-panel.jpg" width="900" height="1199" alt="Example bar PowerPause panel"></figure>
+<h2>Manual Override Button</h2>
+<h3>Single Phase Appliances</h3>
+<figure><img src="powerpause/doc-9-single-phase.png" width="195" height="375" alt="Manual override button on a single phase appliance"><figcaption>Press Once to Override until the next time schedule<br>(Do not hold down the button)</figcaption></figure>
+<h3>Three Phase Appliances</h3>
+<figure><img src="powerpause/doc-10-three-phase.png" width="102" height="239" alt="Manual override button on a three phase appliance"><figcaption>Press Once to Override until the next time schedule<br>(Do not hold down the button)</figcaption></figure>
+<p>Don’t forget to press the start button on the interlock panel for those appliances that have them</p>
+<h2>Contactor Override</h2>
+<p>If the PowerPause is faulty and the pub requires the appliance to be manually overridden to operate. Please either power the coil on the contactor or where present use the contactor manual on button</p>
+<figure><img src="powerpause/doc-11-contactor.png" width="204" height="224" alt="Contactor with its manual control switch"><figcaption>Manual Contactor Control</figcaption></figure>
+<h2>Contact and Report to Airedale Lighthouse Team</h2>
+<p>Please report any issues to the Lighthouse Team on iot@airedale-group.co.uk</p>
+<p>Many thanks</p>
+</main></body></html>
