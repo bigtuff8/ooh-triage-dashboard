@@ -1,4 +1,4 @@
-// OOHDASH-146 rev 3: verifies the built prototype.
+// OOHDASH-146 rev 4: verifies the built prototype.
 //  1. screen-text diff: the text of every prototype screen against the text of the live v1.6.6 screen it was taken from;
 //     every difference must be explained by an item in the "differs from live" list (zero unexplained).
 //  2. click test: every button on every screen is clicked; nothing may throw, and no navigation button may lead nowhere.
@@ -19,7 +19,7 @@ function normText(t, root) {
   const so = SITEOF[root];
   if (so) { t = t.split(so.name).join(SITE.name); t = t.replace(new RegExp('(?<![0-9])' + so.no + '(?![0-9])', 'g'), SITE.no); }
   t = t.replace(/\b4[5-9]\d{3}\b/g, '48213').split('Test Handler').join('Sam Okafor').split('Greene King · Test Street, Test Town').join('Greene King · 14 Mill Lane, Bury St Edmunds');
-  t = t.split('v1.6.6 · fixture data').join('Prototype · OOHDASH-146 rev 3 · live v1.6.6 screens');
+  t = t.split('v1.6.6 · fixture data').join('Prototype · OOHDASH-146 rev 4 · live v1.6.6 screens');
   t = t.replace(/^TH$/gm, 'SO').replace(/Greene King · [^\n]*/g, 'Greene King · 14 Mill Lane, Bury St Edmunds').replace(/^🔁 2 calls this month$/gm, '');
   return t;
 }
@@ -65,9 +65,11 @@ let clicks = 0, dead = [], navDead = [];
 const reach = new Set();
 for (const id of idsAll) {
   await page.evaluate(i => go(i), id);
+  await page.evaluate(() => { const ta = document.querySelector('[data-p1c]'); if (ta && !ta.value) { ta.value = 'Fryers off during Sunday lunch service, 80 covers booked'; ta.dispatchEvent(new Event('input', { bubbles: true })); } });
   const count = await page.evaluate(() => document.querySelectorAll('#stage button, #stage [data-to], #stage .tile, #modalroot button, #modalroot [data-to]').length);
   for (let k = 0; k < count; k++) {
     await page.evaluate(i => go(i), id);
+    await page.evaluate(() => { const ta = document.querySelector('[data-p1c]'); if (ta && !ta.value) { ta.value = 'Fryers off during Sunday lunch service, 80 covers booked'; ta.dispatchEvent(new Event('input', { bubbles: true })); } });
     const info = await page.evaluate(k => {
       const els = [...document.querySelectorAll('#stage button, #stage [data-to], #stage .tile, #modalroot button, #modalroot [data-to]')];
       const el = els[k]; if (!el) return null;
@@ -88,7 +90,53 @@ for (const id of idsAll) {
 }
 // P1 failure simulation
 await page.evaluate(() => { S.sim = true; S.failed = false; go('K8888~30'); });
-const p1 = await page.evaluate(() => { const b = [...document.querySelectorAll('#stage button')].find(x => /^Raise the P1$/.test(x.textContent.trim())); b.click(); return S.id; });
+const p1 = await page.evaluate(() => { const ta = document.querySelector('[data-p1c]'); ta.value = 'Fryers off during Sunday lunch service, 80 covers booked'; ta.dispatchEvent(new Event('input', { bubbles: true })); const b = [...document.querySelectorAll('#stage button')].find(x => /^Raise the P1$/.test(x.textContent.trim())); b.click(); return S.id; });
+
+// ---- D13 checks
+const RISK = "Is there an immediate risk to trade or to anyone's health and safety?";
+const DD = await page.evaluate(() => { const o = {}; Object.keys(D).forEach(k => { const n = D[k]; const set = new Set(); (n.e || []).forEach(x => x && set.add(x)); const re = /data-to="([^"]+)"/g; let m; [n.h, n.m].filter(Boolean).forEach(h => { re.lastIndex = 0; while ((m = re.exec(h))) set.add(m[1]); }); o[k] = { to: [...set], h: (n.h || '') }; }); return o; });
+const parentsOf = {}; Object.entries(DD).forEach(([k, n]) => n.to.forEach(t => { const r = t === '@end' ? null : t; if (r) (parentsOf[r] = parentsOf[r] || []).push(k); }));
+const riskSet = new Set(Object.keys(DD).filter(k => DD[k].h.includes(RISK)));
+const d13 = { questionScreens: riskSet.size, ticketScreens: 0, gated: 0, exempt: 0, ungated: [], confirms: 0, confirmBad: [], confirmUngated: [], askText: 0, askBad: [] };
+const TEXT_OK = { test: h => h.includes("<b>Ask the customer:</b> " + RISK + "</div>") };
+for (const k of riskSet) { d13.askText++; if (!TEXT_OK.test(DD[k].h)) d13.askBad.push(k); }
+for (const n of meta.nodes) {
+  const h = DD[n.id].h;
+  if (/data-testid="p1-confirm-warning"/.test(h)) {
+    d13.confirms++;
+    const ps = (parentsOf[n.id] || []).filter(p => !(n.id === 'SH:p1fail'));
+    if (n.id !== 'SH:p1fail' && !ps.length) d13.confirmUngated.push(n.id + ' (no parent)');
+    ps.forEach(p => { if (!riskSet.has(p)) d13.confirmUngated.push(n.id + ' <- ' + p); });
+  }
+  if (n.tk && !n.p1) {
+    d13.ticketScreens++;
+    if (n.exempt) { d13.exempt++; continue; }
+    const ps = (parentsOf[n.id] || []).filter(p => !(n.exemptParents || []).includes(p));
+    if (!ps.length || ps.some(p => !riskSet.has(p))) d13.ungated.push(n.id + ' <- ' + (ps.join(',') || 'nothing'));
+    else d13.gated++;
+  }
+}
+// P1 button disabled until the comment has real content
+const confirmIds = meta.nodes.filter(n => /data-testid="p1-confirm-warning"/.test(DD[n.id].h) && n.id !== 'SH:p1fail').map(n => n.id);
+const p1cases = []; let p1bad = [];
+for (const id of confirmIds) {
+  await page.evaluate(i => go(i), id);
+  const st = await page.evaluate(() => {
+    const ta = document.querySelector('[data-p1c]'), b = document.querySelector('[data-testid="record-outcome"]'); if (!ta || !b) return null;
+    const out = {}; const set = v => { ta.value = v; ta.dispatchEvent(new Event('input', { bubbles: true })); return b.disabled; };
+    out.initial = b.disabled; out.spaces = set('            '); out.short = set('too short'); out.ok = set('Fryers off, 80 covers booked'); out.cleared = set(''); out.tenSpaced = set('   abcdefghi   '); out.tenReal = set('abcdefghij');
+    return out;
+  });
+  if (!st) { p1bad.push(id + ': no comment box or button'); continue; }
+  const good = st.initial === true && st.spaces === true && st.short === true && st.ok === false && st.cleared === true && st.tenSpaced === true && st.tenReal === false;
+  if (!good) p1bad.push(id + ' ' + JSON.stringify(st));
+  p1cases.push(id);
+}
+// the button cannot be pressed with an empty comment even by clicking
+await page.evaluate(() => go('K8888~30'));
+const clickEmpty = await page.evaluate(() => { const b = document.querySelector('[data-testid="record-outcome"]'); b.click(); return S.id; });
+d13.p1Checked = p1cases.length; d13.p1Bad = p1bad; d13.clickEmptyStaysOn = clickEmpty === 'K8888~30';
+
 // reachability from HOME by clicking
 const adj = {}; // computed from the in-page data
 const D = await page.evaluate(() => { const o = {}; Object.keys(D).forEach(k => { const n = D[k]; const set = new Set(); (n.e || []).forEach(x => x && set.add(x)); const re = /data-to="([^"]+)"/g; let m; [n.h, n.m].filter(Boolean).forEach(h => { re.lastIndex = 0; while ((m = re.exec(h))) set.add(m[1]); }); o[k] = [...set]; }); return o; });
@@ -105,7 +153,7 @@ await browser.close();
 // ---- reports
 const dl = meta.deltas;
 const real = Object.keys(dl).filter(k => !NOTE.has(k));
-let md = '# OOHDASH-146 screen-text diff, revision 3 (prototype against live v1.6.6)\n\n';
+let md = '# OOHDASH-146 screen-text diff, revision 4 (prototype against live v1.6.6)\n\n';
 md += 'Method: the real app (origin/main 916f6e3, v1.6.6) was run in fixture mode with writes enabled and a script clicked every button on every flow, saving each screen\'s html and text. The prototype is built from those captured screens. Example site name, house number and ticket numbers are normalised on both sides (item N1). This script then loads the finished prototype, reads the text of every screen and compares it line by line with the text of the live screen it came from.\n\n';
 md += '## Result\n\n';
 md += '- Prototype screens: ' + meta.nodes.length + ' (' + meta.nodes.filter(n => n.live).length + ' taken from live, ' + meta.nodes.filter(n => n.authored).length + ' authored for 146).\n';
@@ -113,15 +161,17 @@ md += '- Identical to live after example-data normalisation: ' + identical + '.\
 md += '- **Unexplained differences: ' + unexplained + '.**\n';
 md += '- Live screens captured but not shown in the prototype: ' + notShown + ' (mostly control-window and duplicate crawl states; the replaced and removed live screens are listed under "Live screens replaced").\n';
 md += '- Click test: ' + clicks + ' clicks on ' + idsAll.length + ' screens; dead buttons: ' + dead.length + '; buttons that lead to a missing screen: ' + navDead.length + '; JS errors: ' + errors.length + '.\n\n';
+md += '## D13 (R14) checks\n\n- Screens that show the exact question: ' + d13.questionScreens + ' (exact text on all but: ' + (d13.askBad.join(', ') || 'none') + ').\n- Ticket screens (not P1): ' + d13.ticketScreens + '; each is either reached only from a risk question (' + d13.gated + ') or exempt because the problem was resolved on the call or the customer declined (' + d13.exempt + '); ungated: ' + (d13.ungated.join('; ') || 'none') + '.\n- P1 confirm screens: ' + d13.confirms + '; each reached only from a risk question; exceptions: ' + (d13.confirmUngated.join('; ') || 'none') + '.\n- P1 button disabled until the comment has real content: checked on ' + d13.p1Checked + ' confirm screens (empty, spaces only, 9 characters, cleared, ten characters padded with spaces stay disabled; real content enables); failures: ' + (d13.p1Bad.join('; ') || 'none') + '; clicking it with an empty comment stays on the confirm screen: ' + d13.clickEmptyStaysOn + '.\n\n';
 md += '## Live screens not carried into the prototype (crawl states per scenario)\n\n' + Object.entries(replacedRoots).map(([r, c]) => r + ': ' + c).join(', ') + '. These are replaced by the changed screens named in the items below (HW-* by R3, O6832 by R2, CN7004 and CN-devoff by R5, the "Continue under Something else" dead ends in L-none, FAN-none, S-none by R4, the heating agent-button screens by R6), or are crawl states that only show a control window left open.\n\n';
 md += '## The "differs from live" list\n\n| Item | What changes |\n|---|---|\n' + Object.keys(dl).map(k => '| ' + k + ' | ' + dl[k].title + '. ' + dl[k].what.replace(/\|/g, '/') + ' |').join('\n') + '\n\n';
 md += '## Screens that differ from live, and why\n\n| Prototype screen | Live source | Items |\n|---|---|---|\n' + rows.filter(r => r.status !== 'identical').map(r => '| ' + r.id + ' | ' + (r.src || 'none (new)') + ' | ' + (r.items.join(', ') || 'UNEXPLAINED') + ' |').join('\n') + '\n\n';
 md += '## Line-by-line differences (each line is either only in live or only in the prototype)\n\n' + detail.map(x => '### ' + x.id + ' (live ' + x.src + '; items ' + (x.items.join(', ') || 'UNEXPLAINED') + ')\n\n' + x.d.map(l => (l[0] === '-' ? '- Live: ' : '- Prototype: ') + l.slice(2)).join('\n')).join('\n\n') + '\n';
 md += '\n## Identical screens\n\n' + rows.filter(r => r.status === 'identical').map(r => r.id).join(', ') + '\n';
 fs.writeFileSync(OUT + '.md', md);
-fs.writeFileSync(OUT + '.json', JSON.stringify({ screens: meta.nodes.length, identical, explained, isNew, unexplained, clicks, dead, navDead, errors, unreachable, p1sim: p1, rows }, null, 1));
+fs.writeFileSync(OUT + '.json', JSON.stringify({ screens: meta.nodes.length, identical, explained, isNew, unexplained, clicks, dead, navDead, errors, unreachable, p1sim: p1, d13, rows }, null, 1));
 console.log(JSON.stringify({ screens: meta.nodes.length, identical, explained, isNew, unexplained, notShown, clicks, dead: dead.length, navDead: navDead.length, errors: errors.length, unreachable: unreachable.length, p1sim: p1 }));
 if (dead.length) console.log('DEAD:', dead.slice(0, 30));
 if (navDead.length) console.log('NAVDEAD:', navDead.slice(0, 30));
 if (unreachable.length) console.log('UNREACHABLE:', unreachable.slice(0, 40));
+console.log('D13:', JSON.stringify(d13));
 console.log('UNEXPLAINED:', rows.filter(r => r.status === 'UNEXPLAINED').map(r => r.id).slice(0, 40));

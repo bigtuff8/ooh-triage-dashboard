@@ -30,7 +30,7 @@ function frameFor(root) {
   if (frames[root]) return root;
   let pre = B.norm(B.stripOn(PK.frames[root].pre), root), post = B.stripOn(PK.frames[root].post);
   pre = pre.replace(/data-testid="nav-home"/, 'data-testid="nav-home" data-to="HOME"').replace(/data-testid="nav-callback"/, 'data-testid="nav-callback" data-to="CB-list"').replace(/data-testid="nav-tonight"/, 'data-testid="nav-tonight" data-to="TONIGHT"')
-    .replace('v1.6.6 · fixture data', 'Prototype · OOHDASH-146 rev 3 · live v1.6.6 screens');
+    .replace('v1.6.6 · fixture data', 'Prototype · OOHDASH-146 rev 4 · live v1.6.6 screens');
   frames[root] = { pre, post };
   const first = PK.nodes[B.rootFirst[root]];
   heads[root] = B.norm(B.stripOn(first.head || ''), root).replace(/<button class="btn link" style="margin-left:auto">End call<\/button>/, '<button class="btn link" style="margin-left:auto" data-to="@end">End call</button>');
@@ -68,7 +68,7 @@ function rightFor(n, root) {
 const P1BANNER = '<div class="statusstrip p1-banner" data-testid="p1-escalation-banner" style="display:flex;align-items:flex-start;gap:10px"><span style="font-size:1.2em;flex-shrink:0">🚨</span><div><b>Active P1 escalation on record for this site — review before advising.</b> Ticket ' + H.tktLink(EX) + ': Just received — not yet picked up.</div></div>';
 
 /* ---- order screens inside groups (breadth-first from each group's first screen) */
-const START = { K8888: 'K-what', K6832: 'K6832~1', KGW: 'K8888-gw-B-unscheduled~1', KD8: 'K-what', HW: 'HW:HW-nodhw', NLH: 'K-none~1', LIGHT: 'L6749~1', FAN: 'FAN6851~1', FR: 'FR6851~1', CONN: 'WS-offline', CONT: 'CT6832~1', ELSE: 'O-0', AC: 'AC6218~1', HEAT: 'S6832-cold~1', BP: 'BP9001-read~1', CTL: 'CTL:compose-up', CD: 'CD-ws', PAGES: 'HOME' };
+const START = { K8888: 'K-what', K6832: 'K6832~1', KGW: 'K8888-gw-B-unscheduled~1', KD8: 'K-what', HW: 'RQ:HW:HW-nodhw', NLH: 'K-none~1', LIGHT: 'L6749~1', FAN: 'FAN6851~1', FR: 'FR6851~1', CONN: 'WS-offline', CONT: 'CT6832~1', ELSE: 'O-0', AC: 'RQ:AC6218~1', HEAT: 'S6832-cold~1', BP: 'BP9001-read~1', CTL: 'CTL:compose-up', CD: 'CD-ws', PAGES: 'HOME' };
 const order = {};
 GROUPS.forEach(g => {
   const ids = Object.values(NODES).filter(n => n.g === g.id).map(n => n.id);
@@ -113,15 +113,15 @@ const protoCss = fs.readFileSync(path.join(__dirname, 'proto.css'), 'utf8');
 const runtime = fs.readFileSync(path.join(__dirname, 'proto-runtime.js'), 'utf8');
 const DL = {}; Object.entries(DELTAS).forEach(([k, v]) => { DL[k] = { title: v.title, what: v.what, note: /^(N1|R11)$/.test(k) }; });
 const GL = GROUPS.map(g => ({ id: g.id, label: g.label }));
-const head = '<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>OOHDASH-146 prototype, rev 3 (live v1.6.6 plus the 146 changes)</title><link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' viewBox=\'0 0 100 100\'%3E%3Ctext y=\'.9em\' font-size=\'90\'%3E%F0%9F%8C%99%3C/text%3E%3C/svg%3E"><style>' + css + '\n' + protoCss + '</style></head><body>';
-const bar = '<div id="proto"><button class="ptog" id="ptog" onclick="togProto()">Hide</button><b>OOHDASH-146 prototype, rev 3</b> <span id="badge"></span><span class="pdesc"> · every screen is the live v1.6.6 screen (captured from the real app, fixture mode) with only the 146 changes applied. Pick a flow, then a screen, or just click the buttons. Example data only. <label><input type="checkbox" id="showdiff"> Show what differs from live</label><label class="sim"><input type="checkbox" id="simfail"> Make the next P1 fail once</label></span><div class="row"><span style="color:#94A3B8">Flow:</span><select id="gsel"></select><button class="pb" id="gstart">Start of this flow</button><span style="color:#94A3B8">Screen:</span><select id="ssel"></select></div></div>';
+const head = '<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>OOHDASH-146 prototype, rev 4 (live v1.6.6 plus the 146 changes)</title><link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' viewBox=\'0 0 100 100\'%3E%3Ctext y=\'.9em\' font-size=\'90\'%3E%F0%9F%8C%99%3C/text%3E%3C/svg%3E"><style>' + css + '\n' + protoCss + '</style></head><body>';
+const bar = '<div id="proto"><button class="ptog" id="ptog" onclick="togProto()">Hide</button><b>OOHDASH-146 prototype, rev 4</b> <span id="badge"></span><span class="pdesc"> · every screen is the live v1.6.6 screen (captured from the real app, fixture mode) with only the 146 changes applied. Pick a flow, then a screen, or just click the buttons. Example data only. <label><input type="checkbox" id="showdiff"> Show what differs from live</label><label class="sim"><input type="checkbox" id="simfail"> Make the next P1 fail once</label></span><div class="row"><span style="color:#94A3B8">Flow:</span><select id="gsel"></select><button class="pb" id="gstart">Start of this flow</button><span style="color:#94A3B8">Screen:</span><select id="ssel"></select></div></div>';
 const body = bar + '<div id="app-stage"><div id="stage"></div></div><div id="diffpanel"></div><div id="toasts"></div><div id="modalroot"></div>';
 const data = 'var D=' + JSON.stringify(D) + ';\nvar GR=' + JSON.stringify(GR) + ';\nvar GL=' + JSON.stringify(GL) + ';\nvar DL=' + JSON.stringify(DL) + ';\nvar PB={"1":' + JSON.stringify(P1BANNER) + '};\nvar FR=' + JSON.stringify(frames) + ';\nvar HEAD=' + JSON.stringify(heads) + ';\nvar RT=' + JSON.stringify(rightKeys) + ';\n';
 const html = head + body + '<script>\n' + data + runtime + '\n</script></body></html>\n';
 fs.writeFileSync(OUTHTML, html);
 
 /* ---- node list for the diff / click test */
-const list = Object.values(NODES).map(n => ({ id: n.id, g: n.g, t: n.t, src: n.src || null, deltas: n.deltas, kind: n.kind, authored: !!n.authored, live: !!n.live }));
+const list = Object.values(NODES).map(n => ({ id: n.id, g: n.g, t: n.t, src: n.src || null, deltas: n.deltas, kind: n.kind, authored: !!n.authored, live: !!n.live, tk: !!n.ticketNode, p1: !!n.isP1, exempt: n.exempt || null, exemptParents: n.exemptParents || null }));
 fs.writeFileSync(OUTNODES, JSON.stringify({ nodes: list, missing, deltas: DELTAS, groups: GROUPS }, null, 1));
 console.log('built', OUTHTML, (html.length / 1024).toFixed(0) + 'KB', Object.keys(NODES).length, 'screens;', 'live', list.filter(x => x.live).length, 'authored', list.filter(x => x.authored).length);
 if (missing.length) console.log('MISSING TARGETS (' + missing.length + '):\n' + missing.slice(0, 60).join('\n'));

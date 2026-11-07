@@ -19,7 +19,7 @@ const T = words;
 
 /* ------------------------------------------------------------------ delta register (the "differs from live" list) */
 delta('R1', 'Kitchen: a one-off change for the next time (D8)', 'New first question when the customer needs a different time, the equipment\'s next times, the safety question, a check step, a booked card, a cancel path and a site banner. The live answer "It\'s fine, but we need it at different times" goes to this step instead of straight to the timetable form. "Different times every week" still goes to the live form.');
-delta('R2', 'Something else, redesigned (D5, D11)', 'The customer picks what it is about and the dashboard starts that issue\'s questions; the two agent-judgement buttons and the "it is controlled, go back" dead end are gone. The urgent-or-not question and the P1 are as live.');
+delta('R2', 'Something else, redesigned (D5, D11)', 'The customer picks what it is about and the dashboard starts that issue\'s questions; the two agent-judgement buttons and the "it is controlled, go back" dead end are gone. "None of these" asks the universal risk question (R14) in place of the live urgent-or-not question, and the live required reason box becomes the shared mandatory P1 comment.');
 delta('R3', 'Hot water: one closed note everywhere (D5, D7)', 'No hot water control and no temperature reading at any site, so the two agent buttons ("Pass it to the IoT team", "Scope guidance") are removed and the screen goes straight to a closed note telling the customer to use their service contractor. The hot water state at the time of the call is added to the ticket.');
 delta('R4', 'Not on Lighthouse here: closed note, no dead end (D6, D11)', 'Outside lighting, extractor fans, heating and air conditioning that are not on Lighthouse at the site now end on a closed note (with "Which equipment is it?" as in live kitchen), instead of "Continue under Something else". Live air conditioning is the same at every site; it now says so honestly where there is none.');
 delta('R5', 'Connection check: no button, divert corrected (D10)', 'The "Run connection check" button on the site screen and the typed keywords are removed (the automatic divert stays). The divert no longer says "Everything at this site is online" when the customer\'s own thermostat is the thing that is offline. The all-online screen is no longer reachable.');
@@ -165,18 +165,18 @@ step('O-0', { g: 'ELSE', t: 'First screen: the customer\'s words, then "is it ab
   info: 'Each answer goes straight to the right questions for this site. If Lighthouse does not have it here, it goes to a closed note telling the customer to use their service contractor. The list is this site\'s own list.',
   say: '', ask: 'is it about any of these?',
   answers: [['Heating', 'HEAT:start'], ['Hot water', 'HW:HW-auto'], ['Kitchen equipment', 'K-what'], ['Outside lighting', 'O-none'], ['Extractor fans', 'O-none'], ['The boiler itself', 'O-none'], ['None of these', 'O-choice']] });
-step('O-choice', { g: 'ELSE', t: 'None of these: is it urgent? (P1 path as live)', root: 'O6832', f: 'Else', deltas: ['R2'],
+step('O-choice', { g: 'ELSE', t: 'None of these: the risk question (D13)', root: 'O6832', f: 'Else', deltas: ['R2'],
   known: [W('Cellar cooler alarm going off'), ['c', 'It isn\'t about anything on the list']],
-  info: 'A P1 is anything that is immediately health and safety or business trading affecting. Please only use this option after you\'ve attempted to follow through one of the circumstance tiles. P1 escalation will send a text to the escalation manager on the IoT Support team immediately upon submission.',
-  say: '', ask: 'is this stopping the site trading, or is it a safety risk, right now?', answers: [['Yes, it\'s urgent', 'O-p1'], ['No, it can wait', 'O-normal']] });
+  info: H.RISK_INFO + ' Please only use this option after you\'ve attempted to follow through one of the circumstance tiles.',
+  say: '', ask: H.RISK_ASK, answers: [['Yes', 'O-p1'], ['No', 'O-normal']] });
 after('O-normal', { g: 'ELSE', t: 'Can wait: logged as described', root: 'O6832', f: 'Else', deltas: ['R2'],
-  known: [W('Cellar cooler alarm going off'), ['c', 'It isn\'t about anything on the list'], ['c', 'It can wait until the next working day']],
+  known: [W('Cellar cooler alarm going off'), ['c', 'It isn\'t about anything on the list'], ['c', H.RISK_KNOWN('no')]],
   say: 'I\'ve passed exactly what you\'ve described to our IoT team, reference ' + dyn(EXn) + '. They pick it up the next working day. If it becomes urgent tonight, ring back and we\'ll escalate it.', ticketLine: 'General issue captured' });
 p1confirm('O-p1', { g: 'ELSE', t: 'Urgent: confirm the P1', root: 'O6832', f: 'Else', deltas: ['R2'], to: 'O-p1-after',
-  known: [W('Cellar cooler alarm going off'), ['c', 'It isn\'t about anything on the list'], ['c', 'It is urgent: stopping the site trading or a safety risk']],
-  say: 'Thanks. I\'m going to raise this as urgent with our on-call team.', subject: 'Something else - urgent, escalated as P1', detail: 'Customer reported: Cellar cooler alarm going off. Did not fit a specific tile; the customer says it is stopping trading or a safety risk.' });
-p1after('O-p1-after', { g: 'ELSE', t: 'Urgent: P1 raised', root: 'O6832', f: 'Else', deltas: ['R2'], subject: 'Something else - urgent, escalated as P1',
-  known: [W('Cellar cooler alarm going off'), ['c', 'It isn\'t about anything on the list'], ['c', 'It is urgent: stopping the site trading or a safety risk']],
+  known: [W('Cellar cooler alarm going off'), ['c', 'It isn\'t about anything on the list'], ['c', H.RISK_KNOWN('yes')]],
+  say: 'Thanks. I\'m going to raise this as urgent with our on-call team.', subject: 'Something else — risk to trade or health and safety — P1', detail: 'Customer reported: Cellar cooler alarm going off. Did not fit a specific tile; the customer says there is an immediate risk to trade or to anyone\'s health and safety.' });
+p1after('O-p1-after', { g: 'ELSE', t: 'Urgent: P1 raised', root: 'O6832', f: 'Else', deltas: ['R2'], subject: 'Something else — risk to trade or health and safety — P1',
+  known: [W('Cellar cooler alarm going off'), ['c', 'It isn\'t about anything on the list'], ['c', H.RISK_KNOWN('yes')]],
   say: 'That\'s raised as urgent, reference ' + dyn(EXn) + '. Someone from our on-call team will call you back shortly.' });
 after('O-none', { g: 'ELSE', t: 'Not on Lighthouse here: closed note', root: 'O6832', f: 'Else', kind: 'closed', deltas: ['R2', 'R4'],
   known: [W('Cellar cooler alarm going off'), ['c', 'It is about outside lighting, which isn\'t on Lighthouse at this site']],
@@ -281,3 +281,4 @@ heatEdges('S6832-near~3', { warm: 'CTL:compose-up', broken: 'S-broken-keepingup'
 require('./authored-ctl.cjs');
 /* ------------------------------------------------------------------ R11 boiler panel result cards, R8/R9/R10 pages */
 require('./authored-pages.cjs');
+require('./authored-d13.cjs');

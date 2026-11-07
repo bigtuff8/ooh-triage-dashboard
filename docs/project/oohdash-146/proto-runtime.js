@@ -1,7 +1,7 @@
-/* OOHDASH-146 rev 3 prototype runtime. Data (D, GR, FR, HEAD, RT, DL) is injected by build-proto. No network, no build step. */
+/* OOHDASH-146 rev 4 prototype runtime. Data (D, GR, FR, HEAD, RT, DL) is injected by build-proto. No network, no build step. */
 var S = { id: null, sim: false, failed: false, cust: false, diff: false, last: 'WORKSPACE' };
-var TILE = { heating: 'S6832-cold~1', hotwater: 'HW:HW-auto', kitchen: 'K-what', lighting: 'L6749~1', fan: 'FAN6851~1', fridge: 'FR6851~1', contractor: 'CT6832~1', other: 'O-0' };
-var LABELTO = { '✓ This is the right site': 'CD-ws', 'Search again': 'HOME', 'Pass it to the IoT team': 'SITE-ambiguous-logged', 'Use Callback Lookup →': 'CB-list', 'start a new call': 'HOME', '❓ Raise a query with the IoT team': 'TONIGHT-query', 'Cancel': 'TONIGHT', 'Send query': 'TONIGHT', '✕': 'TONIGHT' };
+var TILE = { heating: 'S6832-cold~1', hotwater: 'RQ:HW:HW-auto', kitchen: 'K-what', lighting: 'L6749~1', fan: 'FAN6851~1', fridge: 'FR6851~1', contractor: 'CT6832~1', other: 'O-0' };
+var LABELTO = { '✓ This is the right site': 'CD-ws', 'Search again': 'HOME', 'Pass it to the IoT team': 'RQ:SITE-ambiguous-logged', 'Use Callback Lookup →': 'CB-list', 'start a new call': 'HOME', '❓ Raise a query with the IoT team': 'TONIGHT-query', 'Cancel': 'TONIGHT', 'Send query': 'TONIGHT', '✕': 'TONIGHT' };
 function $(s, r) { return (r || document).querySelector(s); }
 function esc(s) { return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
 function toast(t) { var el = $('#toasts'); el.innerHTML = '<div class="toast">' + t + '</div>'; clearTimeout(toast._t); toast._t = setTimeout(function () { el.innerHTML = ''; }, 2600); }
@@ -97,6 +97,16 @@ document.addEventListener('input', function (e) {
     var v = e.target.value.trim().toLowerCase(), r = $('#sres');
     r.innerHTML = (v.length >= 3 && ('7412'.indexOf(v) === 0 || 'the wheatsheaf'.indexOf(v) >= 0 || v.indexOf('wheat') >= 0)) ? '<div class="stepdone" style="cursor:pointer;margin-top:6px" data-to="SITE-confirm"><b>The Wheatsheaf</b> <span class="mono">7412</span> · Greene King · Bury St Edmunds</div>' : (v.length >= 3 ? '<div class="stepdone" style="cursor:pointer;margin-top:6px" data-to="SEARCH-none">No site matches "' + esc(e.target.value) + '"</div>' : '');
   }
+});
+// D13: the P1 button stays disabled until the agent's comment has real content (trimmed, at least 10 characters)
+function p1ok(v) { return String(v).replace(/s+/g, ' ').trim().length >= 10; }
+document.addEventListener('input', function (e) {
+  var t = e.target; if (!t || !t.getAttribute || !t.getAttribute('data-p1c')) return;
+  var box = t.closest('.confirm-step'); if (!box) return;
+  var b = box.querySelector('[data-testid="record-outcome"]'), ok = p1ok(t.value);
+  if (b) { b.disabled = !ok; b.setAttribute('aria-disabled', ok ? 'false' : 'true'); }
+  var note = box.querySelector('.p1-blocked-note'); if (note) note.hidden = ok;
+  var echo = box.querySelector('[data-p1echo]'); if (echo) echo.textContent = t.value.replace(/s+/g, ' ').trim() || "(you haven't written this yet)";
 });
 (function boot() {
   var gs = Object.keys(GR);

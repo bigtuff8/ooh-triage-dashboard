@@ -8,7 +8,11 @@
    "deltas": [],
    "kind": "flow",
    "authored": false,
-   "live": true
+   "live": true,
+   "tk": false,
+   "p1": false,
+   "exempt": null,
+   "exemptParents": null
   },
   {
    "id": "K8888~2",
@@ -18,7 +22,11 @@
    "deltas": [],
    "kind": "flow",
    "authored": false,
-   "live": true
+   "live": true,
+   "tk": false,
+   "p1": false,
+   "exempt": null,
+   "exemptParents": null
   },
   {
    "id": "K8888~3",
@@ -28,7 +36,11 @@
    "deltas": [],
    "kind": "flow",
    "authored": false,
-   "live": true
+   "live": true,
+   "tk": false,
+   "p1": false,
+   "exempt": null,
+   "exemptParents": null
   },
   {
    "id": "K8888~4",
@@ -38,7 +50,11 @@
    "deltas": [],
    "kind": "flow",
    "authored": false,
-   "live": true
+   "live": true,
+   "tk": false,
+   "p1": false,
+   "exempt": null,
+   "exemptParents": null
   },
   {
    "id": "K8888~5",
@@ -48,7 +64,11 @@
    "deltas": [],
    "kind": "flow",
    "authored": false,
-   "live": true
+   "live": true,
+   "tk": false,
+   "p1": false,
+   "exempt": null,
+   "exemptParents": null
   },
   {
    "id": "K8888~6",
@@ -60,7 +80,11 @@
    ],
    "kind": "flow",
    "authored": false,
-   "live": true
+   "live": true,
+   "tk": false,
+   "p1": false,
+   "exempt": null,
+   "exemptParents": null
   },
   {
    "id": "K8888~7",
@@ -72,7 +96,11 @@
    ],
    "kind": "flow",
    "authored": false,
-   "live": true
+   "live": true,
+   "tk": false,
+   "p1": false,
+   "exempt": null,
+   "exemptParents": null
   },
   {
    "id": "K8888~8",
@@ -82,7 +110,11 @@
    "deltas": [],
    "kind": "flow",
    "authored": false,
-   "live": true
+   "live": true,
+   "tk": false,
+   "p1": false,
+   "exempt": null,
+   "exemptParents": null
   },
   {
    "id": "K8888~9",
@@ -92,47 +124,75 @@
    "deltas": [],
    "kind": "flow",
    "authored": false,
-   "live": true
+   "live": true,
+   "tk": true,
+   "p1": false,
+   "exempt": "resolved",
+   "exemptParents": null
   },
   {
    "id": "K8888~10",
    "g": "K8888",
    "t": "Fryer > No, it hasn't come on",
    "src": "K8888~10",
-   "deltas": [],
+   "deltas": [
+    "R14"
+   ],
    "kind": "flow",
    "authored": false,
-   "live": true
+   "live": true,
+   "tk": false,
+   "p1": false,
+   "exempt": null,
+   "exemptParents": null
   },
   {
    "id": "K8888~11",
    "g": "K8888",
    "t": "Fryer > They can't find the panel",
    "src": "K8888~11",
-   "deltas": [],
+   "deltas": [
+    "R14"
+   ],
    "kind": "flow",
    "authored": false,
-   "live": true
+   "live": true,
+   "tk": false,
+   "p1": false,
+   "exempt": null,
+   "exemptParents": null
   },
   {
    "id": "K8888~12",
    "g": "K8888",
    "t": "Glass washer > I'll call our service contractor",
    "src": "K8888~12",
-   "deltas": [],
+   "deltas": [
+    "R14"
+   ],
    "kind": "flow",
    "authored": false,
-   "live": true
+   "live": true,
+   "tk": true,
+   "p1": false,
+   "exempt": null,
+   "exemptParents": null
   },
   {
    "id": "K8888~13",
    "g": "K8888",
    "t": "Glass washer > I still think it's your equipment",
    "src": "K8888~13",
-   "deltas": [],
+   "deltas": [
+    "R14"
+   ],
    "kind": "flow",
    "authored": false,
-   "live": true
+   "live": true,
+   "tk": false,
+   "p1": false,
+   "exempt": null,
+   "exemptParents": null
   },
   {
    "id": "K8888~14",
@@ -142,27 +202,43 @@
    "deltas": [],
    "kind": "flow",
    "authored": false,
-   "live": true
+   "live": true,
+   "tk": true,
+   "p1": false,
+   "exempt": "resolved",
+   "exemptParents": null
   },
   {
    "id": "K8888~15",
    "g": "K8888",
    "t": "Dishwasher > No, it hasn't come on",
    "src": "K8888~15",
-   "deltas": [],
+   "deltas": [
+    "R14"
+   ],
    "kind": "flow",
    "authored": false,
-   "live": true
+   "live": true,
+   "tk": false,
+   "p1": false,
+   "exempt": null,
+   "exemptParents": null
   },
   {
    "id": "K8888~16",
    "g": "K8888",
    "t": "Dishwasher > They can't find the panel",
    "src": "K8888~16",
-   "deltas": [],
+   "deltas": [
+    "R14"
+   ],
    "kind": "flow",
    "authored": false,
-   "live": true
+   "live": true,
+   "tk": false,
+   "p1": false,
+   "exempt": null,
+   "exemptParents": null
   },
   {
    "id": "K8888~17",
@@ -172,27 +248,43 @@
    "deltas": [],
    "kind": "flow",
    "authored": false,
-   "live": true
+   "live": true,
+   "tk": true,
+   "p1": false,
+   "exempt": "resolved",
+   "exemptParents": null
   },
   {
    "id": "K8888~18",
    "g": "K8888",
    "t": "Pot wash > I'll call our service contractor",
    "src": "K8888~18",
-   "deltas": [],
+   "deltas": [
+    "R14"
+   ],
    "kind": "flow",
    "authored": false,
-   "live": true
+   "live": true,
+   "tk": true,
+   "p1": false,
+   "exempt": null,
+   "exemptParents": null
   },
   {
    "id": "K8888~19",
    "g": "K8888",
    "t": "Pot wash > I still think it's your equipment",
    "src": "K8888~19",
-   "deltas": [],
+   "deltas": [
+    "R14"
+   ],
    "kind": "flow",
    "authored": false,
-   "live": true
+   "live": true,
+   "tk": false,
+   "p1": false,
+   "exempt": null,
+   "exemptParents": null
   },
   {
    "id": "K8888~20",
@@ -202,27 +294,43 @@
    "deltas": [],
    "kind": "flow",
    "authored": false,
-   "live": true
+   "live": true,
+   "tk": true,
+   "p1": false,
+   "exempt": "resolved",
+   "exemptParents": null
   },
   {
    "id": "K8888~21",
    "g": "K8888",
    "t": "Bain-marie > No, it hasn't come on",
    "src": "K8888~21",
-   "deltas": [],
+   "deltas": [
+    "R14"
+   ],
    "kind": "flow",
    "authored": false,
-   "live": true
+   "live": true,
+   "tk": false,
+   "p1": false,
+   "exempt": null,
+   "exemptParents": null
   },
   {
    "id": "K8888~22",
    "g": "K8888",
    "t": "Bain-marie > They can't find the panel",
    "src": "K8888~22",
-   "deltas": [],
+   "deltas": [
+    "R14"
+   ],
    "kind": "flow",
    "authored": false,
-   "live": true
+   "live": true,
+   "tk": false,
+   "p1": false,
+   "exempt": null,
+   "exemptParents": null
   },
   {
    "id": "K8888~23",
@@ -232,7 +340,11 @@
    "deltas": [],
    "kind": "flow",
    "authored": false,
-   "live": true
+   "live": true,
+   "tk": false,
+   "p1": false,
+   "exempt": null,
+   "exemptParents": null
   },
   {
    "id": "K8888~24",
@@ -242,27 +354,43 @@
    "deltas": [],
    "kind": "flow",
    "authored": false,
-   "live": true
+   "live": true,
+   "tk": true,
+   "p1": false,
+   "exempt": "resolved",
+   "exemptParents": null
   },
   {
    "id": "K8888~25",
    "g": "K8888",
    "t": "Several / all of it > No, it hasn't come on",
    "src": "K8888~25",
-   "deltas": [],
+   "deltas": [
+    "R14"
+   ],
    "kind": "flow",
    "authored": false,
-   "live": true
+   "live": true,
+   "tk": false,
+   "p1": false,
+   "exempt": null,
+   "exemptParents": null
   },
   {
    "id": "K8888~26",
    "g": "K8888",
    "t": "Several / all of it > They can't find the panel",
    "src": "K8888~26",
-   "deltas": [],
+   "deltas": [
+    "R14"
+   ],
    "kind": "flow",
    "authored": false,
-   "live": true
+   "live": true,
+   "tk": false,
+   "p1": false,
+   "exempt": null,
+   "exemptParents": null
   },
   {
    "id": "K8888~27",
@@ -272,7 +400,11 @@
    "deltas": [],
    "kind": "flow",
    "authored": false,
-   "live": true
+   "live": true,
+   "tk": true,
+   "p1": false,
+   "exempt": "resolved",
+   "exemptParents": null
   },
   {
    "id": "K8888~28",
@@ -282,337 +414,539 @@
    "deltas": [],
    "kind": "flow",
    "authored": false,
-   "live": true
+   "live": true,
+   "tk": false,
+   "p1": false,
+   "exempt": null,
+   "exemptParents": null
   },
   {
    "id": "K8888~29",
    "g": "K8888",
    "t": "Something not on this list > Continue",
    "src": "K8888~29",
-   "deltas": [],
+   "deltas": [
+    "R14"
+   ],
    "kind": "flow",
    "authored": false,
-   "live": true
+   "live": true,
+   "tk": true,
+   "p1": false,
+   "exempt": null,
+   "exemptParents": null
   },
   {
    "id": "K8888~30",
    "g": "K8888",
-   "t": "Fryer > No, it hasn't come on > Yes, it's needed now",
+   "t": "Fryer > No, it hasn't come on > Yes (immediate risk)",
    "src": "K8888~30",
-   "deltas": [],
+   "deltas": [
+    "R14"
+   ],
    "kind": "flow",
    "authored": false,
-   "live": true
+   "live": true,
+   "tk": false,
+   "p1": false,
+   "exempt": null,
+   "exemptParents": null
   },
   {
    "id": "K8888~31",
    "g": "K8888",
-   "t": "Fryer > No, it hasn't come on > No, it can wait",
+   "t": "Fryer > No, it hasn't come on > No (no immediate risk)",
    "src": "K8888~31",
-   "deltas": [],
+   "deltas": [
+    "R14"
+   ],
    "kind": "flow",
    "authored": false,
-   "live": true
+   "live": true,
+   "tk": true,
+   "p1": false,
+   "exempt": null,
+   "exemptParents": null
   },
   {
    "id": "K8888~32",
    "g": "K8888",
-   "t": "Fryer > They can't find the panel > Yes, it's needed now",
+   "t": "Fryer > They can't find the panel > Yes (immediate risk)",
    "src": "K8888~32",
-   "deltas": [],
+   "deltas": [
+    "R14"
+   ],
    "kind": "flow",
    "authored": false,
-   "live": true
+   "live": true,
+   "tk": false,
+   "p1": false,
+   "exempt": null,
+   "exemptParents": null
   },
   {
    "id": "K8888~33",
    "g": "K8888",
-   "t": "Fryer > They can't find the panel > No, it can wait",
+   "t": "Fryer > They can't find the panel > No (no immediate risk)",
    "src": "K8888~33",
-   "deltas": [],
+   "deltas": [
+    "R14"
+   ],
    "kind": "flow",
    "authored": false,
-   "live": true
+   "live": true,
+   "tk": true,
+   "p1": false,
+   "exempt": null,
+   "exemptParents": null
   },
   {
    "id": "K8888~34",
    "g": "K8888",
-   "t": "Glass washer > I still think it's your equipment > Yes, it's needed now",
+   "t": "Glass washer > I still think it's your equipment > Yes (immediate risk)",
    "src": "K8888~34",
-   "deltas": [],
+   "deltas": [
+    "R14"
+   ],
    "kind": "flow",
    "authored": false,
-   "live": true
+   "live": true,
+   "tk": false,
+   "p1": false,
+   "exempt": null,
+   "exemptParents": null
   },
   {
    "id": "K8888~35",
    "g": "K8888",
-   "t": "Glass washer > I still think it's your equipment > No, it can wait",
+   "t": "Glass washer > I still think it's your equipment > No (no immediate risk)",
    "src": "K8888~35",
-   "deltas": [],
+   "deltas": [
+    "R14"
+   ],
    "kind": "flow",
    "authored": false,
-   "live": true
+   "live": true,
+   "tk": true,
+   "p1": false,
+   "exempt": null,
+   "exemptParents": null
   },
   {
    "id": "K8888~36",
    "g": "K8888",
-   "t": "Dishwasher > No, it hasn't come on > Yes, it's needed now",
+   "t": "Dishwasher > No, it hasn't come on > Yes (immediate risk)",
    "src": "K8888~36",
-   "deltas": [],
+   "deltas": [
+    "R14"
+   ],
    "kind": "flow",
    "authored": false,
-   "live": true
+   "live": true,
+   "tk": false,
+   "p1": false,
+   "exempt": null,
+   "exemptParents": null
   },
   {
    "id": "K8888~37",
    "g": "K8888",
-   "t": "Dishwasher > No, it hasn't come on > No, it can wait",
+   "t": "Dishwasher > No, it hasn't come on > No (no immediate risk)",
    "src": "K8888~37",
-   "deltas": [],
+   "deltas": [
+    "R14"
+   ],
    "kind": "flow",
    "authored": false,
-   "live": true
+   "live": true,
+   "tk": true,
+   "p1": false,
+   "exempt": null,
+   "exemptParents": null
   },
   {
    "id": "K8888~38",
    "g": "K8888",
-   "t": "Dishwasher > They can't find the panel > Yes, it's needed now",
+   "t": "Dishwasher > They can't find the panel > Yes (immediate risk)",
    "src": "K8888~38",
-   "deltas": [],
+   "deltas": [
+    "R14"
+   ],
    "kind": "flow",
    "authored": false,
-   "live": true
+   "live": true,
+   "tk": false,
+   "p1": false,
+   "exempt": null,
+   "exemptParents": null
   },
   {
    "id": "K8888~39",
    "g": "K8888",
-   "t": "Dishwasher > They can't find the panel > No, it can wait",
+   "t": "Dishwasher > They can't find the panel > No (no immediate risk)",
    "src": "K8888~39",
-   "deltas": [],
+   "deltas": [
+    "R14"
+   ],
    "kind": "flow",
    "authored": false,
-   "live": true
+   "live": true,
+   "tk": true,
+   "p1": false,
+   "exempt": null,
+   "exemptParents": null
   },
   {
    "id": "K8888~40",
    "g": "K8888",
-   "t": "Pot wash > I still think it's your equipment > Yes, it's needed now",
+   "t": "Pot wash > I still think it's your equipment > Yes (immediate risk)",
    "src": "K8888~40",
-   "deltas": [],
+   "deltas": [
+    "R14"
+   ],
    "kind": "flow",
    "authored": false,
-   "live": true
+   "live": true,
+   "tk": false,
+   "p1": false,
+   "exempt": null,
+   "exemptParents": null
   },
   {
    "id": "K8888~41",
    "g": "K8888",
-   "t": "Pot wash > I still think it's your equipment > No, it can wait",
+   "t": "Pot wash > I still think it's your equipment > No (no immediate risk)",
    "src": "K8888~41",
-   "deltas": [],
+   "deltas": [
+    "R14"
+   ],
    "kind": "flow",
    "authored": false,
-   "live": true
+   "live": true,
+   "tk": true,
+   "p1": false,
+   "exempt": null,
+   "exemptParents": null
   },
   {
    "id": "K8888~42",
    "g": "K8888",
-   "t": "Bain-marie > No, it hasn't come on > Yes, it's needed now",
+   "t": "Bain-marie > No, it hasn't come on > Yes (immediate risk)",
    "src": "K8888~42",
-   "deltas": [],
+   "deltas": [
+    "R14"
+   ],
    "kind": "flow",
    "authored": false,
-   "live": true
+   "live": true,
+   "tk": false,
+   "p1": false,
+   "exempt": null,
+   "exemptParents": null
   },
   {
    "id": "K8888~43",
    "g": "K8888",
-   "t": "Bain-marie > No, it hasn't come on > No, it can wait",
+   "t": "Bain-marie > No, it hasn't come on > No (no immediate risk)",
    "src": "K8888~43",
-   "deltas": [],
+   "deltas": [
+    "R14"
+   ],
    "kind": "flow",
    "authored": false,
-   "live": true
+   "live": true,
+   "tk": true,
+   "p1": false,
+   "exempt": null,
+   "exemptParents": null
   },
   {
    "id": "K8888~44",
    "g": "K8888",
-   "t": "Bain-marie > They can't find the panel > Yes, it's needed now",
+   "t": "Bain-marie > They can't find the panel > Yes (immediate risk)",
    "src": "K8888~44",
-   "deltas": [],
+   "deltas": [
+    "R14"
+   ],
    "kind": "flow",
    "authored": false,
-   "live": true
+   "live": true,
+   "tk": false,
+   "p1": false,
+   "exempt": null,
+   "exemptParents": null
   },
   {
    "id": "K8888~45",
    "g": "K8888",
-   "t": "Bain-marie > They can't find the panel > No, it can wait",
+   "t": "Bain-marie > They can't find the panel > No (no immediate risk)",
    "src": "K8888~45",
-   "deltas": [],
+   "deltas": [
+    "R14"
+   ],
    "kind": "flow",
    "authored": false,
-   "live": true
+   "live": true,
+   "tk": true,
+   "p1": false,
+   "exempt": null,
+   "exemptParents": null
   },
   {
    "id": "K8888~46",
    "g": "K8888",
    "t": "Bain-marie > It's fine, but we need it at different times > Continue",
    "src": "K8888~46",
-   "deltas": [],
+   "deltas": [
+    "R14"
+   ],
    "kind": "flow",
    "authored": false,
-   "live": true
+   "live": true,
+   "tk": true,
+   "p1": false,
+   "exempt": null,
+   "exemptParents": null
   },
   {
    "id": "K8888~47",
    "g": "K8888",
-   "t": "Several / all of it > No, it hasn't come on > Yes, it's needed now",
+   "t": "Several / all of it > No, it hasn't come on > Yes (immediate risk)",
    "src": "K8888~47",
-   "deltas": [],
+   "deltas": [
+    "R14"
+   ],
    "kind": "flow",
    "authored": false,
-   "live": true
+   "live": true,
+   "tk": false,
+   "p1": false,
+   "exempt": null,
+   "exemptParents": null
   },
   {
    "id": "K8888~48",
    "g": "K8888",
-   "t": "Several / all of it > No, it hasn't come on > No, it can wait",
+   "t": "Several / all of it > No, it hasn't come on > No (no immediate risk)",
    "src": "K8888~48",
-   "deltas": [],
+   "deltas": [
+    "R14"
+   ],
    "kind": "flow",
    "authored": false,
-   "live": true
+   "live": true,
+   "tk": true,
+   "p1": false,
+   "exempt": null,
+   "exemptParents": null
   },
   {
    "id": "K8888~49",
    "g": "K8888",
-   "t": "Several / all of it > They can't find the panel > Yes, it's needed now",
+   "t": "Several / all of it > They can't find the panel > Yes (immediate risk)",
    "src": "K8888~49",
-   "deltas": [],
+   "deltas": [
+    "R14"
+   ],
    "kind": "flow",
    "authored": false,
-   "live": true
+   "live": true,
+   "tk": false,
+   "p1": false,
+   "exempt": null,
+   "exemptParents": null
   },
   {
    "id": "K8888~50",
    "g": "K8888",
-   "t": "Several / all of it > They can't find the panel > No, it can wait",
+   "t": "Several / all of it > They can't find the panel > No (no immediate risk)",
    "src": "K8888~50",
-   "deltas": [],
+   "deltas": [
+    "R14"
+   ],
    "kind": "flow",
    "authored": false,
-   "live": true
+   "live": true,
+   "tk": true,
+   "p1": false,
+   "exempt": null,
+   "exemptParents": null
   },
   {
    "id": "K8888~51",
    "g": "K8888",
    "t": "Several / all of it > It's fine, but we need it at different times > Continue",
    "src": "K8888~51",
-   "deltas": [],
+   "deltas": [
+    "R14"
+   ],
    "kind": "flow",
    "authored": false,
-   "live": true
+   "live": true,
+   "tk": true,
+   "p1": false,
+   "exempt": null,
+   "exemptParents": null
   },
   {
    "id": "K8888~52",
    "g": "K8888",
-   "t": "Fryer > No, it hasn't come on > Yes, it's needed now > Raise the P1",
+   "t": "Fryer > No, it hasn't come on > Yes (immediate risk) > Raise the P1",
    "src": "K8888~52",
-   "deltas": [],
+   "deltas": [
+    "R14"
+   ],
    "kind": "flow",
    "authored": false,
-   "live": true
+   "live": true,
+   "tk": true,
+   "p1": true,
+   "exempt": null,
+   "exemptParents": null
   },
   {
    "id": "K8888~53",
    "g": "K8888",
-   "t": "Fryer > They can't find the panel > Yes, it's needed now > Raise the P1",
+   "t": "Fryer > They can't find the panel > Yes (immediate risk) > Raise the P1",
    "src": "K8888~53",
-   "deltas": [],
+   "deltas": [
+    "R14"
+   ],
    "kind": "flow",
    "authored": false,
-   "live": true
+   "live": true,
+   "tk": true,
+   "p1": true,
+   "exempt": null,
+   "exemptParents": null
   },
   {
    "id": "K8888~54",
    "g": "K8888",
-   "t": "Glass washer > I still think it's your equipment > Yes, it's needed now > Raise the P1",
+   "t": "Glass washer > I still think it's your equipment > Yes (immediate risk) > Raise the P1",
    "src": "K8888~54",
-   "deltas": [],
+   "deltas": [
+    "R14"
+   ],
    "kind": "flow",
    "authored": false,
-   "live": true
+   "live": true,
+   "tk": true,
+   "p1": true,
+   "exempt": null,
+   "exemptParents": null
   },
   {
    "id": "K8888~55",
    "g": "K8888",
-   "t": "Dishwasher > No, it hasn't come on > Yes, it's needed now > Raise the P1",
+   "t": "Dishwasher > No, it hasn't come on > Yes (immediate risk) > Raise the P1",
    "src": "K8888~55",
-   "deltas": [],
+   "deltas": [
+    "R14"
+   ],
    "kind": "flow",
    "authored": false,
-   "live": true
+   "live": true,
+   "tk": true,
+   "p1": true,
+   "exempt": null,
+   "exemptParents": null
   },
   {
    "id": "K8888~56",
    "g": "K8888",
-   "t": "Dishwasher > They can't find the panel > Yes, it's needed now > Raise the P1",
+   "t": "Dishwasher > They can't find the panel > Yes (immediate risk) > Raise the P1",
    "src": "K8888~56",
-   "deltas": [],
+   "deltas": [
+    "R14"
+   ],
    "kind": "flow",
    "authored": false,
-   "live": true
+   "live": true,
+   "tk": true,
+   "p1": true,
+   "exempt": null,
+   "exemptParents": null
   },
   {
    "id": "K8888~57",
    "g": "K8888",
-   "t": "Pot wash > I still think it's your equipment > Yes, it's needed now > Raise the P1",
+   "t": "Pot wash > I still think it's your equipment > Yes (immediate risk) > Raise the P1",
    "src": "K8888~57",
-   "deltas": [],
+   "deltas": [
+    "R14"
+   ],
    "kind": "flow",
    "authored": false,
-   "live": true
+   "live": true,
+   "tk": true,
+   "p1": true,
+   "exempt": null,
+   "exemptParents": null
   },
   {
    "id": "K8888~58",
    "g": "K8888",
-   "t": "Bain-marie > No, it hasn't come on > Yes, it's needed now > Raise the P1",
+   "t": "Bain-marie > No, it hasn't come on > Yes (immediate risk) > Raise the P1",
    "src": "K8888~58",
-   "deltas": [],
+   "deltas": [
+    "R14"
+   ],
    "kind": "flow",
    "authored": false,
-   "live": true
+   "live": true,
+   "tk": true,
+   "p1": true,
+   "exempt": null,
+   "exemptParents": null
   },
   {
    "id": "K8888~59",
    "g": "K8888",
-   "t": "Bain-marie > They can't find the panel > Yes, it's needed now > Raise the P1",
+   "t": "Bain-marie > They can't find the panel > Yes (immediate risk) > Raise the P1",
    "src": "K8888~59",
-   "deltas": [],
+   "deltas": [
+    "R14"
+   ],
    "kind": "flow",
    "authored": false,
-   "live": true
+   "live": true,
+   "tk": true,
+   "p1": true,
+   "exempt": null,
+   "exemptParents": null
   },
   {
    "id": "K8888~60",
    "g": "K8888",
-   "t": "Several / all of it > No, it hasn't come on > Yes, it's needed now > Raise the P1",
+   "t": "Several / all of it > No, it hasn't come on > Yes (immediate risk) > Raise the P1",
    "src": "K8888~60",
-   "deltas": [],
+   "deltas": [
+    "R14"
+   ],
    "kind": "flow",
    "authored": false,
-   "live": true
+   "live": true,
+   "tk": true,
+   "p1": true,
+   "exempt": null,
+   "exemptParents": null
   },
   {
    "id": "K8888~61",
    "g": "K8888",
-   "t": "Several / all of it > They can't find the panel > Yes, it's needed now > Raise the P1",
+   "t": "Several / all of it > They can't find the panel > Yes (immediate risk) > Raise the P1",
    "src": "K8888~61",
-   "deltas": [],
+   "deltas": [
+    "R14"
+   ],
    "kind": "flow",
    "authored": false,
-   "live": true
+   "live": true,
+   "tk": true,
+   "p1": true,
+   "exempt": null,
+   "exemptParents": null
   },
   {
    "id": "K8888-gw-B-unscheduled~1",
@@ -622,57 +956,91 @@
    "deltas": [],
    "kind": "flow",
    "authored": false,
-   "live": true
+   "live": true,
+   "tk": false,
+   "p1": false,
+   "exempt": null,
+   "exemptParents": null
   },
   {
    "id": "K8888-gw-B-unscheduled~2",
    "g": "KGW",
    "t": "Glass washer > I'll call our service contractor",
    "src": "K8888-gw-B-unscheduled~2",
-   "deltas": [],
+   "deltas": [
+    "R14"
+   ],
    "kind": "flow",
    "authored": false,
-   "live": true
+   "live": true,
+   "tk": true,
+   "p1": false,
+   "exempt": null,
+   "exemptParents": null
   },
   {
    "id": "K8888-gw-B-unscheduled~3",
    "g": "KGW",
    "t": "Glass washer > I still think it's your equipment",
    "src": "K8888-gw-B-unscheduled~3",
-   "deltas": [],
+   "deltas": [
+    "R14"
+   ],
    "kind": "flow",
    "authored": false,
-   "live": true
+   "live": true,
+   "tk": false,
+   "p1": false,
+   "exempt": null,
+   "exemptParents": null
   },
   {
    "id": "K8888-gw-B-unscheduled~4",
    "g": "KGW",
-   "t": "Glass washer > I still think it's your equipment > Yes, it's needed now",
+   "t": "Glass washer > I still think it's your equipment > Yes (immediate risk)",
    "src": "K8888-gw-B-unscheduled~4",
-   "deltas": [],
+   "deltas": [
+    "R14"
+   ],
    "kind": "flow",
    "authored": false,
-   "live": true
+   "live": true,
+   "tk": false,
+   "p1": false,
+   "exempt": null,
+   "exemptParents": null
   },
   {
    "id": "K8888-gw-B-unscheduled~5",
    "g": "KGW",
-   "t": "Glass washer > I still think it's your equipment > No, it can wait",
+   "t": "Glass washer > I still think it's your equipment > No (no immediate risk)",
    "src": "K8888-gw-B-unscheduled~5",
-   "deltas": [],
+   "deltas": [
+    "R14"
+   ],
    "kind": "flow",
    "authored": false,
-   "live": true
+   "live": true,
+   "tk": true,
+   "p1": false,
+   "exempt": null,
+   "exemptParents": null
   },
   {
    "id": "K8888-gw-B-unscheduled~6",
    "g": "KGW",
-   "t": "Glass washer > I still think it's your equipment > Yes, it's needed now > Raise the P1",
+   "t": "Glass washer > I still think it's your equipment > Yes (immediate risk) > Raise the P1",
    "src": "K8888-gw-B-unscheduled~6",
-   "deltas": [],
+   "deltas": [
+    "R14"
+   ],
    "kind": "flow",
    "authored": false,
-   "live": true
+   "live": true,
+   "tk": true,
+   "p1": true,
+   "exempt": null,
+   "exemptParents": null
   },
   {
    "id": "K8888-gw-B-outside~1",
@@ -682,57 +1050,91 @@
    "deltas": [],
    "kind": "flow",
    "authored": false,
-   "live": true
+   "live": true,
+   "tk": false,
+   "p1": false,
+   "exempt": null,
+   "exemptParents": null
   },
   {
    "id": "K8888-gw-B-outside~2",
    "g": "KGW",
    "t": "Glass washer > I'll call our service contractor",
    "src": "K8888-gw-B-outside~2",
-   "deltas": [],
+   "deltas": [
+    "R14"
+   ],
    "kind": "flow",
    "authored": false,
-   "live": true
+   "live": true,
+   "tk": true,
+   "p1": false,
+   "exempt": null,
+   "exemptParents": null
   },
   {
    "id": "K8888-gw-B-outside~3",
    "g": "KGW",
    "t": "Glass washer > I still think it's your equipment",
    "src": "K8888-gw-B-outside~3",
-   "deltas": [],
+   "deltas": [
+    "R14"
+   ],
    "kind": "flow",
    "authored": false,
-   "live": true
+   "live": true,
+   "tk": false,
+   "p1": false,
+   "exempt": null,
+   "exemptParents": null
   },
   {
    "id": "K8888-gw-B-outside~4",
    "g": "KGW",
-   "t": "Glass washer > I still think it's your equipment > Yes, it's needed now",
+   "t": "Glass washer > I still think it's your equipment > Yes (immediate risk)",
    "src": "K8888-gw-B-outside~4",
-   "deltas": [],
+   "deltas": [
+    "R14"
+   ],
    "kind": "flow",
    "authored": false,
-   "live": true
+   "live": true,
+   "tk": false,
+   "p1": false,
+   "exempt": null,
+   "exemptParents": null
   },
   {
    "id": "K8888-gw-B-outside~5",
    "g": "KGW",
-   "t": "Glass washer > I still think it's your equipment > No, it can wait",
+   "t": "Glass washer > I still think it's your equipment > No (no immediate risk)",
    "src": "K8888-gw-B-outside~5",
-   "deltas": [],
+   "deltas": [
+    "R14"
+   ],
    "kind": "flow",
    "authored": false,
-   "live": true
+   "live": true,
+   "tk": true,
+   "p1": false,
+   "exempt": null,
+   "exemptParents": null
   },
   {
    "id": "K8888-gw-B-outside~6",
    "g": "KGW",
-   "t": "Glass washer > I still think it's your equipment > Yes, it's needed now > Raise the P1",
+   "t": "Glass washer > I still think it's your equipment > Yes (immediate risk) > Raise the P1",
    "src": "K8888-gw-B-outside~6",
-   "deltas": [],
+   "deltas": [
+    "R14"
+   ],
    "kind": "flow",
    "authored": false,
-   "live": true
+   "live": true,
+   "tk": true,
+   "p1": true,
+   "exempt": null,
+   "exemptParents": null
   },
   {
    "id": "K8888-gw-off-unknown~1",
@@ -742,7 +1144,11 @@
    "deltas": [],
    "kind": "flow",
    "authored": false,
-   "live": true
+   "live": true,
+   "tk": false,
+   "p1": false,
+   "exempt": null,
+   "exemptParents": null
   },
   {
    "id": "K8888-gw-off-unknown~2",
@@ -752,87 +1158,139 @@
    "deltas": [],
    "kind": "flow",
    "authored": false,
-   "live": true
+   "live": true,
+   "tk": true,
+   "p1": false,
+   "exempt": "resolved",
+   "exemptParents": null
   },
   {
    "id": "K8888-gw-off-unknown~3",
    "g": "KGW",
    "t": "Glass washer > No, it hasn't come on",
    "src": "K8888-gw-off-unknown~3",
-   "deltas": [],
+   "deltas": [
+    "R14"
+   ],
    "kind": "flow",
    "authored": false,
-   "live": true
+   "live": true,
+   "tk": false,
+   "p1": false,
+   "exempt": null,
+   "exemptParents": null
   },
   {
    "id": "K8888-gw-off-unknown~4",
    "g": "KGW",
    "t": "Glass washer > They can't find the panel",
    "src": "K8888-gw-off-unknown~4",
-   "deltas": [],
+   "deltas": [
+    "R14"
+   ],
    "kind": "flow",
    "authored": false,
-   "live": true
+   "live": true,
+   "tk": false,
+   "p1": false,
+   "exempt": null,
+   "exemptParents": null
   },
   {
    "id": "K8888-gw-off-unknown~5",
    "g": "KGW",
-   "t": "Glass washer > No, it hasn't come on > Yes, it's needed now",
+   "t": "Glass washer > No, it hasn't come on > Yes (immediate risk)",
    "src": "K8888-gw-off-unknown~5",
-   "deltas": [],
+   "deltas": [
+    "R14"
+   ],
    "kind": "flow",
    "authored": false,
-   "live": true
+   "live": true,
+   "tk": false,
+   "p1": false,
+   "exempt": null,
+   "exemptParents": null
   },
   {
    "id": "K8888-gw-off-unknown~6",
    "g": "KGW",
-   "t": "Glass washer > No, it hasn't come on > No, it can wait",
+   "t": "Glass washer > No, it hasn't come on > No (no immediate risk)",
    "src": "K8888-gw-off-unknown~6",
-   "deltas": [],
+   "deltas": [
+    "R14"
+   ],
    "kind": "flow",
    "authored": false,
-   "live": true
+   "live": true,
+   "tk": true,
+   "p1": false,
+   "exempt": null,
+   "exemptParents": null
   },
   {
    "id": "K8888-gw-off-unknown~7",
    "g": "KGW",
-   "t": "Glass washer > They can't find the panel > Yes, it's needed now",
+   "t": "Glass washer > They can't find the panel > Yes (immediate risk)",
    "src": "K8888-gw-off-unknown~7",
-   "deltas": [],
+   "deltas": [
+    "R14"
+   ],
    "kind": "flow",
    "authored": false,
-   "live": true
+   "live": true,
+   "tk": false,
+   "p1": false,
+   "exempt": null,
+   "exemptParents": null
   },
   {
    "id": "K8888-gw-off-unknown~8",
    "g": "KGW",
-   "t": "Glass washer > They can't find the panel > No, it can wait",
+   "t": "Glass washer > They can't find the panel > No (no immediate risk)",
    "src": "K8888-gw-off-unknown~8",
-   "deltas": [],
+   "deltas": [
+    "R14"
+   ],
    "kind": "flow",
    "authored": false,
-   "live": true
+   "live": true,
+   "tk": true,
+   "p1": false,
+   "exempt": null,
+   "exemptParents": null
   },
   {
    "id": "K8888-gw-off-unknown~9",
    "g": "KGW",
-   "t": "Glass washer > No, it hasn't come on > Yes, it's needed now > Raise the P1",
+   "t": "Glass washer > No, it hasn't come on > Yes (immediate risk) > Raise the P1",
    "src": "K8888-gw-off-unknown~9",
-   "deltas": [],
+   "deltas": [
+    "R14"
+   ],
    "kind": "flow",
    "authored": false,
-   "live": true
+   "live": true,
+   "tk": true,
+   "p1": true,
+   "exempt": null,
+   "exemptParents": null
   },
   {
    "id": "K8888-gw-off-unknown~10",
    "g": "KGW",
-   "t": "Glass washer > They can't find the panel > Yes, it's needed now > Raise the P1",
+   "t": "Glass washer > They can't find the panel > Yes (immediate risk) > Raise the P1",
    "src": "K8888-gw-off-unknown~10",
-   "deltas": [],
+   "deltas": [
+    "R14"
+   ],
    "kind": "flow",
    "authored": false,
-   "live": true
+   "live": true,
+   "tk": true,
+   "p1": true,
+   "exempt": null,
+   "exemptParents": null
   },
   {
    "id": "K8888-gw-fallback~1",
@@ -842,7 +1300,11 @@
    "deltas": [],
    "kind": "flow",
    "authored": false,
-   "live": true
+   "live": true,
+   "tk": false,
+   "p1": false,
+   "exempt": null,
+   "exemptParents": null
   },
   {
    "id": "K8888-gw-fallback~2",
@@ -852,87 +1314,139 @@
    "deltas": [],
    "kind": "flow",
    "authored": false,
-   "live": true
+   "live": true,
+   "tk": true,
+   "p1": false,
+   "exempt": "resolved",
+   "exemptParents": null
   },
   {
    "id": "K8888-gw-fallback~3",
    "g": "KGW",
    "t": "Glass washer > No, it hasn't come on",
    "src": "K8888-gw-fallback~3",
-   "deltas": [],
+   "deltas": [
+    "R14"
+   ],
    "kind": "flow",
    "authored": false,
-   "live": true
+   "live": true,
+   "tk": false,
+   "p1": false,
+   "exempt": null,
+   "exemptParents": null
   },
   {
    "id": "K8888-gw-fallback~4",
    "g": "KGW",
    "t": "Glass washer > They can't find the panel",
    "src": "K8888-gw-fallback~4",
-   "deltas": [],
+   "deltas": [
+    "R14"
+   ],
    "kind": "flow",
    "authored": false,
-   "live": true
+   "live": true,
+   "tk": false,
+   "p1": false,
+   "exempt": null,
+   "exemptParents": null
   },
   {
    "id": "K8888-gw-fallback~5",
    "g": "KGW",
-   "t": "Glass washer > No, it hasn't come on > Yes, it's needed now",
+   "t": "Glass washer > No, it hasn't come on > Yes (immediate risk)",
    "src": "K8888-gw-fallback~5",
-   "deltas": [],
+   "deltas": [
+    "R14"
+   ],
    "kind": "flow",
    "authored": false,
-   "live": true
+   "live": true,
+   "tk": false,
+   "p1": false,
+   "exempt": null,
+   "exemptParents": null
   },
   {
    "id": "K8888-gw-fallback~6",
    "g": "KGW",
-   "t": "Glass washer > No, it hasn't come on > No, it can wait",
+   "t": "Glass washer > No, it hasn't come on > No (no immediate risk)",
    "src": "K8888-gw-fallback~6",
-   "deltas": [],
+   "deltas": [
+    "R14"
+   ],
    "kind": "flow",
    "authored": false,
-   "live": true
+   "live": true,
+   "tk": true,
+   "p1": false,
+   "exempt": null,
+   "exemptParents": null
   },
   {
    "id": "K8888-gw-fallback~7",
    "g": "KGW",
-   "t": "Glass washer > They can't find the panel > Yes, it's needed now",
+   "t": "Glass washer > They can't find the panel > Yes (immediate risk)",
    "src": "K8888-gw-fallback~7",
-   "deltas": [],
+   "deltas": [
+    "R14"
+   ],
    "kind": "flow",
    "authored": false,
-   "live": true
+   "live": true,
+   "tk": false,
+   "p1": false,
+   "exempt": null,
+   "exemptParents": null
   },
   {
    "id": "K8888-gw-fallback~8",
    "g": "KGW",
-   "t": "Glass washer > They can't find the panel > No, it can wait",
+   "t": "Glass washer > They can't find the panel > No (no immediate risk)",
    "src": "K8888-gw-fallback~8",
-   "deltas": [],
+   "deltas": [
+    "R14"
+   ],
    "kind": "flow",
    "authored": false,
-   "live": true
+   "live": true,
+   "tk": true,
+   "p1": false,
+   "exempt": null,
+   "exemptParents": null
   },
   {
    "id": "K8888-gw-fallback~9",
    "g": "KGW",
-   "t": "Glass washer > No, it hasn't come on > Yes, it's needed now > Raise the P1",
+   "t": "Glass washer > No, it hasn't come on > Yes (immediate risk) > Raise the P1",
    "src": "K8888-gw-fallback~9",
-   "deltas": [],
+   "deltas": [
+    "R14"
+   ],
    "kind": "flow",
    "authored": false,
-   "live": true
+   "live": true,
+   "tk": true,
+   "p1": true,
+   "exempt": null,
+   "exemptParents": null
   },
   {
    "id": "K8888-gw-fallback~10",
    "g": "KGW",
-   "t": "Glass washer > They can't find the panel > Yes, it's needed now > Raise the P1",
+   "t": "Glass washer > They can't find the panel > Yes (immediate risk) > Raise the P1",
    "src": "K8888-gw-fallback~10",
-   "deltas": [],
+   "deltas": [
+    "R14"
+   ],
    "kind": "flow",
    "authored": false,
-   "live": true
+   "live": true,
+   "tk": true,
+   "p1": true,
+   "exempt": null,
+   "exemptParents": null
   },
   {
    "id": "K6832~1",
@@ -942,7 +1456,11 @@
    "deltas": [],
    "kind": "flow",
    "authored": false,
-   "live": true
+   "live": true,
+   "tk": false,
+   "p1": false,
+   "exempt": null,
+   "exemptParents": null
   },
   {
    "id": "K6832~2",
@@ -954,7 +1472,11 @@
    ],
    "kind": "flow",
    "authored": false,
-   "live": true
+   "live": true,
+   "tk": false,
+   "p1": false,
+   "exempt": null,
+   "exemptParents": null
   },
   {
    "id": "K6832~3",
@@ -966,7 +1488,11 @@
    ],
    "kind": "flow",
    "authored": false,
-   "live": true
+   "live": true,
+   "tk": false,
+   "p1": false,
+   "exempt": null,
+   "exemptParents": null
   },
   {
    "id": "K6832~4",
@@ -979,7 +1505,11 @@
    ],
    "kind": "flow",
    "authored": false,
-   "live": true
+   "live": true,
+   "tk": false,
+   "p1": false,
+   "exempt": null,
+   "exemptParents": null
   },
   {
    "id": "K6832~5",
@@ -989,7 +1519,11 @@
    "deltas": [],
    "kind": "flow",
    "authored": false,
-   "live": true
+   "live": true,
+   "tk": false,
+   "p1": false,
+   "exempt": null,
+   "exemptParents": null
   },
   {
    "id": "K6832~6",
@@ -999,27 +1533,43 @@
    "deltas": [],
    "kind": "flow",
    "authored": false,
-   "live": true
+   "live": true,
+   "tk": true,
+   "p1": false,
+   "exempt": "resolved",
+   "exemptParents": null
   },
   {
    "id": "K6832~7",
    "g": "K6832",
    "t": "Kitchen — pot wash > No, it hasn't come on",
    "src": "K6832~7",
-   "deltas": [],
+   "deltas": [
+    "R14"
+   ],
    "kind": "flow",
    "authored": false,
-   "live": true
+   "live": true,
+   "tk": false,
+   "p1": false,
+   "exempt": null,
+   "exemptParents": null
   },
   {
    "id": "K6832~8",
    "g": "K6832",
    "t": "Kitchen — pot wash > They can't find the panel",
    "src": "K6832~8",
-   "deltas": [],
+   "deltas": [
+    "R14"
+   ],
    "kind": "flow",
    "authored": false,
-   "live": true
+   "live": true,
+   "tk": false,
+   "p1": false,
+   "exempt": null,
+   "exemptParents": null
   },
   {
    "id": "K6832~9",
@@ -1029,7 +1579,11 @@
    "deltas": [],
    "kind": "flow",
    "authored": false,
-   "live": true
+   "live": true,
+   "tk": false,
+   "p1": false,
+   "exempt": null,
+   "exemptParents": null
   },
   {
    "id": "K6832~10",
@@ -1039,27 +1593,43 @@
    "deltas": [],
    "kind": "flow",
    "authored": false,
-   "live": true
+   "live": true,
+   "tk": true,
+   "p1": false,
+   "exempt": "resolved",
+   "exemptParents": null
   },
   {
    "id": "K6832~11",
    "g": "K6832",
    "t": "Kitchen — fryers > No, it hasn't come on",
    "src": "K6832~11",
-   "deltas": [],
+   "deltas": [
+    "R14"
+   ],
    "kind": "flow",
    "authored": false,
-   "live": true
+   "live": true,
+   "tk": false,
+   "p1": false,
+   "exempt": null,
+   "exemptParents": null
   },
   {
    "id": "K6832~12",
    "g": "K6832",
    "t": "Kitchen — fryers > They can't find the panel",
    "src": "K6832~12",
-   "deltas": [],
+   "deltas": [
+    "R14"
+   ],
    "kind": "flow",
    "authored": false,
-   "live": true
+   "live": true,
+   "tk": false,
+   "p1": false,
+   "exempt": null,
+   "exemptParents": null
   },
   {
    "id": "K6832~13",
@@ -1069,7 +1639,11 @@
    "deltas": [],
    "kind": "flow",
    "authored": false,
-   "live": true
+   "live": true,
+   "tk": false,
+   "p1": false,
+   "exempt": null,
+   "exemptParents": null
   },
   {
    "id": "K6832~14",
@@ -1081,7 +1655,11 @@
    ],
    "kind": "flow",
    "authored": false,
-   "live": true
+   "live": true,
+   "tk": true,
+   "p1": false,
+   "exempt": "resolved",
+   "exemptParents": null
   },
   {
    "id": "K6832~15",
@@ -1089,11 +1667,16 @@
    "t": "Several / all of it > No, it hasn't come on",
    "src": "K6832~15",
    "deltas": [
-    "G1"
+    "G1",
+    "R14"
    ],
    "kind": "flow",
    "authored": false,
-   "live": true
+   "live": true,
+   "tk": false,
+   "p1": false,
+   "exempt": null,
+   "exemptParents": null
   },
   {
    "id": "K6832~16",
@@ -1101,11 +1684,16 @@
    "t": "Several / all of it > They can't find the panel",
    "src": "K6832~16",
    "deltas": [
-    "G1"
+    "G1",
+    "R14"
    ],
    "kind": "flow",
    "authored": false,
-   "live": true
+   "live": true,
+   "tk": false,
+   "p1": false,
+   "exempt": null,
+   "exemptParents": null
   },
   {
    "id": "K6832~17",
@@ -1117,165 +1705,255 @@
    ],
    "kind": "flow",
    "authored": false,
-   "live": true
+   "live": true,
+   "tk": false,
+   "p1": false,
+   "exempt": null,
+   "exemptParents": null
   },
   {
    "id": "K6832~18",
    "g": "K6832",
    "t": "Something not on this list > Continue",
    "src": "K6832~18",
-   "deltas": [],
+   "deltas": [
+    "R14"
+   ],
    "kind": "flow",
    "authored": false,
-   "live": true
+   "live": true,
+   "tk": true,
+   "p1": false,
+   "exempt": null,
+   "exemptParents": null
   },
   {
    "id": "K6832~19",
    "g": "K6832",
-   "t": "Kitchen — pot wash > No, it hasn't come on > Yes, it's needed now",
+   "t": "Kitchen — pot wash > No, it hasn't come on > Yes (immediate risk)",
    "src": "K6832~19",
-   "deltas": [],
+   "deltas": [
+    "R14"
+   ],
    "kind": "flow",
    "authored": false,
-   "live": true
+   "live": true,
+   "tk": false,
+   "p1": false,
+   "exempt": null,
+   "exemptParents": null
   },
   {
    "id": "K6832~20",
    "g": "K6832",
-   "t": "Kitchen — pot wash > No, it hasn't come on > No, it can wait",
+   "t": "Kitchen — pot wash > No, it hasn't come on > No (no immediate risk)",
    "src": "K6832~20",
-   "deltas": [],
+   "deltas": [
+    "R14"
+   ],
    "kind": "flow",
    "authored": false,
-   "live": true
+   "live": true,
+   "tk": true,
+   "p1": false,
+   "exempt": null,
+   "exemptParents": null
   },
   {
    "id": "K6832~21",
    "g": "K6832",
-   "t": "Kitchen — pot wash > They can't find the panel > Yes, it's needed now",
+   "t": "Kitchen — pot wash > They can't find the panel > Yes (immediate risk)",
    "src": "K6832~21",
-   "deltas": [],
+   "deltas": [
+    "R14"
+   ],
    "kind": "flow",
    "authored": false,
-   "live": true
+   "live": true,
+   "tk": false,
+   "p1": false,
+   "exempt": null,
+   "exemptParents": null
   },
   {
    "id": "K6832~22",
    "g": "K6832",
-   "t": "Kitchen — pot wash > They can't find the panel > No, it can wait",
+   "t": "Kitchen — pot wash > They can't find the panel > No (no immediate risk)",
    "src": "K6832~22",
-   "deltas": [],
+   "deltas": [
+    "R14"
+   ],
    "kind": "flow",
    "authored": false,
-   "live": true
+   "live": true,
+   "tk": true,
+   "p1": false,
+   "exempt": null,
+   "exemptParents": null
   },
   {
    "id": "K6832~23",
    "g": "K6832",
    "t": "Kitchen — pot wash > It's fine, but we need it at different times > Continue",
    "src": "K6832~23",
-   "deltas": [],
+   "deltas": [
+    "R14"
+   ],
    "kind": "flow",
    "authored": false,
-   "live": true
+   "live": true,
+   "tk": true,
+   "p1": false,
+   "exempt": null,
+   "exemptParents": null
   },
   {
    "id": "K6832~24",
    "g": "K6832",
-   "t": "Kitchen — fryers > No, it hasn't come on > Yes, it's needed now",
+   "t": "Kitchen — fryers > No, it hasn't come on > Yes (immediate risk)",
    "src": "K6832~24",
-   "deltas": [],
+   "deltas": [
+    "R14"
+   ],
    "kind": "flow",
    "authored": false,
-   "live": true
+   "live": true,
+   "tk": false,
+   "p1": false,
+   "exempt": null,
+   "exemptParents": null
   },
   {
    "id": "K6832~25",
    "g": "K6832",
-   "t": "Kitchen — fryers > No, it hasn't come on > No, it can wait",
+   "t": "Kitchen — fryers > No, it hasn't come on > No (no immediate risk)",
    "src": "K6832~25",
-   "deltas": [],
+   "deltas": [
+    "R14"
+   ],
    "kind": "flow",
    "authored": false,
-   "live": true
+   "live": true,
+   "tk": true,
+   "p1": false,
+   "exempt": null,
+   "exemptParents": null
   },
   {
    "id": "K6832~26",
    "g": "K6832",
-   "t": "Kitchen — fryers > They can't find the panel > Yes, it's needed now",
+   "t": "Kitchen — fryers > They can't find the panel > Yes (immediate risk)",
    "src": "K6832~26",
-   "deltas": [],
+   "deltas": [
+    "R14"
+   ],
    "kind": "flow",
    "authored": false,
-   "live": true
+   "live": true,
+   "tk": false,
+   "p1": false,
+   "exempt": null,
+   "exemptParents": null
   },
   {
    "id": "K6832~27",
    "g": "K6832",
-   "t": "Kitchen — fryers > They can't find the panel > No, it can wait",
+   "t": "Kitchen — fryers > They can't find the panel > No (no immediate risk)",
    "src": "K6832~27",
-   "deltas": [],
+   "deltas": [
+    "R14"
+   ],
    "kind": "flow",
    "authored": false,
-   "live": true
+   "live": true,
+   "tk": true,
+   "p1": false,
+   "exempt": null,
+   "exemptParents": null
   },
   {
    "id": "K6832~28",
    "g": "K6832",
    "t": "Kitchen — fryers > It's fine, but we need it at different times > Continue",
    "src": "K6832~28",
-   "deltas": [],
+   "deltas": [
+    "R14"
+   ],
    "kind": "flow",
    "authored": false,
-   "live": true
+   "live": true,
+   "tk": true,
+   "p1": false,
+   "exempt": null,
+   "exemptParents": null
   },
   {
    "id": "K6832~29",
    "g": "K6832",
-   "t": "Several / all of it > No, it hasn't come on > Yes, it's needed now",
+   "t": "Several / all of it > No, it hasn't come on > Yes (immediate risk)",
    "src": "K6832~29",
    "deltas": [
-    "G1"
+    "G1",
+    "R14"
    ],
    "kind": "flow",
    "authored": false,
-   "live": true
+   "live": true,
+   "tk": false,
+   "p1": false,
+   "exempt": null,
+   "exemptParents": null
   },
   {
    "id": "K6832~30",
    "g": "K6832",
-   "t": "Several / all of it > No, it hasn't come on > No, it can wait",
+   "t": "Several / all of it > No, it hasn't come on > No (no immediate risk)",
    "src": "K6832~30",
    "deltas": [
-    "G1"
+    "G1",
+    "R14"
    ],
    "kind": "flow",
    "authored": false,
-   "live": true
+   "live": true,
+   "tk": true,
+   "p1": false,
+   "exempt": null,
+   "exemptParents": null
   },
   {
    "id": "K6832~31",
    "g": "K6832",
-   "t": "Several / all of it > They can't find the panel > Yes, it's needed now",
+   "t": "Several / all of it > They can't find the panel > Yes (immediate risk)",
    "src": "K6832~31",
    "deltas": [
-    "G1"
+    "G1",
+    "R14"
    ],
    "kind": "flow",
    "authored": false,
-   "live": true
+   "live": true,
+   "tk": false,
+   "p1": false,
+   "exempt": null,
+   "exemptParents": null
   },
   {
    "id": "K6832~32",
    "g": "K6832",
-   "t": "Several / all of it > They can't find the panel > No, it can wait",
+   "t": "Several / all of it > They can't find the panel > No (no immediate risk)",
    "src": "K6832~32",
    "deltas": [
-    "G1"
+    "G1",
+    "R14"
    ],
    "kind": "flow",
    "authored": false,
-   "live": true
+   "live": true,
+   "tk": true,
+   "p1": false,
+   "exempt": null,
+   "exemptParents": null
   },
   {
    "id": "K6832~33",
@@ -1283,75 +1961,114 @@
    "t": "Several / all of it > It's fine, but we need it at different times > Continue",
    "src": "K6832~33",
    "deltas": [
-    "G1"
+    "G1",
+    "R14"
    ],
    "kind": "flow",
    "authored": false,
-   "live": true
+   "live": true,
+   "tk": true,
+   "p1": false,
+   "exempt": null,
+   "exemptParents": null
   },
   {
    "id": "K6832~34",
    "g": "K6832",
-   "t": "Kitchen — pot wash > No, it hasn't come on > Yes, it's needed now > Raise the P1",
+   "t": "Kitchen — pot wash > No, it hasn't come on > Yes (immediate risk) > Raise the P1",
    "src": "K6832~34",
-   "deltas": [],
+   "deltas": [
+    "R14"
+   ],
    "kind": "flow",
    "authored": false,
-   "live": true
+   "live": true,
+   "tk": true,
+   "p1": true,
+   "exempt": null,
+   "exemptParents": null
   },
   {
    "id": "K6832~35",
    "g": "K6832",
-   "t": "Kitchen — pot wash > They can't find the panel > Yes, it's needed now > Raise the P1",
+   "t": "Kitchen — pot wash > They can't find the panel > Yes (immediate risk) > Raise the P1",
    "src": "K6832~35",
-   "deltas": [],
+   "deltas": [
+    "R14"
+   ],
    "kind": "flow",
    "authored": false,
-   "live": true
+   "live": true,
+   "tk": true,
+   "p1": true,
+   "exempt": null,
+   "exemptParents": null
   },
   {
    "id": "K6832~36",
    "g": "K6832",
-   "t": "Kitchen — fryers > No, it hasn't come on > Yes, it's needed now > Raise the P1",
+   "t": "Kitchen — fryers > No, it hasn't come on > Yes (immediate risk) > Raise the P1",
    "src": "K6832~36",
-   "deltas": [],
+   "deltas": [
+    "R14"
+   ],
    "kind": "flow",
    "authored": false,
-   "live": true
+   "live": true,
+   "tk": true,
+   "p1": true,
+   "exempt": null,
+   "exemptParents": null
   },
   {
    "id": "K6832~37",
    "g": "K6832",
-   "t": "Kitchen — fryers > They can't find the panel > Yes, it's needed now > Raise the P1",
+   "t": "Kitchen — fryers > They can't find the panel > Yes (immediate risk) > Raise the P1",
    "src": "K6832~37",
-   "deltas": [],
+   "deltas": [
+    "R14"
+   ],
    "kind": "flow",
    "authored": false,
-   "live": true
+   "live": true,
+   "tk": true,
+   "p1": true,
+   "exempt": null,
+   "exemptParents": null
   },
   {
    "id": "K6832~38",
    "g": "K6832",
-   "t": "Several / all of it > No, it hasn't come on > Yes, it's needed now > Raise the P1",
+   "t": "Several / all of it > No, it hasn't come on > Yes (immediate risk) > Raise the P1",
    "src": "K6832~38",
    "deltas": [
-    "G1"
+    "G1",
+    "R14"
    ],
    "kind": "flow",
    "authored": false,
-   "live": true
+   "live": true,
+   "tk": true,
+   "p1": true,
+   "exempt": null,
+   "exemptParents": null
   },
   {
    "id": "K6832~39",
    "g": "K6832",
-   "t": "Several / all of it > They can't find the panel > Yes, it's needed now > Raise the P1",
+   "t": "Several / all of it > They can't find the panel > Yes (immediate risk) > Raise the P1",
    "src": "K6832~39",
    "deltas": [
-    "G1"
+    "G1",
+    "R14"
    ],
    "kind": "flow",
    "authored": false,
-   "live": true
+   "live": true,
+   "tk": true,
+   "p1": true,
+   "exempt": null,
+   "exemptParents": null
   },
   {
    "id": "K-none~1",
@@ -1361,17 +2078,27 @@
    "deltas": [],
    "kind": "flow",
    "authored": false,
-   "live": true
+   "live": true,
+   "tk": false,
+   "p1": false,
+   "exempt": null,
+   "exemptParents": null
   },
   {
    "id": "K-none~2",
    "g": "NLH",
    "t": "Continue",
    "src": "K-none~2",
-   "deltas": [],
+   "deltas": [
+    "R14"
+   ],
    "kind": "flow",
    "authored": false,
-   "live": true
+   "live": true,
+   "tk": true,
+   "p1": false,
+   "exempt": null,
+   "exemptParents": null
   },
   {
    "id": "L6749~1",
@@ -1381,7 +2108,11 @@
    "deltas": [],
    "kind": "flow",
    "authored": false,
-   "live": true
+   "live": true,
+   "tk": false,
+   "p1": false,
+   "exempt": null,
+   "exemptParents": null
   },
   {
    "id": "L6749~2",
@@ -1393,7 +2124,11 @@
    ],
    "kind": "flow",
    "authored": false,
-   "live": true
+   "live": true,
+   "tk": true,
+   "p1": false,
+   "exempt": "resolved",
+   "exemptParents": null
   },
   {
    "id": "L6749~3",
@@ -1401,11 +2136,16 @@
    "t": "No, they're still off",
    "src": "L6749~3",
    "deltas": [
-    "R12"
+    "R12",
+    "R14"
    ],
    "kind": "flow",
    "authored": false,
-   "live": true
+   "live": true,
+   "tk": false,
+   "p1": false,
+   "exempt": null,
+   "exemptParents": null
   },
   {
    "id": "L6749~4",
@@ -1413,11 +2153,16 @@
    "t": "No, they're still off > Raise the P1",
    "src": "L6749~4",
    "deltas": [
-    "R12"
+    "R12",
+    "R14"
    ],
    "kind": "flow",
    "authored": false,
-   "live": true
+   "live": true,
+   "tk": true,
+   "p1": true,
+   "exempt": null,
+   "exemptParents": null
   },
   {
    "id": "L6360~1",
@@ -1427,7 +2172,11 @@
    "deltas": [],
    "kind": "flow",
    "authored": false,
-   "live": true
+   "live": true,
+   "tk": false,
+   "p1": false,
+   "exempt": null,
+   "exemptParents": null
   },
   {
    "id": "L6360~2",
@@ -1439,7 +2188,11 @@
    ],
    "kind": "flow",
    "authored": false,
-   "live": true
+   "live": true,
+   "tk": true,
+   "p1": false,
+   "exempt": "resolved",
+   "exemptParents": null
   },
   {
    "id": "L6360~3",
@@ -1447,11 +2200,16 @@
    "t": "No, they're still off",
    "src": "L6360~3",
    "deltas": [
-    "R12"
+    "R12",
+    "R14"
    ],
    "kind": "flow",
    "authored": false,
-   "live": true
+   "live": true,
+   "tk": false,
+   "p1": false,
+   "exempt": null,
+   "exemptParents": null
   },
   {
    "id": "L6360~4",
@@ -1459,11 +2217,16 @@
    "t": "No, they're still off > Raise the P1",
    "src": "L6360~4",
    "deltas": [
-    "R12"
+    "R12",
+    "R14"
    ],
    "kind": "flow",
    "authored": false,
-   "live": true
+   "live": true,
+   "tk": true,
+   "p1": true,
+   "exempt": null,
+   "exemptParents": null
   },
   {
    "id": "L6961~1",
@@ -1473,7 +2236,11 @@
    "deltas": [],
    "kind": "flow",
    "authored": false,
-   "live": true
+   "live": true,
+   "tk": false,
+   "p1": false,
+   "exempt": null,
+   "exemptParents": null
   },
   {
    "id": "L6961~2",
@@ -1483,7 +2250,11 @@
    "deltas": [],
    "kind": "flow",
    "authored": false,
-   "live": true
+   "live": true,
+   "tk": false,
+   "p1": false,
+   "exempt": null,
+   "exemptParents": null
   },
   {
    "id": "L6961~3",
@@ -1495,7 +2266,11 @@
    ],
    "kind": "flow",
    "authored": false,
-   "live": true
+   "live": true,
+   "tk": true,
+   "p1": false,
+   "exempt": "resolved",
+   "exemptParents": null
   },
   {
    "id": "L6961~4",
@@ -1503,11 +2278,16 @@
    "t": "No, they're still off",
    "src": "L6961~4",
    "deltas": [
-    "R12"
+    "R12",
+    "R14"
    ],
    "kind": "flow",
    "authored": false,
-   "live": true
+   "live": true,
+   "tk": false,
+   "p1": false,
+   "exempt": null,
+   "exemptParents": null
   },
   {
    "id": "L6961~6",
@@ -1515,11 +2295,16 @@
    "t": "No, they're still off > Raise the P1",
    "src": "L6961~6",
    "deltas": [
-    "R12"
+    "R12",
+    "R14"
    ],
    "kind": "flow",
    "authored": false,
-   "live": true
+   "live": true,
+   "tk": true,
+   "p1": true,
+   "exempt": null,
+   "exemptParents": null
   },
   {
    "id": "L6961~7",
@@ -1531,7 +2316,11 @@
    ],
    "kind": "flow",
    "authored": false,
-   "live": true
+   "live": true,
+   "tk": true,
+   "p1": false,
+   "exempt": "resolved",
+   "exemptParents": null
   },
   {
    "id": "FAN6851~1",
@@ -1541,17 +2330,27 @@
    "deltas": [],
    "kind": "flow",
    "authored": false,
-   "live": true
+   "live": true,
+   "tk": false,
+   "p1": false,
+   "exempt": null,
+   "exemptParents": null
   },
   {
    "id": "FAN6851~2",
    "g": "FAN",
    "t": "Continue",
    "src": "FAN6851~2",
-   "deltas": [],
+   "deltas": [
+    "R14"
+   ],
    "kind": "flow",
    "authored": false,
-   "live": true
+   "live": true,
+   "tk": true,
+   "p1": false,
+   "exempt": null,
+   "exemptParents": null
   },
   {
    "id": "FAN-switch~1",
@@ -1561,7 +2360,11 @@
    "deltas": [],
    "kind": "flow",
    "authored": false,
-   "live": true
+   "live": true,
+   "tk": false,
+   "p1": false,
+   "exempt": null,
+   "exemptParents": null
   },
   {
    "id": "FAN-switch~2",
@@ -1571,57 +2374,91 @@
    "deltas": [],
    "kind": "flow",
    "authored": false,
-   "live": true
+   "live": true,
+   "tk": false,
+   "p1": false,
+   "exempt": null,
+   "exemptParents": null
   },
   {
    "id": "FAN-switch~3",
    "g": "FAN",
    "t": "Continue",
    "src": "FAN-switch~3",
-   "deltas": [],
+   "deltas": [
+    "R14"
+   ],
    "kind": "flow",
    "authored": false,
-   "live": true
+   "live": true,
+   "tk": true,
+   "p1": false,
+   "exempt": null,
+   "exemptParents": null
   },
   {
    "id": "FR6851~1",
    "g": "FR",
    "t": "First screen",
    "src": "FR6851~1",
-   "deltas": [],
+   "deltas": [
+    "R14"
+   ],
    "kind": "flow",
    "authored": false,
-   "live": true
+   "live": true,
+   "tk": false,
+   "p1": false,
+   "exempt": null,
+   "exemptParents": null
   },
   {
    "id": "FR6851~2",
    "g": "FR",
-   "t": "Yes, stock is at risk",
+   "t": "Yes (immediate risk)",
    "src": "FR6851~2",
-   "deltas": [],
+   "deltas": [
+    "R14"
+   ],
    "kind": "flow",
    "authored": false,
-   "live": true
+   "live": true,
+   "tk": false,
+   "p1": false,
+   "exempt": null,
+   "exemptParents": null
   },
   {
    "id": "FR6851~3",
    "g": "FR",
-   "t": "No, it's just a query",
+   "t": "No (no immediate risk)",
    "src": "FR6851~3",
-   "deltas": [],
+   "deltas": [
+    "R14"
+   ],
    "kind": "flow",
    "authored": false,
-   "live": true
+   "live": true,
+   "tk": true,
+   "p1": false,
+   "exempt": null,
+   "exemptParents": null
   },
   {
    "id": "FR6851~4",
    "g": "FR",
-   "t": "Yes, stock is at risk > Raise the P1",
+   "t": "Yes (immediate risk) > Raise the P1",
    "src": "FR6851~4",
-   "deltas": [],
+   "deltas": [
+    "R14"
+   ],
    "kind": "flow",
    "authored": false,
-   "live": true
+   "live": true,
+   "tk": true,
+   "p1": true,
+   "exempt": null,
+   "exemptParents": null
   },
   {
    "id": "CN6832~1",
@@ -1631,17 +2468,27 @@
    "deltas": [],
    "kind": "flow",
    "authored": false,
-   "live": true
+   "live": true,
+   "tk": false,
+   "p1": false,
+   "exempt": null,
+   "exemptParents": null
   },
   {
    "id": "CN6832~2",
    "g": "CONN",
    "t": "No, it's still not working",
    "src": "CN6832~2",
-   "deltas": [],
+   "deltas": [
+    "R14"
+   ],
    "kind": "flow",
    "authored": false,
-   "live": true
+   "live": true,
+   "tk": true,
+   "p1": false,
+   "exempt": null,
+   "exemptParents": null
   },
   {
    "id": "CN5198~1",
@@ -1651,17 +2498,27 @@
    "deltas": [],
    "kind": "flow",
    "authored": false,
-   "live": true
+   "live": true,
+   "tk": false,
+   "p1": false,
+   "exempt": null,
+   "exemptParents": null
   },
   {
    "id": "CN5198~2",
    "g": "CONN",
    "t": "No, it's still not working",
    "src": "CN5198~2",
-   "deltas": [],
+   "deltas": [
+    "R14"
+   ],
    "kind": "flow",
    "authored": false,
-   "live": true
+   "live": true,
+   "tk": true,
+   "p1": false,
+   "exempt": null,
+   "exemptParents": null
   },
   {
    "id": "CN6771~1",
@@ -1671,7 +2528,11 @@
    "deltas": [],
    "kind": "flow",
    "authored": false,
-   "live": true
+   "live": true,
+   "tk": false,
+   "p1": false,
+   "exempt": null,
+   "exemptParents": null
   },
   {
    "id": "CN6771~2",
@@ -1681,17 +2542,27 @@
    "deltas": [],
    "kind": "flow",
    "authored": false,
-   "live": true
+   "live": true,
+   "tk": true,
+   "p1": false,
+   "exempt": "resolved",
+   "exemptParents": null
   },
   {
    "id": "CN6771~3",
    "g": "CONN",
    "t": "No, it's still not working",
    "src": "CN6771~3",
-   "deltas": [],
+   "deltas": [
+    "R14"
+   ],
    "kind": "flow",
    "authored": false,
-   "live": true
+   "live": true,
+   "tk": true,
+   "p1": false,
+   "exempt": null,
+   "exemptParents": null
   },
   {
    "id": "CN6772~1",
@@ -1701,17 +2572,27 @@
    "deltas": [],
    "kind": "flow",
    "authored": false,
-   "live": true
+   "live": true,
+   "tk": false,
+   "p1": false,
+   "exempt": null,
+   "exemptParents": null
   },
   {
    "id": "CN6772~2",
    "g": "CONN",
    "t": "No, it's still not working",
    "src": "CN6772~2",
-   "deltas": [],
+   "deltas": [
+    "R14"
+   ],
    "kind": "flow",
    "authored": false,
-   "live": true
+   "live": true,
+   "tk": true,
+   "p1": false,
+   "exempt": null,
+   "exemptParents": null
   },
   {
    "id": "CN6773~1",
@@ -1721,17 +2602,27 @@
    "deltas": [],
    "kind": "flow",
    "authored": false,
-   "live": true
+   "live": true,
+   "tk": false,
+   "p1": false,
+   "exempt": null,
+   "exemptParents": null
   },
   {
    "id": "CN6773~2",
    "g": "CONN",
    "t": "No, it's still not working",
    "src": "CN6773~2",
-   "deltas": [],
+   "deltas": [
+    "R14"
+   ],
    "kind": "flow",
    "authored": false,
-   "live": true
+   "live": true,
+   "tk": true,
+   "p1": false,
+   "exempt": null,
+   "exemptParents": null
   },
   {
    "id": "CT6832~1",
@@ -1741,7 +2632,11 @@
    "deltas": [],
    "kind": "flow",
    "authored": false,
-   "live": true
+   "live": true,
+   "tk": false,
+   "p1": false,
+   "exempt": null,
+   "exemptParents": null
   },
   {
    "id": "CT6832~2",
@@ -1751,7 +2646,11 @@
    "deltas": [],
    "kind": "flow",
    "authored": false,
-   "live": true
+   "live": true,
+   "tk": false,
+   "p1": false,
+   "exempt": null,
+   "exemptParents": null
   },
   {
    "id": "CT6832~3",
@@ -1761,17 +2660,27 @@
    "deltas": [],
    "kind": "flow",
    "authored": false,
-   "live": true
+   "live": true,
+   "tk": false,
+   "p1": false,
+   "exempt": null,
+   "exemptParents": null
   },
   {
    "id": "CT6832~4",
    "g": "CONT",
    "t": "Continue > No, something else",
    "src": "CT6832~4",
-   "deltas": [],
+   "deltas": [
+    "R14"
+   ],
    "kind": "flow",
    "authored": false,
-   "live": true
+   "live": true,
+   "tk": false,
+   "p1": false,
+   "exempt": null,
+   "exemptParents": null
   },
   {
    "id": "CT6832~5",
@@ -1781,7 +2690,11 @@
    "deltas": [],
    "kind": "flow",
    "authored": false,
-   "live": true
+   "live": true,
+   "tk": false,
+   "p1": false,
+   "exempt": null,
+   "exemptParents": null
   },
   {
    "id": "CT6832~6",
@@ -1791,17 +2704,27 @@
    "deltas": [],
    "kind": "flow",
    "authored": false,
-   "live": true
+   "live": true,
+   "tk": false,
+   "p1": false,
+   "exempt": null,
+   "exemptParents": null
   },
   {
    "id": "CT6832~7",
    "g": "CONT",
    "t": "Continue > No, something else > Raise the P1",
    "src": "CT6832~7",
-   "deltas": [],
+   "deltas": [
+    "R14"
+   ],
    "kind": "flow",
    "authored": false,
-   "live": true
+   "live": true,
+   "tk": true,
+   "p1": true,
+   "exempt": null,
+   "exemptParents": null
   },
   {
    "id": "CT6832~8",
@@ -1811,37 +2734,59 @@
    "deltas": [],
    "kind": "flow",
    "authored": false,
-   "live": true
+   "live": true,
+   "tk": true,
+   "p1": false,
+   "exempt": "resolved",
+   "exemptParents": null
   },
   {
    "id": "CT6832~9",
    "g": "CONT",
    "t": "Continue > Yes, the override > Tongou > No, it hasn't come on",
    "src": "CT6832~9",
-   "deltas": [],
+   "deltas": [
+    "R14"
+   ],
    "kind": "flow",
    "authored": false,
-   "live": true
+   "live": true,
+   "tk": false,
+   "p1": false,
+   "exempt": null,
+   "exemptParents": null
   },
   {
    "id": "CT6832~10",
    "g": "CONT",
    "t": "Continue > Yes, the override > Owon > No, it hasn't come on",
    "src": "CT6832~10",
-   "deltas": [],
+   "deltas": [
+    "R14"
+   ],
    "kind": "flow",
    "authored": false,
-   "live": true
+   "live": true,
+   "tk": false,
+   "p1": false,
+   "exempt": null,
+   "exemptParents": null
   },
   {
    "id": "CT6832~11",
    "g": "CONT",
    "t": "Continue > Yes, the override > Tongou > No, it hasn't come on > Raise the P1",
    "src": "CT6832~11",
-   "deltas": [],
+   "deltas": [
+    "R14"
+   ],
    "kind": "flow",
    "authored": false,
-   "live": true
+   "live": true,
+   "tk": true,
+   "p1": true,
+   "exempt": null,
+   "exemptParents": null
   },
   {
    "id": "CT-dd~1",
@@ -1851,7 +2796,11 @@
    "deltas": [],
    "kind": "flow",
    "authored": false,
-   "live": true
+   "live": true,
+   "tk": false,
+   "p1": false,
+   "exempt": null,
+   "exemptParents": null
   },
   {
    "id": "CT-dd~2",
@@ -1861,67 +2810,107 @@
    "deltas": [],
    "kind": "flow",
    "authored": false,
-   "live": true
+   "live": true,
+   "tk": false,
+   "p1": false,
+   "exempt": null,
+   "exemptParents": null
   },
   {
    "id": "CT-dd~3",
    "g": "CONT",
    "t": "Continue > Yes, the override",
    "src": "CT-dd~3",
-   "deltas": [],
+   "deltas": [
+    "R14"
+   ],
    "kind": "flow",
    "authored": false,
-   "live": true
+   "live": true,
+   "tk": false,
+   "p1": false,
+   "exempt": null,
+   "exemptParents": null
   },
   {
    "id": "CT-dd~4",
    "g": "CONT",
    "t": "Continue > No, something else",
    "src": "CT-dd~4",
-   "deltas": [],
+   "deltas": [
+    "R14"
+   ],
    "kind": "flow",
    "authored": false,
-   "live": true
+   "live": true,
+   "tk": false,
+   "p1": false,
+   "exempt": null,
+   "exemptParents": null
   },
   {
    "id": "CT-dd~5",
    "g": "CONT",
    "t": "Continue > Yes, the override > Continue to the P1",
    "src": "CT-dd~5",
-   "deltas": [],
+   "deltas": [
+    "R14"
+   ],
    "kind": "flow",
    "authored": false,
-   "live": true
+   "live": true,
+   "tk": false,
+   "p1": false,
+   "exempt": null,
+   "exemptParents": null
   },
   {
    "id": "CT-dd~6",
    "g": "CONT",
    "t": "Continue > No, something else > Raise the P1",
    "src": "CT-dd~6",
-   "deltas": [],
+   "deltas": [
+    "R14"
+   ],
    "kind": "flow",
    "authored": false,
-   "live": true
+   "live": true,
+   "tk": true,
+   "p1": true,
+   "exempt": null,
+   "exemptParents": null
   },
   {
    "id": "CT-dd~7",
    "g": "CONT",
    "t": "Continue > Yes, the override > Continue to the P1 > Raise the P1",
    "src": "CT-dd~7",
-   "deltas": [],
+   "deltas": [
+    "R14"
+   ],
    "kind": "flow",
    "authored": false,
-   "live": true
+   "live": true,
+   "tk": true,
+   "p1": true,
+   "exempt": null,
+   "exemptParents": null
   },
   {
    "id": "AC6218~1",
    "g": "AC",
    "t": "First screen",
    "src": "AC6218~1",
-   "deltas": [],
+   "deltas": [
+    "R14"
+   ],
    "kind": "flow",
    "authored": false,
-   "live": true
+   "live": true,
+   "tk": true,
+   "p1": false,
+   "exempt": null,
+   "exemptParents": null
   },
   {
    "id": "BP9001~1",
@@ -1933,7 +2922,11 @@
    ],
    "kind": "flow",
    "authored": false,
-   "live": true
+   "live": true,
+   "tk": false,
+   "p1": false,
+   "exempt": null,
+   "exemptParents": null
   },
   {
    "id": "BP9001~2",
@@ -1945,7 +2938,11 @@
    ],
    "kind": "flow",
    "authored": false,
-   "live": true
+   "live": true,
+   "tk": false,
+   "p1": false,
+   "exempt": null,
+   "exemptParents": null
   },
   {
    "id": "BP9001~3",
@@ -1957,7 +2954,11 @@
    ],
    "kind": "flow",
    "authored": false,
-   "live": true
+   "live": true,
+   "tk": false,
+   "p1": false,
+   "exempt": null,
+   "exemptParents": null
   },
   {
    "id": "BP9001~4",
@@ -1969,7 +2970,11 @@
    ],
    "kind": "flow",
    "authored": false,
-   "live": true
+   "live": true,
+   "tk": false,
+   "p1": false,
+   "exempt": null,
+   "exemptParents": null
   },
   {
    "id": "BP9001~5",
@@ -1977,11 +2982,16 @@
    "t": "Bar/Restaurant > Too cold / not working > Finish this issue",
    "src": "BP9001~5",
    "deltas": [
-    "R11"
+    "R11",
+    "R14"
    ],
    "kind": "flow",
    "authored": false,
-   "live": true
+   "live": true,
+   "tk": true,
+   "p1": false,
+   "exempt": null,
+   "exemptParents": null
   },
   {
    "id": "BP9001~6",
@@ -1989,11 +2999,16 @@
    "t": "Bar/Restaurant > Too hot / wants it off > Finish this issue",
    "src": "BP9001~6",
    "deltas": [
-    "R11"
+    "R11",
+    "R14"
    ],
    "kind": "flow",
    "authored": false,
-   "live": true
+   "live": true,
+   "tk": true,
+   "p1": false,
+   "exempt": null,
+   "exemptParents": null
   },
   {
    "id": "BP9001-read~1",
@@ -2005,7 +3020,11 @@
    ],
    "kind": "flow",
    "authored": false,
-   "live": true
+   "live": true,
+   "tk": false,
+   "p1": false,
+   "exempt": null,
+   "exemptParents": null
   },
   {
    "id": "BP9001-read~2",
@@ -2017,7 +3036,11 @@
    ],
    "kind": "flow",
    "authored": false,
-   "live": true
+   "live": true,
+   "tk": false,
+   "p1": false,
+   "exempt": null,
+   "exemptParents": null
   },
   {
    "id": "BP9001-read~3",
@@ -2029,7 +3052,11 @@
    ],
    "kind": "flow",
    "authored": false,
-   "live": true
+   "live": true,
+   "tk": false,
+   "p1": false,
+   "exempt": null,
+   "exemptParents": null
   },
   {
    "id": "BP9001-read~4",
@@ -2041,7 +3068,11 @@
    ],
    "kind": "flow",
    "authored": false,
-   "live": true
+   "live": true,
+   "tk": false,
+   "p1": false,
+   "exempt": null,
+   "exemptParents": null
   },
   {
    "id": "BP9001-read~5",
@@ -2053,7 +3084,11 @@
    ],
    "kind": "flow",
    "authored": false,
-   "live": true
+   "live": true,
+   "tk": false,
+   "p1": false,
+   "exempt": null,
+   "exemptParents": null
   },
   {
    "id": "BP9001-read~6",
@@ -2061,11 +3096,18 @@
    "t": "Bar/Restaurant > Too cold / not working > Finish this issue",
    "src": "BP9001-read~6",
    "deltas": [
-    "R11"
+    "R11",
+    "R14"
    ],
    "kind": "flow",
    "authored": false,
-   "live": true
+   "live": true,
+   "tk": true,
+   "p1": false,
+   "exempt": null,
+   "exemptParents": [
+    "BPdone-on"
+   ]
   },
   {
    "id": "BP9001-read~7",
@@ -2077,7 +3119,11 @@
    ],
    "kind": "flow",
    "authored": false,
-   "live": true
+   "live": true,
+   "tk": false,
+   "p1": false,
+   "exempt": null,
+   "exemptParents": null
   },
   {
    "id": "BP9001-read~8",
@@ -2085,11 +3131,18 @@
    "t": "Bar/Restaurant > Too hot / wants it off > Finish this issue",
    "src": "BP9001-read~8",
    "deltas": [
-    "R11"
+    "R11",
+    "R14"
    ],
    "kind": "flow",
    "authored": false,
-   "live": true
+   "live": true,
+   "tk": true,
+   "p1": false,
+   "exempt": null,
+   "exemptParents": [
+    "BPdone-off"
+   ]
   },
   {
    "id": "S7001~1",
@@ -2099,7 +3152,11 @@
    "deltas": [],
    "kind": "flow",
    "authored": false,
-   "live": true
+   "live": true,
+   "tk": false,
+   "p1": false,
+   "exempt": null,
+   "exemptParents": null
   },
   {
    "id": "S7001~2",
@@ -2109,17 +3166,27 @@
    "deltas": [],
    "kind": "flow",
    "authored": false,
-   "live": true
+   "live": true,
+   "tk": false,
+   "p1": false,
+   "exempt": null,
+   "exemptParents": null
   },
   {
    "id": "S7001~4",
    "g": "HEAT",
    "t": "Accommodation > Yes, please",
    "src": "S7001~4",
-   "deltas": [],
+   "deltas": [
+    "R14"
+   ],
    "kind": "flow",
    "authored": false,
-   "live": true
+   "live": true,
+   "tk": true,
+   "p1": false,
+   "exempt": null,
+   "exemptParents": null
   },
   {
    "id": "S7001~5",
@@ -2129,7 +3196,11 @@
    "deltas": [],
    "kind": "flow",
    "authored": false,
-   "live": true
+   "live": true,
+   "tk": true,
+   "p1": false,
+   "exempt": "declined",
+   "exemptParents": null
   },
   {
    "id": "S6832-cold~1",
@@ -2139,7 +3210,11 @@
    "deltas": [],
    "kind": "flow",
    "authored": false,
-   "live": true
+   "live": true,
+   "tk": false,
+   "p1": false,
+   "exempt": null,
+   "exemptParents": null
   },
   {
    "id": "S6832-cold~2",
@@ -2151,7 +3226,11 @@
    ],
    "kind": "flow",
    "authored": false,
-   "live": true
+   "live": true,
+   "tk": false,
+   "p1": false,
+   "exempt": null,
+   "exemptParents": null
   },
   {
    "id": "S6832-cold~3",
@@ -2163,7 +3242,11 @@
    ],
    "kind": "flow",
    "authored": false,
-   "live": true
+   "live": true,
+   "tk": false,
+   "p1": false,
+   "exempt": null,
+   "exemptParents": null
   },
   {
    "id": "S6832-near~3",
@@ -2175,7 +3258,11 @@
    ],
    "kind": "flow",
    "authored": false,
-   "live": true
+   "live": true,
+   "tk": false,
+   "p1": false,
+   "exempt": null,
+   "exemptParents": null
   },
   {
    "id": "HW:HW-nodhw",
@@ -2183,11 +3270,16 @@
    "t": "Hot water: not controlled (no setting shown)",
    "src": null,
    "deltas": [
-    "R3"
+    "R3",
+    "R14"
    ],
    "kind": "flow",
    "authored": true,
-   "live": false
+   "live": false,
+   "tk": true,
+   "p1": false,
+   "exempt": null,
+   "exemptParents": null
   },
   {
    "id": "HW:HW-auto",
@@ -2195,11 +3287,16 @@
    "t": "Setting: normal timetable",
    "src": null,
    "deltas": [
-    "R3"
+    "R3",
+    "R14"
    ],
    "kind": "flow",
    "authored": true,
-   "live": false
+   "live": false,
+   "tk": true,
+   "p1": false,
+   "exempt": null,
+   "exemptParents": null
   },
   {
    "id": "HW:HW-auto-ended",
@@ -2207,11 +3304,16 @@
    "t": "Setting: a change has just ended",
    "src": null,
    "deltas": [
-    "R3"
+    "R3",
+    "R14"
    ],
    "kind": "flow",
    "authored": true,
-   "live": false
+   "live": false,
+   "tk": true,
+   "p1": false,
+   "exempt": null,
+   "exemptParents": null
   },
   {
    "id": "HW:HW-on-until",
@@ -2219,11 +3321,16 @@
    "t": "Setting: switched on until a time",
    "src": null,
    "deltas": [
-    "R3"
+    "R3",
+    "R14"
    ],
    "kind": "flow",
    "authored": true,
-   "live": false
+   "live": false,
+   "tk": true,
+   "p1": false,
+   "exempt": null,
+   "exemptParents": null
   },
   {
    "id": "HW:HW-off-until",
@@ -2231,11 +3338,16 @@
    "t": "Setting: switched off until a time",
    "src": null,
    "deltas": [
-    "R3"
+    "R3",
+    "R14"
    ],
    "kind": "flow",
    "authored": true,
-   "live": false
+   "live": false,
+   "tk": true,
+   "p1": false,
+   "exempt": null,
+   "exemptParents": null
   },
   {
    "id": "HW:HW-on-v1",
@@ -2243,11 +3355,16 @@
    "t": "Setting: switched on (no end time)",
    "src": null,
    "deltas": [
-    "R3"
+    "R3",
+    "R14"
    ],
    "kind": "flow",
    "authored": true,
-   "live": false
+   "live": false,
+   "tk": true,
+   "p1": false,
+   "exempt": null,
+   "exemptParents": null
   },
   {
    "id": "HW:HW-off-v1",
@@ -2255,11 +3372,16 @@
    "t": "Setting: switched off (no end time)",
    "src": null,
    "deltas": [
-    "R3"
+    "R3",
+    "R14"
    ],
    "kind": "flow",
    "authored": true,
-   "live": false
+   "live": false,
+   "tk": true,
+   "p1": false,
+   "exempt": null,
+   "exemptParents": null
   },
   {
    "id": "HW:HW-cc-stale",
@@ -2267,11 +3389,16 @@
    "t": "Can't confirm: controls last reported hours ago",
    "src": null,
    "deltas": [
-    "R3"
+    "R3",
+    "R14"
    ],
    "kind": "flow",
    "authored": true,
-   "live": false
+   "live": false,
+   "tk": true,
+   "p1": false,
+   "exempt": null,
+   "exemptParents": null
   },
   {
    "id": "HW:HW-cc-notreconf",
@@ -2279,11 +3406,16 @@
    "t": "Can't confirm: not confirmed recently",
    "src": null,
    "deltas": [
-    "R3"
+    "R3",
+    "R14"
    ],
    "kind": "flow",
    "authored": true,
-   "live": false
+   "live": false,
+   "tk": true,
+   "p1": false,
+   "exempt": null,
+   "exemptParents": null
   },
   {
    "id": "HW:HW-cc-decode",
@@ -2291,11 +3423,16 @@
    "t": "Can't confirm: reading doesn't make sense",
    "src": null,
    "deltas": [
-    "R3"
+    "R3",
+    "R14"
    ],
    "kind": "flow",
    "authored": true,
-   "live": false
+   "live": false,
+   "tk": true,
+   "p1": false,
+   "exempt": null,
+   "exemptParents": null
   },
   {
    "id": "HW:HW-nlh",
@@ -2303,11 +3440,16 @@
    "t": "Site has no hot water on Lighthouse",
    "src": null,
    "deltas": [
-    "R3"
+    "R3",
+    "R14"
    ],
    "kind": "flow",
    "authored": true,
-   "live": false
+   "live": false,
+   "tk": true,
+   "p1": false,
+   "exempt": null,
+   "exemptParents": null
   },
   {
    "id": "L-none-0",
@@ -2319,7 +3461,11 @@
    ],
    "kind": "flow",
    "authored": true,
-   "live": false
+   "live": false,
+   "tk": false,
+   "p1": false,
+   "exempt": null,
+   "exemptParents": null
   },
   {
    "id": "L-none-1",
@@ -2327,11 +3473,16 @@
    "t": "Outside lighting: closed note",
    "src": null,
    "deltas": [
-    "R4"
+    "R4",
+    "R14"
    ],
    "kind": "flow",
    "authored": true,
-   "live": false
+   "live": false,
+   "tk": true,
+   "p1": false,
+   "exempt": null,
+   "exemptParents": null
   },
   {
    "id": "FAN-none-0",
@@ -2343,7 +3494,11 @@
    ],
    "kind": "flow",
    "authored": true,
-   "live": false
+   "live": false,
+   "tk": false,
+   "p1": false,
+   "exempt": null,
+   "exemptParents": null
   },
   {
    "id": "FAN-none-1",
@@ -2351,11 +3506,16 @@
    "t": "Extractor fans: closed note",
    "src": null,
    "deltas": [
-    "R4"
+    "R4",
+    "R14"
    ],
    "kind": "flow",
    "authored": true,
-   "live": false
+   "live": false,
+   "tk": true,
+   "p1": false,
+   "exempt": null,
+   "exemptParents": null
   },
   {
    "id": "H-none-0",
@@ -2367,7 +3527,11 @@
    ],
    "kind": "flow",
    "authored": true,
-   "live": false
+   "live": false,
+   "tk": false,
+   "p1": false,
+   "exempt": null,
+   "exemptParents": null
   },
   {
    "id": "H-none-1",
@@ -2375,11 +3539,16 @@
    "t": "Heating: closed note",
    "src": null,
    "deltas": [
-    "R4"
+    "R4",
+    "R14"
    ],
    "kind": "flow",
    "authored": true,
-   "live": false
+   "live": false,
+   "tk": true,
+   "p1": false,
+   "exempt": null,
+   "exemptParents": null
   },
   {
    "id": "AC-none-0",
@@ -2391,7 +3560,11 @@
    ],
    "kind": "flow",
    "authored": true,
-   "live": false
+   "live": false,
+   "tk": false,
+   "p1": false,
+   "exempt": null,
+   "exemptParents": null
   },
   {
    "id": "AC-none-1",
@@ -2399,11 +3572,16 @@
    "t": "Air conditioning: closed note",
    "src": null,
    "deltas": [
-    "R4"
+    "R4",
+    "R14"
    ],
    "kind": "flow",
    "authored": true,
-   "live": false
+   "live": false,
+   "tk": true,
+   "p1": false,
+   "exempt": null,
+   "exemptParents": null
   },
   {
    "id": "CN-devoff",
@@ -2415,7 +3593,11 @@
    ],
    "kind": "flow",
    "authored": true,
-   "live": false
+   "live": false,
+   "tk": false,
+   "p1": false,
+   "exempt": null,
+   "exemptParents": null
   },
   {
    "id": "O-0",
@@ -2427,19 +3609,28 @@
    ],
    "kind": "flow",
    "authored": true,
-   "live": false
+   "live": false,
+   "tk": false,
+   "p1": false,
+   "exempt": null,
+   "exemptParents": null
   },
   {
    "id": "O-choice",
    "g": "ELSE",
-   "t": "None of these: is it urgent? (P1 path as live)",
+   "t": "None of these: the risk question (D13)",
    "src": null,
    "deltas": [
-    "R2"
+    "R2",
+    "R14"
    ],
    "kind": "flow",
    "authored": true,
-   "live": false
+   "live": false,
+   "tk": false,
+   "p1": false,
+   "exempt": null,
+   "exemptParents": null
   },
   {
    "id": "O-normal",
@@ -2451,7 +3642,11 @@
    ],
    "kind": "flow",
    "authored": true,
-   "live": false
+   "live": false,
+   "tk": true,
+   "p1": false,
+   "exempt": null,
+   "exemptParents": null
   },
   {
    "id": "O-p1",
@@ -2459,11 +3654,16 @@
    "t": "Urgent: confirm the P1",
    "src": null,
    "deltas": [
-    "R2"
+    "R2",
+    "R14"
    ],
    "kind": "flow",
    "authored": true,
-   "live": false
+   "live": false,
+   "tk": false,
+   "p1": false,
+   "exempt": null,
+   "exemptParents": null
   },
   {
    "id": "O-p1-after",
@@ -2471,11 +3671,16 @@
    "t": "Urgent: P1 raised",
    "src": null,
    "deltas": [
-    "R2"
+    "R2",
+    "R14"
    ],
    "kind": "flow",
    "authored": true,
-   "live": false
+   "live": false,
+   "tk": true,
+   "p1": true,
+   "exempt": null,
+   "exemptParents": null
   },
   {
    "id": "O-none",
@@ -2484,11 +3689,16 @@
    "src": null,
    "deltas": [
     "R2",
-    "R4"
+    "R4",
+    "R14"
    ],
    "kind": "flow",
    "authored": true,
-   "live": false
+   "live": false,
+   "tk": true,
+   "p1": false,
+   "exempt": null,
+   "exemptParents": null
   },
   {
    "id": "K-what",
@@ -2496,11 +3706,16 @@
    "t": "First question: not working, or a different time? (new)",
    "src": null,
    "deltas": [
-    "R1"
+    "R1",
+    "R14"
    ],
    "kind": "flow",
    "authored": true,
-   "live": false
+   "live": false,
+   "tk": false,
+   "p1": false,
+   "exempt": null,
+   "exemptParents": null
   },
   {
    "id": "K-when-pick",
@@ -2508,11 +3723,16 @@
    "t": "Which equipment needs a different time? (new)",
    "src": null,
    "deltas": [
-    "R1"
+    "R1",
+    "R14"
    ],
    "kind": "flow",
    "authored": true,
-   "live": false
+   "live": false,
+   "tk": false,
+   "p1": false,
+   "exempt": null,
+   "exemptParents": null
   },
   {
    "id": "K-when",
@@ -2520,11 +3740,16 @@
    "t": "Its next times: do they work? (new)",
    "src": null,
    "deltas": [
-    "R1"
+    "R1",
+    "R14"
    ],
    "kind": "flow",
    "authored": true,
-   "live": false
+   "live": false,
+   "tk": false,
+   "p1": false,
+   "exempt": null,
+   "exemptParents": null
   },
   {
    "id": "K-fine",
@@ -2532,11 +3757,16 @@
    "t": "Outcome: its normal times are fine (closed note)",
    "src": null,
    "deltas": [
-    "R1"
+    "R1",
+    "R14"
    ],
    "kind": "flow",
    "authored": true,
-   "live": false
+   "live": false,
+   "tk": true,
+   "p1": false,
+   "exempt": "resolved",
+   "exemptParents": null
   },
   {
    "id": "K-later",
@@ -2544,11 +3774,16 @@
    "t": "On later tonight: how long? (new)",
    "src": null,
    "deltas": [
-    "R1"
+    "R1",
+    "R14"
    ],
    "kind": "flow",
    "authored": true,
-   "live": false
+   "live": false,
+   "tk": false,
+   "p1": false,
+   "exempt": null,
+   "exemptParents": null
   },
   {
    "id": "K-earlier",
@@ -2556,11 +3791,16 @@
    "t": "On earlier tomorrow: what time? (new)",
    "src": null,
    "deltas": [
-    "R1"
+    "R1",
+    "R14"
    ],
    "kind": "flow",
    "authored": true,
-   "live": false
+   "live": false,
+   "tk": false,
+   "p1": false,
+   "exempt": null,
+   "exemptParents": null
   },
   {
    "id": "K-attend-later",
@@ -2568,11 +3808,16 @@
    "t": "Safety check: will someone be there? (later)",
    "src": null,
    "deltas": [
-    "R1"
+    "R1",
+    "R14"
    ],
    "kind": "flow",
    "authored": true,
-   "live": false
+   "live": false,
+   "tk": false,
+   "p1": false,
+   "exempt": null,
+   "exemptParents": null
   },
   {
    "id": "K-confirm-later",
@@ -2584,7 +3829,11 @@
    ],
    "kind": "flow",
    "authored": true,
-   "live": false
+   "live": false,
+   "tk": false,
+   "p1": false,
+   "exempt": null,
+   "exemptParents": null
   },
   {
    "id": "K-booked-later",
@@ -2596,7 +3845,11 @@
    ],
    "kind": "flow",
    "authored": true,
-   "live": false
+   "live": false,
+   "tk": true,
+   "p1": false,
+   "exempt": "resolved",
+   "exemptParents": null
   },
   {
    "id": "K-attend-earlier",
@@ -2604,11 +3857,16 @@
    "t": "Safety check: will someone be there? (earlier)",
    "src": null,
    "deltas": [
-    "R1"
+    "R1",
+    "R14"
    ],
    "kind": "flow",
    "authored": true,
-   "live": false
+   "live": false,
+   "tk": false,
+   "p1": false,
+   "exempt": null,
+   "exemptParents": null
   },
   {
    "id": "K-confirm-earlier",
@@ -2620,7 +3878,11 @@
    ],
    "kind": "flow",
    "authored": true,
-   "live": false
+   "live": false,
+   "tk": false,
+   "p1": false,
+   "exempt": null,
+   "exemptParents": null
   },
   {
    "id": "K-booked-earlier",
@@ -2632,7 +3894,11 @@
    ],
    "kind": "flow",
    "authored": true,
-   "live": false
+   "live": false,
+   "tk": true,
+   "p1": false,
+   "exempt": "resolved",
+   "exemptParents": null
   },
   {
    "id": "K-attend-no",
@@ -2640,11 +3906,16 @@
    "t": "Outcome: nobody will be there, so no one-off (ticket for the team)",
    "src": null,
    "deltas": [
-    "R1"
+    "R1",
+    "R14"
    ],
    "kind": "flow",
    "authored": true,
-   "live": false
+   "live": false,
+   "tk": true,
+   "p1": false,
+   "exempt": null,
+   "exemptParents": null
   },
   {
    "id": "K-book-fail",
@@ -2656,7 +3927,11 @@
    ],
    "kind": "flow",
    "authored": true,
-   "live": false
+   "live": false,
+   "tk": false,
+   "p1": false,
+   "exempt": null,
+   "exemptParents": null
   },
   {
    "id": "K-cancelled",
@@ -2668,7 +3943,11 @@
    ],
    "kind": "flow",
    "authored": true,
-   "live": false
+   "live": false,
+   "tk": true,
+   "p1": false,
+   "exempt": "resolved",
+   "exemptParents": null
   },
   {
    "id": "K-when-unknown",
@@ -2676,11 +3955,16 @@
    "t": "Needed at a different time, but we can't read its times (fallback)",
    "src": null,
    "deltas": [
-    "R1"
+    "R1",
+    "R14"
    ],
    "kind": "flow",
    "authored": true,
-   "live": false
+   "live": false,
+   "tk": false,
+   "p1": false,
+   "exempt": null,
+   "exemptParents": null
   },
   {
    "id": "S-warm-buildheat",
@@ -2692,7 +3976,11 @@
    ],
    "kind": "flow",
    "authored": true,
-   "live": false
+   "live": false,
+   "tk": false,
+   "p1": false,
+   "exempt": null,
+   "exemptParents": null
   },
   {
    "id": "S-buildheat",
@@ -2700,11 +3988,16 @@
    "t": "Radiators warm: closed note",
    "src": null,
    "deltas": [
-    "R6"
+    "R6",
+    "R14"
    ],
    "kind": "flow",
    "authored": true,
-   "live": false
+   "live": false,
+   "tk": true,
+   "p1": false,
+   "exempt": null,
+   "exemptParents": null
   },
   {
    "id": "S-coldrads",
@@ -2712,11 +4005,16 @@
    "t": "Radiators cold: ticket for the team",
    "src": null,
    "deltas": [
-    "R6"
+    "R6",
+    "R14"
    ],
    "kind": "flow",
    "authored": true,
-   "live": false
+   "live": false,
+   "tk": true,
+   "p1": false,
+   "exempt": null,
+   "exemptParents": null
   },
   {
    "id": "S-broken-under",
@@ -2728,7 +4026,11 @@
    ],
    "kind": "flow",
    "authored": true,
-   "live": false
+   "live": false,
+   "tk": false,
+   "p1": false,
+   "exempt": null,
+   "exemptParents": null
   },
   {
    "id": "S-broken-keepingup",
@@ -2736,11 +4038,16 @@
    "t": "Not working, room near its target: closed note",
    "src": null,
    "deltas": [
-    "R6"
+    "R6",
+    "R14"
    ],
    "kind": "flow",
    "authored": true,
-   "live": false
+   "live": false,
+   "tk": true,
+   "p1": false,
+   "exempt": null,
+   "exemptParents": null
   },
   {
    "id": "S-off-frost",
@@ -2752,7 +4059,11 @@
    ],
    "kind": "flow",
    "authored": true,
-   "live": false
+   "live": false,
+   "tk": false,
+   "p1": false,
+   "exempt": null,
+   "exemptParents": null
   },
   {
    "id": "S-offnoact",
@@ -2764,7 +4075,11 @@
    ],
    "kind": "flow",
    "authored": true,
-   "live": false
+   "live": false,
+   "tk": true,
+   "p1": false,
+   "exempt": "declined",
+   "exemptParents": null
   },
   {
    "id": "CTL:compose-up",
@@ -2776,7 +4091,11 @@
    ],
    "kind": "flow",
    "authored": true,
-   "live": false
+   "live": false,
+   "tk": false,
+   "p1": false,
+   "exempt": null,
+   "exemptParents": null
   },
   {
    "id": "CTL:compose-up-hold",
@@ -2788,7 +4107,11 @@
    ],
    "kind": "flow",
    "authored": true,
-   "live": false
+   "live": false,
+   "tk": false,
+   "p1": false,
+   "exempt": null,
+   "exemptParents": null
   },
   {
    "id": "CTL:compose-down",
@@ -2800,7 +4123,11 @@
    ],
    "kind": "flow",
    "authored": true,
-   "live": false
+   "live": false,
+   "tk": false,
+   "p1": false,
+   "exempt": null,
+   "exemptParents": null
   },
   {
    "id": "CTL:compose-frost",
@@ -2812,7 +4139,11 @@
    ],
    "kind": "flow",
    "authored": true,
-   "live": false
+   "live": false,
+   "tk": false,
+   "p1": false,
+   "exempt": null,
+   "exemptParents": null
   },
   {
    "id": "CTL:compose-switch",
@@ -2824,7 +4155,11 @@
    ],
    "kind": "flow",
    "authored": true,
-   "live": false
+   "live": false,
+   "tk": false,
+   "p1": false,
+   "exempt": null,
+   "exemptParents": null
   },
   {
    "id": "CTL:inflight",
@@ -2836,7 +4171,11 @@
    ],
    "kind": "flow",
    "authored": true,
-   "live": false
+   "live": false,
+   "tk": false,
+   "p1": false,
+   "exempt": null,
+   "exemptParents": null
   },
   {
    "id": "CTL:slow",
@@ -2848,7 +4187,11 @@
    ],
    "kind": "flow",
    "authored": true,
-   "live": false
+   "live": false,
+   "tk": false,
+   "p1": false,
+   "exempt": null,
+   "exemptParents": null
   },
   {
    "id": "CTL:confirmed",
@@ -2860,7 +4203,11 @@
    ],
    "kind": "flow",
    "authored": true,
-   "live": false
+   "live": false,
+   "tk": false,
+   "p1": false,
+   "exempt": null,
+   "exemptParents": null
   },
   {
    "id": "CTL:confirmed-late",
@@ -2872,7 +4219,11 @@
    ],
    "kind": "flow",
    "authored": true,
-   "live": false
+   "live": false,
+   "tk": false,
+   "p1": false,
+   "exempt": null,
+   "exemptParents": null
   },
   {
    "id": "CTL:already",
@@ -2884,7 +4235,11 @@
    ],
    "kind": "flow",
    "authored": true,
-   "live": false
+   "live": false,
+   "tk": false,
+   "p1": false,
+   "exempt": null,
+   "exemptParents": null
   },
   {
    "id": "CTL:nondelivery",
@@ -2896,7 +4251,11 @@
    ],
    "kind": "flow",
    "authored": true,
-   "live": false
+   "live": false,
+   "tk": false,
+   "p1": false,
+   "exempt": null,
+   "exemptParents": null
   },
   {
    "id": "CTL:indeterminate",
@@ -2908,7 +4267,11 @@
    ],
    "kind": "flow",
    "authored": true,
-   "live": false
+   "live": false,
+   "tk": false,
+   "p1": false,
+   "exempt": null,
+   "exemptParents": null
   },
   {
    "id": "CTL:finish-up",
@@ -2920,7 +4283,11 @@
    ],
    "kind": "flow",
    "authored": true,
-   "live": false
+   "live": false,
+   "tk": true,
+   "p1": false,
+   "exempt": "resolved",
+   "exemptParents": null
   },
   {
    "id": "CTL:finish-frost",
@@ -2932,7 +4299,11 @@
    ],
    "kind": "flow",
    "authored": true,
-   "live": false
+   "live": false,
+   "tk": true,
+   "p1": false,
+   "exempt": "resolved",
+   "exemptParents": null
   },
   {
    "id": "CTL:finish-switch",
@@ -2944,7 +4315,11 @@
    ],
    "kind": "flow",
    "authored": true,
-   "live": false
+   "live": false,
+   "tk": true,
+   "p1": false,
+   "exempt": "resolved",
+   "exemptParents": null
   },
   {
    "id": "CTL:finish-fail",
@@ -2956,7 +4331,11 @@
    ],
    "kind": "flow",
    "authored": true,
-   "live": false
+   "live": false,
+   "tk": false,
+   "p1": false,
+   "exempt": null,
+   "exemptParents": null
   },
   {
    "id": "CTL:release-ok",
@@ -2968,7 +4347,11 @@
    ],
    "kind": "flow",
    "authored": true,
-   "live": false
+   "live": false,
+   "tk": true,
+   "p1": false,
+   "exempt": "resolved",
+   "exemptParents": null
   },
   {
    "id": "CTL:release-fail",
@@ -2980,7 +4363,11 @@
    ],
    "kind": "flow",
    "authored": true,
-   "live": false
+   "live": false,
+   "tk": false,
+   "p1": false,
+   "exempt": null,
+   "exemptParents": null
   },
   {
    "id": "CTL:escalate-indet",
@@ -2988,11 +4375,16 @@
    "t": "Result: not confirmed, logged",
    "src": null,
    "deltas": [
-    "R7"
+    "R7",
+    "R14"
    ],
    "kind": "flow",
    "authored": true,
-   "live": false
+   "live": false,
+   "tk": true,
+   "p1": false,
+   "exempt": null,
+   "exemptParents": null
   },
   {
    "id": "CTL:escalate-nondel",
@@ -3000,11 +4392,16 @@
    "t": "Result: not delivered, logged",
    "src": null,
    "deltas": [
-    "R7"
+    "R7",
+    "R14"
    ],
    "kind": "flow",
    "authored": true,
-   "live": false
+   "live": false,
+   "tk": true,
+   "p1": false,
+   "exempt": null,
+   "exemptParents": null
   },
   {
    "id": "BPdone-on",
@@ -3016,7 +4413,11 @@
    ],
    "kind": "flow",
    "authored": false,
-   "live": true
+   "live": true,
+   "tk": true,
+   "p1": false,
+   "exempt": "resolved",
+   "exemptParents": null
   },
   {
    "id": "BPdone-off",
@@ -3028,7 +4429,11 @@
    ],
    "kind": "flow",
    "authored": false,
-   "live": true
+   "live": true,
+   "tk": true,
+   "p1": false,
+   "exempt": "resolved",
+   "exemptParents": null
   },
   {
    "id": "HOME",
@@ -3038,7 +4443,11 @@
    "deltas": [],
    "kind": "page",
    "authored": false,
-   "live": false
+   "live": false,
+   "tk": false,
+   "p1": false,
+   "exempt": null,
+   "exemptParents": null
   },
   {
    "id": "SEARCH-none",
@@ -3048,7 +4457,11 @@
    "deltas": [],
    "kind": "page",
    "authored": false,
-   "live": false
+   "live": false,
+   "tk": false,
+   "p1": false,
+   "exempt": null,
+   "exemptParents": null
   },
   {
    "id": "SITE-confirm",
@@ -3058,7 +4471,11 @@
    "deltas": [],
    "kind": "page",
    "authored": false,
-   "live": false
+   "live": false,
+   "tk": false,
+   "p1": false,
+   "exempt": null,
+   "exemptParents": null
   },
   {
    "id": "SITE-ambiguous",
@@ -3068,7 +4485,11 @@
    "deltas": [],
    "kind": "page",
    "authored": false,
-   "live": false
+   "live": false,
+   "tk": false,
+   "p1": false,
+   "exempt": null,
+   "exemptParents": null
   },
   {
    "id": "WORKSPACE",
@@ -3078,7 +4499,11 @@
    "deltas": [],
    "kind": "page",
    "authored": false,
-   "live": false
+   "live": false,
+   "tk": false,
+   "p1": false,
+   "exempt": null,
+   "exemptParents": null
   },
   {
    "id": "WS-offline",
@@ -3091,7 +4516,11 @@
    ],
    "kind": "page",
    "authored": true,
-   "live": false
+   "live": false,
+   "tk": false,
+   "p1": false,
+   "exempt": null,
+   "exemptParents": null
   },
   {
    "id": "CD-ws",
@@ -3103,7 +4532,11 @@
    ],
    "kind": "page",
    "authored": true,
-   "live": false
+   "live": false,
+   "tk": false,
+   "p1": false,
+   "exempt": null,
+   "exemptParents": null
   },
   {
    "id": "CD-saved",
@@ -3115,7 +4548,11 @@
    ],
    "kind": "page",
    "authored": true,
-   "live": false
+   "live": false,
+   "tk": false,
+   "p1": false,
+   "exempt": null,
+   "exemptParents": null
   },
   {
    "id": "CD-declined",
@@ -3127,7 +4564,11 @@
    ],
    "kind": "page",
    "authored": true,
-   "live": false
+   "live": false,
+   "tk": false,
+   "p1": false,
+   "exempt": null,
+   "exemptParents": null
   },
   {
    "id": "K-banner",
@@ -3139,7 +4580,11 @@
    ],
    "kind": "page",
    "authored": true,
-   "live": false
+   "live": false,
+   "tk": false,
+   "p1": false,
+   "exempt": null,
+   "exemptParents": null
   },
   {
    "id": "CB-list",
@@ -3151,7 +4596,11 @@
    ],
    "kind": "page",
    "authored": true,
-   "live": false
+   "live": false,
+   "tk": false,
+   "p1": false,
+   "exempt": null,
+   "exemptParents": null
   },
   {
    "id": "CB-drawer",
@@ -3163,7 +4612,11 @@
    ],
    "kind": "page",
    "authored": true,
-   "live": false
+   "live": false,
+   "tk": false,
+   "p1": false,
+   "exempt": null,
+   "exemptParents": null
   },
   {
    "id": "CB-empty",
@@ -3173,7 +4626,11 @@
    "deltas": [],
    "kind": "page",
    "authored": false,
-   "live": false
+   "live": false,
+   "tk": false,
+   "p1": false,
+   "exempt": null,
+   "exemptParents": null
   },
   {
    "id": "TONIGHT",
@@ -3185,7 +4642,11 @@
    ],
    "kind": "page",
    "authored": true,
-   "live": false
+   "live": false,
+   "tk": false,
+   "p1": false,
+   "exempt": null,
+   "exemptParents": null
   },
   {
    "id": "TONIGHT-query",
@@ -3197,7 +4658,11 @@
    ],
    "kind": "page",
    "authored": true,
-   "live": false
+   "live": false,
+   "tk": false,
+   "p1": false,
+   "exempt": null,
+   "exemptParents": null
   },
   {
    "id": "TICKET-TEXT",
@@ -3209,7 +4674,11 @@
    ],
    "kind": "page",
    "authored": true,
-   "live": false
+   "live": false,
+   "tk": false,
+   "p1": false,
+   "exempt": null,
+   "exemptParents": null
   },
   {
    "id": "SH:p1fail",
@@ -3217,11 +4686,16 @@
    "t": "Kitchen P1: could not be raised (nobody paged, no ticket number)",
    "src": null,
    "deltas": [
-    "R7"
+    "R7",
+    "R14"
    ],
    "kind": "flow",
    "authored": true,
-   "live": false
+   "live": false,
+   "tk": false,
+   "p1": false,
+   "exempt": "copy",
+   "exemptParents": null
   },
   {
    "id": "SITE-ambiguous-logged",
@@ -3229,11 +4703,1456 @@
    "t": "House number matches two sites: logged",
    "src": null,
    "deltas": [
-    "R10"
+    "R10",
+    "R14"
    ],
    "kind": "page",
    "authored": true,
-   "live": false
+   "live": false,
+   "tk": false,
+   "p1": false,
+   "exempt": null,
+   "exemptParents": null
+  },
+  {
+   "id": "F:unm:Kitchen",
+   "g": "K8888",
+   "t": "Risk: Yes, confirm the P1 (unm, kitchen equipment)",
+   "src": null,
+   "deltas": [
+    "R14"
+   ],
+   "kind": "flow",
+   "authored": true,
+   "live": false,
+   "tk": false,
+   "p1": false,
+   "exempt": null,
+   "exemptParents": null
+  },
+  {
+   "id": "F:unm:Kitchen:after",
+   "g": "K8888",
+   "t": "Risk: P1 raised (unm, kitchen equipment)",
+   "src": null,
+   "deltas": [
+    "R14"
+   ],
+   "kind": "flow",
+   "authored": true,
+   "live": false,
+   "tk": true,
+   "p1": true,
+   "exempt": null,
+   "exemptParents": null
+  },
+  {
+   "id": "RQ:K8888~12",
+   "g": "K8888",
+   "t": "Risk question before: Glass washer > I'll call our service contractor",
+   "src": null,
+   "deltas": [
+    "R14"
+   ],
+   "kind": "flow",
+   "authored": true,
+   "live": false,
+   "tk": false,
+   "p1": false,
+   "exempt": null,
+   "exemptParents": null
+  },
+  {
+   "id": "RQ:K8888~18",
+   "g": "K8888",
+   "t": "Risk question before: Pot wash > I'll call our service contractor",
+   "src": null,
+   "deltas": [
+    "R14"
+   ],
+   "kind": "flow",
+   "authored": true,
+   "live": false,
+   "tk": false,
+   "p1": false,
+   "exempt": null,
+   "exemptParents": null
+  },
+  {
+   "id": "RQ:K8888~29",
+   "g": "K8888",
+   "t": "Risk question before: Something not on this list > Continue",
+   "src": null,
+   "deltas": [
+    "R14"
+   ],
+   "kind": "flow",
+   "authored": true,
+   "live": false,
+   "tk": false,
+   "p1": false,
+   "exempt": null,
+   "exemptParents": null
+  },
+  {
+   "id": "RQ:K6832~18",
+   "g": "K6832",
+   "t": "Risk question before: Something not on this list > Continue",
+   "src": null,
+   "deltas": [
+    "R14"
+   ],
+   "kind": "flow",
+   "authored": true,
+   "live": false,
+   "tk": false,
+   "p1": false,
+   "exempt": null,
+   "exemptParents": null
+  },
+  {
+   "id": "RQ:K8888-gw-B-unscheduled~2",
+   "g": "KGW",
+   "t": "Risk question before: Glass washer > I'll call our service contractor",
+   "src": null,
+   "deltas": [
+    "R14"
+   ],
+   "kind": "flow",
+   "authored": true,
+   "live": false,
+   "tk": false,
+   "p1": false,
+   "exempt": null,
+   "exemptParents": null
+  },
+  {
+   "id": "RQ:K8888-gw-B-outside~2",
+   "g": "KGW",
+   "t": "Risk question before: Glass washer > I'll call our service contractor",
+   "src": null,
+   "deltas": [
+    "R14"
+   ],
+   "kind": "flow",
+   "authored": true,
+   "live": false,
+   "tk": false,
+   "p1": false,
+   "exempt": null,
+   "exemptParents": null
+  },
+  {
+   "id": "RQ:K-none~2",
+   "g": "NLH",
+   "t": "Risk question before: Continue",
+   "src": null,
+   "deltas": [
+    "R14"
+   ],
+   "kind": "flow",
+   "authored": true,
+   "live": false,
+   "tk": false,
+   "p1": false,
+   "exempt": null,
+   "exemptParents": null
+  },
+  {
+   "id": "F:kitchen:Kitchen",
+   "g": "K8888",
+   "t": "Risk: Yes, confirm the P1 (kitchen, kitchen equipment)",
+   "src": null,
+   "deltas": [
+    "R14"
+   ],
+   "kind": "flow",
+   "authored": true,
+   "live": false,
+   "tk": false,
+   "p1": false,
+   "exempt": null,
+   "exemptParents": null
+  },
+  {
+   "id": "F:kitchen:Kitchen:after",
+   "g": "K8888",
+   "t": "Risk: P1 raised (kitchen, kitchen equipment)",
+   "src": null,
+   "deltas": [
+    "R14"
+   ],
+   "kind": "flow",
+   "authored": true,
+   "live": false,
+   "tk": true,
+   "p1": true,
+   "exempt": null,
+   "exemptParents": null
+  },
+  {
+   "id": "RQ:K8888~46",
+   "g": "K8888",
+   "t": "Risk question before: Bain-marie > It's fine, but we need it at different times > ",
+   "src": null,
+   "deltas": [
+    "R14"
+   ],
+   "kind": "flow",
+   "authored": true,
+   "live": false,
+   "tk": false,
+   "p1": false,
+   "exempt": null,
+   "exemptParents": null
+  },
+  {
+   "id": "RQ:K8888~51",
+   "g": "K8888",
+   "t": "Risk question before: Several / all of it > It's fine, but we need it at different",
+   "src": null,
+   "deltas": [
+    "R14"
+   ],
+   "kind": "flow",
+   "authored": true,
+   "live": false,
+   "tk": false,
+   "p1": false,
+   "exempt": null,
+   "exemptParents": null
+  },
+  {
+   "id": "RQ:K6832~23",
+   "g": "K6832",
+   "t": "Risk question before: Kitchen — pot wash > It's fine, but we need it at different ",
+   "src": null,
+   "deltas": [
+    "R14"
+   ],
+   "kind": "flow",
+   "authored": true,
+   "live": false,
+   "tk": false,
+   "p1": false,
+   "exempt": null,
+   "exemptParents": null
+  },
+  {
+   "id": "RQ:K6832~28",
+   "g": "K6832",
+   "t": "Risk question before: Kitchen — fryers > It's fine, but we need it at different ti",
+   "src": null,
+   "deltas": [
+    "R14"
+   ],
+   "kind": "flow",
+   "authored": true,
+   "live": false,
+   "tk": false,
+   "p1": false,
+   "exempt": null,
+   "exemptParents": null
+  },
+  {
+   "id": "RQ:K6832~33",
+   "g": "K6832",
+   "t": "Risk question before: Several / all of it > It's fine, but we need it at different",
+   "src": null,
+   "deltas": [
+    "R14"
+   ],
+   "kind": "flow",
+   "authored": true,
+   "live": false,
+   "tk": false,
+   "p1": false,
+   "exempt": null,
+   "exemptParents": null
+  },
+  {
+   "id": "RQ:K-attend-no",
+   "g": "KD8",
+   "t": "Risk question before: Outcome: nobody will be there, so no one-off (ticket for the",
+   "src": null,
+   "deltas": [
+    "R14"
+   ],
+   "kind": "flow",
+   "authored": true,
+   "live": false,
+   "tk": false,
+   "p1": false,
+   "exempt": null,
+   "exemptParents": null
+  },
+  {
+   "id": "NT:L6749~3",
+   "g": "LIGHT",
+   "t": "Risk: No, normal ticket (lighting still off)",
+   "src": null,
+   "deltas": [
+    "R14"
+   ],
+   "kind": "flow",
+   "authored": true,
+   "live": false,
+   "tk": true,
+   "p1": false,
+   "exempt": null,
+   "exemptParents": null
+  },
+  {
+   "id": "RQ:L6749~3",
+   "g": "LIGHT",
+   "t": "Risk question before: No, they're still off",
+   "src": null,
+   "deltas": [
+    "R14"
+   ],
+   "kind": "flow",
+   "authored": true,
+   "live": false,
+   "tk": false,
+   "p1": false,
+   "exempt": null,
+   "exemptParents": null
+  },
+  {
+   "id": "NT:L6360~3",
+   "g": "LIGHT",
+   "t": "Risk: No, normal ticket (lighting still off)",
+   "src": null,
+   "deltas": [
+    "R14"
+   ],
+   "kind": "flow",
+   "authored": true,
+   "live": false,
+   "tk": true,
+   "p1": false,
+   "exempt": null,
+   "exemptParents": null
+  },
+  {
+   "id": "RQ:L6360~3",
+   "g": "LIGHT",
+   "t": "Risk question before: No, they're still off",
+   "src": null,
+   "deltas": [
+    "R14"
+   ],
+   "kind": "flow",
+   "authored": true,
+   "live": false,
+   "tk": false,
+   "p1": false,
+   "exempt": null,
+   "exemptParents": null
+  },
+  {
+   "id": "NT:L6961~4",
+   "g": "LIGHT",
+   "t": "Risk: No, normal ticket (lighting still off)",
+   "src": null,
+   "deltas": [
+    "R14"
+   ],
+   "kind": "flow",
+   "authored": true,
+   "live": false,
+   "tk": true,
+   "p1": false,
+   "exempt": null,
+   "exemptParents": null
+  },
+  {
+   "id": "RQ:L6961~4",
+   "g": "LIGHT",
+   "t": "Risk question before: No, they're still off",
+   "src": null,
+   "deltas": [
+    "R14"
+   ],
+   "kind": "flow",
+   "authored": true,
+   "live": false,
+   "tk": false,
+   "p1": false,
+   "exempt": null,
+   "exemptParents": null
+  },
+  {
+   "id": "F:fan:Fans",
+   "g": "FAN",
+   "t": "Risk: Yes, confirm the P1 (fan, extractor fans)",
+   "src": null,
+   "deltas": [
+    "R14"
+   ],
+   "kind": "flow",
+   "authored": true,
+   "live": false,
+   "tk": false,
+   "p1": false,
+   "exempt": null,
+   "exemptParents": null
+  },
+  {
+   "id": "F:fan:Fans:after",
+   "g": "FAN",
+   "t": "Risk: P1 raised (fan, extractor fans)",
+   "src": null,
+   "deltas": [
+    "R14"
+   ],
+   "kind": "flow",
+   "authored": true,
+   "live": false,
+   "tk": true,
+   "p1": true,
+   "exempt": null,
+   "exemptParents": null
+  },
+  {
+   "id": "RQ:FAN6851~2",
+   "g": "FAN",
+   "t": "Risk question before: Continue",
+   "src": null,
+   "deltas": [
+    "R14"
+   ],
+   "kind": "flow",
+   "authored": true,
+   "live": false,
+   "tk": false,
+   "p1": false,
+   "exempt": null,
+   "exemptParents": null
+  },
+  {
+   "id": "RQ:FAN-switch~3",
+   "g": "FAN",
+   "t": "Risk question before: Continue",
+   "src": null,
+   "deltas": [
+    "R14"
+   ],
+   "kind": "flow",
+   "authored": true,
+   "live": false,
+   "tk": false,
+   "p1": false,
+   "exempt": null,
+   "exemptParents": null
+  },
+  {
+   "id": "F:ac:Air",
+   "g": "AC",
+   "t": "Risk: Yes, confirm the P1 (ac, air conditioning)",
+   "src": null,
+   "deltas": [
+    "R14"
+   ],
+   "kind": "flow",
+   "authored": true,
+   "live": false,
+   "tk": false,
+   "p1": false,
+   "exempt": null,
+   "exemptParents": null
+  },
+  {
+   "id": "F:ac:Air:after",
+   "g": "AC",
+   "t": "Risk: P1 raised (ac, air conditioning)",
+   "src": null,
+   "deltas": [
+    "R14"
+   ],
+   "kind": "flow",
+   "authored": true,
+   "live": false,
+   "tk": true,
+   "p1": true,
+   "exempt": null,
+   "exemptParents": null
+  },
+  {
+   "id": "RQ:AC6218~1",
+   "g": "AC",
+   "t": "Risk question before: First screen",
+   "src": null,
+   "deltas": [
+    "R14"
+   ],
+   "kind": "flow",
+   "authored": true,
+   "live": false,
+   "tk": false,
+   "p1": false,
+   "exempt": null,
+   "exemptParents": null
+  },
+  {
+   "id": "F:hw:Hot",
+   "g": "HW",
+   "t": "Risk: Yes, confirm the P1 (hw, hot water)",
+   "src": null,
+   "deltas": [
+    "R14"
+   ],
+   "kind": "flow",
+   "authored": true,
+   "live": false,
+   "tk": false,
+   "p1": false,
+   "exempt": null,
+   "exemptParents": null
+  },
+  {
+   "id": "F:hw:Hot:after",
+   "g": "HW",
+   "t": "Risk: P1 raised (hw, hot water)",
+   "src": null,
+   "deltas": [
+    "R14"
+   ],
+   "kind": "flow",
+   "authored": true,
+   "live": false,
+   "tk": true,
+   "p1": true,
+   "exempt": null,
+   "exemptParents": null
+  },
+  {
+   "id": "RQ:HW:HW-nodhw",
+   "g": "HW",
+   "t": "Risk question before: Hot water: not controlled (no setting shown)",
+   "src": null,
+   "deltas": [
+    "R14"
+   ],
+   "kind": "flow",
+   "authored": true,
+   "live": false,
+   "tk": false,
+   "p1": false,
+   "exempt": null,
+   "exemptParents": null
+  },
+  {
+   "id": "RQ:HW:HW-auto",
+   "g": "HW",
+   "t": "Risk question before: Setting: normal timetable",
+   "src": null,
+   "deltas": [
+    "R14"
+   ],
+   "kind": "flow",
+   "authored": true,
+   "live": false,
+   "tk": false,
+   "p1": false,
+   "exempt": null,
+   "exemptParents": null
+  },
+  {
+   "id": "RQ:HW:HW-auto-ended",
+   "g": "HW",
+   "t": "Risk question before: Setting: a change has just ended",
+   "src": null,
+   "deltas": [
+    "R14"
+   ],
+   "kind": "flow",
+   "authored": true,
+   "live": false,
+   "tk": false,
+   "p1": false,
+   "exempt": null,
+   "exemptParents": null
+  },
+  {
+   "id": "RQ:HW:HW-on-until",
+   "g": "HW",
+   "t": "Risk question before: Setting: switched on until a time",
+   "src": null,
+   "deltas": [
+    "R14"
+   ],
+   "kind": "flow",
+   "authored": true,
+   "live": false,
+   "tk": false,
+   "p1": false,
+   "exempt": null,
+   "exemptParents": null
+  },
+  {
+   "id": "RQ:HW:HW-off-until",
+   "g": "HW",
+   "t": "Risk question before: Setting: switched off until a time",
+   "src": null,
+   "deltas": [
+    "R14"
+   ],
+   "kind": "flow",
+   "authored": true,
+   "live": false,
+   "tk": false,
+   "p1": false,
+   "exempt": null,
+   "exemptParents": null
+  },
+  {
+   "id": "RQ:HW:HW-on-v1",
+   "g": "HW",
+   "t": "Risk question before: Setting: switched on (no end time)",
+   "src": null,
+   "deltas": [
+    "R14"
+   ],
+   "kind": "flow",
+   "authored": true,
+   "live": false,
+   "tk": false,
+   "p1": false,
+   "exempt": null,
+   "exemptParents": null
+  },
+  {
+   "id": "RQ:HW:HW-off-v1",
+   "g": "HW",
+   "t": "Risk question before: Setting: switched off (no end time)",
+   "src": null,
+   "deltas": [
+    "R14"
+   ],
+   "kind": "flow",
+   "authored": true,
+   "live": false,
+   "tk": false,
+   "p1": false,
+   "exempt": null,
+   "exemptParents": null
+  },
+  {
+   "id": "RQ:HW:HW-cc-stale",
+   "g": "HW",
+   "t": "Risk question before: Can't confirm: controls last reported hours ago",
+   "src": null,
+   "deltas": [
+    "R14"
+   ],
+   "kind": "flow",
+   "authored": true,
+   "live": false,
+   "tk": false,
+   "p1": false,
+   "exempt": null,
+   "exemptParents": null
+  },
+  {
+   "id": "RQ:HW:HW-cc-notreconf",
+   "g": "HW",
+   "t": "Risk question before: Can't confirm: not confirmed recently",
+   "src": null,
+   "deltas": [
+    "R14"
+   ],
+   "kind": "flow",
+   "authored": true,
+   "live": false,
+   "tk": false,
+   "p1": false,
+   "exempt": null,
+   "exemptParents": null
+  },
+  {
+   "id": "RQ:HW:HW-cc-decode",
+   "g": "HW",
+   "t": "Risk question before: Can't confirm: reading doesn't make sense",
+   "src": null,
+   "deltas": [
+    "R14"
+   ],
+   "kind": "flow",
+   "authored": true,
+   "live": false,
+   "tk": false,
+   "p1": false,
+   "exempt": null,
+   "exemptParents": null
+  },
+  {
+   "id": "RQ:HW:HW-nlh",
+   "g": "HW",
+   "t": "Risk question before: Site has no hot water on Lighthouse",
+   "src": null,
+   "deltas": [
+    "R14"
+   ],
+   "kind": "flow",
+   "authored": true,
+   "live": false,
+   "tk": false,
+   "p1": false,
+   "exempt": null,
+   "exemptParents": null
+  },
+  {
+   "id": "F:conn:Conn",
+   "g": "CONN",
+   "t": "Risk: Yes, confirm the P1 (conn, connection)",
+   "src": null,
+   "deltas": [
+    "R14"
+   ],
+   "kind": "flow",
+   "authored": true,
+   "live": false,
+   "tk": false,
+   "p1": false,
+   "exempt": null,
+   "exemptParents": null
+  },
+  {
+   "id": "F:conn:Conn:after",
+   "g": "CONN",
+   "t": "Risk: P1 raised (conn, connection)",
+   "src": null,
+   "deltas": [
+    "R14"
+   ],
+   "kind": "flow",
+   "authored": true,
+   "live": false,
+   "tk": true,
+   "p1": true,
+   "exempt": null,
+   "exemptParents": null
+  },
+  {
+   "id": "RQ:CN6832~2",
+   "g": "CONN",
+   "t": "Risk question before: No, it's still not working",
+   "src": null,
+   "deltas": [
+    "R14"
+   ],
+   "kind": "flow",
+   "authored": true,
+   "live": false,
+   "tk": false,
+   "p1": false,
+   "exempt": null,
+   "exemptParents": null
+  },
+  {
+   "id": "RQ:CN5198~2",
+   "g": "CONN",
+   "t": "Risk question before: No, it's still not working",
+   "src": null,
+   "deltas": [
+    "R14"
+   ],
+   "kind": "flow",
+   "authored": true,
+   "live": false,
+   "tk": false,
+   "p1": false,
+   "exempt": null,
+   "exemptParents": null
+  },
+  {
+   "id": "RQ:CN6771~3",
+   "g": "CONN",
+   "t": "Risk question before: No, it's still not working",
+   "src": null,
+   "deltas": [
+    "R14"
+   ],
+   "kind": "flow",
+   "authored": true,
+   "live": false,
+   "tk": false,
+   "p1": false,
+   "exempt": null,
+   "exemptParents": null
+  },
+  {
+   "id": "RQ:CN6772~2",
+   "g": "CONN",
+   "t": "Risk question before: No, it's still not working",
+   "src": null,
+   "deltas": [
+    "R14"
+   ],
+   "kind": "flow",
+   "authored": true,
+   "live": false,
+   "tk": false,
+   "p1": false,
+   "exempt": null,
+   "exemptParents": null
+  },
+  {
+   "id": "RQ:CN6773~2",
+   "g": "CONN",
+   "t": "Risk question before: No, it's still not working",
+   "src": null,
+   "deltas": [
+    "R14"
+   ],
+   "kind": "flow",
+   "authored": true,
+   "live": false,
+   "tk": false,
+   "p1": false,
+   "exempt": null,
+   "exemptParents": null
+  },
+  {
+   "id": "F:heat:Heat",
+   "g": "BP",
+   "t": "Risk: Yes, confirm the P1 (heat, heating)",
+   "src": null,
+   "deltas": [
+    "R14"
+   ],
+   "kind": "flow",
+   "authored": true,
+   "live": false,
+   "tk": false,
+   "p1": false,
+   "exempt": null,
+   "exemptParents": null
+  },
+  {
+   "id": "F:heat:Heat:after",
+   "g": "BP",
+   "t": "Risk: P1 raised (heat, heating)",
+   "src": null,
+   "deltas": [
+    "R14"
+   ],
+   "kind": "flow",
+   "authored": true,
+   "live": false,
+   "tk": true,
+   "p1": true,
+   "exempt": null,
+   "exemptParents": null
+  },
+  {
+   "id": "RQ:BP9001~5",
+   "g": "BP",
+   "t": "Risk question before: Bar/Restaurant > Too cold / not working > Finish this issue",
+   "src": null,
+   "deltas": [
+    "R14"
+   ],
+   "kind": "flow",
+   "authored": true,
+   "live": false,
+   "tk": false,
+   "p1": false,
+   "exempt": null,
+   "exemptParents": null
+  },
+  {
+   "id": "RQ:BP9001~6",
+   "g": "BP",
+   "t": "Risk question before: Bar/Restaurant > Too hot / wants it off > Finish this issue",
+   "src": null,
+   "deltas": [
+    "R14"
+   ],
+   "kind": "flow",
+   "authored": true,
+   "live": false,
+   "tk": false,
+   "p1": false,
+   "exempt": null,
+   "exemptParents": null
+  },
+  {
+   "id": "RQ:BP9001-read~6",
+   "g": "BP",
+   "t": "Risk question before: Bar/Restaurant > Too cold / not working > Finish this issue",
+   "src": null,
+   "deltas": [
+    "R14"
+   ],
+   "kind": "flow",
+   "authored": true,
+   "live": false,
+   "tk": false,
+   "p1": false,
+   "exempt": null,
+   "exemptParents": null
+  },
+  {
+   "id": "RQ:BP9001-read~8",
+   "g": "BP",
+   "t": "Risk question before: Bar/Restaurant > Too hot / wants it off > Finish this issue",
+   "src": null,
+   "deltas": [
+    "R14"
+   ],
+   "kind": "flow",
+   "authored": true,
+   "live": false,
+   "tk": false,
+   "p1": false,
+   "exempt": null,
+   "exemptParents": null
+  },
+  {
+   "id": "RQ:S7001~4",
+   "g": "HEAT",
+   "t": "Risk question before: Accommodation > Yes, please",
+   "src": null,
+   "deltas": [
+    "R14"
+   ],
+   "kind": "flow",
+   "authored": true,
+   "live": false,
+   "tk": false,
+   "p1": false,
+   "exempt": null,
+   "exemptParents": null
+  },
+  {
+   "id": "RQ:S-coldrads",
+   "g": "HEAT",
+   "t": "Risk question before: Radiators cold: ticket for the team",
+   "src": null,
+   "deltas": [
+    "R14"
+   ],
+   "kind": "flow",
+   "authored": true,
+   "live": false,
+   "tk": false,
+   "p1": false,
+   "exempt": null,
+   "exemptParents": null
+  },
+  {
+   "id": "F:unm:Heat",
+   "g": "HEAT",
+   "t": "Risk: Yes, confirm the P1 (unm, heating)",
+   "src": null,
+   "deltas": [
+    "R14"
+   ],
+   "kind": "flow",
+   "authored": true,
+   "live": false,
+   "tk": false,
+   "p1": false,
+   "exempt": null,
+   "exemptParents": null
+  },
+  {
+   "id": "F:unm:Heat:after",
+   "g": "HEAT",
+   "t": "Risk: P1 raised (unm, heating)",
+   "src": null,
+   "deltas": [
+    "R14"
+   ],
+   "kind": "flow",
+   "authored": true,
+   "live": false,
+   "tk": true,
+   "p1": true,
+   "exempt": null,
+   "exemptParents": null
+  },
+  {
+   "id": "RQ:S-buildheat",
+   "g": "HEAT",
+   "t": "Risk question before: Radiators warm: closed note",
+   "src": null,
+   "deltas": [
+    "R14"
+   ],
+   "kind": "flow",
+   "authored": true,
+   "live": false,
+   "tk": false,
+   "p1": false,
+   "exempt": null,
+   "exemptParents": null
+  },
+  {
+   "id": "RQ:S-broken-keepingup",
+   "g": "HEAT",
+   "t": "Risk question before: Not working, room near its target: closed note",
+   "src": null,
+   "deltas": [
+    "R14"
+   ],
+   "kind": "flow",
+   "authored": true,
+   "live": false,
+   "tk": false,
+   "p1": false,
+   "exempt": null,
+   "exemptParents": null
+  },
+  {
+   "id": "RQ:CTL:escalate-indet",
+   "g": "CTL",
+   "t": "Risk question before: Result: not confirmed, logged",
+   "src": null,
+   "deltas": [
+    "R14"
+   ],
+   "kind": "flow",
+   "authored": true,
+   "live": false,
+   "tk": false,
+   "p1": false,
+   "exempt": null,
+   "exemptParents": null
+  },
+  {
+   "id": "RQ:CTL:escalate-nondel",
+   "g": "CTL",
+   "t": "Risk question before: Result: not delivered, logged",
+   "src": null,
+   "deltas": [
+    "R14"
+   ],
+   "kind": "flow",
+   "authored": true,
+   "live": false,
+   "tk": false,
+   "p1": false,
+   "exempt": null,
+   "exemptParents": null
+  },
+  {
+   "id": "NT:CT6832~4",
+   "g": "CONT",
+   "t": "Risk: No, normal ticket (contractor, something else)",
+   "src": null,
+   "deltas": [
+    "R14"
+   ],
+   "kind": "flow",
+   "authored": true,
+   "live": false,
+   "tk": true,
+   "p1": false,
+   "exempt": null,
+   "exemptParents": null
+  },
+  {
+   "id": "RQ:CT6832~4",
+   "g": "CONT",
+   "t": "Risk question before: Continue > No, something else",
+   "src": null,
+   "deltas": [
+    "R14"
+   ],
+   "kind": "flow",
+   "authored": true,
+   "live": false,
+   "tk": false,
+   "p1": false,
+   "exempt": null,
+   "exemptParents": null
+  },
+  {
+   "id": "NT:CT6832~9",
+   "g": "CONT",
+   "t": "Risk: No, normal ticket (contractor, override failed)",
+   "src": null,
+   "deltas": [
+    "R14"
+   ],
+   "kind": "flow",
+   "authored": true,
+   "live": false,
+   "tk": true,
+   "p1": false,
+   "exempt": null,
+   "exemptParents": null
+  },
+  {
+   "id": "RQ:CT6832~9",
+   "g": "CONT",
+   "t": "Risk question before: Continue > Yes, the override > Tongou > No, it hasn't come o",
+   "src": null,
+   "deltas": [
+    "R14"
+   ],
+   "kind": "flow",
+   "authored": true,
+   "live": false,
+   "tk": false,
+   "p1": false,
+   "exempt": null,
+   "exemptParents": null
+  },
+  {
+   "id": "NT:CT6832~10",
+   "g": "CONT",
+   "t": "Risk: No, normal ticket (contractor, override failed)",
+   "src": null,
+   "deltas": [
+    "R14"
+   ],
+   "kind": "flow",
+   "authored": true,
+   "live": false,
+   "tk": true,
+   "p1": false,
+   "exempt": null,
+   "exemptParents": null
+  },
+  {
+   "id": "RQ:CT6832~10",
+   "g": "CONT",
+   "t": "Risk question before: Continue > Yes, the override > Owon > No, it hasn't come on",
+   "src": null,
+   "deltas": [
+    "R14"
+   ],
+   "kind": "flow",
+   "authored": true,
+   "live": false,
+   "tk": false,
+   "p1": false,
+   "exempt": null,
+   "exemptParents": null
+  },
+  {
+   "id": "NT:CT-dd~4",
+   "g": "CONT",
+   "t": "Risk: No, normal ticket (contractor, something else)",
+   "src": null,
+   "deltas": [
+    "R14"
+   ],
+   "kind": "flow",
+   "authored": true,
+   "live": false,
+   "tk": true,
+   "p1": false,
+   "exempt": null,
+   "exemptParents": null
+  },
+  {
+   "id": "RQ:CT-dd~4",
+   "g": "CONT",
+   "t": "Risk question before: Continue > No, something else",
+   "src": null,
+   "deltas": [
+    "R14"
+   ],
+   "kind": "flow",
+   "authored": true,
+   "live": false,
+   "tk": false,
+   "p1": false,
+   "exempt": null,
+   "exemptParents": null
+  },
+  {
+   "id": "NT:CT-dd~5",
+   "g": "CONT",
+   "t": "Risk: No, normal ticket (contractor, Donkey Derby)",
+   "src": null,
+   "deltas": [
+    "R14"
+   ],
+   "kind": "flow",
+   "authored": true,
+   "live": false,
+   "tk": true,
+   "p1": false,
+   "exempt": null,
+   "exemptParents": null
+  },
+  {
+   "id": "RQ:CT-dd~5",
+   "g": "CONT",
+   "t": "Risk question before: Continue > Yes, the override > Continue to the P1",
+   "src": null,
+   "deltas": [
+    "R14"
+   ],
+   "kind": "flow",
+   "authored": true,
+   "live": false,
+   "tk": false,
+   "p1": false,
+   "exempt": null,
+   "exemptParents": null
+  },
+  {
+   "id": "F:unm:Lighting",
+   "g": "NLH",
+   "t": "Risk: Yes, confirm the P1 (unm, outside lighting)",
+   "src": null,
+   "deltas": [
+    "R14"
+   ],
+   "kind": "flow",
+   "authored": true,
+   "live": false,
+   "tk": false,
+   "p1": false,
+   "exempt": null,
+   "exemptParents": null
+  },
+  {
+   "id": "F:unm:Lighting:after",
+   "g": "NLH",
+   "t": "Risk: P1 raised (unm, outside lighting)",
+   "src": null,
+   "deltas": [
+    "R14"
+   ],
+   "kind": "flow",
+   "authored": true,
+   "live": false,
+   "tk": true,
+   "p1": true,
+   "exempt": null,
+   "exemptParents": null
+  },
+  {
+   "id": "RQ:L-none-1",
+   "g": "NLH",
+   "t": "Risk question before: Outside lighting: closed note",
+   "src": null,
+   "deltas": [
+    "R14"
+   ],
+   "kind": "flow",
+   "authored": true,
+   "live": false,
+   "tk": false,
+   "p1": false,
+   "exempt": null,
+   "exemptParents": null
+  },
+  {
+   "id": "F:unm:Fans",
+   "g": "NLH",
+   "t": "Risk: Yes, confirm the P1 (unm, extractor fans)",
+   "src": null,
+   "deltas": [
+    "R14"
+   ],
+   "kind": "flow",
+   "authored": true,
+   "live": false,
+   "tk": false,
+   "p1": false,
+   "exempt": null,
+   "exemptParents": null
+  },
+  {
+   "id": "F:unm:Fans:after",
+   "g": "NLH",
+   "t": "Risk: P1 raised (unm, extractor fans)",
+   "src": null,
+   "deltas": [
+    "R14"
+   ],
+   "kind": "flow",
+   "authored": true,
+   "live": false,
+   "tk": true,
+   "p1": true,
+   "exempt": null,
+   "exemptParents": null
+  },
+  {
+   "id": "RQ:FAN-none-1",
+   "g": "NLH",
+   "t": "Risk question before: Extractor fans: closed note",
+   "src": null,
+   "deltas": [
+    "R14"
+   ],
+   "kind": "flow",
+   "authored": true,
+   "live": false,
+   "tk": false,
+   "p1": false,
+   "exempt": null,
+   "exemptParents": null
+  },
+  {
+   "id": "RQ:H-none-1",
+   "g": "NLH",
+   "t": "Risk question before: Heating: closed note",
+   "src": null,
+   "deltas": [
+    "R14"
+   ],
+   "kind": "flow",
+   "authored": true,
+   "live": false,
+   "tk": false,
+   "p1": false,
+   "exempt": null,
+   "exemptParents": null
+  },
+  {
+   "id": "F:unm:Air",
+   "g": "NLH",
+   "t": "Risk: Yes, confirm the P1 (unm, air conditioning)",
+   "src": null,
+   "deltas": [
+    "R14"
+   ],
+   "kind": "flow",
+   "authored": true,
+   "live": false,
+   "tk": false,
+   "p1": false,
+   "exempt": null,
+   "exemptParents": null
+  },
+  {
+   "id": "F:unm:Air:after",
+   "g": "NLH",
+   "t": "Risk: P1 raised (unm, air conditioning)",
+   "src": null,
+   "deltas": [
+    "R14"
+   ],
+   "kind": "flow",
+   "authored": true,
+   "live": false,
+   "tk": true,
+   "p1": true,
+   "exempt": null,
+   "exemptParents": null
+  },
+  {
+   "id": "RQ:AC-none-1",
+   "g": "NLH",
+   "t": "Risk question before: Air conditioning: closed note",
+   "src": null,
+   "deltas": [
+    "R14"
+   ],
+   "kind": "flow",
+   "authored": true,
+   "live": false,
+   "tk": false,
+   "p1": false,
+   "exempt": null,
+   "exemptParents": null
+  },
+  {
+   "id": "F:unm:Else",
+   "g": "ELSE",
+   "t": "Risk: Yes, confirm the P1 (unm, something else)",
+   "src": null,
+   "deltas": [
+    "R14"
+   ],
+   "kind": "flow",
+   "authored": true,
+   "live": false,
+   "tk": false,
+   "p1": false,
+   "exempt": null,
+   "exemptParents": null
+  },
+  {
+   "id": "F:unm:Else:after",
+   "g": "ELSE",
+   "t": "Risk: P1 raised (unm, something else)",
+   "src": null,
+   "deltas": [
+    "R14"
+   ],
+   "kind": "flow",
+   "authored": true,
+   "live": false,
+   "tk": true,
+   "p1": true,
+   "exempt": null,
+   "exemptParents": null
+  },
+  {
+   "id": "RQ:O-none",
+   "g": "ELSE",
+   "t": "Risk question before: Not on Lighthouse here: closed note",
+   "src": null,
+   "deltas": [
+    "R14"
+   ],
+   "kind": "flow",
+   "authored": true,
+   "live": false,
+   "tk": false,
+   "p1": false,
+   "exempt": null,
+   "exemptParents": null
+  },
+  {
+   "id": "F:site:Else",
+   "g": "PAGES",
+   "t": "Risk: Yes, confirm the P1 (site, something else)",
+   "src": null,
+   "deltas": [
+    "R14"
+   ],
+   "kind": "flow",
+   "authored": true,
+   "live": false,
+   "tk": false,
+   "p1": false,
+   "exempt": null,
+   "exemptParents": null
+  },
+  {
+   "id": "F:site:Else:after",
+   "g": "PAGES",
+   "t": "Risk: P1 raised (site, something else)",
+   "src": null,
+   "deltas": [
+    "R14"
+   ],
+   "kind": "flow",
+   "authored": true,
+   "live": false,
+   "tk": true,
+   "p1": true,
+   "exempt": null,
+   "exemptParents": null
+  },
+  {
+   "id": "RQ:SITE-ambiguous-logged",
+   "g": "PAGES",
+   "t": "Risk question before: house number matches two sites: logged",
+   "src": null,
+   "deltas": [
+    "R14"
+   ],
+   "kind": "page",
+   "authored": true,
+   "live": false,
+   "tk": false,
+   "p1": false,
+   "exempt": null,
+   "exemptParents": null
   }
  ],
  "missing": [],
@@ -3244,7 +6163,7 @@
   },
   "R2": {
    "title": "Something else, redesigned (D5, D11)",
-   "what": "The customer picks what it is about and the dashboard starts that issue's questions; the two agent-judgement buttons and the \"it is controlled, go back\" dead end are gone. The urgent-or-not question and the P1 are as live."
+   "what": "The customer picks what it is about and the dashboard starts that issue's questions; the two agent-judgement buttons and the \"it is controlled, go back\" dead end are gone. \"None of these\" asks the universal risk question (R14) in place of the live urgent-or-not question, and the live required reason box becomes the shared mandatory P1 comment."
   },
   "R3": {
    "title": "Hot water: one closed note everywhere (D5, D7)",
@@ -3297,6 +6216,10 @@
   "N1": {
    "title": "Example data",
    "what": "Site name, house number, ticket numbers and the times shown are fixed examples so every screen reads the same; the live screens use the site's own data."
+  },
+  "R14": {
+   "title": "D13: the universal risk question, the only way to a P1",
+   "what": "Every flow asks \"Is there an immediate risk to trade or to anyone's health and safety?\" (Yes / No) where the problem is still not resolved on the call, before the ticket is made. Yes goes to the live P1 confirm step and cannot be raised until the agent has written why it is urgent. No is the normal ticket for the next working day (or the closed note where Lighthouse does not control the equipment). It replaces the kitchen \"is it needed for service\" question, the fridge \"is stock at risk\" question and the Something else \"is it urgent\" question, and it is now the only way to a P1 (lighting, contractor, hot water, fans, heating, air conditioning, connection, not-on-Lighthouse and site-not-identified paths all go through it)."
   }
  },
  "groups": [
