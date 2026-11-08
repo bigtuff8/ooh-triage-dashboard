@@ -18,6 +18,7 @@ COPY --from=build /app/node_modules ./node_modules
 COPY package.json server.js config.js ./
 COPY services ./services
 COPY routes ./routes
+COPY config ./config
 COPY public ./public
 COPY data/fixtures ./data/fixtures
 COPY data/site-aliases.json ./data/

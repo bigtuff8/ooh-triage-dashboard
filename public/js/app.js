@@ -20,7 +20,10 @@ const state = {
     cb: { siteNo: null, data: null, tab: 'active', error: null },
     admin: null,
     drawer: null,
-    loadError: null
+    loadError: null,
+    // OOHDASH-146 D15/D16 (B34): the customer on this call. Memory only, cleared at End call, never stored.
+    caller: { name: '', role: '', phone: '', declined: false },
+    cdAdd: false            // true while the 'Add details' screen is open over the screen the agent was on
 };
 
 const $ = s => document.querySelector(s);
@@ -33,6 +36,56 @@ function toast(msg) {
     t.innerHTML = msg;
     $('#toasts').appendChild(t);
     setTimeout(() => t.remove(), 4200);
+}
+
+/* ------------------------ OOHDASH-146 D15/D16: the customer on this call (B34) ------------------------ */
+/** One line of plain text: new lines and runs of spaces collapse to single spaces. */
+function callerOneLine(v) {
+    return String(v == null ? '' : v).replace(/[\r\n\t  ]+/g, ' ').replace(/\s+/g, ' ').trim();
+}
+
+/**
+ * The `customerContact` object for ticket posts, built from state.caller. A field that is empty or fails
+ * validation (name 1-80, role up to 40, phone 7-20 of digits, spaces and + ( ) -) is left out; it never blocks.
+ * Returns null when there is nothing to send. Declined is sent only when no detail was given.
+ */
+function callerContactFrom(c) {
+    c = c || {};
+    const name = callerOneLine(c.name), role = callerOneLine(c.role), phone = callerOneLine(c.phone);
+    const out = {};
+    if (name && name.length <= 80) out.OohCustomerName = name;
+    if (role && role.length <= 40) out.OohCustomerRole = role;
+    if (phone && phone.length >= 7 && phone.length <= 20 && /^[0-9 +()-]+$/.test(phone)) out.OohCustomerPhone = phone;
+    if (Object.keys(out).length) return out;
+    return c.declined ? { OohCustomerDeclined: true } : null;
+}
+
+/** Updates state.caller and repaints only the banner. No network call. */
+function setCaller(patch) {
+    const next = Object.assign({}, state.caller, patch || {});
+    const any = (callerOneLine(next.name) + callerOneLine(next.role) + callerOneLine(next.phone)) !== '';
+    if (any && !(patch && patch.declined === true)) next.declined = false;
+    state.caller = { name: String(next.name || ''), role: String(next.role || ''), phone: String(next.phone || ''), declined: !!next.declined };
+    paintCallerBanner();
+}
+
+/** Cleared at End call (and when a call is abandoned): the next call starts empty. */
+function callerReset() {
+    state.caller = { name: '', role: '', phone: '', declined: false };
+    state.cdAdd = false;
+}
+
+function paintCallerBanner() {
+    const el = document.querySelector('.callbanner');
+    if (el && typeof callerBanner === 'function') el.outerHTML = callerBanner(state);
+}
+
+/** The one visually hidden status node: written only when the customer details are saved. */
+function callerAnnounce(msg) {
+    const el = document.getElementById('srlive');
+    if (!el) return;
+    el.textContent = '';
+    el.textContent = msg;
 }
 
 /**
@@ -204,8 +257,9 @@ function render() {
 }
 
 async function go(v) {
-    if (v === 'home' && state.call && state.call.id) callFinalise('left-screen'); // OOHDASH-159 rev 5 (E1)
+    if (v === 'home' && state.call && state.call.id) { callFinalise('left-screen'); callerReset(); } // OOHDASH-159 rev 5 (E1); D16: the call is over, so is the customer's contact
     state.view = v;
+    state.cdAdd = false;
     if (v === 'home') {
         state.siteNo = null; state.pendingSite = null; state.ambiguous = null;
         state.confirmToken = null; state.workspace = null; state.flow = null; state.call = null;
