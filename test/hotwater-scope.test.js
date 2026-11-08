@@ -172,7 +172,7 @@ test('flow: before-compose out-of-scope — HW complaint front-loads "not contro
     // OOHDASH-123 (J5/D-BOOST): hot water is now always capture-and-escalate — no boost, no compose.
     assert.match(html, /can't control|not controllable/i, 'the out-of-scope message is front-loaded before any compose affordance');
     assert.doesNotMatch(html, /hw-boost-yes/, 'the boost/compose chip is removed');
-    assert.match(html, /Log and escalate to IoT team/, 'capture-and-escalate is the deterministic path');
+    assert.match(html, /Pass it to the IoT team/, 'capture-and-escalate is the deterministic path');
 });
 
 test('flow: compose chip never renders from live-shaped inventory, and no boost/openControl path is reachable', async () => {

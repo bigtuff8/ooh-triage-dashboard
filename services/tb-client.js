@@ -61,16 +61,17 @@ function tbSession(username, password, label) {
      */
     async function activeReadProbe() {
         if (!(username && password)) return probe;
-        // Force a FRESH authentication rather than trusting a cached JWT: a cred that has been
-        // revoked server-side still has a locally-cached (unexpired) token, so reusing it would
-        // never detect the death — the stale-green defect this ticket exists to kill. Clearing the
-        // token makes getToken() re-hit /api/auth/login and surfaces a 401 on a dead cred.
-        token = null;
-        expiry = 0;
+        // OOHDASH-148 Option C: post directly against /api/auth/login instead of clearing token
+        // and delegating to getToken(), so concurrent requests continue on the valid cached token
+        // during probe flight. Revoked-credential detection is preserved: a 401 from the live
+        // login call still marks the probe unhealthy without disturbing the cached JWT.
         try {
-            await getToken(); // re-authenticates; marks ok + fresh on success
+            const res = await axios.post(`${config.thingsboard.url}/api/auth/login`, { username, password }, { timeout: 10000 });
+            token = res.data.token;
+            expiry = Date.now() + 2 * 60 * 60 * 1000;
+            markProbe(true);
         } catch {
-            markProbe(false); // 401 / transport ⇒ not-ok + fresh
+            markProbe(false);
         }
         return probe;
     }

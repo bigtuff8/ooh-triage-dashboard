@@ -8,16 +8,16 @@ test.describe('tonight & callback', () => {
         // Produce a distinctive captured outcome first
         await confirmSite(page, '6749', 'Angel Inn');
         await page.locator('[data-testid="tile-lighting"]').click();
-        await page.locator('.chip:has-text("Caller sorted it with the override")').click();
-        // OOHDASH-119: confirm step required before POST fires
-        await page.locator('[data-testid="record-outcome"]').click();
+        const postPromise = page.waitForRequest(r => r.url().includes('/api/outcomes') && r.method() === 'POST');
+        await page.locator('[data-testid="lighting-ok"]').click(); // J1: "Yes, they've come on", auto-submits
+        await postPromise;
         await expect(page.locator('[data-testid="outcome-captured"]')).toContainText(/Ticket #\d+/);
 
         await page.locator('[data-testid="nav-tonight"]').click();
         const table = page.locator('[data-testid="tonight-table"]');
         await expect(table).toContainText('Angel Inn');
         await expect(table).toContainText('Test Handler');
-        await expect(table).toContainText('External lighting — resolved with on-site override · class: lighting');
+        await expect(table).toContainText('External lighting — on with the manual override · class: lighting');
         await expect(table.locator('.tag:has-text("captured")').first()).toBeVisible();
         await expect(table).not.toContainText('[object');
 
@@ -99,7 +99,7 @@ test.describe('tonight & callback', () => {
         await page.locator('[data-testid="suggest-heating"]').click();
         // caller's words pinned to the flow
         await expect(page.locator('[data-testid="flow-panel"]')).toContainText('pub is freezing cold');
-        await expect(page.locator('[data-testid="flow-panel"]')).toContainText('Which area is the customer talking about?');
+        await expect(page.locator('[data-testid="flow-panel"]')).toContainText('which area are you calling about?');
     });
 
     test('smart issue entry works with quotes/apostrophes in the caller\'s words (rework-1 regression)', async ({ page }) => {
@@ -114,7 +114,7 @@ test.describe('tonight & callback', () => {
         page.on('pageerror', e => consoleErrors.push(e.message));
         await page.locator('[data-testid="suggest-heating"]').click();
         // the flow MUST start and carry the words verbatim (apostrophes intact)
-        await expect(page.locator('[data-testid="flow-panel"]')).toContainText('Which area is the customer talking about?');
+        await expect(page.locator('[data-testid="flow-panel"]')).toContainText('which area are you calling about?');
         await expect(page.locator('[data-testid="flow-panel"]')).toContainText(callerWords);
         expect(consoleErrors).toEqual([]);
 
@@ -138,10 +138,10 @@ test.describe('tonight & callback', () => {
         await expect(banner).toContainText('not responding');
         await expect(page.locator('[data-testid="offline-banner-optional-hint"]')).toBeVisible();
         await banner.locator('button:has-text("Run connection check")').click();
-        await expect(page.locator('[data-testid="connectivity-alert"]')).toContainText('gateway at this site is offline');
-        await page.locator('[data-testid="connectivity-stilldead"]').click();
-        // OOHDASH-119: confirm step required before POST fires
-        await page.locator('[data-testid="record-outcome"]').click();
+        await expect(page.locator('[data-testid="connectivity-alert"]')).toContainText("Lighthouse wall unit at this site isn't connecting to us");
+        const connPostPromise = page.waitForRequest(r => r.url().includes('/api/outcomes') && r.method() === 'POST');
+        await page.locator('[data-testid="connectivity-stilldead"]').click(); // E1: auto-submits for non-P1
+        await connPostPromise;
         await expect(page.locator('[data-testid="outcome-captured"]')).toContainText(/Ticket #\d+/);
     });
 
@@ -157,15 +157,14 @@ test.describe('tonight & callback', () => {
         await expect(page.locator('[data-testid="contractor-pp-no"]')).toBeVisible();
         // No-guidance path: direct escalation (same P1 outcome as before)
         await page.locator('[data-testid="contractor-pp-no"]').click();
-        // OOHDASH-119: confirm step required before POST fires
+        // contractor-pp-no → P1 path: confirm step still required
         await page.locator('[data-testid="record-outcome"]').click();
         const p1 = page.locator('[data-testid="outcome-p1"]');
-        await expect(p1).toContainText('Escalated — P1');
+        await expect(p1).toContainText('P1 raised');
         // Approach B: OOH tags ooh_p1 and the IoT Support Dashboard pages the on-duty manager.
         // The dispatch-status line is always the honest fixed sentence — no conditional send/not-sent branch.
-        await expect(p1).toContainText('logged as ticket');
-        await expect(p1).toContainText('IoT Support dashboard');
-        await expect(p1).toContainText('pages the on-duty manager');
+        await expect(p1).toContainText('been paged and will call the site back');
+        await expect(p1).toContainText('will call the site back');
         // Old Approach-A false warnings must be absent
         await expect(p1).not.toContainText('Text not sent');
         await expect(p1).not.toContainText('text message has been sent');
@@ -178,11 +177,9 @@ test.describe('tonight & callback', () => {
         await page.locator('[data-testid="other-text"]').fill('');
         await page.locator('[data-testid="other-text"]').pressSequentially('boiler PCB fault — is that you?', { delay: 15 });
         await page.locator('[data-testid="other-check"]').click();
-        await page.locator('[data-testid="scope-boiler"]').click();
-        // OOHDASH-119: confirm step required before POST fires
-        await page.locator('[data-testid="record-outcome"]').click();
+        await page.locator('[data-testid="scope-fridge"]').click(); // E1: outcomeScope auto-submits for non-P1
         const outcome = page.locator('[data-testid="outcome-scope"]');
-        await expect(outcome).toContainText('Not on Lighthouse at this site');
-        await expect(outcome).toContainText(/ticket #\d+ \(scope-only\)/);
+        await expect(outcome).toContainText("Lighthouse doesn't control this here");
+        await expect(outcome).toContainText(/Ticket #\d+/);
     });
 });

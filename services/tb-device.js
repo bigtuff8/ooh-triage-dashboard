@@ -1076,8 +1076,8 @@ export function dhwOverrideOutcome(dhwOverride, nowMs) {
             state: 'cant-confirm',
             headline: "Hot water override: can't confirm",
             explanation: ago
-                ? `The boiler panel last reported ${ago}, so we can't tell whether the hot water is overridden. Don't tell the caller it is on or off; log it and escalate as normal.`
-                : "The boiler panel isn't reporting, so we can't tell whether the hot water is overridden. Don't tell the caller it is on or off; log it and escalate as normal.",
+                ? `The boiler panel last reported ${ago}, so we can't tell whether the hot water is overridden. Don't tell the customer it is on or off; log it and escalate as normal.`
+                : "The boiler panel isn't reporting, so we can't tell whether the hot water is overridden. Don't tell the customer it is on or off; log it and escalate as normal.",
             script: "I can't see the current hot water setting from here right now, so I'll log it for the team to check.",
             ticketSentence: `Hot water override at time of call: could not be confirmed (${reason}).`
         };
@@ -1158,15 +1158,15 @@ export function dhwOverrideOutcome(dhwOverride, nowMs) {
         const ago = _dhwFmtAgo(panelLastSeenMs, nowMs);
         const reason = ago ? `last reported ${ago}` : "isn't reporting";
         explanation = ago
-            ? `The boiler panel last reported ${ago}, so we can't tell whether the hot water is overridden. Don't tell the caller it is on or off; log it and escalate as normal.`
-            : "The boiler panel isn't reporting, so we can't tell whether the hot water is overridden. Don't tell the caller it is on or off; log it and escalate as normal.";
+            ? `The boiler panel last reported ${ago}, so we can't tell whether the hot water is overridden. Don't tell the customer it is on or off; log it and escalate as normal.`
+            : "The boiler panel isn't reporting, so we can't tell whether the hot water is overridden. Don't tell the customer it is on or off; log it and escalate as normal.";
         ticketSentence = `Hot water override at time of call: could not be confirmed (${reason}).`;
     } else if (effectiveReason === 'not-reconfirmed') {
-        explanation = "The boiler panel hasn't re-confirmed its hot water override recently, so we can't tell whether it is still in place. Don't tell the caller it is on or off; log it and escalate as normal.";
+        explanation = "The boiler panel hasn't re-confirmed its hot water override recently, so we can't tell whether it is still in place. Don't tell the customer it is on or off; log it and escalate as normal.";
         ticketSentence = "Hot water override at time of call: could not be confirmed (panel hasn't re-confirmed recently).";
     } else {
         // not-a-number, implausible, decode-error, or unspecified
-        explanation = "The boiler panel's hot water override reading doesn't make sense right now, so we can't tell whether it is overridden. Don't tell the caller it is on or off; log it and escalate as normal.";
+        explanation = "The boiler panel's hot water override reading doesn't make sense right now, so we can't tell whether it is overridden. Don't tell the customer it is on or off; log it and escalate as normal.";
         ticketSentence = "Hot water override at time of call: could not be confirmed (reading doesn't make sense).";
     }
     return {
@@ -1479,6 +1479,9 @@ async function fetchLiveSitesByNumber(siteNo) {
     const cached = perSiteCache.get(key);
     if (cached && Date.now() - cached.at < LIVE_CACHE_TTL) return cached.sites;
 
+    const t0 = Date.now();
+    const siteNamePromise = resolveSiteName(key).catch(err => { console.error(`[TB] Site name enrichment failed for ${key}: ${err.message}`); return null; });
+
     const { brand, tokens } = siteQueryTokens(key);
     const filter = siteNameFilter(brand, tokens);
 
@@ -1495,10 +1498,12 @@ async function fetchLiveSitesByNumber(siteNo) {
         });
 
     // Step 3 — await both in parallel. Wall-clock cost = max(token fetch, legacy fetch), not sum.
+    const t1 = Date.now();
     const [tokenResults, legacyRaw] = await Promise.all([
         Promise.all(tokenPromises),
         legacyPromise
     ]);
+    const tbSearchMs = Date.now() - t1;
 
     // Step 4 — deduplicate by TB id. Token results are added first (priority); legacy results
     // skip any id already seen.
@@ -1519,6 +1524,7 @@ async function fetchLiveSitesByNumber(siteNo) {
     const matched = [...byId.values()].filter(d =>
         filter.test(normaliseName(d.name)) || isLegacySalusForSite(d.name, key)
     );
+    const deviceCount = matched.length;
 
     // OOHDASH-140: lazy helpers for Tuya (dynamic import to avoid coupling to fixture-mode tests)
     async function _readSiteListing(br, k) {
@@ -1537,6 +1543,7 @@ async function fetchLiveSitesByNumber(siteNo) {
     const tuyaEnabled = config.tuya?.readEnabled && config.tuya?.clientId && !await _tuyaReadOff().catch(() => true);
 
     // Latest telemetry + Tuya listing run concurrently
+    const t2 = Date.now();
     const [telemetryById, tuyaListing] = await Promise.all([
         fetchTelemetry(matched),
         tuyaEnabled ? _readSiteListing(brand, key).catch(err => {
@@ -1544,6 +1551,7 @@ async function fetchLiveSitesByNumber(siteNo) {
             return null;
         }) : Promise.resolve(null)
     ]);
+    const tbReadsMs = Date.now() - t2;
 
     const now = Date.now();
     const devices = matched.map(d => {
@@ -1585,12 +1593,10 @@ async function fetchLiveSitesByNumber(siteNo) {
     }
 
     // Zendesk human-name enrichment (non-fatal, mirrors bridge.js — searchSites/audit read siteName).
-    let humanName = null;
-    try {
-        humanName = await resolveSiteName(key);
-    } catch (err) {
-        console.error(`[TB] Site name enrichment failed for ${key}: ${err.message}`);
-    }
+    const t3 = Date.now();
+    const humanName = await siteNamePromise;
+    const zdNameMs = Date.now() - t3;
+    console.log(`[SITE] ${key} resolve: tb-search=${tbSearchMs}ms devices=${deviceCount} tb-reads=${tbReadsMs}ms zd-name=${zdNameMs}ms total=${Date.now() - t0}ms`);
     // OOHDASH-114-F1: derive boilerControl field.
     // OOHDASH-136: also decode the DHW override state and attach as boilerControl.dhwOverride.
     const boilerControlRaw = matched

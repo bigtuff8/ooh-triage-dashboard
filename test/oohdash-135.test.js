@@ -161,14 +161,13 @@ test("T1-4b: heating scope is ctl when salus-it500 is online and effective contr
     assert.equal(heatingLevel(devices), "ctl", "iT500 online+controllable=true (flag on) -> ctl");
 });
 
-test("T1-4c: heating scope is ctl when salus-it500 effective controllable=true regardless of online (scope is capability-driven)", () => {
-    // SCOPE_GROUPS heating checks d.controllable only -- NOT d.online.
-    // Scope reflects device capability; current connectivity is handled inside the flow.
-    // This proves the scope is stable: a briefly-offline controllable device stays 'ctl' scope.
-    // (In real traffic the Level A gate sets controllable=false for iT500 when flag=false, making
-    // T1-4a the authoritative "flag-off -> mon" test; T1-4c tests the flag-on / post-activation path.)
+test("T1-4c: heating scope is mon when salus-it500 is offline (scope is connectivity-driven since OOHDASH-159)", () => {
+    // OOHDASH-159 rev4: SCOPE_GROUPS heating now requires d.online AND d.controllable for 'ctl'.
+    // An offline device (d.online=false) returns 'mon' even when effective controllable=true.
+    // (The Level A gate still sets controllable=false for iT500 when SALUS_IT500_CTL_ENABLED=false,
+    // making T1-4a the authoritative "flag-off -> mon" test; T1-4c confirms offline=mon too.)
     const devices = [makeHeatDev("salus-it500", false, true)];
-    assert.equal(heatingLevel(devices), "ctl", "iT500 offline but effective controllable=true -> ctl (scope is capability-driven, online state handled in flow)");
+    assert.equal(heatingLevel(devices), "mon", "iT500 offline + effective controllable=true -> mon (scope is connectivity-driven since OOHDASH-159)");
 });
 
 test("T1-4d: salus-it500-dhw controllable is still false -- Item 3 did not open the DHW boost path", () => {
@@ -210,12 +209,12 @@ test("T1-5: heating scope is ctl for online salus-it700 with no boilerControl re
     assert.equal(heatingLevel(devices), "ctl", "iT700 online+controllable -> ctl (Item 4: device-driven, not boilerControl-driven)");
 });
 
-test("T1-5b: heating scope is ctl for offline salus-it700 -- scope is capability-driven, not connectivity-driven", () => {
-    // Same principle as T1-4c: SCOPE_GROUPS heating only checks d.controllable, not d.online.
-    // An offline iT700 with controllable=true still resolves to 'ctl' scope.
-    // (The flow renders device-level online/offline status separately inside the heating flow.)
+test("T1-5b: heating scope is mon for offline salus-it700 (scope is connectivity-driven since OOHDASH-159)", () => {
+    // OOHDASH-159 rev4: SCOPE_GROUPS heating now requires d.online AND d.controllable for 'ctl'.
+    // An offline iT700 (d.online=false) with controllable=true resolves to 'mon' scope.
+    // (The dark-fleet flow handles the iT500/bare-salus sub-class; iT700 offline diverts to connectivity.)
     const devices = [makeHeatDev("salus-it700", false, true)];
-    assert.equal(heatingLevel(devices), "ctl", "iT700 offline + controllable=true -> ctl (scope is capability-driven)");
+    assert.equal(heatingLevel(devices), "mon", "iT700 offline + controllable=true -> mon (scope is connectivity-driven since OOHDASH-159)");
 });
 
 test("T1-6: heating scope is mon for bare-salus dark-fleet device (controllable=false, offline)", () => {

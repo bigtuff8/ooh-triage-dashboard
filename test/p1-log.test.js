@@ -175,12 +175,13 @@ test('Source guard: no "a text has gone" or "sent an urgent text" in flows.js', 
     assert.doesNotMatch(flowsContent, /sent an urgent text/i, '"sent an urgent text" must not appear in flows.js');
 });
 
-test('Source guard: D2 sentence appears exactly 7 times in flows.js', () => {
+test('Source guard: D2 sentence appears exactly 8 times in flows.js', () => {
     const flowsContent = readFileSync(join(__dirname, '..', 'public', 'js', 'flows.js'), 'utf8');
-    // The sentence as it appears in the JS source file — apostrophes are \' inside single-quoted strings
-    const d2 = "I\\'ve raised an urgent P1 ticket for this site and someone will call you back shortly.";
-    const count = flowsContent.split(d2).length - 1;
-    assert.equal(count, 7, `D2 sentence must appear exactly 7 times; found ${count}`);
+    // OOHDASH-159 rev4: the P1 script changed from a fixed string to a function including ticket ref.
+    // The invariant tail shared by all 8 P1 flows (kitchen P1 added in OOHDASH-159).
+    const d2tail = 'on-call team will call you back shortly.';
+    const count = flowsContent.split(d2tail).length - 1;
+    assert.equal(count, 8, `D2 P1 script tail must appear exactly 8 times; found ${count}`);
 });
 
 test('Source guard: no escalation.js import in routes/ or services/', () => {

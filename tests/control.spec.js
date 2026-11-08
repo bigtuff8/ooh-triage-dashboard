@@ -36,7 +36,7 @@ test.describe('control & sync', () => {
         await expect(page.locator('[data-testid="sync-sent-slow"]')).toContainText('Sent to the device', { timeout: 20000 });
         await page.locator('[data-testid="sync-release"]').click();
         const outcome = page.locator('[data-testid="outcome-awaiting"]');
-        await expect(outcome).toContainText('awaiting the device');
+        await expect(outcome).toContainText('waiting for the device to confirm');
         await expect(outcome).toContainText('IT500-BAR-6832');
         await expect(outcome).not.toContainText('[object');
 
@@ -100,10 +100,9 @@ test.describe('control & sync', () => {
         const reco = page.locator('[data-testid="reco-frost"]');
         await expect(reco).toContainText('no "off" switch');
         await expect(reco).toContainText('frost-hold');
-        await page.locator('[data-testid="frost-decline"]').click();
-        await page.locator('[data-testid="record-outcome"]').click();
+        await page.locator('[data-testid="frost-decline"]').click(); // E1: auto-submits for non-P1
         const outcome = page.locator('[data-testid="outcome-noaction"]');
-        await expect(outcome).toContainText('Call logged — no action taken');
+        await expect(outcome).toContainText('Call recorded, nothing changed');
         await expect(outcome).toContainText(/Ticket #\d+/);
     });
 
@@ -145,20 +144,22 @@ test.describe('control & sync', () => {
         await expect(page.locator('[data-testid="smart-entry"]')).toBeVisible();
 
         await page.locator('[data-testid="smart-entry"]').pressSequentially('the air con is blowing warm', { delay: 25 });
-        await page.locator('[data-testid="suggest-aircon"]').click();
-        await page.locator('[data-testid="record-outcome"]').click();
+        await page.locator('[data-testid="suggest-aircon"]').click(); // E1: auto-submits for non-P1
         const captured = page.locator('[data-testid="outcome-captured"]');
-        await expect(captured).toContainText('Captured for the IoT team');
+        await expect(captured).toContainText('Ticket created for the IoT team');
         await expect(captured).toContainText(/Ticket #\d+/);
         await expect(page.locator('[data-testid="control-send"]')).toHaveCount(0);
     });
 
     test('outcome-record failure shows inline error with manual retry (Protocol 4: 500 path)', async ({ page }) => {
         await confirmSite(page, '6832', 'Old Grey Mare');
-        let failNext = true;
+        let outcomeCall = 0;
         await page.route('**/api/outcomes', route => {
-            if (failNext) { failNext = false; return route.fulfill({ status: 500, contentType: 'application/json', body: JSON.stringify({ error: 'Zendesk exploded' }) }); }
-            return route.continue();
+            outcomeCall++;
+            if (outcomeCall === 1) {
+                return route.fulfill({ status: 500, contentType: 'application/json', body: JSON.stringify({ error: 'Zendesk exploded' }) });
+            }
+            return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ticket: { id: 55001 } }) });
         });
         await page.locator('[data-testid="tile-fridge"]').click();
         await page.locator('[data-testid="fridge-risk"]').click(); // P1 path
@@ -166,8 +167,8 @@ test.describe('control & sync', () => {
         await expect(page.locator('.flowbody')).toContainText("Couldn't record the outcome: Zendesk exploded");
         await page.locator('button:has-text("Try again")').click();
         await page.locator('[data-testid="record-outcome"]').click();
-        await expect(page.locator('[data-testid="outcome-p1"]')).toContainText('logged as ticket', { timeout: 15000 });
-        await expect(page.locator('[data-testid="outcome-p1"]')).toContainText('pages the on-duty manager');
+        await expect(page.locator('[data-testid="outcome-p1"]')).toContainText('P1 raised', { timeout: 15000 });
+        await expect(page.locator('[data-testid="outcome-p1"]')).toContainText('has been paged');
         await expect(page.locator('[data-testid="outcome-p1"]')).not.toContainText('Text not sent');
     });
 });

@@ -390,22 +390,20 @@ test.describe('OOHDASH-144 fix tests — C1 and C2', () => {
         const hasTicket = /ticket\s*#\d+/.test(autologText || '');
         // Ticket may not appear if Zendesk fixture is not available — that is OK; we still test the append path.
 
-        // Click "Finish and add notes" to reach the Check and log step.
+        // E1: set up route interception before auto-submit fires on bp-finish-notes click
+        await page.route('**/api/outcomes', route => route.fulfill({
+            status: 200, contentType: 'application/json',
+            body: JSON.stringify({ ticket: { id: 55001 } })
+        }));
+
+        // Click "Finish and add notes" — E1: auto-submits immediately (no wrap-submit button)
         await page.locator('[data-testid="bp-finish-notes"]').click();
 
-        // Check and log step must appear.
-        await expect(page.locator('[data-testid="wrap-submit"]')).toBeVisible({ timeout: 5000 });
-
-        // If a ticket was auto-logged, the submit button should say "Add to ticket #N and finish".
-        // If not, it says "Log for the IoT helpdesk and finish".
-        const submitLabel = await page.locator('[data-testid="wrap-submit"]').textContent();
-
-        // Click submit and verify no "append-refused" error is shown.
-        await page.locator('[data-testid="wrap-submit"]').click();
+        // E1: wrap-logged appears directly (no wrap-submit step)
+        await expect(page.locator('[data-testid="wrap-logged"]')).toBeVisible({ timeout: 10000 });
 
         // On success: wrap-error must NOT be visible.
-        // Wait briefly for any error to appear (it would appear quickly if present).
-        await page.waitForTimeout(3000);
+        await page.waitForTimeout(1000);
         const errVisible = await page.locator('[data-testid="wrap-error"]').isVisible().catch(() => false);
         const errText = errVisible ? await page.locator('[data-testid="wrap-error"]').textContent() : '';
         expect(errText, 'wrap-error must not show append-refused').not.toContain('append-refused');

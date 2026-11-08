@@ -33,7 +33,7 @@ test.describe('OOHDASH-134 — P1 Escalation in Something else', () => {
         await expect(p1).toBeVisible();
         await expect(normal).toBeVisible();
         await expect(p1).toHaveText('P1 Escalation');
-        await expect(normal).toHaveText('Raise a Normal Priority ticket');
+        await expect(normal).toHaveText('Not urgent: pass it to the IoT team');
         await expect(p1).toBeEnabled();
         // Order: P1 first, then normal
         const ids = await page.locator('.chips button').evaluateAll(els => els.map(e => e.dataset.testid));
@@ -76,7 +76,7 @@ test.describe('OOHDASH-134 — P1 Escalation in Something else', () => {
 
         const card = page.locator('[data-testid="outcome-p1"]');
         await expect(card).toBeVisible();
-        await expect(card).toContainText('Escalated — P1');
+        await expect(card).toContainText('P1 raised');
         await expect(card).toContainText(/Ticket #\d+/);
         await expect(page.locator('[data-testid="outcome-captured"]')).toHaveCount(0);
     });
@@ -148,14 +148,13 @@ test.describe('OOHDASH-134 — P1 Escalation in Something else', () => {
     test('134-E: Raise a Normal Priority ticket is exactly today\'s capture (AC4)', async ({ page }) => {
         await openOther(page, 'Voltage optimiser needs a reset');
         await page.locator('[data-testid="other-capture"]').click();
-        await page.locator('[data-testid="other-normal"]').click();
         const reqP = page.waitForRequest(isOutcomePost);
-        await page.locator('[data-testid="record-outcome"]').click();
+        await page.locator('[data-testid="other-normal"]').click(); // E1: auto-submits for non-P1
         const body = JSON.parse((await reqP).postData());
         expect(body.type).toBe('capture');
         expect(body.subject).toBe('General issue captured');
         expect(body.OohCaptureClass).toBe('general');
-        expect(body.detail).toBe('Caller reported: Voltage optimiser needs a reset. Captured verbatim for the IoT team.');
+        expect(body.detail).toBe('Customer reported: Voltage optimiser needs a reset. Captured verbatim for the IoT team.');
         expect(body.p1Summary).toBeUndefined();
         await expect(page.locator('[data-testid="outcome-captured"]')).toBeVisible();
         await expect(page.locator('[data-testid="outcome-p1"]')).toHaveCount(0);
@@ -174,9 +173,9 @@ test.describe('OOHDASH-134 — P1 Escalation in Something else', () => {
 
         // 1) Lighting P1 (proven flow)
         await page.locator('[data-testid="tile-lighting"]').click();
-        await page.locator('.chip:has-text("Still not working")').click();
         let reqP = page.waitForRequest(isOutcomePost);
         let resP = page.waitForResponse(r => isOutcomePost(r.request()));
+        await page.locator('[data-testid="lighting-still-off"]').click(); // J1: P1 chip
         await page.locator('[data-testid="record-outcome"]').click();
         const lightReq = JSON.parse((await reqP).postData());
         const lightRes = await (await resP).json();
@@ -204,7 +203,7 @@ test.describe('OOHDASH-134 — P1 Escalation in Something else', () => {
         expect('actionId' in lightReq).toBe(false);
         expect('actionId' in otherReq).toBe(false);
         const differing = Object.keys(lightReq).filter(k => JSON.stringify(lightReq[k]) !== JSON.stringify(otherReq[k])).sort();
-        const allowed = ['callerWords', 'detail', 'issueLabel', 'p1Summary', 'subject'];
+        const allowed = ['callerWords', 'detail', 'issueKey', 'issueLabel', 'knownSoFar', 'p1Summary', 'subject'];
         for (const k of differing) expect(allowed).toContain(k);
 
         // Ticket parity: both read back with identical tag sets incl. ooh + ooh_p1 (priority is

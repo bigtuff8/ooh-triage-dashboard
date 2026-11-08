@@ -5,11 +5,18 @@
  * 5 kitchen devices with preloaded Tuya fixture state → no real API calls.
  *
  * Expected verdicts (from tuyaFixture data):
- *   gk-8888-fryer-1     — OFF + always-ON schedule  → A (should have come on)
+ *   gk-8888-fryer-1       — OFF + always-ON schedule  → A (should have come on)
  *   gk-8888-glasswasher-1 — ON 500 cur_power (50W) + always-ON schedule → B (on as expected)
- *   gk-8888-dishwasher-1  — OFF + empty schedule      → D (no active schedule)
- *   gk-8888-potwash-1   — ON 0W + always-ON schedule → E (on but drawing nothing)
- *   gk-8888-bainmarie-1 — OFF + ON-at-23:59/OFF-at-00:00 schedule → C (off per schedule)
+ *   gk-8888-dishwasher-1  — OFF + empty schedule      → D (no active schedule = always-on category)
+ *   gk-8888-potwash-1     — ON 0W + always-ON schedule → E (on but drawing nothing)
+ *   gk-8888-bainmarie-1   — OFF + ON-at-23:59/OFF-at-00:00 schedule → C (off per schedule)
+ *
+ * OOHDASH-159 J1 override-first behaviour (rev 5):
+ *   OFF devices (A, C, D): kitchen-override-step appears FIRST; no kitchen-verdict card.
+ *     - kitchen-override-ok  → outcome-captured (E1 auto-submit — override worked)
+ *     - kitchen-override-fail / kitchen-no-panel → kitchen-service-question (kitchen-critical)
+ *   ON devices (B, E): kitchen-verdict appears directly; no override step.
+ *   Always-on category (verdict D): kitchen-fuse-fixed chip also shown in override step.
  */
 import { test, expect } from '@playwright/test';
 import { signIn, confirmSite } from './helpers.js';
@@ -36,93 +43,93 @@ test.describe('OOHDASH-140 Tuya kitchen flow — fixture site 8888', () => {
         await expect(page.locator('[data-testid="kitchen-all"]')).toBeVisible();
     });
 
-    // ── TF-140-02: Fryer → verdict A ──────────────────────────────────────────
+    // ── TF-140-02: Fryer → J1 override step (OFF, verdict A — should have come on) ──
 
-    test('TF-140-02: fryer circuit → verdict A (OFF but scheduled on)', async ({ page }) => {
+    test('TF-140-02: fryer circuit → J1 override step appears with verdict A info (OFF but scheduled on)', async ({ page }) => {
         await openKitchen(page);
         await expect(page.locator('[data-testid="kitchen-picker"]')).toBeVisible({ timeout: 5000 });
-        // Click the Fryer chip (displayName = Fryer)
         await page.locator('[data-testid="kitchen-picker"] button.chip', { hasText: 'Fryer' }).click();
-        const card = page.locator('[data-testid="kitchen-verdict"]');
-        await expect(card).toBeVisible();
-        // Verdict A wording: "is OFF but the schedule says it should have come on"
-        await expect(card).toContainText('is OFF but the schedule says it should have come on');
-        // Override chips present
+        // J1 override-first: override step appears for OFF devices before any verdict card
+        const overrideStep = page.locator('[data-testid="kitchen-override-step"]');
+        await expect(overrideStep).toBeVisible();
+        // Info box contains verdict A reasoning (should have come on per schedule)
+        await expect(overrideStep).toContainText('it should have come on');
         await expect(page.locator('[data-testid="kitchen-override-ok"]')).toBeVisible();
         await expect(page.locator('[data-testid="kitchen-override-fail"]')).toBeVisible();
+        await expect(page.locator('[data-testid="kitchen-no-panel"]')).toBeVisible();
     });
 
-    // ── TF-140-03: Glasswasher → verdict B ────────────────────────────────────
+    // ── TF-140-03: Glasswasher → verdict B (ON device, no override step) ───────
 
-    test('TF-140-03: glasswasher circuit → verdict B (ON as expected)', async ({ page }) => {
+    test('TF-140-03: glasswasher circuit → verdict B (ON as expected, no override step)', async ({ page }) => {
         await openKitchen(page);
         await expect(page.locator('[data-testid="kitchen-picker"]')).toBeVisible({ timeout: 5000 });
         await page.locator('[data-testid="kitchen-picker"] button.chip', { hasText: 'Glass washer' }).click();
+        // ON device — no override step; kitchen-verdict appears directly
         const card = page.locator('[data-testid="kitchen-verdict"]');
         await expect(card).toBeVisible();
-        // Verdict B wording: "is ON as expected"
-        await expect(card).toContainText('is ON as expected');
-        // Repairs chips
+        // Verdict B: device has power and is switched on
+        await expect(card).toContainText('has power and is switched on');
+        // Service contractor chips
         await expect(page.locator('[data-testid="kitchen-repairs"]')).toBeVisible();
         await expect(page.locator('[data-testid="kitchen-still-ours"]')).toBeVisible();
     });
 
-    // ── TF-140-04: Dishwasher → verdict D ─────────────────────────────────────
+    // ── TF-140-04: Dishwasher → J1 override step with fuse option (OFF, verdict D) ─
 
-    test('TF-140-04: dishwasher circuit → verdict D (OFF, no schedule)', async ({ page }) => {
+    test('TF-140-04: dishwasher circuit → override step with fuse-fixed option (always-on, no schedule)', async ({ page }) => {
         await openKitchen(page);
         await expect(page.locator('[data-testid="kitchen-picker"]')).toBeVisible({ timeout: 5000 });
         await page.locator('[data-testid="kitchen-picker"] button.chip', { hasText: 'Dishwasher' }).click();
-        const card = page.locator('[data-testid="kitchen-verdict"]');
-        await expect(card).toBeVisible();
-        // Verdict D wording: "no active schedule"
-        await expect(card).toContainText('no active schedule');
-        // Fuse chips
+        // J1 override-first: override step for OFF device; verdict D shows fuse-fixed chip
+        await expect(page.locator('[data-testid="kitchen-override-step"]')).toBeVisible();
+        // Always-on category (verdict D) → kitchen-fuse-fixed chip also shown
         await expect(page.locator('[data-testid="kitchen-fuse-fixed"]')).toBeVisible();
-        await expect(page.locator('[data-testid="kitchen-fuse-fail"]')).toBeVisible();
-    });
-
-    // ── TF-140-05: Potwash → verdict E ────────────────────────────────────────
-
-    test('TF-140-05: pot wash circuit → verdict E (ON but no load)', async ({ page }) => {
-        await openKitchen(page);
-        await expect(page.locator('[data-testid="kitchen-picker"]')).toBeVisible({ timeout: 5000 });
-        await page.locator('[data-testid="kitchen-picker"] button.chip', { hasText: 'Pot wash' }).click();
-        const card = page.locator('[data-testid="kitchen-verdict"]');
-        await expect(card).toBeVisible();
-        // Verdict E wording: "drawing no power"
-        await expect(card).toContainText('drawing no power');
-        // Repairs chips
-        await expect(page.locator('[data-testid="kitchen-repairs"]')).toBeVisible();
-        await expect(page.locator('[data-testid="kitchen-still-ours"]')).toBeVisible();
-    });
-
-    // ── TF-140-06: Bain-marie → verdict C ─────────────────────────────────────
-
-    test('TF-140-06: bain-marie circuit → verdict C (OFF per schedule)', async ({ page }) => {
-        await openKitchen(page);
-        await expect(page.locator('[data-testid="kitchen-picker"]')).toBeVisible({ timeout: 5000 });
-        await page.locator('[data-testid="kitchen-picker"] button.chip', { hasText: 'Bain-marie' }).click();
-        const card = page.locator('[data-testid="kitchen-verdict"]');
-        await expect(card).toBeVisible();
-        // Verdict C wording: "OFF — the schedule has it off until"
-        await expect(card).toContainText('OFF');
-        await expect(card).toContainText('schedule');
-        // Override chips
         await expect(page.locator('[data-testid="kitchen-override-ok"]')).toBeVisible();
         await expect(page.locator('[data-testid="kitchen-override-fail"]')).toBeVisible();
     });
 
-    // ── TF-140-07: kitchen-all summary ────────────────────────────────────────
+    // ── TF-140-05: Potwash → verdict E (ON but drawing no power, no override step) ─
 
-    test('TF-140-07: kitchen-all shows summary lines and top-priority verdict card', async ({ page }) => {
+    test('TF-140-05: pot wash circuit → verdict E (ON but no load, no override step)', async ({ page }) => {
+        await openKitchen(page);
+        await expect(page.locator('[data-testid="kitchen-picker"]')).toBeVisible({ timeout: 5000 });
+        await page.locator('[data-testid="kitchen-picker"] button.chip', { hasText: 'Pot wash' }).click();
+        // ON device — no override step; kitchen-verdict appears directly
+        const card = page.locator('[data-testid="kitchen-verdict"]');
+        await expect(card).toBeVisible();
+        // Verdict E: device is on but the appliance is not drawing any power
+        await expect(card).toContainText("isn't drawing any");
+        await expect(page.locator('[data-testid="kitchen-repairs"]')).toBeVisible();
+        await expect(page.locator('[data-testid="kitchen-still-ours"]')).toBeVisible();
+    });
+
+    // ── TF-140-06: Bain-marie → J1 override step (OFF per schedule, verdict C) ──
+
+    test('TF-140-06: bain-marie circuit → J1 override step appears (OFF per schedule)', async ({ page }) => {
+        await openKitchen(page);
+        await expect(page.locator('[data-testid="kitchen-picker"]')).toBeVisible({ timeout: 5000 });
+        await page.locator('[data-testid="kitchen-picker"] button.chip', { hasText: 'Bain-marie' }).click();
+        // J1 override-first: override step for OFF device; verdict C (off per timetable)
+        const overrideStep = page.locator('[data-testid="kitchen-override-step"]');
+        await expect(overrideStep).toBeVisible();
+        // Info box contains verdict C reasoning (timetable has it off until next-on time)
+        await expect(overrideStep).toContainText('its timetable has it off until');
+        // No fuse-fixed chip for verdict C (not always-on category)
+        await expect(page.locator('[data-testid="kitchen-fuse-fixed"]')).toHaveCount(0);
+    });
+
+    // ── TF-140-07: kitchen-all → J1 override step (3 circuits OFF, 2 ON) ───────
+
+    test('TF-140-07: kitchen-all shows override step for the OFF circuits', async ({ page }) => {
         await openKitchen(page);
         await expect(page.locator('[data-testid="kitchen-picker"]')).toBeVisible({ timeout: 5000 });
         await page.locator('[data-testid="kitchen-all"]').click();
-        // Summary section
-        await expect(page.locator('[data-testid="kitchen-all-summary"]')).toBeVisible();
-        // Top verdict card (priority order: A is highest concern)
-        await expect(page.locator('[data-testid="kitchen-verdict"]')).toBeVisible();
+        // 3 circuits are OFF (fryer A, dishwasher D, bain-marie C) → override step appears
+        await expect(page.locator('[data-testid="kitchen-override-step"]')).toBeVisible();
+        await expect(page.locator('[data-testid="kitchen-override-ok"]')).toBeVisible();
+        // Dishwasher (verdict D, always-on) → fuse-fixed chip shown
+        await expect(page.locator('[data-testid="kitchen-fuse-fixed"]')).toBeVisible();
     });
 
     // ── TF-140-08: override-ok follow-up records outcome ──────────────────────
@@ -131,25 +138,22 @@ test.describe('OOHDASH-140 Tuya kitchen flow — fixture site 8888', () => {
         await openKitchen(page);
         await expect(page.locator('[data-testid="kitchen-picker"]')).toBeVisible({ timeout: 5000 });
         await page.locator('[data-testid="kitchen-picker"] button.chip', { hasText: 'Fryer' }).click();
-        await expect(page.locator('[data-testid="kitchen-verdict"]')).toBeVisible();
+        // J1 override-first: override step appears before verdict
+        // E1: kitchen-override-ok auto-submits for non-P1 → outcome-captured directly
         await page.locator('[data-testid="kitchen-override-ok"]').click();
-        // Confirm step appears — click Record outcome to submit
-        await expect(page.locator('[data-testid="record-outcome"]')).toBeVisible({ timeout: 5000 });
-        await page.locator('[data-testid="record-outcome"]').click();
         await expect(page.locator('[data-testid="outcome-captured"]')).toBeVisible({ timeout: 10000 });
     });
 
-    // ── TF-140-09: fuse-fail follow-up on verdict D escalates ─────────────────
+    // ── TF-140-09: fuse-fixed on verdict D records captured outcome (E1) ──────
 
-    test('TF-140-09: after verdict D — fuse-fail leads to capture step', async ({ page }) => {
+    test('TF-140-09: after override step — fuse-fixed records captured outcome', async ({ page }) => {
         await openKitchen(page);
         await expect(page.locator('[data-testid="kitchen-picker"]')).toBeVisible({ timeout: 5000 });
         await page.locator('[data-testid="kitchen-picker"] button.chip', { hasText: 'Dishwasher' }).click();
-        await expect(page.locator('[data-testid="kitchen-verdict"]')).toBeVisible();
-        await page.locator('[data-testid="kitchen-fuse-fail"]').click();
-        // Should reach a criticality question or outcome (fuse-fail → capture escalation)
-        const hasCaptured = await page.locator('[data-testid="outcome-captured"]').isVisible().catch(() => false);
-        const hasQuestion = await page.locator('[data-testid="kitchen-critical"]').isVisible().catch(() => false);
-        expect(hasCaptured || hasQuestion).toBe(true);
+        // J1 override-first: override step appears for OFF device (verdict D)
+        await expect(page.locator('[data-testid="kitchen-override-step"]')).toBeVisible();
+        // E1: kitchen-fuse-fixed auto-submits for non-P1 → outcome-captured directly
+        await page.locator('[data-testid="kitchen-fuse-fixed"]').click();
+        await expect(page.locator('[data-testid="outcome-captured"]')).toBeVisible({ timeout: 10000 });
     });
 });

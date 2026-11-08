@@ -114,7 +114,30 @@ async function boot() {
     } catch (err) {
         state.loadError = err.message;
     }
+    // OOHDASH-159 rev 5 (A1): /ticket/:id is the in-app ticket page, always opened in its own tab.
+    const tm = /^\/ticket\/(\d+)\/?$/.exec((window.location && window.location.pathname) || '');
+    if (tm && !state.loadError) return renderTicketPage(tm[1]);
     render();
+}
+
+async function renderTicketPage(id) {
+    document.title = 'Ticket #' + id + ' · OOH Dashboard';
+    const app = document.getElementById('app');
+    app.innerHTML = `<div class="content narrow ticketpage" style="margin:30px auto"><div class="card"><h2>Ticket #${esc(id)}</h2><p class="small">Loading…</p></div></div>`;
+    try {
+        const { ticket: t } = await api.get('/api/tickets/' + encodeURIComponent(id) + '/view');
+        app.innerHTML = `<div class="content narrow ticketpage" data-testid="ticket-page" style="margin:30px auto"><div class="card">
+   <p class="small" style="margin:0 0 6px">OOH Dashboard · ticket page (this tab can be closed when you're done)</p>
+   <h2 style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">Ticket #${esc(String(t.id))} ${t.isP1 ? '<span class="tag red" data-testid="ticket-page-p1">P1</span>' : ''}</h2>
+   <p style="margin:6px 0"><b>${esc(t.subject)}</b></p>
+   <div class="gtk" data-testid="ticket-page-status"><span class="gtk-label">ℹ Status right now (from the IoT team)</span>${esc(t.status.agent)}</div>
+   <p class="small">Opened ${esc(t.createdFriendly)} · last updated ${esc(t.updatedFriendly)}${t.fromOoh ? ' · raised from this dashboard' : ''}</p>
+   <h3 style="margin-top:14px">What's on the ticket</h3>
+   ${t.thread.length ? `<div class="timeline">${t.thread.slice().reverse().map(c => `<div class="tlitem"><div class="tw">${esc(new Date(c.at).toLocaleString('en-GB', { weekday: 'short', hour: '2-digit', minute: '2-digit' }))}</div><div style="white-space:pre-line">${esc(c.text)}</div></div>`).join('')}</div>` : '<p class="small">Nothing on the ticket yet.</p>'}
+  </div></div>`;
+    } catch (err) {
+        app.innerHTML = `<div class="content narrow" style="margin:30px auto"><div class="alert err" data-testid="ticket-page-error">Couldn't open ticket #${esc(id)}: ${esc(err.message)}</div></div>`;
+    }
 }
 
 /* ------------------------ shell ------------------------ */
@@ -164,7 +187,7 @@ function render() {
    <span class="ctx">${ws && state.confirmToken ? `${esc(ws.site.siteName)} · <span class="mono">${esc(ws.site.siteNo)}</span>` : ({ home: 'New Call', callback: 'Callback Lookup', tonight: 'Tonight', admin: 'Admin', site: 'New Call' })[state.view]}</span>
    <span class="ver">v${esc(state.me.version)}${state.me.dataMode === 'fixture' ? ' · fixture data' : ''}</span>
   </div>
-  ${kill ? `<div class="banner kill" data-testid="kill-banner">⛔ ${kill} — control actions are disabled; capture &amp; escalate still works.${isIot ? ' <button class="btn link" onclick="go(\'admin\')">Manage</button>' : ''}</div>` : ''}
+  ${kill ? `<div class="banner kill" data-testid="kill-banner">⛔ ${kill} — control actions are disabled; passing issues to the IoT team still works.${isIot ? ' <button class="btn link" onclick="go(\'admin\')">Manage</button>' : ''}</div>` : ''}
   ${state.me.controlLive && !kill ? `<div class="banner live" data-testid="control-live-banner">🟢 <b>Device control is LIVE</b> — changes you send will reach real equipment. Confirm the site before every change.</div>` : ''}
   ${notice && (state.view === 'home' || state.view === 'site') ? `<div class="banner notice" data-testid="notice-banner">📣 <b>${esc(notice.OohNoticeTitle)}</b>&nbsp;${esc(notice.OohNoticeBody)}</div>` : ''}
   <div id="view"></div>
@@ -181,6 +204,7 @@ function render() {
 }
 
 async function go(v) {
+    if (v === 'home' && state.call && state.call.id) callFinalise('left-screen'); // OOHDASH-159 rev 5 (E1)
     state.view = v;
     if (v === 'home') {
         state.siteNo = null; state.pendingSite = null; state.ambiguous = null;
@@ -225,13 +249,13 @@ async function searchInput(q) {
     } catch (err) {
         srch.hits = [];
         box.innerHTML = `<div class="sresults"><div class="empty">${err.degraded
-            ? '<b>The device inventory is unreachable right now.</b> You can still capture the caller\'s issue — go to a manual capture via "Something else" once the site is known, or raise it in Tonight → Raise a query.'
+            ? '<b>The device inventory is unreachable right now.</b> You can still capture the customer\'s issue — go to a manual capture via "Something else" once the site is known, or raise it in Tonight → Raise a query.'
             : esc(err.message)}</div></div>`;
         return;
     }
     srch.hits = results;
     if (!results.length) {
-        box.innerHTML = `<div class="sresults"><div class="empty" data-testid="search-empty"><b>No site matches "${esc(q)}".</b><br>Check the house number with the caller. If it\'s still not found, the site may not be on Lighthouse — search by pub name, or capture &amp; escalate.</div></div>`;
+        box.innerHTML = `<div class="sresults"><div class="empty" data-testid="search-empty"><b>No site matches "${esc(q)}".</b><br>Check the house number with the customer. If it\'s still not found, the site may not be on Lighthouse — search by pub name, or pass it to the IoT team.</div></div>`;
         return;
     }
     box.innerHTML = `<div class="sresults" data-testid="search-results">${results.map((s, i) =>

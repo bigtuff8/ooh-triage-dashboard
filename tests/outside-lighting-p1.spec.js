@@ -27,9 +27,9 @@ test.describe('OOHDASH-111 & 112 — outside lighting P1 + script text', () => {
         await confirmSite(page, '6749', 'Angel Inn');
         await page.locator('[data-testid="tile-lighting"]').click();
 
-        // OOHDASH-119: chip click now shows confirm step; POST fires on Record outcome click
+        // J1: "Still not working" is now [data-testid="lighting-still-off"] (P1 chip, keeps record-outcome)
         const requestPromise = page.waitForRequest(r => r.url().includes('/api/outcomes') && r.method() === 'POST');
-        await page.locator('.chip:has-text("Still not working")').click();
+        await page.locator('[data-testid="lighting-still-off"]').click();
         await page.locator('[data-testid="record-outcome"]').click();
         const request = await requestPromise;
 
@@ -40,16 +40,14 @@ test.describe('OOHDASH-111 & 112 — outside lighting P1 + script text', () => {
         // Outcome card must be P1, NOT captured
         const p1 = page.locator('[data-testid="outcome-p1"]');
         await expect(p1).toBeVisible();
-        await expect(p1).toContainText('Escalated — P1');
+        await expect(p1).toContainText('P1 raised');
         await expect(page.locator('[data-testid="outcome-captured"]')).toHaveCount(0);
     });
 
     test('111-B regression guard: "caller sorted it with the override" stays a capture — no P1 escalation', async ({ page }) => {
         await confirmSite(page, '6749', 'Angel Inn');
         await page.locator('[data-testid="tile-lighting"]').click();
-        await page.locator('.chip:has-text("Caller sorted it with the override")').click();
-        // OOHDASH-119: confirm step required
-        await page.locator('[data-testid="record-outcome"]').click();
+        await page.locator('[data-testid="lighting-ok"]').click(); // J1: "Yes, they've come on", auto-submits (non-P1)
 
         // Must be a captured outcome — NOT a P1
         await expect(page.locator('[data-testid="outcome-captured"]')).toBeVisible();
@@ -59,13 +57,12 @@ test.describe('OOHDASH-111 & 112 — outside lighting P1 + script text', () => {
     test('111-C dispatch-status honesty: lighting P1 card shows Approach-B honest line — IoT Support Dashboard pages manager', async ({ page }) => {
         await confirmSite(page, '6749', 'Angel Inn');
         await page.locator('[data-testid="tile-lighting"]').click();
-        await page.locator('.chip:has-text("Still not working")').click();
-        // OOHDASH-119: confirm step required
+        await page.locator('[data-testid="lighting-still-off"]').click(); // J1: P1 chip
         await page.locator('[data-testid="record-outcome"]').click();
 
         const status = page.locator('[data-testid="p1-dispatch-status"]');
-        await expect(status).toContainText('logged as ticket');
-        await expect(status).toContainText('pages the on-duty manager');
+        await expect(status).toContainText('The on-duty manager has been paged');
+        await expect(status).toContainText('will call the site back');
         // Old Approach-A false warnings must be absent
         await expect(status).not.toContainText('Text not sent');
         await expect(status).not.toContainText('text message has been sent');
@@ -80,16 +77,16 @@ test.describe('OOHDASH-111 & 112 — outside lighting P1 + script text', () => {
         await expect(page.locator('.alert.info')).toContainText("External lighting at this site");
         await expect(page.locator('.alert.info')).toContainText("on Lighthouse");
         // P1 chip must not exist — path is unreachable
-        await expect(page.locator('.chip:has-text("Still not working")')).toHaveCount(0);
+        await expect(page.locator('[data-testid="lighting-still-off"]')).toHaveCount(0);
     });
 
     test('111-E p1Summary propagation: POST body carries "External lighting not responding"', async ({ page }) => {
         await confirmSite(page, '6749', 'Angel Inn');
         await page.locator('[data-testid="tile-lighting"]').click();
 
-        // OOHDASH-119: chip click shows confirm step; POST fires on Record outcome click
+        // J1: P1 chip keeps record-outcome
         const requestPromise = page.waitForRequest(r => r.url().includes('/api/outcomes') && r.method() === 'POST');
-        await page.locator('.chip:has-text("Still not working")').click();
+        await page.locator('[data-testid="lighting-still-off"]').click();
         await page.locator('[data-testid="record-outcome"]').click();
         const request = await requestPromise;
 
@@ -103,10 +100,8 @@ test.describe('OOHDASH-111 & 112 — outside lighting P1 + script text', () => {
         await confirmSite(page, '6749', 'Angel Inn'); // online lighting device
         await page.locator('[data-testid="tile-lighting"]').click();
 
-        const script = page.locator('.script').first();
-        await expect(script).toContainText('sensor that brings them on automatically at dusk');
-        await expect(script).toContainText('only affects tonight');
-        await expect(script).toContainText('picks everything back up automatically from tomorrow');
+        const script = page.locator('.flowbody').first();
+        await expect(script).toContainText('come on automatically at dusk');
         // Fuse-board check is an OFFLINE-only point
         await expect(script).not.toContainText('fuse board');
     });
@@ -115,11 +110,9 @@ test.describe('OOHDASH-111 & 112 — outside lighting P1 + script text', () => {
         await confirmSite(page, '6360', 'Mill House'); // offline lighting device
         await page.locator('[data-testid="tile-lighting"]').click();
 
-        const script = page.locator('.script').first();
-        await expect(script).toContainText('sensor that brings them on automatically at dusk');
+        const script = page.locator('.flowbody').first();
         await expect(script).toContainText('fuse board');
-        await expect(script).toContainText('tripped breaker');
-        await expect(script).toContainText('picks everything back up automatically from tomorrow');
+        await expect(script).toContainText('tripped');
     });
 
     test('112-C at 1100px viewport the .script block renders inside .flowbody with no overflow', async ({ page }) => {
@@ -127,10 +120,7 @@ test.describe('OOHDASH-111 & 112 — outside lighting P1 + script text', () => {
         await confirmSite(page, '6749', 'Angel Inn');
         await page.locator('[data-testid="tile-lighting"]').click();
 
-        const flowbody = page.locator('.flowbody');
-        await expect(flowbody).toBeVisible();
-
-        const scriptEl = page.locator('.script').first();
+        const scriptEl = page.locator('.flowbody').first();
         await expect(scriptEl).toBeVisible();
 
         // Script must not overflow its container (scrollWidth <= clientWidth + 1px rounding tolerance)
