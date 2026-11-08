@@ -2,36 +2,59 @@
 TICKET: OOHDASH-146
 PHASE: design
 SECTION: What this design does
-It applies one agent-screen standard to every flow in the OOH Dashboard, so a call handler always reads one clear script, asks the customer a plain question, and finishes with a ticket number. The prototype IS the live product (version 1.6.6, which already contains the OOHDASH-159 changes) with only the 146 changes applied on top. Every screen you click is the real live screen, captured from the running app, unless this document lists it as changed. Revision 4 adds your decision D13, the universal risk question.
-SECTION: What changed in revision 4
-Revision 4 added your decision D13, the universal risk question (details in the next section). Revision 4.1 applies your answers of 2026-11-07: the guide-picture rights check IP-1 is closed (rights confirmed); customer contact details on a ticket are kept until an agent removes them by hand (PD-1); and the PowerPause guide is now a faithful copy of the Word document "Lighthouse PowerPause Contractor Info.docx", with its text, phone number and pictures exactly as in the document. The prototype has {{NSCREENS}} screens: {{NQ}} show the question and {{NCONF}} P1 confirm screens carry the mandatory comment box. Nothing else changed.
+It applies one agent-screen standard to every flow in the OOH Dashboard, so a call handler always reads one clear script, asks the customer a plain question, and finishes with a ticket number. The prototype IS the live product (version 1.6.6, which already contains the OOHDASH-159 changes) with only the 146 changes applied on top. Every screen you click is the real live screen, captured from the running app, unless this document lists it as changed. You can click through it here: https://home-desktop-jb-new.tail30d2e6.ts.net/review/oohdash-146-mockup.html and read the PowerPause guide here: https://home-desktop-jb-new.tail30d2e6.ts.net/review/oohdash-146-powerpause-guide.html
+SECTION: What changed in revision 4.2
+Revision 4 added your decision D13, the universal risk question. Revision 4.1 applied your answers on the guide (a faithful copy of the Word document) and closed the picture rights check. Revision 4.2 applies your answers of 2026-11-08. Customer contact details in Zendesk now have an automatic deletion backstop of 12 months from ticket close, and an agent can still remove them earlier by hand (this answers the compliance block). The failed one-off switch-off keeps its automatic P1, as the sole exception you accepted. A new rule D14, the urgency window, replaces the blanket question on planned requests: fans, kitchen times, kitchen one-offs and air conditioning schedule changes are filtered by whether the change is needed before the IoT team could act. The kitchen one-off no longer asks "will someone be in the kitchen". The build rows gain the hardening the review panel asked for. The prototype has {{NSCREENS}} screens: {{NQ}} show a question and {{NCONF}} P1 confirm screens carry the mandatory comment box.
 SECTION: The universal risk question
-Yes goes to the live P1 confirm step, with one new thing: a box labelled "Why is this urgent? (required, goes on the P1 ticket)". The red Raise the P1 button stays greyed out until the agent has typed at least ten real characters, and the server refuses a P1 with an empty comment as well. The comment is written into the P1 ticket, never into the subject. No gives the normal ticket for the next working day, in the live wording ("It's logged, reference N, and our IoT team picks it up the next working day"), or the live closed note where Lighthouse does not control the equipment. A P1 means the ticket is tagged ooh_p1; when it reaches the IoT Support Dashboard, that dashboard texts the IoT team's on-call agent, who deals with it immediately. The OOH Dashboard itself sends no text message (OOHDASH-153).
+Every flow still asks the same question, word for word: "Is there an immediate risk to trade or to anyone's health and safety?" with Yes and No. Yes goes to the live P1 confirm step, with a box labelled "Why is this urgent? (required, goes on the P1 ticket)"; the red Raise the P1 button stays greyed out until the agent has typed at least ten real characters, and the server refuses a P1 with an empty comment as well. The comment is written into the P1 ticket, never into the subject. No gives the normal ticket for the next working day, in the live wording, or the live closed note where Lighthouse does not control the equipment. A P1 means the ticket is tagged ooh_p1; when it reaches the IoT Support Dashboard, that dashboard texts the IoT team's on-call agent, who deals with it immediately. The OOH Dashboard itself sends no text message (OOHDASH-153).
 SECTION: Where the question sits and what it replaces
-One rule everywhere. Self-help comes first as in 159 decision J1 (the override, the fuse board, the switch). The question is asked at the point the problem is still not resolved on the call, before the ticket is made. It is not asked where the problem was resolved on the call (for example the override worked). Flows with no self-help ask it once the problem is understood. It also sits before every closed "use your own service contractor" note, because you said every flow; there a Yes raises a P1 so the on-call agent can call back, even though they cannot fix equipment Lighthouse does not control (please check this, see Your checks). The P1 triggers it replaces: the kitchen service question, the fridge stock-at-risk question, lighting "still off", the contractor "something else" and "override did not work" paths, the Donkey Derby straight-to-P1, the Something else "is it urgent" question, and the automatic P1 for a failed kitchen one-off switch-off. This also settles the open fridge item (Q4).
+One rule everywhere. Self-help comes first as in 159 decision J1 (the override, the fuse board, the switch). The question is asked at the point the problem is still not resolved on the call, before the ticket is made. It is not asked where the problem was resolved on the call (for example the override worked). Flows with no self-help ask it once the problem is understood. It also sits before every closed "use your own service contractor" note, because you said every flow; there a Yes raises a P1 so the on-call agent can call back, even though they cannot fix equipment Lighthouse does not control (still your check, Q9). The P1 triggers it replaces: the kitchen service question, the fridge stock-at-risk question, lighting "still off", the contractor "something else" and "override did not work" paths, the Donkey Derby straight-to-P1 and the Something else "is it urgent" question. A P1 now has these ways in only: the question; a P1 offered (not forced) on an urgent fan one-off or an urgent kitchen permanent timetable request; and two automatic exceptions where nobody is on a call to ask, a failed kitchen one-off switch-off and an urgent kitchen one-off the dashboard cannot make.
+SECTION: The urgency window (D14)
+Planned requests are filtered by urgency instead of asking the risk question. Business as usual is the IoT support office; I have assumed Monday to Friday 09:00 to 17:00, excluding bank holidays, and the IoT team aims to act within 3 working hours (please confirm the exact hours, Q14). A request is urgent if the change must happen before the IoT team could reasonably do it: tonight, before the office opens, or before 12:00 on the next working day when asked out of hours. One shared helper works it out from the time the agent says it is needed, and the screen shows "Urgent — outside office hours" or "Not urgent — the IoT team can pick this up in time". Extractor fans: the agent first says one-off or every week, then when; only an urgent one-off can be a P1, anything else is a normal ticket with no P1 offered. Kitchen "different times every week": only an urgent request may be a P1, with the permanent request written into the P1 for the IoT team. Air conditioning keeps the risk question and says where to put an ongoing schedule change. Kitchen one-off: the "will someone be there" question is removed, because PowerPause only controls power and safe use stays the site's responsibility; an urgent one-off the dashboard can make is booked and ticketed, one it cannot make raises a P1 automatically, and anything not urgent is a normal ticket.
 SECTION: What 146 still changes compared with live
 {{NDELTAS}} items, each listed with the screens it touches in section 3. The main ones: the universal risk question (item R14); a one-off "keep it on longer or switch on earlier" for kitchen equipment (no timetable is ever written); a redesigned "Something else"; hot water ends on one closed note everywhere; equipment that is not on Lighthouse here ends on a closed note instead of a dead end; the connection-check button is removed while the automatic divert stays; the heating questions no longer ask the agent to judge; the device control window uses plain words and never says "I've logged it" without a ticket number; customer name, role and number are asked after the site is confirmed; Tonight shows plain outcome chips; and "caller" becomes "customer" in ticket text.
 SECTION: Decisions amended in revisions 3 and 4
-From revision 3: D3 (call it a manual control button) is superseded, live says "manual override" and that stays; D9 never blocks, the customer details are asked after the site is confirmed. From revision 4: D13 changes D6 and D7. The fridge is now a P1 only through the universal question, not by its own stock-at-risk rule. Hot water was "never a P1" and can now be one if the customer answers Yes. The contractor rule "calls are always treated as urgent" is replaced: the engineer is helped with the override first, and a P1 is raised only when there is an immediate risk. Everything else from D1 to D12 stands, and 159 decision J1 (self-help first, then a ticket for the next working day) is kept.
+From revision 3: D3 (call it a manual control button) is superseded, live says "manual override" and that stays; D9 never blocks, the customer details are asked after the site is confirmed. From revision 4: D13 changes D6 and D7. The fridge is now a P1 only through the universal question. Hot water was "never a P1" and can now be one if the customer answers Yes. The contractor rule "calls are always treated as urgent" is replaced: the engineer is helped with the override first, and a P1 is raised only when there is an immediate risk. From revision 4.2: D14 is new, Q11 is accepted (the failed switch-off keeps its automatic P1), and Q13 is closed as superseded by D14. Everything else from D1 to D12 stands, and 159 decision J1 (self-help first, then a ticket for the next working day) is kept.
 SECTION: PowerPause guide pictures
 The live guide showed no device pictures because the page was published without its picture files and rewritten as text only. You said the guide already exists and should simply be copied from the Word document. The source is "Lighthouse PowerPause Contractor Info.docx" (Remote Monitoring, Greene King, Flaming Grills, Phase 2 Sites, Engineer Information). The guide is now that document word for word, in the same order: all 12 pictures (11 in the body and the header logo), the support phone number 023 814 0228, the Tongou and Owon wording, the fire-up and fire-down table and the contactor override section (you asked for that section to stay). Nothing is refined or reworded. The pictures add about 1.2 MB of static files and no running cost. The rights check IP-1 is closed on your confirmation. The contractor-on-site flow improvements (asking override versus something else, choosing the device, reading and emailing the instructions) are the backlog story OOHDASH-163 and are out of scope here.
 SECTION: How it was checked
-The real app was run in fixture mode and a script clicked every button on every flow, saving each screen. The prototype is built from those captures. A second script then read the text of every prototype screen and compared it line by line with the live screen it came from: {{NIDENT}} screens are identical, {{NEXPL}} differ and each difference maps to an item in the list, {{NNEW}} are new in 146 and each maps to an item, and there are {{NUNEXPL}} unexplained differences. A click test pressed {{NCLICKS}} buttons on the {{NSCREENS}} screens with no errors and no dead buttons. For D13 the script proved three more things: every ticket screen is reached only from the question or is on the list of problems resolved on the call (none left over); every P1 confirm screen is reached only from the question; and on all {{NP1}} P1 confirm screens the Raise the P1 button stays disabled for an empty comment, spaces only, nine characters or a cleared box, and enables only for real content.
+The real app was run in fixture mode and a script clicked every button on every flow, saving each screen. The prototype is built from those captures. A second script then read the text of every prototype screen and compared it line by line with the live screen it came from: {{NIDENT}} screens are identical, {{NEXPL}} differ and each difference maps to an item in the list, {{NNEW}} are new in 146 and each maps to an item, and there are {{NUNEXPL}} unexplained differences. A click test pressed {{NCLICKS}} buttons on the {{NSCREENS}} screens with no errors and no dead buttons. The D13 and D14 checks also passed: every ticket screen is reached only from a question or the urgency screens, or is on the list of problems resolved on the call (none left over); every P1 confirm screen is reached only from the question or an urgent screen; every not-urgent screen is a dead end for P1 (no P1 can be reached from it); the two automatic P1 exceptions are reached only from the "cannot make the change" screens; and on all {{NP1}} ordinary P1 confirm screens, plus the pre-filled retry screen, the Raise the P1 button stays disabled for an empty comment, spaces only, nine characters or a cleared box, and enables only for real content.
 SECTION: Your checks still open
-Revision 4 left six things for you, all marked in section 15, and they are still open. First, hot water can now be a P1, which reverses D7 (Q8). Second, "every flow" includes the equipment Lighthouse does not control; the on-call agent cannot fix that, only call back (Q9). Third, the contractor "always urgent" rule is gone (Q10). Fourth, a failed kitchen one-off switch-off no longer raises a P1 by itself, because nobody is on a call to ask the question; this is a safety trade-off for you to decide (Q11). Fifth, the screens say "the on-duty manager" where you said "on-call agent" (Q12). Sixth, planned timetable requests and fan requests now ask the question too, which adds one click (Q13). Also still to do: the IoT helpdesk lead agrees the new ticket subject list (R1), Sam Day on the contractor "override worked" ticket (Q1), and the handler briefing note. Closed by your answers: IP-1 (rights confirmed), PD-1 (kept until an agent removes it), the guide phone number and Tongou/Owon wording (as per the Word document, Q5 and Q6) and the contactor section (kept, Q7).
+Still open for you, all marked in section 15: hot water can now be a P1, reversing D7 (Q8); "every flow" includes equipment Lighthouse does not control, where the on-call agent can only call back (Q9); the contractor "always urgent" rule is gone (Q10); the screens say "the on-duty manager" where you said "on-call agent" (Q12). New for you: please confirm the IoT office hours I assumed for D14, Monday to Friday 09:00 to 17:00 excluding bank holidays (Q14). Also still to do: the IoT helpdesk lead agrees the new ticket subject list (R1), Sam Day on the contractor "override worked" ticket (Q1), the handler briefing note, and, before release, the IoT helpdesk sets up the 12 month automatic deletion in Zendesk (PD-1). Closed by your answers: IP-1 (rights confirmed, including the device pictures), the guide content (Q5, Q6, Q7), the failed switch-off P1 (Q11 accepted) and the planned-request question (Q13, replaced by D14).
 SECTION: Cost, background running and going back
-No AI or per-use costs. D13 is browser code and one server check, with nothing running in the background. The only cost is a few seconds: one extra click on tickets that were already being raised, and one typed sentence on a P1. The kitchen one-off reuses the dashboard's existing revert timer that already runs silently inside the server; nothing new runs on any computer and no screen, window or notification appears while it waits. It is behind a switch that starts off. The guide pictures add about 1.2 MB of static files to the container image and no running cost. Rollback is a revert of the release; cancel any booked one-offs first.
-DECISION: Approve revision 4.1 of the design and proceed to build? | Approve - proceed to build | Block - needs changes
-DETAIL: Revision 4.1 changes the prototype, the guide copy and this document only; the live app is untouched. Section 15 lists the open items Q8 to Q13; none blocks the build, but Q9 and Q11 are your calls on safety and scope.
+No AI or per-use costs. D13 and D14 are browser code, one shared urgency function and server checks on existing routes, with nothing running in the background. The only cost is a few seconds: one extra click on tickets that were already being raised, and one typed sentence on a P1. The kitchen one-off reuses the dashboard's existing revert timer that already runs silently inside the server; nothing new runs on any computer and no screen, window or notification appears while it waits. The 12 month Zendesk deletion is a setting in the helpdesk tool, not a job we run. The guide pictures add about 1.2 MB of static files to the container image and no running cost. Rollback is a revert of the release; cancel any booked one-offs first.
+DECISION: Approve revision 4.2 of the design and proceed to build? | Approve - proceed to build | Block - needs changes
+DETAIL: Revision 4.2 changes the prototype, the guide copy and this document only; the live app is untouched. Section 15 lists the open items Q8, Q9, Q10, Q12 and Q14; none blocks the build, but Q9 is your call on scope.
 -->
 
-# OOHDASH-146 Design: the agent-screen standard for every flow (revision 4.1: universal risk question and faithful guide, on live v1.6.6)
+# OOHDASH-146 Design: the agent-screen standard for every flow (revision 4.2: risk question, urgency window and faithful guide, on live v1.6.6)
 
-Date: 2026-11-07 · Base: origin/main `916f6e3` (v1.6.6, includes OOHDASH-159) · Discovery: PR #162 (D1 to D4) · Your UI review of PR #178 (D5 to D12) · Your drift review of 2026-11-05 (items A1 to C6b, "implement your recommendations") · Your decision D13 of 2026-11-07 (the universal risk question)
+Date: 2026-11-08 · Base: origin/main `916f6e3` (v1.6.6, includes OOHDASH-159) · Discovery: PR #162 (D1 to D4) · Your UI review of PR #178 (D5 to D12) · Your drift review of 2026-11-05 (items A1 to C6b, "implement your recommendations") · Your decision D13 of 2026-11-07 (the universal risk question) · Your decisions of 2026-11-08 (PD-1, Q11, D14)
+
+**Review links:** prototype https://home-desktop-jb-new.tail30d2e6.ts.net/review/oohdash-146-mockup.html · PowerPause guide https://home-desktop-jb-new.tail30d2e6.ts.net/review/oohdash-146-powerpause-guide.html
 
 **Clickable prototype (the live screens, with the 146 changes applied):** [OOHDASH-146 prototype](mockups/OOHDASH-146-mockup.html) · **Revised PowerPause guide (with pictures):** [guide prototype](oohdash-146/guide/powerpause-contractor-info.html) · **Screen-text diff against live:** [OOHDASH-146-SCREEN-DIFF.md](OOHDASH-146-SCREEN-DIFF.md)
 
-## 1. What changed in revision 4
+## 1. What changed in revision 4.2
+
+| Part | What was done |
+|---|---|
+| A. PD-1 (fixes the compliance block) | Customer contact data (name, role, phone) in Zendesk gets an automatic deletion backstop of 12 months from ticket close, and an agent can still remove it earlier by hand. Lawful basis: legitimate interests (call-back). How it works and the pre-release item for the IoT helpdesk are in the rework addendum and the data dictionary (section 17). The compliance finding is closed. |
+| B. Q11 accepted | A failed kitchen one-off switch-off keeps its automatic P1 (sole exception to "a P1 only through the question" until D14d adds a second). |
+| C. D14 urgency window | Fans, kitchen "different times every week", kitchen one-off and air conditioning are filtered by urgency. Section 2B. Q13 is closed as superseded. |
+| D. One-off safety question removed | "Will someone be in the kitchen?" is gone; PowerPause only controls power and safe use stays with the site (stated on the screens). |
+| E. Build hardening from the review panel | Section 6, rows B27 to B32. |
+| F. Prototype | {{NSCREENS}} screens (was 388). Screen-text diff {{NUNEXPL}} unexplained; click test no dead buttons or errors; D13 and D14 checks pass (section 4). |
+| G. Review links | The prototype and guide links are at the top of this document (the review is presented through the PR). |
+
+### 1B. Earlier: what changed in revision 4 and 4.1 (kept for the record)
+
+| Part | What was done |
+|---|---|
+| Revision 4: D13 | The universal risk question (section 2A) with the mandatory P1 comment. |
+| Revision 4.1 | IP-1 closed; guide rebuilt as a faithful copy of the Word document (section 5); Q5, Q6, Q7 closed. |
+
+## 1C. Revision 4 table, kept
 
 | Part | What was done |
 |---|---|
@@ -40,7 +63,7 @@ Date: 2026-11-07 · Base: origin/main `916f6e3` (v1.6.6, includes OOHDASH-159) �
 | C. Mandatory comment | Every P1 confirm screen has "Why is this urgent? (required, goes on the P1 ticket)". The button is disabled until it has at least 10 real characters; the server refuses an empty one. Section 2A.1 and section 6 (B19 to B21). |
 | D. Placement | Self-help first (159 J1), question when the problem is still not resolved on the call, none where it was resolved, and before every closed note. Section 2A.3. |
 | E. Prototype and checks | {{NSCREENS}} screens (was 298). The screen-text diff still has {{NUNEXPL}} unexplained differences, the click test found no dead buttons or errors, and three new D13 checks pass (section 4). |
-| F. Revision 4.1 (your answers of 2026-11-07) | IP-1 closed (rights confirmed), so build step G-2 is unconditional. PD-1 decided: customer contact data stays on the Zendesk ticket until an agent removes it by hand (no fixed period). The PowerPause guide is a faithful copy of the Word document "Lighthouse PowerPause Contractor Info.docx" (section 5). The contactor-override section stays. Q5, Q6 and Q7 are closed. OOHDASH-163 (contractor-on-site flow improvements) is the follow-on story, out of scope. |
+| F. Revision 4.1 (your answers of 2026-11-07) | IP-1 closed (rights confirmed), so build step G-2 is unconditional. PD-1 decided: customer contact data stays on the Zendesk ticket until an agent removes it by hand (no fixed period; replaced in revision 4.2 by a 12 month automatic deletion backstop plus manual removal). The PowerPause guide is a faithful copy of the Word document "Lighthouse PowerPause Contractor Info.docx" (section 5). The contactor-override section stays. Q5, Q6 and Q7 are closed. OOHDASH-163 (contractor-on-site flow improvements) is the follow-on story, out of scope. |
 | G. Everything else | Unchanged from revision 3, including the rework addendum at the end (now read with the 4.1 notes in it). |
 
 ### 1A. Earlier: what changed in revision 3 (kept for the record)
@@ -69,6 +92,7 @@ Date: 2026-11-07 · Base: origin/main `916f6e3` (v1.6.6, includes OOHDASH-159) �
 | D10 | Connection check: no standalone entry, keep the divert | Unchanged. Corrected divert wording replaces the false "Everything at this site is online". |
 | D11 | Something else: remove the "it is controlled" dead end | Unchanged. |
 | D13 | The universal risk question | **New in revision 4.** Section 2A. |
+| D14 | The urgency window | **New in revision 4.2.** Section 2B. Replaces the blanket question on planned requests (Q13). |
 | D12 | Thermostat heating stays in 146 | Unchanged. The pub boiler-panel screens are shown as live (C6a). |
 
 ## 2A. D13: the universal risk question (new in revision 4)
@@ -100,22 +124,22 @@ A P1 is a ticket raised with the existing `escalate-p1` outcome: priority urgent
 
 | Flow | Where the question sits | Yes goes to | No goes to |
 |---|---|---|---|
-| Kitchen (every site type, including the glass washer states) | The live "is the kitchen needed for service?" question is replaced in place, after the override did not work, the customer could not find the panel, or "I still think it's your equipment". It is also asked before the "different times every week" request ticket and before the "nobody will be there" ticket. | The live kitchen P1 confirm, with the comment | The live "not needed until later" ticket, now headed "Kitchen equipment off — no immediate risk" |
+| Kitchen (every site type, including the glass washer states) | The live "is the kitchen needed for service?" question is replaced in place, after the override did not work, the customer could not find the panel, or "I still think it's your equipment". "Different times every week" and the one-off flow are filtered by urgency instead (section 2B). | The live kitchen P1 confirm, with the comment | The live "not needed until later" ticket, now headed "Kitchen equipment off — no immediate risk" |
 | Kitchen: appliance fault ("I'll call our service contractor"), "Something not on this list", no kitchen on Lighthouse | Before the closed note | P1 (equipment Lighthouse does not control), with the comment | The live closed note |
 | Outside lighting | After the manual override: on "No, they're still off" | The live lighting P1 confirm, with the comment | A new next-working-day ticket, "External lighting not working — no immediate risk" |
-| Extractor fans | After the self-help screen, before the timetable request ticket | Fans P1 | The live ticket |
+| Extractor fans | Not the risk question: the urgency filter (section 2B): one-off or every week, then when it is needed | A P1 is offered only for an urgent one-off, with the comment | The live ticket (always, for every week or not urgent) |
 | Fridges and freezers | The live "is stock at risk?" question is replaced in place | The live fridge P1 confirm, with the comment | The live closed note (Lighthouse does not control fridges) |
 | Hot water (all eleven readings) | Before the closed note | Hot water P1 | The closed note |
 | Heating, thermostats | After the radiator question ("cold" gives a ticket, "warm" gives a closed note) and before the "Yes, please" log for a thermostat that is not reporting; also before the control-failure tickets ("not delivered", "not confirmed") | Heating P1 | The ticket or the closed note |
 | Heating, pub boiler panel | Before the helpdesk ticket when no heating change was made on the call | Heating P1 | The helpdesk ticket |
-| Air conditioning | Before the ticket | Air conditioning P1 | The ticket |
+| Air conditioning | Before the ticket, regardless of Lighthouse not controlling it; the info box says to put an ongoing schedule change in the notes box | Air conditioning P1, with the comment (a long-term part goes in the comment) | The ticket, with the optional notes text |
 | Connection check (reached by the automatic divert) | After the customer's checks did not fix it ("No, it's still not working") | Connection P1 | The ticket |
 | Contractor on site | After the override did not bring it on, on "No, something else", and at Donkey Derby (where the override does not work) | The live contractor P1 confirm, with the comment | A new next-working-day ticket |
 | Something else | "None of these" asks it in place of the live "is it urgent?" question. The other answers start that issue's own flow, which asks it. | The live Something else P1 (its required reason box is now the shared comment) | The live "can wait" ticket |
 | Not on Lighthouse here (lighting, fans, heating, air conditioning, kitchen, Something else) | Before the closed note | P1 (equipment Lighthouse does not control), with the comment | The closed note |
 | Site could not be identified (house number matches two sites) | Before the "pass it to the IoT team" ticket | P1 (site not identified) | The logged ticket |
 
-Not asked, on purpose (listed so nothing is a silent gap): a kitchen, lighting, fan or heating problem resolved by the override or the fuse board; "the unit's lights are back on"; a kitchen one-off booked or cancelled; "its normal times are fine"; a confirmed control change; a heating boost on the pub boiler panel; "No, leave it" on a thermostat (the customer declined to log it). Not call flows, so not asked: callback lookup, Tonight, and the Tonight query to the IoT helpdesk. The screen-text check proves every other ticket screen is reached only from the question (section 4).
+Not asked, on purpose (listed so nothing is a silent gap): a kitchen, lighting or heating problem resolved by the override or the fuse board; "the unit's lights are back on"; a kitchen one-off booked or cancelled; "its normal times are fine"; a confirmed control change; a heating boost on the pub boiler panel; "No, leave it" on a thermostat (the customer declined to log it). Not call flows, so not asked: callback lookup, Tonight, and the Tonight query to the IoT helpdesk. The screen-text check proves every other ticket screen is reached only from the question (section 4).
 
 ### 2A.4 The P1 triggers this replaces
 
@@ -129,9 +153,9 @@ Not asked, on purpose (listed so nothing is a silent gap): a kitchen, lighting, 
 | Contractor at Donkey Derby: "this is the one case where you go straight to a P1" | The universal question |
 | Contractor: "calls are always treated as urgent" (guide line on the first screen) | Reworded: help with the override first; a P1 only if there is an immediate risk |
 | Something else: "is this stopping the site trading, or is it a safety risk, right now?" and the live separate required reason box | The universal question and the shared comment |
-| Kitchen one-off: the server raised a P1 if a switch-off failed (design rev 3 section 9) | A normal ticket marked "one-off not switched off" (no agent is on a call to ask). See Q11 for your decision. |
+| Kitchen one-off: the server raised a P1 if a switch-off failed (design rev 3 section 9) | **Kept (Q11 accepted by you on 2026-11-08)**: still an automatic P1, the sole exception that is not a question until D14d (an urgent one-off the dashboard cannot make, also automatic). See section 2B.3. |
 
-Nothing else raises a P1: the server accepts the `escalate-p1` outcome only with a comment (section 6, B19), and the device control failure tickets use the normal ticket, as live.
+The complete list of ways to a P1 is in section 2B.3: the question; a P1 offered on an urgent fan one-off or an urgent kitchen permanent request; and two automatic exceptions. The server accepts the `escalate-p1` outcome only with a reason (the agent's comment, or a fixed system reason for the two automatic cases), and the device control failure tickets use the normal ticket, as live.
 
 ### 2A.5 P1 ticket subjects (the list to confirm with the IoT helpdesk lead)
 
@@ -140,19 +164,21 @@ The subject names the flow and "risk to trade or health and safety". Subjects fo
 | Flow | P1 subject (Yes) | Normal subject (No) |
 |---|---|---|
 | Kitchen | Kitchen equipment off — risk to trade or health and safety — P1 | Kitchen equipment off — no immediate risk |
-| Kitchen, other (times, nobody there) | Kitchen equipment — risk to trade or health and safety — P1 | the live ticket subject |
+| Kitchen, other (permanent times) | Kitchen equipment — risk to trade or health and safety — P1 (agent confirms, permanent request in the comment) | the live ticket subject |
 | Outside lighting | External lighting not working — risk to trade or health and safety — P1 | External lighting not working — no immediate risk |
 | Fridges | Refrigeration alarm — risk to trade or health and safety — P1 | live closed note |
 | Contractor | Contractor on site — risk to trade or health and safety — P1 | Contractor on site — no immediate risk |
 | Contractor, override failed | Contractor on site, PowerPause override failed — risk to trade or health and safety — P1 | Contractor on site, PowerPause override failed — no immediate risk |
 | Contractor, Donkey Derby | Contractor on site (Donkey Derby), override unavailable — risk to trade or health and safety — P1 | Contractor on site (Donkey Derby), override unavailable — no immediate risk |
 | Something else | Something else — risk to trade or health and safety — P1 | the live "can wait" subject |
-| Extractor fans | Extractor fans — risk to trade or health and safety — P1 | the live ticket subject |
+| Extractor fans | Extractor fans — urgent one-off — P1 (agent confirms) | the live ticket subject |
 | Heating | Heating — risk to trade or health and safety — P1 | the live ticket subject |
 | Hot water | Hot water — risk to trade or health and safety — P1 | live closed note |
 | Air conditioning | Air conditioning — risk to trade or health and safety — P1 | the live ticket subject |
 | Connection | Equipment not connecting — risk to trade or health and safety — P1 | the live ticket subject |
 | Not on Lighthouse here | Equipment Lighthouse does not control (kitchen equipment, lighting and so on) — risk to trade or health and safety — P1 | live closed note |
+| Kitchen one-off the dashboard cannot make (urgent) | Kitchen one-off could not be set up — urgent request — P1 (automatic) | Kitchen equipment: different times needed (not urgent) |
+| Kitchen one-off switch-off failed (overnight) | Kitchen one-off: switch-off failed, equipment may still be on — P1 (automatic) | not applicable |
 | Site not identified | Site not identified — risk to trade or health and safety — P1 | the live ticket subject |
 
 ### 2A.6 Where D13 meets earlier decisions
@@ -164,6 +190,59 @@ The subject names the flow and "risk to trade or health and safety". Subjects fo
 | D6 and D7 (closed "use your service contractor" notes; hot water never a P1) | **Changed, as you directed ("every flow").** The question is asked before every closed note too, and Yes raises a P1 even where Lighthouse cannot fix the equipment, so the on-call agent can call the site back straight away. Hot water was "never a P1" (D7); it can now be one. See Q8 and Q9. |
 | OOHDASH-153 | Kept: six sentences literal, `ooh_p1` tag, no OOH text message. The P1 ticket now also carries the agent's comment. |
 | Q4 (fridge) | Resolved by D13 (section 2A.4). |
+
+## 2B. D14: the urgency window (new in revision 4.2)
+
+Your decision of 2026-11-08. It replaces the blanket "ask the risk question on planned requests" treatment (old open item Q13). Planned requests (extractor fans, kitchen times, kitchen one-offs, air conditioning schedule changes) are filtered by whether they are really urgent. A P1 is offered only where the change has to happen before the IoT team could reasonably do it.
+
+### 2B.1 The rule
+
+| Term | Meaning |
+|---|---|
+| Business as usual (BAU) | The IoT support office hours. **Assumed: Monday to Friday 09:00 to 17:00, excluding bank holidays.** This is a guess for you to confirm (open item Q14: exact hours, and whether bank holidays and any weekend cover change it). |
+| Response window | The IoT team aims to act within **3 working hours**. Only office hours count: a request made at 19:44 on Tuesday is first actioned from 09:00 on Wednesday, so the earliest it can be done is 12:00 on Wednesday. |
+| Urgent | The change is needed **before** the earliest time the IoT team could do it. Examples: needed tonight or before the office opens; an on-time before 12:00 on the next working day (when asked out of hours); a later switch-off or extension asked for after 14:00 on the same working day (14:00 plus 3 working hours is 17:00, closing time). |
+| Not urgent | The IoT team can pick it up in time. |
+
+**One shared helper.** The build writes one function, `urgencyOf(neededAt, now)`, used by every flow in this section. It adds three working hours to "now" (skipping evenings, weekends and bank holidays from a small configured list) and compares the result with the time the agent picked as "when it is needed". The screen shows "Urgent — outside office hours" or "Not urgent — the IoT team can pick this up in time". The server runs the same function again; the browser's answer is never trusted. In the prototype "now" is fixed at Tuesday 19:44, and the agent picks the time from four options: tonight (urgent), tomorrow before 12:00 (urgent), tomorrow at 12:00 or later (not urgent), a later day this week (not urgent).
+
+| Raised | Needed | Result |
+|---|---|---|
+| Tuesday 19:44 | Tonight | Urgent |
+| Tuesday 19:44 | Wednesday 11:00 | Urgent (earliest action is Wednesday 12:00) |
+| Tuesday 19:44 | Wednesday 12:00 | Not urgent |
+| Tuesday 14:30 | Tuesday 23:30 | Urgent (14:30 plus 3 working hours is Wednesday 09:30) |
+| Tuesday 13:30 | Tuesday 23:30 | Not urgent (done by 16:30) |
+| Friday 18:00 | Monday 11:00 | Urgent (earliest action is Monday 12:00) |
+| Friday 18:00 | Monday 12:00 | Not urgent |
+
+Because this dashboard is used out of hours, most requests made on a call arrive when the office is shut and will be urgent when they are needed tonight or early tomorrow; the filter matters for requests about later days.
+
+### 2B.2 What each scenario looks like (state ids are the prototype screen ids)
+
+| Scenario | What the agent sees | Where in the prototype |
+|---|---|---|
+| **a) Extractor fans** | After the self-help screen, a filter: "Is it just this once, or every week?" Every week goes straight to the normal ticket and no P1 is offered. Just this once asks "When does the customer need this in place?" Urgent shows the "Urgent — outside office hours" banner and the choice Raise a P1 (confirm step with the mandatory comment) or Log a normal ticket. Not urgent shows "Not urgent" and only Log the ticket. | `UK:FAN6851~2` (one-off or every week), `UQ:FAN6851~2` (when), `UU:FAN6851~2` (urgent), `UN:FAN6851~2` (not urgent), `F:fan:Fans` (the P1 confirm); the same four for the controllable-fan path with ids ending `FAN-switch~3` |
+| **b) Air conditioning** | Keeps the universal risk question, even though Lighthouse does not control it. The agent decides: Yes raises a P1 with the mandatory comment, and if the request is both urgent and a long-term change, the long-term part goes in that comment and so into the P1 ticket. No (not urgent, not permanent) gives the normal ticket. The agent info box says to write any ongoing schedule change in the notes box, which goes on the ticket. | `RQ:AC6218~1` (question and the note), `F:ac:Air` (P1 confirm with the long-term note), `AC6218~1` (normal ticket) |
+| **c) Kitchen "different times every week"** | After the times form, "When does the customer need this in place?" Not urgent gives a normal ticket and no P1 is offered. Urgent shows the banner and lets the agent raise a P1, entering the permanent request in the comment so the IoT team can sort it out; or log a normal ticket. | `UQ:`, `UU:`, `UN:` screens for `K8888~46`, `K8888~51`, `K6832~23`, `K6832~28`, `K6832~33`; P1 confirm `F:kitchen:Kitchen` |
+| **d) Kitchen one-off** | The "will someone be in the kitchen?" question is gone. PowerPause only controls the power to the equipment; starting it, stopping it and using it safely stays the site's responsibility, and the agent info box and the Say both say so. If the request is urgent and the dashboard can make the change, the agent books it (the live one-off booking) and a ticket goes to the IoT team for the record and next-day review. If the dashboard cannot make the change and it is urgent, a P1 is raised **automatically** (no question, no comment: nobody typed one). Not urgent gives a normal ticket. | Booked: `K-confirm-later`, `K-confirm-earlier` (banner "Urgent", no safety question), `K-booked-later`, `K-booked-earlier`. Cannot make the change: `K-when-unknown` (older or legacy site, or one-off not available), `K-book-fail` (the equipment did not respond), both ending at `K-auto-p1` when urgent. Not urgent: `K-normal` (reached from `K-when` "needed for a later day" and from `K-when-unknown`) |
+
+### 2B.3 The only ways to a P1
+
+D13 made the universal question the only way to a P1. With D14 and your answer on Q11 the complete list is:
+
+1. **The universal risk question** (section 2A): the agent answers Yes and writes why it is urgent.
+2. **D14a and D14c: a P1 is offered, not forced.** It is offered only when the request is an urgent one-off (fans) or an urgent permanent timetable request (kitchen), and the agent still confirms it with the mandatory comment. When it is not urgent, no P1 is offered at all.
+3. **Two automatic exceptions**, because nobody is on a call to ask a question: (i) a kitchen one-off whose switch-off fails and the circuit is still on 10 minutes after its end time (Q11, accepted by you on 2026-11-08); (ii) D14d: an urgent kitchen one-off that the dashboard cannot make. Both go through the same `escalate-p1` outcome with the tag `ooh_p1`, a fixed system reason ("Automatic: ..."), and the origin recorded as automatic, so the server check "a P1 needs a reason" is satisfied by the system text and never by an empty field.
+
+### 2B.4 What D14 changes from revision 4
+
+| Revision 4 | Revision 4.2 |
+|---|---|
+| Fans, kitchen "different times every week" and the "nobody will be there" refusal all asked the risk question (open item Q13) | Replaced by the urgency filter above. Q13 is closed as superseded. |
+| A kitchen one-off asked "will someone be in the kitchen?" and refused when the answer was no | The question is removed; responsibility for safe use stays with the site and is stated on the screens. |
+| A failed one-off booking logged a normal ticket | Urgent: a P1 is raised automatically. Not urgent: a normal ticket. |
+| A failed switch-off raised a normal ticket (open item Q11) | Back to an automatic P1. You accepted this as the sole exception to "a P1 only through the question", now one of two. |
 
 ## 3. What differs from live (the complete list)
 
@@ -217,7 +296,24 @@ Your instruction: the guide exists already, just copy the Word document. The sou
 - The fire-up and fire-down table is copied as a real table (21 rows, 6 columns).
 - The "Contactor Override" section is kept, as you asked. This closes Q7. Improvements to the contractor flow (ask override or something else, choose the device, read the instructions, email them to the engineer) are story OOHDASH-163 and are out of scope.
 - All **12 pictures** in the document are included (the Word file holds image1 to image12), placed by following the document's own picture references. Body pictures, in the document's places: the interlock panel, Tongou, Owon, the Lighthouse label, example kitchen panel, example interlock panel, example ceiling panel, example bar panel, single phase button, three phase button and the contactor. The twelfth is the page-header logo (the header repeats on every Word page, so it is shown once at the top). The contactor picture is stored in the document as a Windows metafile (EMF) that browsers cannot show, so it was converted to PNG without any change to the picture. Pictures are only reduced in file size (largest side 900 pixels); each has a plain description for screen readers.
-- Total picture weight about 1.2 MB; no running cost.
+- Total picture weight about 1.2 MB (one figure everywhere in this document); no running cost.
+
+**Picture provenance and rights (the compliance residual, closed in revision 4.2).** All twelve pictures come from the same Word document, which you confirmed (IP-1, 2026-11-07) as rights-cleared. That confirmation covers the Tongou, Owon and other device pictures: they carry no third-party reproduction restriction. The "Rights basis" column below reads "confirmed (IP-1)" for every row; the build gate does not need to re-check it.
+
+| # | Picture (position in the document) | File | Rights basis |
+|---|---|---|---|
+| 0 | Lighthouse logo (page header) | `doc-0-header-logo.png` | confirmed (IP-1) |
+| 1 | Interlock panel, green light and start button (under "Safety Interlock Appliances") | `doc-1-interlock-panel.jpg` | confirmed (IP-1) |
+| 2 | Tongou device with the override button (under "All Devices connected to Power Pause") | `doc-2-tongou.png` | confirmed (IP-1); device picture, no third-party restriction |
+| 3 | Owon meter with the override button | `doc-3-owon.png` | confirmed (IP-1); device picture, no third-party restriction |
+| 4 | The Lighthouse label ("Look for This Label") | `doc-4-label.png` | confirmed (IP-1) |
+| 5 | Example kitchen PowerPause panel | `doc-5-kitchen-panel.jpg` | confirmed (IP-1) |
+| 6 | Example interlock panel | `doc-6-interlock-panel.jpg` | confirmed (IP-1) |
+| 7 | Example ceiling panel | `doc-7-ceiling-panel.jpg` | confirmed (IP-1) |
+| 8 | Example bar panel | `doc-8-bar-panel.jpg` | confirmed (IP-1) |
+| 9 | Single phase manual override button | `doc-9-single-phase.png` | confirmed (IP-1); device picture, no third-party restriction |
+| 10 | Three phase manual override button | `doc-10-three-phase.png` | confirmed (IP-1); device picture, no third-party restriction |
+| 11 | Contactor with manual switch (converted from the document's EMF) | `doc-11-contactor.png` | confirmed (IP-1); device picture, no third-party restriction |
 
 The review copy is `docs/project/mockups/oohdash-146-powerpause-guide.html` (pictures inside the file) and the build copy is `docs/project/oohdash-146/guide/powerpause-contractor-info.html` with its pictures in `guide/powerpause/`.
 
@@ -257,12 +353,19 @@ The line numbers in the retained sections 8 to 14 were taken on 7bd03ba; the bui
 | B17 | `public/css/styles.css` | `.callerline`, `.oneoff-banner` only. D13 adds no CSS: the comment box reuses the live `formrow` and `p1-blocked-note` styles (OOHDASH-134). |
 | B19 | `public/js/flows.js` (new shared helper) | D13: `riskQuestion(f, {yes, no})` renders the exact question (constant `RISK_ASK`), the grey "for you" note and the Yes / No chips, and records the answer as the known-so-far line "Immediate risk to trade or to anyone's health and safety: yes or no". Every flow calls it at the place listed in section 2A.3 and nowhere else. Remove `SERVICE_ASK` (about line 2112) and its screens (about 2290 to 2303), the fridge stock-at-risk question, and the Something else "is it urgent" step. Straight quotes only. |
 | B20 | `public/js/flows.js` (new shared helper) | D13: `p1ReasonBox(f)` and `p1ReasonValid(text)`: label "Why is this urgent? (required, goes on the P1 ticket)", textarea `data-testid="p1-reason"`, up to 500 characters; valid means at least 10 characters after trimming and collapsing spaces. `outcomeP1` and the Something else P1 render the box above `p1WarnBox()`; the "Raise the P1" button is rendered `disabled` and enabled by an input handler (same pattern as the live `otherP1ReasonInput`); the ticket box shows "Why it's urgent (your words)". The comment is sent as `p1Reason` and as `p1Summary` (cut to 80 characters as `otherP1Summary` does today). |
-| B21 | `routes/api.js` (/api/outcomes), `services/zendesk.js` | D13: when `type === 'escalate-p1'` the server collapses whitespace in `p1Reason` and returns 400 ("A P1 needs a reason of at least 10 characters") if it is shorter than 10 or longer than 500 after trimming. The reason is written into the ticket's first internal `[TRG]` comment as a labelled line "Why urgent (agent): …" after the Operator line, never in the subject. `escalate-p1` stays the only outcome type that sets priority urgent and the `ooh_p1` tag, so the question is the only route to a P1. |
+| B21 | `routes/api.js` (/api/outcomes), `services/zendesk.js` | D13: when `type === 'escalate-p1'` the server collapses whitespace in `p1Reason` and returns 400 ("A P1 needs a reason of at least 10 characters") if it is shorter than 10 or longer than 500. The reason is written into the ticket's first internal `[TRG]` comment as a labelled line "Why urgent (agent): …" after the Operator line, never in the subject. The two automatic P1s (switch-off failure, urgent one-off that cannot be made) send `p1Origin: 'automatic'` with a fixed system reason ("Automatic: ..."), and the server accepts `automatic` only from the one-off code path, never from a browser post. `escalate-p1` stays the only outcome type that sets priority urgent and the `ooh_p1` tag. |
 | B22 | `public/js/flows.js` subjects | D13: the subject list in section 2A.5, the "no immediate risk" subject for No tickets, the new Say and "what goes on the ticket" texts. The P1 confirm Say becomes: "Thanks. As there's an immediate risk to trade or to anyone's health and safety, I'm going to raise this as urgent with our on-call team." |
 | B23 | `public/js/flows.js` lighting, contractor | D13: lighting "No, they're still off" and the three contractor paths ask the question first; add the new normal tickets for No (lighting still off; contractor, something else; contractor, override failed; Donkey Derby). Reword the contractor first-screen line (section 2A.4). |
 | B24 | `public/js/flows.js` closed notes and hot water, fans, air conditioning, heating, boiler panel, connection | D13: ask the question before the ticket or closed note in each place listed in section 2A.3; Yes uses the P1 family for that flow (section 2A.5). |
-| B25 | `services/oneoffs.js` (section 9) | D13: a failed switch-off no longer calls `escalate-p1`. It creates a normal ticket "Kitchen one-off: switch-off failed, check the equipment" and keeps the existing danger alert. Final decision at Q11. |
+| B25 | `services/oneoffs.js` (section 9) | Q11 accepted: a failed switch-off keeps its automatic P1 through `escalate-p1` (new ticket, `ooh_p1`, `p1Origin: 'automatic'`). D14d: when an urgent one-off cannot be made (no one-off for the site or circuit, flag off, times unreadable, equipment not responding at booking) the browser raises the automatic P1; not urgent gives a normal ticket. The `OohOneOffAttended` field and its question are removed. |
 | B26 | `public/js/views.js` site not identified | D13: the "pass it to the IoT team" button on the house-number-matches-two-sites screen asks the question first. |
+| B27 | `public/js/urgency.js` (new, shared with the server) | D14: `urgencyOf(neededAt, now)`: adds 3 working hours to now using office hours Mon to Fri 09:00 to 17:00 (configurable `OOH_OFFICE_HOURS`) and a bank holiday list (`config/bank-holidays.json`); urgent when neededAt is earlier than that time. Pure function, unit-tested with the table in section 2B.1. The server calls it again on `POST /api/outcomes` (fans, kitchen times) and `POST /api/oneoffs`; the browser result is never trusted. |
+| B28 | `public/js/flows.js` fans, kitchen times, kitchen one-off, air conditioning | D14: the one-off or every week filter and the "when is it needed" question for fans; the same "when" question before the kitchen permanent timetable ticket and in the kitchen one-off fallback; an urgent banner with Raise a P1 (confirm with comment) or Log a normal ticket; a not-urgent screen with no P1 path; remove the "will someone be in the kitchen" step; air conditioning keeps the risk question plus the notes hint. |
+| B29 | `routes/api.js` `POST /api/oneoffs` | Hardening: bind `siteNo` and `deviceId` to the site confirmed on the current call (the same non-consuming call check the cancel route uses); refuse a device that does not belong to that site; refuse a one-off that `urgencyOf` says is not urgent. |
+| B30 | `services/overrides.js`, `services/oneoffs.js` | Hardening: the duplicate-booking guard must not be in memory only. Make it store-backed (a unique key on site, device and start time in `OohOverrides`, written with the booking in one operation) so it holds across restarts and across more than one server copy; also confirm in the deployment manifest how many replicas run today (recorded at release). |
+| B31 | `routes/api.js`, `services/zendesk.js`, `public/js/flows.js` | Hardening: before `p1Reason` or the customer contact line is written into the `[TRG]` comment, remove carriage returns and line feeds (collapse to single spaces) and strip any text that looks like a ticket anchor at the start of a line or after the collapsed text (`Operator:`, `Outcome:`, `Caller's words:`, `Customer contact:`, `Why urgent (agent):`, case-insensitive), so a typed value can never forge a line the IoT Support Dashboard reads. When either value is shown back on a screen (the ticket box echo, the call record, Tonight) it is escaped for the place it lands (text content, attribute, or URL), never concatenated into HTML. Tests: a value containing a new line and "Outcome: solved" produces one line and no anchor; a value containing a script tag is shown as text. |
+| B32 | `test/` and the prototype checks | Hardening: the disabled-button test covers every P1 confirm screen, including the retry screen shown after a failed raise (pre-filled, so it starts enabled; clearing the comment disables it again; typing enables it). The earlier count of 45 of 46 was this screen. |
+| B26 |
 | B18 | IoT Support Dashboard (separate repo, own small gate) | `OUTCOME_LABELS`: `'boiler-boost': 'heating changed'`; closed notes stay "advice given". |
 
 Rules for the build: keep every `data-testid` the 159 tests rely on (`after-say`, `after-ticket`, `ticket-box`, `p1-confirm-warning`, `record-outcome`, `known-so-far`, `customer-answers`, `ask-customer`, `override-guide-link`, `sched-*`, `end-block`, `publish-note`). The six OOHDASH-153 sentences stay literal. The ticket body anchors `Operator:`, `Caller's words:` and `Outcome:` are not renamed (the IoT Support Dashboard parses them); only the display wording in R10 changes. Straight quotes as JS delimiters (a curly quote shipped as a SyntaxError in v1.5.3).
@@ -279,7 +382,7 @@ The Say always names who to call: "please contact your service contractor throug
 
 ## 9. D8: kitchen one-off change for the next time only (restyled to the live look)
 
-Screens: K-what, K-when-pick, K-when, K-fine, K-later, K-earlier, K-attend-later, K-attend-earlier, K-confirm-later, K-confirm-earlier, K-booked-later, K-booked-earlier, K-attend-no, K-book-fail, K-cancelled, K-when-unknown and the banner on the site screen (prototype group "Kitchen: one-off change for next time").
+Screens: K-what, K-when-pick, K-when, K-fine, K-later, K-earlier, K-confirm-later, K-confirm-earlier, K-booked-later, K-booked-earlier, K-normal, K-auto-p1, K-book-fail, K-cancelled, K-when-unknown and the banner on the site screen (prototype group "Kitchen: one-off change for next time").
 
 {{S8}}
 
@@ -311,6 +414,9 @@ Screens: K-what, K-when-pick, K-when, K-fine, K-later, K-earlier, K-attend-later
 | Use | Never | Where |
 |---|---|---|
 | Is there an immediate risk to trade or to anyone's health and safety? with the chips Yes and No (exactly this question, in every flow) | "Is the kitchen needed for service", "is stock at risk", "is it urgent", "Yes, it's needed now", "No, it can wait", "Yes, it's urgent", "Yes, stock is at risk", "No, it's just a query" | every flow (D13) |
+| Urgent — outside office hours / Not urgent — the IoT team can pick this up in time (the two banners; nothing else) | "peak", "SLA breach", "out of SLA", "priority" | fans, kitchen times and one-offs (D14) |
+| When does the customer need this in place? | "deadline", "ETA" | fans, kitchen times, kitchen one-off fallback (D14) |
+| PowerPause only controls the power to the equipment; starting it, stopping it and using it safely stays the site's responsibility | "will someone be in the kitchen", "safe to switch on" | kitchen one-off (D14d) |
 | Why is this urgent? (required, goes on the P1 ticket) | "Reason for a P1" | every P1 confirm screen (D13) |
 | Immediate risk to trade or to anyone's health and safety: yes / no (what we know so far) | "Kitchen needed for service now: yes" | every screen after the question (D13) |
 | Ask the customer: … (question line inside the green box) | "Scope guidance", "Capture & escalate", "anyway", "Check if…", "Back to the issue picker" | every flow (D5) |
@@ -333,7 +439,7 @@ Screens: K-what, K-when-pick, K-when, K-fine, K-later, K-earlier, K-attend-later
 | R2 | Handlers meet a new details step, new kitchen questions and a changed Something else. | Handler briefing note drafted at the release gate; James sends it before go-live (owner: James). |
 | R3 | e2e churn: Playwright specs that click the old hot water buttons, the connection banner button, the old thermostat buttons or the old Something else buttons. | Listed in section 16; each updated; new tests proved to fail on the old code. |
 | R4 | Hot water wording lives in two twins. | B1 changes both; parity test. |
-| R5 | Kitchen one-off switches real equipment later with nobody watching the dashboard. | Attended question, limits, never late, missed reported, failed switch-off raises a normal ticket (D13, Q11), off by default, proven end to end before it is turned on. |
+| R5 | Kitchen one-off switches real equipment later with nobody watching the dashboard. | Limits, never late, missed reported, a failed switch-off raises the automatic P1 (accepted, Q11), PowerPause only controls power and safe use stays with the site, off by default, proven end to end before it is turned on. |
 | R6 | The one-off depends on the live kitchen read and the Tuya switch path, both unproven in production. | It does not appear until both are on and proven; time requests go to the live timetable form meanwhile. |
 | R7 | Customer name and number are personal data. | Zendesk internal comment only; browser memory only; never in OOH stores, logs, Tonight or SMS. |
 | R8 | Rollback. | Revert the release (previous image by digest). Cancel any booked one-offs from the site screen first. |
@@ -344,21 +450,22 @@ Screens: K-what, K-when-pick, K-when, K-fine, K-later, K-earlier, K-attend-later
 | Q5 | The support phone number differs between documents: the Word cheat sheet says 023 8144 0228, the contractor guide says 023 814 0228, and the label says +44 (0)23 814 0228. The P1 failure screen uses 023 814 0228 (from the 146 failure-path design). | **Closed (revision 4.1).** As per the Word document: 023 814 0228. The P1 failure screen keeps the same number. |
 | Q6 | The guide pairs Tongou with single-phase and Owon with three-phase. | **Closed (revision 4.1).** As per the Word document: no pairing statement is added. |
 | Q7 | The guide's contactor-override section (page 9 of the contractor guide) tells a contractor how to run an appliance when the PowerPause is faulty. | **Closed (revision 4.1).** Kept; improvements are story OOHDASH-163, out of scope. |
-| IP-1 | Rights to use the guide pictures. | **Closed (revision 4.1):** you confirmed the rights on 2026-11-07. Build step G-2 is unconditional. |
-| PD-1 | Retention of the customer contact line in Zendesk. | **Decided (revision 4.1):** kept until an agent removes it by hand. No fixed period (replaces the 12 month recommendation). Deletion path: an agent removes the line from the ticket in Zendesk. |
+| IP-1 | Rights to use the guide pictures. | **Closed (2026-11-07):** you confirmed the rights. This includes the Tongou, Owon and other device pictures: they carry no third-party reproduction restriction. Build step G-2 is unconditional. |
+| PD-1 | Retention of the customer contact line in Zendesk (compliance finding on revision 4.1). | **Decided by you on 2026-11-08, finding closed:** an automatic deletion backstop of 12 months from ticket close, plus agents can remove the line by hand earlier. Lawful basis: legitimate interests (call-back). How the backstop works and who sets it up: rework addendum and section 17. Pre-release item for the IoT helpdesk. |
 | Q8 | **D13 reverses D7: hot water can now be a P1.** D7 said hot water is never a P1 because Lighthouse has no hot water control. You said every flow asks the question, so it does. | Applied as you directed. Check that a hot water P1 is wanted: the on-call agent can only call back and advise. |
 | Q9 | **D13 on equipment Lighthouse does not control (D6/D7 closed notes, fridges, hot water, "not on Lighthouse here", radiators and appliance faults).** You said every flow. Yes raises a P1 so the on-call agent can call back immediately, but the on-call team cannot fix that equipment. | Applied as you directed, with the Say telling the customer to contact their own service contractor as well. Please confirm. The alternative is No-only on those paths (closed note, no P1). |
 | Q10 | **The contractor rule "calls are always treated as urgent" is gone.** An engineer waiting on site is now a P1 only if the customer answers Yes. | Applied for consistency. Sam Day may want to confirm the rule for contractors. |
-| Q11 | **Failed kitchen one-off switch-off no longer raises a P1.** Rev 3 raised one after 10 minutes because kitchen equipment left powered overnight is a safety risk. D13 says the question is the only way to a P1, and no agent is on a call to ask it. | Default (as you directed): a normal ticket and the existing alert. **Safety trade-off:** nobody is texted overnight if a switch-off fails. Alternative: keep this one automatic P1 as the only exception. Your call. |
+| Q11 | **Failed kitchen one-off switch-off keeps its automatic P1.** | **Accepted by you on 2026-11-08.** It is an exception to "a P1 only through the question" because nobody is on a call to ask. D14d adds a second automatic case (section 2B.3). |
 | Q12 | You wrote "the on-call agent"; the live screens and the six 153 sentences say "the on-duty manager" (for example "It pages the on-duty manager straight away"). | Left as live. Say if you want them renamed (small wording change, one place). |
-| Q13 | Planned requests (kitchen "different times every week", fans on late, air conditioning, the "nobody will be there" refusal) now ask the question too. It adds one click to flows that never had a P1. | Applied because you said every flow. Easy to drop for planned requests if agents find it odd. |
+| Q13 | Planned requests (kitchen "different times every week", fans, air conditioning, the "nobody will be there" refusal) asking the risk question. | **Closed, superseded by D14 (2026-11-08):** planned requests are filtered by urgency instead (section 2B). |
+| Q14 | **Office hours for D14 are assumed:** Monday to Friday 09:00 to 17:00 excluding bank holidays, 3 working hour response. | Please confirm the exact hours (and any weekend or bank holiday cover). The rule is one configurable setting, so a change is a one-line edit; the prototype wording uses these hours. |
 
 ## 16. Tests the build must add (and prove they fail on the old code)
 
 | ID | Type | Case |
 |---|---|---|
 | GOLD-146 | unit, golden | vm-load `flows.js` and `control.js`; render each changed screen listed in section 3 with fixed data and compare with `test/fixtures/oohdash-146-screens.json` (generated from `docs/project/oohdash-146/proto-nodes.json` and the prototype text). Unchanged live screens are covered by the existing 159 tests. |
-| LEX-146 | unit | No rendered screen contains: "needed for service", "stock at risk" as a question, "Yes, it's urgent", "No, it can wait", caller, setpoint, frost-hold, "manual control button", "on-site switch", "repairs engineer", "refrigeration engineer", "boiler or service engineer", "Check and log", device-id patterns. |
+| LEX-146 | unit | No rendered screen contains: "needed for service", "will someone be in the kitchen", "stock at risk" as a question, "Yes, it's urgent", "No, it can wait", caller, setpoint, frost-hold, "manual control button", "on-site switch", "repairs engineer", "refrigeration engineer", "boiler or service engineer", "Check and log", device-id patterns. |
 | D5-146 | unit | No rendered button label is one of the removed agent choices: "Scope guidance", "Give the radiator advice", "Raise the setpoint anyway", "Adjust the setpoint anyway", "Check if it's Lighthouse-controlled", "Pass it to the IoT team as described", "Continue under Something else", "Run connection check". |
 | HW-146 | unit + route | Every hot water reading ends on the closed note; hot water scope level is never `ctl`; the twins agree. |
 | NLH-146 | e2e | Lighting, fans, heating and air conditioning with none at the site end on a closed note with the "Which equipment is it?" box. |
@@ -368,12 +475,19 @@ Screens: K-what, K-when-pick, K-when, K-fine, K-later, K-earlier, K-attend-later
 | D13-2 | e2e | Yes opens the P1 confirm step; with an empty, spaces-only or nine-character comment the Raise the P1 button is disabled; with ten real characters it is enabled; the comment is on the ticket. |
 | D13-3 | route | `POST /api/outcomes` with `type: escalate-p1` and no, blank, or short `p1Reason` returns 400 and creates no ticket; with a valid reason it creates the ticket with `ooh_p1`, priority urgent and "Why urgent (agent): …" in the first internal comment. |
 | D13-4 | e2e | No gives the next-working-day ticket in the live wording (`It's logged, reference N`) or the live closed note; the subject ends "no immediate risk" where listed in section 2A.5. |
-| D13-5 | unit | No code path other than the shared question reaches `escalate-p1`: a source check that every `outcomeP1` call is preceded by `riskQuestion` and that `services/oneoffs.js` never posts `escalate-p1`. |
+| D13-5 | unit | No code path other than the shared question, the two D14 offers and the two automatic exceptions reaches `escalate-p1`: a source check that every `outcomeP1` call is preceded by `riskQuestion` or an urgent screen, and that `services/oneoffs.js` posts `escalate-p1` only with `p1Origin: 'automatic'` in the two named cases. |
+| D14-1 | unit | `urgencyOf` gives the results in the table in section 2B.1 (including Friday 18:00 to Monday 11:00 urgent, bank holiday Monday pushes the window to Tuesday, and the 14:00 boundary). |
+| D14-2 | e2e | Fans: "Every week" gives the normal ticket with no P1 offered; "Just this once" and not urgent gives the normal ticket with no P1 offered; "Just this once" and urgent shows the banner, offers Raise a P1 (comment mandatory) or a normal ticket. |
+| D14-3 | e2e | Kitchen "different times every week": not urgent has no P1 path; urgent offers a P1 with the comment. |
+| D14-4 | e2e + route | Kitchen one-off: no "will someone be in the kitchen" step anywhere; urgent and supported books it (ticket for next-day review); urgent and unsupported (flag off, older site, equipment not responding) raises a P1 automatically with the system reason and no comment box; not urgent is a normal ticket; `POST /api/oneoffs` for a site not confirmed on the call, or a device not at that site, is refused. |
+| D14-5 | e2e | Air conditioning: the risk question; Yes needs the comment; No gives the normal ticket; the notes hint is shown. |
+| HARD-1 | unit | `p1Reason` and the customer contact line with new lines, "Operator:", "Outcome:" or "Caller's words:" produce a single line and no forged anchor; values with markup are shown as text. |
+| HARD-2 | unit + route | The one-off duplicate guard holds across a restart (store-backed). |
 | D13-6 | e2e | Resolved-on-the-call paths (override worked, fuse board, lights came on, confirmed control change, one-off booked, boiler boost) do not show the question. |
 | D13-7 | e2e | The unmanaged paths (closed notes, hot water, fridge) show the question; Yes raises the unmanaged P1 and the Say tells the customer to contact their service contractor too. |
 | HEAT-146 | e2e | Room below target, "Warmer" or "It's not working": the radiator question; warm gives the closed note, cold gives a ticket. |
 | CD-146 | e2e + route | Details card after site confirm; issue buttons never blocked; `[TRG]` has "Customer contact: …"; the P1 text, `OohSmsLog`, audit entry, Tonight row and sessionStorage contain no phone number; the declined path. |
-| ONE-1..7 | unit, worker, route, e2e | As in section 9: booking refusals, worker steps and lease, offline retry then missed, switch-off failure raises a normal ticket and no P1, cancel, no timetable keys written, booked wording only on a 200 with a booking id. |
+| ONE-1..7 | unit, worker, route, e2e | As in section 9: booking refusals, worker steps and lease, offline retry then missed, switch-off failure raises the automatic P1 (Q11), cancel, no timetable keys written, booked wording only on a 200 with a booking id. |
 | REL-1..4 | unit | `ctlRelease` failure and retry, duplicate guard, site match, in-flight map empties. |
 | BG-1 | unit | The "Not confirmed yet" toast fires once in 20 ticks. |
 | TN-1 | unit | `tonightChip` never returns a raw code, including the one-off outcomes and the boiler-boost key. |
@@ -398,7 +512,7 @@ Screens: K-what, K-when-pick, K-when, K-fine, K-later, K-earlier, K-attend-later
 | Hot water | 6832 with `boilerControl.dhwOverride` set to each of nine settings, 6360 | every hot water closed note |
 | Kitchen, live equipment list | 8888 (fryer, glass washer, dishwasher, pot wash, bain-marie); glass washer verdict injected to B-unscheduled, B-outside, off-unknown, fallback | live screens and the D8 entry |
 | Kitchen, older site | 6832 | live two-circuit screens, grammar fixes |
-| Kitchen one-off | 8888 with `OOH_KITCHEN_ONEOFF_ENABLED=true`; fake clock in unit tests | on later, on earlier, attended no, cancel, offline at start, switch-off failure (stub, normal ticket) |
+| Kitchen one-off | 8888 with `OOH_KITCHEN_ONEOFF_ENABLED=true`; fake clock in unit tests | on later, on earlier (urgent, booked), not urgent, one-off unavailable (automatic P1), equipment not responding at booking, cancel, switch-off failure (stub, automatic P1) |
 | Not on Lighthouse | 6832 with kitchen, lighting, fan or heating devices removed | closed notes |
 | Outside lighting, fans, fridges | 6749, 6360, 6961; 6851 | live flows |
 | Connection check (divert only) | 7004 with one thermostat offline, 6771, 6772, 6773, 5198 | |
@@ -411,7 +525,7 @@ Screens: K-what, K-when-pick, K-when, K-fine, K-later, K-earlier, K-attend-later
 
 **Manual test script (any agent, fixture mode).**
 1. New call, find 6832, confirm: the "Who's calling?" card shows above the issue buttons; start an issue without saving it (it must work); then save Priya Shah, duty manager, 07700 900123: the customer line shows above every issue screen.
-2. Kitchen 8888: "I need it at a different time", Fryer, "On later tonight", "Until midnight", "Yes, someone will be there", check card, Book it: booked card with the ticket link and Cancel; site banner; Tonight shows "one-off booked".
+2. Kitchen 8888: "I need it at a different time", Fryer, "On later tonight", "Until midnight": the check card shows "Urgent — outside office hours" and no "will someone be there" question; Book it: booked card with the ticket link and Cancel; site banner; Tonight shows "one-off booked". Then "Needed for a later day": a normal ticket, no booking, no P1. On the older site 6832 "different times": the "when" question; tonight gives an automatic P1 with no comment box.
 3. Kitchen 8888: "It's not working", Fryer: the live override script with the guide link; "Yes, it's come on" gives the live captured ticket, no question and no P1. "No, it hasn't come on" asks the universal question: No gives the "no immediate risk" ticket; Yes shows the P1 confirm with the comment box; Raise the P1 is greyed out until you type at least ten characters.
 4. Hot water at 6832: straight to the closed note with "service contractor"; the ticket is created closed.
 5. Fridges 6851: the universal question; Yes with a comment gives the live P1; No gives the closed note.
@@ -422,7 +536,8 @@ Screens: K-what, K-when-pick, K-when, K-fine, K-later, K-earlier, K-attend-later
 10. Block `/api/outcomes` and raise a P1: "The P1 has NOT been raised", no ticket number; allow and retry.
 11. Open the guide from the override screen: twelve pictures load, each with its description; the text matches the Word document, with the phone number 023 814 0228.
 12. For every other flow (lighting 6749 "still off", fans, hot water, air conditioning, heating "cold radiators", contractor "something else" and "hasn't come on", a closed note such as "Something not on this list", site not identified): confirm the exact question appears before the ticket, the P1 button is disabled until the comment is filled, and a P1 cannot be raised without it (try with the box empty, with spaces only and with nine characters).
-13. Search every screen above for the LEX-146 and D5-146 word lists: none.
+13. Extractor fans: "Just this once", "Tomorrow at 12:00 or later": "Not urgent", only the ticket. Back, "Tomorrow before 12:00": "Urgent", Raise a P1 needs the comment. "Every week": ticket only. Air conditioning: the risk question and the notes hint.
+14. Search every screen above for the LEX-146 and D5-146 word lists: none.
 
 ## 19. How the customer-experience aims are met (where to see them in the prototype)
 

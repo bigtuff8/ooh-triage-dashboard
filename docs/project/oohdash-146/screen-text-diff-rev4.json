@@ -1,10 +1,10 @@
 {
- "screens": 388,
- "identical": 77,
- "explained": 140,
- "isNew": 171,
+ "screens": 402,
+ "identical": 83,
+ "explained": 134,
+ "isNew": 185,
  "unexplained": 0,
- "clicks": 3307,
+ "clicks": 3431,
  "dead": [],
  "navDead": [],
  "errors": [],
@@ -154,6 +154,7 @@
   "AC-none-0",
   "AC-none-1",
   "CN-devoff",
+  "K-auto-p1",
   "K-book-fail",
   "K-when-unknown",
   "S-broken-keepingup",
@@ -179,15 +180,26 @@
   "RQ:K8888-gw-B-unscheduled~2",
   "RQ:K8888-gw-B-outside~2",
   "RQ:K-none~2",
-  "RQ:K8888~46",
-  "RQ:K6832~23",
-  "RQ:K6832~28",
-  "RQ:K6832~33",
+  "UQ:K8888~46",
+  "UU:K8888~46",
+  "UN:K8888~46",
+  "UQ:K6832~23",
+  "UU:K6832~23",
+  "UN:K6832~23",
+  "UQ:K6832~28",
+  "UU:K6832~28",
+  "UN:K6832~28",
+  "UQ:K6832~33",
+  "UU:K6832~33",
+  "UN:K6832~33",
+  "UK:FAN-switch~3",
+  "UQ:FAN-switch~3",
+  "UU:FAN-switch~3",
+  "UN:FAN-switch~3",
   "NT:L6360~3",
   "RQ:L6360~3",
   "NT:L6961~4",
   "RQ:L6961~4",
-  "RQ:FAN-switch~3",
   "F:ac:Air",
   "F:ac:Air:after",
   "RQ:AC6218~1",
@@ -234,7 +246,7 @@
  ],
  "p1sim": "SH:p1fail",
  "d13": {
-  "questionScreens": 80,
+  "questionScreens": 72,
   "ticketScreens": 108,
   "gated": 79,
   "exempt": 29,
@@ -242,8 +254,27 @@
   "confirms": 46,
   "confirmBad": [],
   "confirmUngated": [],
-  "askText": 80,
+  "askText": 72,
   "askBad": [],
+  "urg": {
+   "question": 8,
+   "urgent": 9,
+   "notUrgent": 7,
+   "chipBad": [],
+   "unReachesP1": [],
+   "uuNoConfirm": [],
+   "p1Orphans": [],
+   "auto": [
+    "K-auto-p1"
+   ],
+   "autoBad": []
+  },
+  "p1failCheck": {
+   "initialEnabled": true,
+   "cleared": true,
+   "short": true,
+   "typed": false
+  },
   "p1Checked": 45,
   "p1Bad": [],
   "clickEmptyStaysOn": true
@@ -626,10 +657,8 @@
    "id": "K8888~46",
    "g": "K8888",
    "src": "K8888~46",
-   "status": "differs",
-   "items": [
-    "R14"
-   ]
+   "status": "identical",
+   "items": []
   },
   {
    "id": "K8888~47",
@@ -671,10 +700,8 @@
    "id": "K8888~51",
    "g": "K8888",
    "src": "K8888~51",
-   "status": "differs",
-   "items": [
-    "R14"
-   ]
+   "status": "identical",
+   "items": []
   },
   {
    "id": "K8888~52",
@@ -1231,10 +1258,8 @@
    "id": "K6832~23",
    "g": "K6832",
    "src": "K6832~23",
-   "status": "differs",
-   "items": [
-    "R14"
-   ]
+   "status": "identical",
+   "items": []
   },
   {
    "id": "K6832~24",
@@ -1276,10 +1301,8 @@
    "id": "K6832~28",
    "g": "K6832",
    "src": "K6832~28",
-   "status": "differs",
-   "items": [
-    "R14"
-   ]
+   "status": "identical",
+   "items": []
   },
   {
    "id": "K6832~29",
@@ -1327,8 +1350,7 @@
    "src": "K6832~33",
    "status": "differs",
    "items": [
-    "G1",
-    "R14"
+    "G1"
    ]
   },
   {
@@ -1538,10 +1560,8 @@
    "id": "FAN6851~2",
    "g": "FAN",
    "src": "FAN6851~2",
-   "status": "differs",
-   "items": [
-    "R14"
-   ]
+   "status": "identical",
+   "items": []
   },
   {
    "id": "FAN-switch~1",
@@ -1561,10 +1581,8 @@
    "id": "FAN-switch~3",
    "g": "FAN",
    "src": "FAN-switch~3",
-   "status": "differs",
-   "items": [
-    "R14"
-   ]
+   "status": "identical",
+   "items": []
   },
   {
    "id": "FR6851~1",
@@ -2241,8 +2259,7 @@
    "g": "KD8",
    "status": "new",
    "items": [
-    "R1",
-    "R14"
+    "R1"
    ]
   },
   {
@@ -2250,8 +2267,7 @@
    "g": "KD8",
    "status": "new",
    "items": [
-    "R1",
-    "R14"
+    "R1"
    ]
   },
   {
@@ -2259,8 +2275,7 @@
    "g": "KD8",
    "status": "new",
    "items": [
-    "R1",
-    "R14"
+    "R1"
    ]
   },
   {
@@ -2268,8 +2283,7 @@
    "g": "KD8",
    "status": "new",
    "items": [
-    "R1",
-    "R14"
+    "R1"
    ]
   },
   {
@@ -2277,8 +2291,7 @@
    "g": "KD8",
    "status": "new",
    "items": [
-    "R1",
-    "R14"
+    "R1"
    ]
   },
   {
@@ -2286,17 +2299,7 @@
    "g": "KD8",
    "status": "new",
    "items": [
-    "R1",
-    "R14"
-   ]
-  },
-  {
-   "id": "K-attend-later",
-   "g": "KD8",
-   "status": "new",
-   "items": [
-    "R1",
-    "R14"
+    "R1"
    ]
   },
   {
@@ -2304,7 +2307,8 @@
    "g": "KD8",
    "status": "new",
    "items": [
-    "R1"
+    "R1",
+    "R15"
    ]
   },
   {
@@ -2316,20 +2320,12 @@
    ]
   },
   {
-   "id": "K-attend-earlier",
-   "g": "KD8",
-   "status": "new",
-   "items": [
-    "R1",
-    "R14"
-   ]
-  },
-  {
    "id": "K-confirm-earlier",
    "g": "KD8",
    "status": "new",
    "items": [
-    "R1"
+    "R1",
+    "R15"
    ]
   },
   {
@@ -2341,11 +2337,21 @@
    ]
   },
   {
-   "id": "K-attend-no",
+   "id": "K-normal",
    "g": "KD8",
    "status": "new",
    "items": [
     "R1",
+    "R15"
+   ]
+  },
+  {
+   "id": "K-auto-p1",
+   "g": "KD8",
+   "status": "new",
+   "items": [
+    "R1",
+    "R15",
     "R14"
    ]
   },
@@ -2370,8 +2376,7 @@
    "g": "KD8",
    "status": "new",
    "items": [
-    "R1",
-    "R14"
+    "R1"
    ]
   },
   {
@@ -2839,51 +2844,203 @@
    ]
   },
   {
-   "id": "RQ:K8888~46",
+   "id": "UQ:K8888~46",
    "g": "K8888",
    "status": "new",
    "items": [
-    "R14"
+    "R15"
    ]
   },
   {
-   "id": "RQ:K8888~51",
+   "id": "UU:K8888~46",
    "g": "K8888",
    "status": "new",
    "items": [
-    "R14"
+    "R15"
    ]
   },
   {
-   "id": "RQ:K6832~23",
+   "id": "UN:K8888~46",
+   "g": "K8888",
+   "status": "new",
+   "items": [
+    "R15"
+   ]
+  },
+  {
+   "id": "UQ:K8888~51",
+   "g": "K8888",
+   "status": "new",
+   "items": [
+    "R15"
+   ]
+  },
+  {
+   "id": "UU:K8888~51",
+   "g": "K8888",
+   "status": "new",
+   "items": [
+    "R15"
+   ]
+  },
+  {
+   "id": "UN:K8888~51",
+   "g": "K8888",
+   "status": "new",
+   "items": [
+    "R15"
+   ]
+  },
+  {
+   "id": "UQ:K6832~23",
    "g": "K6832",
    "status": "new",
    "items": [
-    "R14"
+    "R15"
    ]
   },
   {
-   "id": "RQ:K6832~28",
+   "id": "UU:K6832~23",
    "g": "K6832",
    "status": "new",
    "items": [
-    "R14"
+    "R15"
    ]
   },
   {
-   "id": "RQ:K6832~33",
+   "id": "UN:K6832~23",
    "g": "K6832",
    "status": "new",
    "items": [
+    "R15"
+   ]
+  },
+  {
+   "id": "UQ:K6832~28",
+   "g": "K6832",
+   "status": "new",
+   "items": [
+    "R15"
+   ]
+  },
+  {
+   "id": "UU:K6832~28",
+   "g": "K6832",
+   "status": "new",
+   "items": [
+    "R15"
+   ]
+  },
+  {
+   "id": "UN:K6832~28",
+   "g": "K6832",
+   "status": "new",
+   "items": [
+    "R15"
+   ]
+  },
+  {
+   "id": "UQ:K6832~33",
+   "g": "K6832",
+   "status": "new",
+   "items": [
+    "R15"
+   ]
+  },
+  {
+   "id": "UU:K6832~33",
+   "g": "K6832",
+   "status": "new",
+   "items": [
+    "R15"
+   ]
+  },
+  {
+   "id": "UN:K6832~33",
+   "g": "K6832",
+   "status": "new",
+   "items": [
+    "R15"
+   ]
+  },
+  {
+   "id": "F:fan:Fans",
+   "g": "FAN",
+   "status": "new",
+   "items": [
     "R14"
    ]
   },
   {
-   "id": "RQ:K-attend-no",
-   "g": "KD8",
+   "id": "F:fan:Fans:after",
+   "g": "FAN",
    "status": "new",
    "items": [
     "R14"
+   ]
+  },
+  {
+   "id": "UK:FAN6851~2",
+   "g": "FAN",
+   "status": "new",
+   "items": [
+    "R15"
+   ]
+  },
+  {
+   "id": "UQ:FAN6851~2",
+   "g": "FAN",
+   "status": "new",
+   "items": [
+    "R15"
+   ]
+  },
+  {
+   "id": "UU:FAN6851~2",
+   "g": "FAN",
+   "status": "new",
+   "items": [
+    "R15"
+   ]
+  },
+  {
+   "id": "UN:FAN6851~2",
+   "g": "FAN",
+   "status": "new",
+   "items": [
+    "R15"
+   ]
+  },
+  {
+   "id": "UK:FAN-switch~3",
+   "g": "FAN",
+   "status": "new",
+   "items": [
+    "R15"
+   ]
+  },
+  {
+   "id": "UQ:FAN-switch~3",
+   "g": "FAN",
+   "status": "new",
+   "items": [
+    "R15"
+   ]
+  },
+  {
+   "id": "UU:FAN-switch~3",
+   "g": "FAN",
+   "status": "new",
+   "items": [
+    "R15"
+   ]
+  },
+  {
+   "id": "UN:FAN-switch~3",
+   "g": "FAN",
+   "status": "new",
+   "items": [
+    "R15"
    ]
   },
   {
@@ -2935,43 +3092,12 @@
    ]
   },
   {
-   "id": "F:fan:Fans",
-   "g": "FAN",
-   "status": "new",
-   "items": [
-    "R14"
-   ]
-  },
-  {
-   "id": "F:fan:Fans:after",
-   "g": "FAN",
-   "status": "new",
-   "items": [
-    "R14"
-   ]
-  },
-  {
-   "id": "RQ:FAN6851~2",
-   "g": "FAN",
-   "status": "new",
-   "items": [
-    "R14"
-   ]
-  },
-  {
-   "id": "RQ:FAN-switch~3",
-   "g": "FAN",
-   "status": "new",
-   "items": [
-    "R14"
-   ]
-  },
-  {
    "id": "F:ac:Air",
    "g": "AC",
    "status": "new",
    "items": [
-    "R14"
+    "R14",
+    "R15"
    ]
   },
   {
@@ -2987,7 +3113,8 @@
    "g": "AC",
    "status": "new",
    "items": [
-    "R14"
+    "R14",
+    "R15"
    ]
   },
   {

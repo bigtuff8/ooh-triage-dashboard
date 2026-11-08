@@ -4,20 +4,24 @@ Method: the real app (origin/main 916f6e3, v1.6.6) was run in fixture mode with 
 
 ## Result
 
-- Prototype screens: 388 (211 taken from live, 171 authored for 146).
-- Identical to live after example-data normalisation: 77.
-- Differ from live, every difference mapped to an item below: 140.
-- New in 146 (no live screen), each mapped to an item: 171 of 171.
+- Prototype screens: 402 (211 taken from live, 185 authored for 146).
+- Identical to live after example-data normalisation: 83.
+- Differ from live, every difference mapped to an item below: 134.
+- New in 146 (no live screen), each mapped to an item: 185 of 185.
 - **Unexplained differences: 0.**
 - Live screens captured but not shown in the prototype: 244 (mostly control-window and duplicate crawl states; the replaced and removed live screens are listed under "Live screens replaced").
-- Click test: 3307 clicks on 388 screens; dead buttons: 0; buttons that lead to a missing screen: 0; JS errors: 0.
+- Click test: 3431 clicks on 402 screens; dead buttons: 0; buttons that lead to a missing screen: 0; JS errors: 0.
 
 ## D13 (R14) checks
 
-- Screens that show the exact question: 80 (exact text on all but: none).
+- Screens that show the exact question: 72 (exact text on all but: none).
 - Ticket screens (not P1): 108; each is either reached only from a risk question (79) or exempt because the problem was resolved on the call or the customer declined (29); ungated: none.
 - P1 confirm screens: 46; each reached only from a risk question; exceptions: none.
 - P1 button disabled until the comment has real content: checked on 45 confirm screens (empty, spaces only, 9 characters, cleared, ten characters padded with spaces stay disabled; real content enables); failures: none; clicking it with an empty comment stays on the confirm screen: true.
+
+- D14 urgency: 8 "when is it needed" screens (chip mapping wrong on: none); 9 urgent banners; 7 not-urgent banners; a not-urgent screen reaches a P1: never; an urgent screen with no P1 confirm ahead: none.
+- Automatic P1 exceptions: P1 screens with no confirm step ahead of them: K-auto-p1 (only K-auto-p1 expected; others: none); K-auto-p1 reached only from the "cannot make the change" screens: yes.
+- The retry confirm screen (SH:p1fail, pre-filled): {"initialEnabled":true,"cleared":true,"short":true,"typed":false}.
 
 ## Live screens not carried into the prototype (crawl states per scenario)
 
@@ -43,6 +47,7 @@ L6961: 1, L-none: 7, FAN-switch: 5, FAN-none: 7, HW-nodhw: 3, HW-auto: 3, HW-aut
 | G1 | Grammar fixes on multi-circuit kitchen sites (D). "can't show whether them are on" becomes "can't show whether they are on", and "has the kitchen — pot wash and kitchen — fryers come on?" becomes "have the kitchen — pot wash and kitchen — fryers come on?". |
 | N1 | Example data. Site name, house number, ticket numbers and the times shown are fixed examples so every screen reads the same; the live screens use the site's own data. |
 | R14 | D13: the universal risk question, the only way to a P1. Every flow asks "Is there an immediate risk to trade or to anyone's health and safety?" (Yes / No) where the problem is still not resolved on the call, before the ticket is made. Yes goes to the live P1 confirm step and cannot be raised until the agent has written why it is urgent. No is the normal ticket for the next working day (or the closed note where Lighthouse does not control the equipment). It replaces the kitchen "is it needed for service" question, the fridge "is stock at risk" question and the Something else "is it urgent" question, and it is now the only way to a P1 (lighting, contractor, hot water, fans, heating, air conditioning, connection, not-on-Lighthouse and site-not-identified paths all go through it). |
+| R15 | D14: the urgency window (fans, air conditioning, kitchen times and one-offs). Planned requests are filtered by whether they are urgent, judged against the IoT team's office hours and a 3 working hour response. Extractor fans: one-off or every week, then when it is needed; only a one-off that is urgent can be a P1. Kitchen "different times every week": only an urgent request can be a P1. Kitchen one-off: the "will someone be there" question is gone; an urgent one-off the dashboard can make is booked, and one it cannot make raises a P1 automatically. Air conditioning keeps the risk question and tells the agent where to put an ongoing schedule change. |
 
 ## Screens that differ from live, and why
 
@@ -77,12 +82,10 @@ L6961: 1, L-none: 7, FAN-switch: 5, FAN-none: 7, HW-nodhw: 3, HW-auto: 3, HW-aut
 | K8888~43 | K8888~43 | R14 |
 | K8888~44 | K8888~44 | R14 |
 | K8888~45 | K8888~45 | R14 |
-| K8888~46 | K8888~46 | R14 |
 | K8888~47 | K8888~47 | R14 |
 | K8888~48 | K8888~48 | R14 |
 | K8888~49 | K8888~49 | R14 |
 | K8888~50 | K8888~50 | R14 |
-| K8888~51 | K8888~51 | R14 |
 | K8888~52 | K8888~52 | R14 |
 | K8888~53 | K8888~53 | R14 |
 | K8888~54 | K8888~54 | R14 |
@@ -133,17 +136,15 @@ L6961: 1, L-none: 7, FAN-switch: 5, FAN-none: 7, HW-nodhw: 3, HW-auto: 3, HW-aut
 | K6832~20 | K6832~20 | R14 |
 | K6832~21 | K6832~21 | R14 |
 | K6832~22 | K6832~22 | R14 |
-| K6832~23 | K6832~23 | R14 |
 | K6832~24 | K6832~24 | R14 |
 | K6832~25 | K6832~25 | R14 |
 | K6832~26 | K6832~26 | R14 |
 | K6832~27 | K6832~27 | R14 |
-| K6832~28 | K6832~28 | R14 |
 | K6832~29 | K6832~29 | G1, R14 |
 | K6832~30 | K6832~30 | G1, R14 |
 | K6832~31 | K6832~31 | G1, R14 |
 | K6832~32 | K6832~32 | G1, R14 |
-| K6832~33 | K6832~33 | G1, R14 |
+| K6832~33 | K6832~33 | G1 |
 | K6832~34 | K6832~34 | R14 |
 | K6832~35 | K6832~35 | R14 |
 | K6832~36 | K6832~36 | R14 |
@@ -161,8 +162,6 @@ L6961: 1, L-none: 7, FAN-switch: 5, FAN-none: 7, HW-nodhw: 3, HW-auto: 3, HW-aut
 | L6961~4 | L6961~4 | R12, R14 |
 | L6961~6 | L6961~6 | R12, R14 |
 | L6961~7 | L6961~7 | R12 |
-| FAN6851~2 | FAN6851~2 | R14 |
-| FAN-switch~3 | FAN-switch~3 | R14 |
 | FR6851~1 | FR6851~1 | R14 |
 | FR6851~2 | FR6851~2 | R14 |
 | FR6851~3 | FR6851~3 | R14 |
@@ -214,22 +213,21 @@ L6961: 1, L-none: 7, FAN-switch: 5, FAN-none: 7, HW-nodhw: 3, HW-auto: 3, HW-aut
 | O-p1 | none (new) | R2, R14 |
 | O-p1-after | none (new) | R2, R14 |
 | O-none | none (new) | R2, R4, R14 |
-| K-what | none (new) | R1, R14 |
-| K-when-pick | none (new) | R1, R14 |
-| K-when | none (new) | R1, R14 |
-| K-fine | none (new) | R1, R14 |
-| K-later | none (new) | R1, R14 |
-| K-earlier | none (new) | R1, R14 |
-| K-attend-later | none (new) | R1, R14 |
-| K-confirm-later | none (new) | R1 |
+| K-what | none (new) | R1 |
+| K-when-pick | none (new) | R1 |
+| K-when | none (new) | R1 |
+| K-fine | none (new) | R1 |
+| K-later | none (new) | R1 |
+| K-earlier | none (new) | R1 |
+| K-confirm-later | none (new) | R1, R15 |
 | K-booked-later | none (new) | R1 |
-| K-attend-earlier | none (new) | R1, R14 |
-| K-confirm-earlier | none (new) | R1 |
+| K-confirm-earlier | none (new) | R1, R15 |
 | K-booked-earlier | none (new) | R1 |
-| K-attend-no | none (new) | R1, R14 |
+| K-normal | none (new) | R1, R15 |
+| K-auto-p1 | none (new) | R1, R15, R14 |
 | K-book-fail | none (new) | R1 |
 | K-cancelled | none (new) | R1 |
-| K-when-unknown | none (new) | R1, R14 |
+| K-when-unknown | none (new) | R1 |
 | S-warm-buildheat | none (new) | R6 |
 | S-buildheat | none (new) | R6, R14 |
 | S-coldrads | none (new) | R6, R14 |
@@ -280,25 +278,40 @@ L6961: 1, L-none: 7, FAN-switch: 5, FAN-none: 7, HW-nodhw: 3, HW-auto: 3, HW-aut
 | RQ:K-none~2 | none (new) | R14 |
 | F:kitchen:Kitchen | none (new) | R14 |
 | F:kitchen:Kitchen:after | none (new) | R14 |
-| RQ:K8888~46 | none (new) | R14 |
-| RQ:K8888~51 | none (new) | R14 |
-| RQ:K6832~23 | none (new) | R14 |
-| RQ:K6832~28 | none (new) | R14 |
-| RQ:K6832~33 | none (new) | R14 |
-| RQ:K-attend-no | none (new) | R14 |
+| UQ:K8888~46 | none (new) | R15 |
+| UU:K8888~46 | none (new) | R15 |
+| UN:K8888~46 | none (new) | R15 |
+| UQ:K8888~51 | none (new) | R15 |
+| UU:K8888~51 | none (new) | R15 |
+| UN:K8888~51 | none (new) | R15 |
+| UQ:K6832~23 | none (new) | R15 |
+| UU:K6832~23 | none (new) | R15 |
+| UN:K6832~23 | none (new) | R15 |
+| UQ:K6832~28 | none (new) | R15 |
+| UU:K6832~28 | none (new) | R15 |
+| UN:K6832~28 | none (new) | R15 |
+| UQ:K6832~33 | none (new) | R15 |
+| UU:K6832~33 | none (new) | R15 |
+| UN:K6832~33 | none (new) | R15 |
+| F:fan:Fans | none (new) | R14 |
+| F:fan:Fans:after | none (new) | R14 |
+| UK:FAN6851~2 | none (new) | R15 |
+| UQ:FAN6851~2 | none (new) | R15 |
+| UU:FAN6851~2 | none (new) | R15 |
+| UN:FAN6851~2 | none (new) | R15 |
+| UK:FAN-switch~3 | none (new) | R15 |
+| UQ:FAN-switch~3 | none (new) | R15 |
+| UU:FAN-switch~3 | none (new) | R15 |
+| UN:FAN-switch~3 | none (new) | R15 |
 | NT:L6749~3 | none (new) | R14 |
 | RQ:L6749~3 | none (new) | R14 |
 | NT:L6360~3 | none (new) | R14 |
 | RQ:L6360~3 | none (new) | R14 |
 | NT:L6961~4 | none (new) | R14 |
 | RQ:L6961~4 | none (new) | R14 |
-| F:fan:Fans | none (new) | R14 |
-| F:fan:Fans:after | none (new) | R14 |
-| RQ:FAN6851~2 | none (new) | R14 |
-| RQ:FAN-switch~3 | none (new) | R14 |
-| F:ac:Air | none (new) | R14 |
+| F:ac:Air | none (new) | R14, R15 |
 | F:ac:Air:after | none (new) | R14 |
-| RQ:AC6218~1 | none (new) | R14 |
+| RQ:AC6218~1 | none (new) | R14, R15 |
 | F:hw:Hot | none (new) | R14 |
 | F:hw:Hot:after | none (new) | R14 |
 | RQ:HW:HW-nodhw | none (new) | R14 |
@@ -655,11 +668,6 @@ L6961: 1, L-none: 7, FAN-switch: 5, FAN-none: 7, HW-nodhw: 3, HW-auto: 3, HW-aut
 - Live: On the ticket: Kitchen equipment off — not needed until later
 - Prototype: On the ticket: Kitchen equipment off — no immediate risk
 
-### K8888~46 (live K8888~46; items R14)
-
-- Prototype: 👤
-- Prototype: Immediate risk to trade or to anyone's health and safety: no
-
 ### K8888~47 (live K8888~47; items R14)
 
 - Live: Kitchen needed for service now: yes
@@ -701,11 +709,6 @@ L6961: 1, L-none: 7, FAN-switch: 5, FAN-none: 7, HW-nodhw: 3, HW-auto: 3, HW-aut
 - Prototype: Immediate risk to trade or to anyone's health and safety: no
 - Live: On the ticket: Kitchen equipment off — not needed until later
 - Prototype: On the ticket: Kitchen equipment off — no immediate risk
-
-### K8888~51 (live K8888~51; items R14)
-
-- Prototype: 👤
-- Prototype: Immediate risk to trade or to anyone's health and safety: no
 
 ### K8888~52 (live K8888~52; items R14)
 
@@ -1169,11 +1172,6 @@ L6961: 1, L-none: 7, FAN-switch: 5, FAN-none: 7, HW-nodhw: 3, HW-auto: 3, HW-aut
 - Live: On the ticket: Kitchen equipment off — not needed until later
 - Prototype: On the ticket: Kitchen equipment off — no immediate risk
 
-### K6832~23 (live K6832~23; items R14)
-
-- Prototype: 👤
-- Prototype: Immediate risk to trade or to anyone's health and safety: no
-
 ### K6832~24 (live K6832~24; items R14)
 
 - Live: Kitchen needed for service now: yes
@@ -1215,11 +1213,6 @@ L6961: 1, L-none: 7, FAN-switch: 5, FAN-none: 7, HW-nodhw: 3, HW-auto: 3, HW-aut
 - Prototype: Immediate risk to trade or to anyone's health and safety: no
 - Live: On the ticket: Kitchen equipment off — not needed until later
 - Prototype: On the ticket: Kitchen equipment off — no immediate risk
-
-### K6832~28 (live K6832~28; items R14)
-
-- Prototype: 👤
-- Prototype: Immediate risk to trade or to anyone's health and safety: no
 
 ### K6832~29 (live K6832~29; items G1, R14)
 
@@ -1271,12 +1264,10 @@ L6961: 1, L-none: 7, FAN-switch: 5, FAN-none: 7, HW-nodhw: 3, HW-auto: 3, HW-aut
 - Live: On the ticket: Kitchen equipment off — not needed until later
 - Prototype: On the ticket: Kitchen equipment off — no immediate risk
 
-### K6832~33 (live K6832~33; items G1, R14)
+### K6832~33 (live K6832~33; items G1)
 
 - Live: Kitchen — pot wash and Kitchen — fryers are connecting to us (this site can't show whether them are on)
 - Prototype: Kitchen — pot wash and Kitchen — fryers are connecting to us (this site can't show whether they are on)
-- Prototype: 👤
-- Prototype: Immediate risk to trade or to anyone's health and safety: no
 
 ### K6832~34 (live K6832~34; items R14)
 
@@ -1426,16 +1417,6 @@ L6961: 1, L-none: 7, FAN-switch: 5, FAN-none: 7, HW-nodhw: 3, HW-auto: 3, HW-aut
 
 - Live: The lights are still off after the on-site switch
 - Prototype: The lights are still off after the manual override
-
-### FAN6851~2 (live FAN6851~2; items R14)
-
-- Prototype: 👤
-- Prototype: Immediate risk to trade or to anyone's health and safety: no
-
-### FAN-switch~3 (live FAN-switch~3; items R14)
-
-- Prototype: 👤
-- Prototype: Immediate risk to trade or to anyone's health and safety: no
 
 ### FR6851~1 (live FR6851~1; items R14)
 
@@ -1629,4 +1610,4 @@ L6961: 1, L-none: 7, FAN-switch: 5, FAN-none: 7, HW-nodhw: 3, HW-auto: 3, HW-aut
 
 ## Identical screens
 
-K8888~1, K8888~2, K8888~3, K8888~4, K8888~5, K8888~6, K8888~7, K8888~8, K8888~9, K8888~14, K8888~17, K8888~20, K8888~23, K8888~24, K8888~27, K8888~28, K8888-gw-B-unscheduled~1, K8888-gw-B-outside~1, K8888-gw-off-unknown~1, K8888-gw-off-unknown~2, K8888-gw-fallback~1, K8888-gw-fallback~2, K6832~1, K6832~2, K6832~3, K6832~5, K6832~6, K6832~9, K6832~10, K6832~13, K-none~1, L6749~1, L6360~1, L6961~1, L6961~2, FAN6851~1, FAN-switch~1, FAN-switch~2, CN6832~1, CN5198~1, CN6771~1, CN6771~2, CN6772~1, CN6773~1, CT6832~1, CT6832~2, CT6832~3, CT6832~5, CT6832~6, CT6832~8, CT-dd~1, CT-dd~2, BP9001~1, BP9001~2, BP9001~3, BP9001~4, BP9001-read~1, BP9001-read~2, BP9001-read~3, BP9001-read~4, BP9001-read~5, BP9001-read~7, S7001~1, S7001~2, S7001~5, S6832-cold~1, S6832-cold~2, S6832-cold~3, S6832-near~3, BPdone-on, BPdone-off, HOME, SEARCH-none, SITE-confirm, SITE-ambiguous, WORKSPACE, CB-empty
+K8888~1, K8888~2, K8888~3, K8888~4, K8888~5, K8888~6, K8888~7, K8888~8, K8888~9, K8888~14, K8888~17, K8888~20, K8888~23, K8888~24, K8888~27, K8888~28, K8888~46, K8888~51, K8888-gw-B-unscheduled~1, K8888-gw-B-outside~1, K8888-gw-off-unknown~1, K8888-gw-off-unknown~2, K8888-gw-fallback~1, K8888-gw-fallback~2, K6832~1, K6832~2, K6832~3, K6832~5, K6832~6, K6832~9, K6832~10, K6832~13, K6832~23, K6832~28, K-none~1, L6749~1, L6360~1, L6961~1, L6961~2, FAN6851~1, FAN6851~2, FAN-switch~1, FAN-switch~2, FAN-switch~3, CN6832~1, CN5198~1, CN6771~1, CN6771~2, CN6772~1, CN6773~1, CT6832~1, CT6832~2, CT6832~3, CT6832~5, CT6832~6, CT6832~8, CT-dd~1, CT-dd~2, BP9001~1, BP9001~2, BP9001~3, BP9001~4, BP9001-read~1, BP9001-read~2, BP9001-read~3, BP9001-read~4, BP9001-read~5, BP9001-read~7, S7001~1, S7001~2, S7001~5, S6832-cold~1, S6832-cold~2, S6832-cold~3, S6832-near~3, BPdone-on, BPdone-off, HOME, SEARCH-none, SITE-confirm, SITE-ambiguous, WORKSPACE, CB-empty

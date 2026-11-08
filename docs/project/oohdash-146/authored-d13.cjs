@@ -15,6 +15,9 @@ const { RISK_ASK, RISK_KNOWN, RISK_HELP } = H;
 delta('R14', 'D13: the universal risk question, the only way to a P1',
   'Every flow asks "Is there an immediate risk to trade or to anyone\'s health and safety?" (Yes / No) where the problem is still not resolved on the call, before the ticket is made. Yes goes to the live P1 confirm step and cannot be raised until the agent has written why it is urgent. No is the normal ticket for the next working day (or the closed note where Lighthouse does not control the equipment). It replaces the kitchen "is it needed for service" question, the fridge "is stock at risk" question and the Something else "is it urgent" question, and it is now the only way to a P1 (lighting, contractor, hot water, fans, heating, air conditioning, connection, not-on-Lighthouse and site-not-identified paths all go through it).');
 
+delta('R15', 'D14: the urgency window (fans, air conditioning, kitchen times and one-offs)',
+  'Planned requests are filtered by whether they are urgent, judged against the IoT team\'s office hours and a 3 working hour response. Extractor fans: one-off or every week, then when it is needed; only a one-off that is urgent can be a P1. Kitchen "different times every week": only an urgent request can be a P1. Kitchen one-off: the "will someone be there" question is gone; an urgent one-off the dashboard can make is booked, and one it cannot make raises a P1 automatically. Air conditioning keeps the risk question and tells the agent where to put an ongoing schedule change.');
+
 const ICONKEY = Object.fromEntries(Object.entries(ICON).map(([k, v]) => [v, k]));
 const WORDS = { Kitchen: 'The fryer will not come on', Lighting: 'Car park lights are off', Fans: 'Need the fans on late', Hot: 'No hot water in the kitchen', Heat: 'The bar is freezing', Else: 'Cellar cooler alarm going off', Conn: 'Nothing is working', Air: 'Aircon is blowing warm', Fridge: 'Freezer alarm going off', Cont: 'Needs the fryers on to test the gas interlock' };
 const mark = n => { if (!n.deltas.includes('R14')) n.deltas.push('R14'); };
@@ -103,7 +106,30 @@ function afterFrom(id, o) { // an open next-working-day ticket screen, built fro
     'Thanks. It\'s logged, reference ' + dyn(EX) + ', and our IoT team picks it up the next working day.', '');
   return add({ id, g: o.g, t: o.t, rootKey: o.root, flowHtml: shell(o.icon, o.title, addKnown(o.known, 'no') + card + H.addNote(EX) + H.outButtons(), false), edges: [], deltas: ['R14'], authored: true, ticketNode: true, from: o.from });
 }
-const GATED = []; // [question id, target id]
+const GATED = [];
+function urgGate(target, o) {
+  const t = NODES[target]; if (!t) throw new Error('urgGate: no node ' + target);
+  const parents = Object.values(NODES).filter(n => n.id !== target && !/^(RQ:|F:|NT:|UQ:|UU:|UN:|UK:)/.test(n.id) && refersTo(n, target));
+  const hd = headOf(t.flowHtml) || { icon: '🛠', title: 'Something else / not sure' };
+  const fkey = ICONKEY[hd.icon] || 'Else';
+  const p0 = parents.find(p => knownOf(p.flowHtml));
+  const known = p0 ? knownOf(p0.flowHtml) : knownOf(t.flowHtml);
+  const g = t.g, root = frameOf(t);
+  const yes = famNodes(o.fam, fkey, g, root);
+  const uk = 'UK:' + target, uq = 'UQ:' + target, uu = 'UU:' + target, un = 'UN:' + target;
+  const entry = o.kind === 'fan' ? uk : uq;
+  parents.forEach(p => retargetAll(p, target, entry));
+  const mk = (id, title, body, withNotes) => add({ id, g, t: title + ' (' + (t.t || target).slice(0, 40) + ')', rootKey: root, authored: true, deltas: ['R15'], edges: [], kind: 'flow', flowHtml: shell(hd.icon, hd.title, body, withNotes !== false) });
+  if (o.kind === 'fan') mk(uk, 'D14: one-off or every week?', known + '<div data-testid="urgency-kind"></div>' + H.infoBox('A P1 is only for a one-off that is needed before the IoT team could act. A request for every week is always a normal ticket.') + H.sayBox('', 'Is it just this once, or every week?') + H.answers([['Just this once', uq], ['Every week', target]], 'customer-answers'));
+  mk(uq, 'D14: when is it needed?', known + H.infoBox(H.URG_INFO) + H.sayBox('', H.URG_ASK) + H.answers(H.urgChips(uu, un), 'customer-answers'));
+  mk(uu, 'D14: urgent', known + H.urgBanner(true, o.kind === 'fan' ? 'A one-off needed before the IoT team could act.' : 'The new times are needed before the IoT team could act.') +
+    H.infoBox(o.kind === 'fan' ? 'You can raise a P1 for this one-off. You will be asked to say why it is urgent.' : 'You can raise a P1. Put the permanent timetable request in your reason: it goes into the P1 ticket text and the IoT team sorts it out. Or log a normal ticket if the customer would rather wait.') +
+    '<div class="outbtns">' + H.btn('Raise a P1', yes, 'danger') + H.btn('Log a normal ticket instead', target) + '</div>');
+  mk(un, 'D14: not urgent', known + H.urgBanner(false, 'No P1 is offered.') + H.sayBox('Thanks. I\'ll log it for the IoT team. They pick it up in plenty of time for when you need it.', '') + '<div class="outbtns">' + H.btn('Log the ticket', target, 'primary') + '</div>');
+  [uq, uu, un].concat(o.kind === 'fan' ? [uk] : []).forEach(id => GATED.push([id, target]));
+  t.urgParents = [uk, uq, uu, un];
+}
+ // [question id, target id]
 function gate(target, o) {
   o = o || {};
   const t = NODES[target]; if (!t) throw new Error('gate: no node ' + target);
@@ -128,14 +154,16 @@ function gate(target, o) {
 
 /* kitchen: the live questions are rewritten in place above; the paths that did not ask one are gated here */
 ['K8888~12', 'K8888~18', 'K8888~29', 'K6832~18', 'K8888-gw-B-unscheduled~2', 'K8888-gw-B-outside~2', 'K-none~2'].forEach(id => gate(id, { fam: 'unm' }));
-['K8888~46', 'K8888~51', 'K6832~23', 'K6832~28', 'K6832~33', 'K-attend-no'].forEach(id => gate(id, { fam: 'kitchen' }));
+/* D14: planned requests are filtered by urgency instead of asking the risk question */
+['K8888~46', 'K8888~51', 'K6832~23', 'K6832~28', 'K6832~33'].forEach(id => urgGate(id, { fam: 'kitchen', kind: 'perm' }));
+['FAN6851~2', 'FAN-switch~3'].forEach(id => urgGate(id, { fam: 'fan', kind: 'fan' }));
 /* lighting: override first (159 J1); still off now asks the question instead of going straight to the P1 */
 gate('L6749~3', { yesIsTarget: true, noNew: { label: 'lighting still off', subject: 'External lighting not working — no immediate risk' } });
 gate('L6360~3', { yesIsTarget: true, noNew: { label: 'lighting still off', subject: 'External lighting not working — no immediate risk' } });
 gate('L6961~4', { yesIsTarget: true, noNew: { label: 'lighting still off', subject: 'External lighting not working — no immediate risk' } });
 /* extractor fans, air conditioning, hot water, connection check, heating, boiler panel */
-['FAN6851~2', 'FAN-switch~3'].forEach(id => gate(id, { fam: 'fan' }));
 gate('AC6218~1', { fam: 'ac' });
+NODES['RQ:AC6218~1'].flowHtml = NODES['RQ:AC6218~1'].flowHtml.replace('<div class="answers"', H.infoBox('If the customer also wants a regular schedule change for the air conditioning, write it in the notes box at the bottom: it goes on the ticket, or into the P1 ticket text if you raise a P1.') + '<div class="answers"'); mark(NODES['RQ:AC6218~1']); NODES['RQ:AC6218~1'].deltas.push('R15');
 ['HW-nodhw', 'HW-auto', 'HW-auto-ended', 'HW-on-until', 'HW-off-until', 'HW-on-v1', 'HW-off-v1', 'HW-cc-stale', 'HW-cc-notreconf', 'HW-cc-decode', 'HW-nlh'].forEach(r => gate('HW:' + r, { fam: 'hw' }));
 ['CN6832~2', 'CN5198~2', 'CN6771~3', 'CN6772~2', 'CN6773~2'].forEach(id => gate(id, { fam: 'conn' }));
 ['BP9001~5', 'BP9001~6'].forEach(id => gate(id, { fam: 'heat' }));
@@ -182,6 +210,7 @@ function p1After(n) {
   n.flowHtml = h; mark(n);
 }
 Object.values(NODES).forEach(n => { p1Confirm(n); if (n.isP1) p1After(n); });
+NODES['F:ac:Air'].flowHtml = NODES['F:ac:Air'].flowHtml.replace('<div class="confirm-step" data-testid="confirm-step">', '<div class="confirm-step" data-testid="confirm-step">' + H.infoBox('You decide whether this is urgent. If it is also a long-term change, put the long-term part in your reason; it goes into the P1 ticket text.')); NODES['F:ac:Air'].deltas.push('R15');
 // fridge: "No" is the live closed note (Lighthouse does not control fridges); it records the answer
 NODES['FR6851~3'].flowHtml = addKnown(NODES['FR6851~3'].flowHtml, 'no'); mark(NODES['FR6851~3']);
 
@@ -189,8 +218,10 @@ NODES['FR6851~3'].flowHtml = addKnown(NODES['FR6851~3'].flowHtml, 'no'); mark(NO
 const EXEMPT = {
   resolved: ['K8888~9', 'K8888~14', 'K8888~17', 'K8888~20', 'K8888~24', 'K8888~27', 'K6832~6', 'K6832~10', 'K6832~14', 'K8888-gw-off-unknown~2', 'K8888-gw-fallback~2', 'L6749~2', 'L6360~2', 'L6961~3', 'L6961~7', 'CT6832~8', 'CN6771~2', 'K-booked-later', 'K-booked-earlier', 'K-cancelled', 'K-fine', 'CTL:finish-up', 'CTL:finish-frost', 'CTL:finish-switch', 'CTL:release-ok', 'BPdone-on', 'BPdone-off'],
   declined: ['S7001~5', 'S-offnoact'],
-  copy: ['SH:p1fail']
+  copy: ['SH:p1fail'],
+  auto: ['K-auto-p1']
 };
 Object.entries(EXEMPT).forEach(([why, ids]) => ids.forEach(id => { if (!NODES[id]) throw new Error('exempt: no node ' + id); NODES[id].exempt = why; }));
 
+NODES['K-normal'].exemptParents = ['K-when'];
 module.exports = { GATED, EXEMPT };

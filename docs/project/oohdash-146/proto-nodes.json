@@ -697,9 +697,7 @@
    "g": "K8888",
    "t": "Bain-marie > It's fine, but we need it at different times > Continue",
    "src": "K8888~46",
-   "deltas": [
-    "R14"
-   ],
+   "deltas": [],
    "kind": "flow",
    "authored": false,
    "live": true,
@@ -777,9 +775,7 @@
    "g": "K8888",
    "t": "Several / all of it > It's fine, but we need it at different times > Continue",
    "src": "K8888~51",
-   "deltas": [
-    "R14"
-   ],
+   "deltas": [],
    "kind": "flow",
    "authored": false,
    "live": true,
@@ -1796,9 +1792,7 @@
    "g": "K6832",
    "t": "Kitchen — pot wash > It's fine, but we need it at different times > Continue",
    "src": "K6832~23",
-   "deltas": [
-    "R14"
-   ],
+   "deltas": [],
    "kind": "flow",
    "authored": false,
    "live": true,
@@ -1876,9 +1870,7 @@
    "g": "K6832",
    "t": "Kitchen — fryers > It's fine, but we need it at different times > Continue",
    "src": "K6832~28",
-   "deltas": [
-    "R14"
-   ],
+   "deltas": [],
    "kind": "flow",
    "authored": false,
    "live": true,
@@ -1961,8 +1953,7 @@
    "t": "Several / all of it > It's fine, but we need it at different times > Continue",
    "src": "K6832~33",
    "deltas": [
-    "G1",
-    "R14"
+    "G1"
    ],
    "kind": "flow",
    "authored": false,
@@ -2341,9 +2332,7 @@
    "g": "FAN",
    "t": "Continue",
    "src": "FAN6851~2",
-   "deltas": [
-    "R14"
-   ],
+   "deltas": [],
    "kind": "flow",
    "authored": false,
    "live": true,
@@ -2385,9 +2374,7 @@
    "g": "FAN",
    "t": "Continue",
    "src": "FAN-switch~3",
-   "deltas": [
-    "R14"
-   ],
+   "deltas": [],
    "kind": "flow",
    "authored": false,
    "live": true,
@@ -3706,8 +3693,7 @@
    "t": "First question: not working, or a different time? (new)",
    "src": null,
    "deltas": [
-    "R1",
-    "R14"
+    "R1"
    ],
    "kind": "flow",
    "authored": true,
@@ -3723,8 +3709,7 @@
    "t": "Which equipment needs a different time? (new)",
    "src": null,
    "deltas": [
-    "R1",
-    "R14"
+    "R1"
    ],
    "kind": "flow",
    "authored": true,
@@ -3740,8 +3725,7 @@
    "t": "Its next times: do they work? (new)",
    "src": null,
    "deltas": [
-    "R1",
-    "R14"
+    "R1"
    ],
    "kind": "flow",
    "authored": true,
@@ -3757,8 +3741,7 @@
    "t": "Outcome: its normal times are fine (closed note)",
    "src": null,
    "deltas": [
-    "R1",
-    "R14"
+    "R1"
    ],
    "kind": "flow",
    "authored": true,
@@ -3774,8 +3757,7 @@
    "t": "On later tonight: how long? (new)",
    "src": null,
    "deltas": [
-    "R1",
-    "R14"
+    "R1"
    ],
    "kind": "flow",
    "authored": true,
@@ -3791,25 +3773,7 @@
    "t": "On earlier tomorrow: what time? (new)",
    "src": null,
    "deltas": [
-    "R1",
-    "R14"
-   ],
-   "kind": "flow",
-   "authored": true,
-   "live": false,
-   "tk": false,
-   "p1": false,
-   "exempt": null,
-   "exemptParents": null
-  },
-  {
-   "id": "K-attend-later",
-   "g": "KD8",
-   "t": "Safety check: will someone be there? (later)",
-   "src": null,
-   "deltas": [
-    "R1",
-    "R14"
+    "R1"
    ],
    "kind": "flow",
    "authored": true,
@@ -3822,10 +3786,11 @@
   {
    "id": "K-confirm-later",
    "g": "KD8",
-   "t": "Check before booking (later)",
+   "t": "Check before booking (later, urgent)",
    "src": null,
    "deltas": [
-    "R1"
+    "R1",
+    "R15"
    ],
    "kind": "flow",
    "authored": true,
@@ -3852,29 +3817,13 @@
    "exemptParents": null
   },
   {
-   "id": "K-attend-earlier",
+   "id": "K-confirm-earlier",
    "g": "KD8",
-   "t": "Safety check: will someone be there? (earlier)",
+   "t": "Check before booking (earlier, urgent)",
    "src": null,
    "deltas": [
     "R1",
-    "R14"
-   ],
-   "kind": "flow",
-   "authored": true,
-   "live": false,
-   "tk": false,
-   "p1": false,
-   "exempt": null,
-   "exemptParents": null
-  },
-  {
-   "id": "K-confirm-earlier",
-   "g": "KD8",
-   "t": "Check before booking (earlier)",
-   "src": null,
-   "deltas": [
-    "R1"
+    "R15"
    ],
    "kind": "flow",
    "authored": true,
@@ -3901,13 +3850,13 @@
    "exemptParents": null
   },
   {
-   "id": "K-attend-no",
+   "id": "K-normal",
    "g": "KD8",
-   "t": "Outcome: nobody will be there, so no one-off (ticket for the team)",
+   "t": "Not urgent: a normal ticket for the team (no booking, no P1)",
    "src": null,
    "deltas": [
     "R1",
-    "R14"
+    "R15"
    ],
    "kind": "flow",
    "authored": true,
@@ -3915,6 +3864,26 @@
    "tk": true,
    "p1": false,
    "exempt": null,
+   "exemptParents": [
+    "K-when"
+   ]
+  },
+  {
+   "id": "K-auto-p1",
+   "g": "KD8",
+   "t": "Urgent, and the dashboard cannot make the change: P1 raised automatically",
+   "src": null,
+   "deltas": [
+    "R1",
+    "R15",
+    "R14"
+   ],
+   "kind": "flow",
+   "authored": true,
+   "live": false,
+   "tk": true,
+   "p1": true,
+   "exempt": "auto",
    "exemptParents": null
   },
   {
@@ -3952,11 +3921,10 @@
   {
    "id": "K-when-unknown",
    "g": "KD8",
-   "t": "Needed at a different time, but we can't read its times (fallback)",
+   "t": "Needed at a different time, but the dashboard can't make a one-off change here (fallback)",
    "src": null,
    "deltas": [
-    "R1",
-    "R14"
+    "R1"
    ],
    "kind": "flow",
    "authored": true,
@@ -4891,12 +4859,12 @@
    "exemptParents": null
   },
   {
-   "id": "RQ:K8888~46",
+   "id": "UQ:K8888~46",
    "g": "K8888",
-   "t": "Risk question before: Bain-marie > It's fine, but we need it at different times > ",
+   "t": "D14: when is it needed? (Bain-marie > It's fine, but we need it a)",
    "src": null,
    "deltas": [
-    "R14"
+    "R15"
    ],
    "kind": "flow",
    "authored": true,
@@ -4907,12 +4875,12 @@
    "exemptParents": null
   },
   {
-   "id": "RQ:K8888~51",
+   "id": "UU:K8888~46",
    "g": "K8888",
-   "t": "Risk question before: Several / all of it > It's fine, but we need it at different",
+   "t": "D14: urgent (Bain-marie > It's fine, but we need it a)",
    "src": null,
    "deltas": [
-    "R14"
+    "R15"
    ],
    "kind": "flow",
    "authored": true,
@@ -4923,12 +4891,76 @@
    "exemptParents": null
   },
   {
-   "id": "RQ:K6832~23",
+   "id": "UN:K8888~46",
+   "g": "K8888",
+   "t": "D14: not urgent (Bain-marie > It's fine, but we need it a)",
+   "src": null,
+   "deltas": [
+    "R15"
+   ],
+   "kind": "flow",
+   "authored": true,
+   "live": false,
+   "tk": false,
+   "p1": false,
+   "exempt": null,
+   "exemptParents": null
+  },
+  {
+   "id": "UQ:K8888~51",
+   "g": "K8888",
+   "t": "D14: when is it needed? (Several / all of it > It's fine, but we )",
+   "src": null,
+   "deltas": [
+    "R15"
+   ],
+   "kind": "flow",
+   "authored": true,
+   "live": false,
+   "tk": false,
+   "p1": false,
+   "exempt": null,
+   "exemptParents": null
+  },
+  {
+   "id": "UU:K8888~51",
+   "g": "K8888",
+   "t": "D14: urgent (Several / all of it > It's fine, but we )",
+   "src": null,
+   "deltas": [
+    "R15"
+   ],
+   "kind": "flow",
+   "authored": true,
+   "live": false,
+   "tk": false,
+   "p1": false,
+   "exempt": null,
+   "exemptParents": null
+  },
+  {
+   "id": "UN:K8888~51",
+   "g": "K8888",
+   "t": "D14: not urgent (Several / all of it > It's fine, but we )",
+   "src": null,
+   "deltas": [
+    "R15"
+   ],
+   "kind": "flow",
+   "authored": true,
+   "live": false,
+   "tk": false,
+   "p1": false,
+   "exempt": null,
+   "exemptParents": null
+  },
+  {
+   "id": "UQ:K6832~23",
    "g": "K6832",
-   "t": "Risk question before: Kitchen — pot wash > It's fine, but we need it at different ",
+   "t": "D14: when is it needed? (Kitchen — pot wash > It's fine, but we n)",
    "src": null,
    "deltas": [
-    "R14"
+    "R15"
    ],
    "kind": "flow",
    "authored": true,
@@ -4939,12 +4971,12 @@
    "exemptParents": null
   },
   {
-   "id": "RQ:K6832~28",
+   "id": "UU:K6832~23",
    "g": "K6832",
-   "t": "Risk question before: Kitchen — fryers > It's fine, but we need it at different ti",
+   "t": "D14: urgent (Kitchen — pot wash > It's fine, but we n)",
    "src": null,
    "deltas": [
-    "R14"
+    "R15"
    ],
    "kind": "flow",
    "authored": true,
@@ -4955,9 +4987,121 @@
    "exemptParents": null
   },
   {
-   "id": "RQ:K6832~33",
+   "id": "UN:K6832~23",
    "g": "K6832",
-   "t": "Risk question before: Several / all of it > It's fine, but we need it at different",
+   "t": "D14: not urgent (Kitchen — pot wash > It's fine, but we n)",
+   "src": null,
+   "deltas": [
+    "R15"
+   ],
+   "kind": "flow",
+   "authored": true,
+   "live": false,
+   "tk": false,
+   "p1": false,
+   "exempt": null,
+   "exemptParents": null
+  },
+  {
+   "id": "UQ:K6832~28",
+   "g": "K6832",
+   "t": "D14: when is it needed? (Kitchen — fryers > It's fine, but we nee)",
+   "src": null,
+   "deltas": [
+    "R15"
+   ],
+   "kind": "flow",
+   "authored": true,
+   "live": false,
+   "tk": false,
+   "p1": false,
+   "exempt": null,
+   "exemptParents": null
+  },
+  {
+   "id": "UU:K6832~28",
+   "g": "K6832",
+   "t": "D14: urgent (Kitchen — fryers > It's fine, but we nee)",
+   "src": null,
+   "deltas": [
+    "R15"
+   ],
+   "kind": "flow",
+   "authored": true,
+   "live": false,
+   "tk": false,
+   "p1": false,
+   "exempt": null,
+   "exemptParents": null
+  },
+  {
+   "id": "UN:K6832~28",
+   "g": "K6832",
+   "t": "D14: not urgent (Kitchen — fryers > It's fine, but we nee)",
+   "src": null,
+   "deltas": [
+    "R15"
+   ],
+   "kind": "flow",
+   "authored": true,
+   "live": false,
+   "tk": false,
+   "p1": false,
+   "exempt": null,
+   "exemptParents": null
+  },
+  {
+   "id": "UQ:K6832~33",
+   "g": "K6832",
+   "t": "D14: when is it needed? (Several / all of it > It's fine, but we )",
+   "src": null,
+   "deltas": [
+    "R15"
+   ],
+   "kind": "flow",
+   "authored": true,
+   "live": false,
+   "tk": false,
+   "p1": false,
+   "exempt": null,
+   "exemptParents": null
+  },
+  {
+   "id": "UU:K6832~33",
+   "g": "K6832",
+   "t": "D14: urgent (Several / all of it > It's fine, but we )",
+   "src": null,
+   "deltas": [
+    "R15"
+   ],
+   "kind": "flow",
+   "authored": true,
+   "live": false,
+   "tk": false,
+   "p1": false,
+   "exempt": null,
+   "exemptParents": null
+  },
+  {
+   "id": "UN:K6832~33",
+   "g": "K6832",
+   "t": "D14: not urgent (Several / all of it > It's fine, but we )",
+   "src": null,
+   "deltas": [
+    "R15"
+   ],
+   "kind": "flow",
+   "authored": true,
+   "live": false,
+   "tk": false,
+   "p1": false,
+   "exempt": null,
+   "exemptParents": null
+  },
+  {
+   "id": "F:fan:Fans",
+   "g": "FAN",
+   "t": "Risk: Yes, confirm the P1 (fan, extractor fans)",
    "src": null,
    "deltas": [
     "R14"
@@ -4971,12 +5115,140 @@
    "exemptParents": null
   },
   {
-   "id": "RQ:K-attend-no",
-   "g": "KD8",
-   "t": "Risk question before: Outcome: nobody will be there, so no one-off (ticket for the",
+   "id": "F:fan:Fans:after",
+   "g": "FAN",
+   "t": "Risk: P1 raised (fan, extractor fans)",
    "src": null,
    "deltas": [
     "R14"
+   ],
+   "kind": "flow",
+   "authored": true,
+   "live": false,
+   "tk": true,
+   "p1": true,
+   "exempt": null,
+   "exemptParents": null
+  },
+  {
+   "id": "UK:FAN6851~2",
+   "g": "FAN",
+   "t": "D14: one-off or every week? (Continue)",
+   "src": null,
+   "deltas": [
+    "R15"
+   ],
+   "kind": "flow",
+   "authored": true,
+   "live": false,
+   "tk": false,
+   "p1": false,
+   "exempt": null,
+   "exemptParents": null
+  },
+  {
+   "id": "UQ:FAN6851~2",
+   "g": "FAN",
+   "t": "D14: when is it needed? (Continue)",
+   "src": null,
+   "deltas": [
+    "R15"
+   ],
+   "kind": "flow",
+   "authored": true,
+   "live": false,
+   "tk": false,
+   "p1": false,
+   "exempt": null,
+   "exemptParents": null
+  },
+  {
+   "id": "UU:FAN6851~2",
+   "g": "FAN",
+   "t": "D14: urgent (Continue)",
+   "src": null,
+   "deltas": [
+    "R15"
+   ],
+   "kind": "flow",
+   "authored": true,
+   "live": false,
+   "tk": false,
+   "p1": false,
+   "exempt": null,
+   "exemptParents": null
+  },
+  {
+   "id": "UN:FAN6851~2",
+   "g": "FAN",
+   "t": "D14: not urgent (Continue)",
+   "src": null,
+   "deltas": [
+    "R15"
+   ],
+   "kind": "flow",
+   "authored": true,
+   "live": false,
+   "tk": false,
+   "p1": false,
+   "exempt": null,
+   "exemptParents": null
+  },
+  {
+   "id": "UK:FAN-switch~3",
+   "g": "FAN",
+   "t": "D14: one-off or every week? (Continue)",
+   "src": null,
+   "deltas": [
+    "R15"
+   ],
+   "kind": "flow",
+   "authored": true,
+   "live": false,
+   "tk": false,
+   "p1": false,
+   "exempt": null,
+   "exemptParents": null
+  },
+  {
+   "id": "UQ:FAN-switch~3",
+   "g": "FAN",
+   "t": "D14: when is it needed? (Continue)",
+   "src": null,
+   "deltas": [
+    "R15"
+   ],
+   "kind": "flow",
+   "authored": true,
+   "live": false,
+   "tk": false,
+   "p1": false,
+   "exempt": null,
+   "exemptParents": null
+  },
+  {
+   "id": "UU:FAN-switch~3",
+   "g": "FAN",
+   "t": "D14: urgent (Continue)",
+   "src": null,
+   "deltas": [
+    "R15"
+   ],
+   "kind": "flow",
+   "authored": true,
+   "live": false,
+   "tk": false,
+   "p1": false,
+   "exempt": null,
+   "exemptParents": null
+  },
+  {
+   "id": "UN:FAN-switch~3",
+   "g": "FAN",
+   "t": "D14: not urgent (Continue)",
+   "src": null,
+   "deltas": [
+    "R15"
    ],
    "kind": "flow",
    "authored": true,
@@ -5083,76 +5355,13 @@
    "exemptParents": null
   },
   {
-   "id": "F:fan:Fans",
-   "g": "FAN",
-   "t": "Risk: Yes, confirm the P1 (fan, extractor fans)",
-   "src": null,
-   "deltas": [
-    "R14"
-   ],
-   "kind": "flow",
-   "authored": true,
-   "live": false,
-   "tk": false,
-   "p1": false,
-   "exempt": null,
-   "exemptParents": null
-  },
-  {
-   "id": "F:fan:Fans:after",
-   "g": "FAN",
-   "t": "Risk: P1 raised (fan, extractor fans)",
-   "src": null,
-   "deltas": [
-    "R14"
-   ],
-   "kind": "flow",
-   "authored": true,
-   "live": false,
-   "tk": true,
-   "p1": true,
-   "exempt": null,
-   "exemptParents": null
-  },
-  {
-   "id": "RQ:FAN6851~2",
-   "g": "FAN",
-   "t": "Risk question before: Continue",
-   "src": null,
-   "deltas": [
-    "R14"
-   ],
-   "kind": "flow",
-   "authored": true,
-   "live": false,
-   "tk": false,
-   "p1": false,
-   "exempt": null,
-   "exemptParents": null
-  },
-  {
-   "id": "RQ:FAN-switch~3",
-   "g": "FAN",
-   "t": "Risk question before: Continue",
-   "src": null,
-   "deltas": [
-    "R14"
-   ],
-   "kind": "flow",
-   "authored": true,
-   "live": false,
-   "tk": false,
-   "p1": false,
-   "exempt": null,
-   "exemptParents": null
-  },
-  {
    "id": "F:ac:Air",
    "g": "AC",
    "t": "Risk: Yes, confirm the P1 (ac, air conditioning)",
    "src": null,
    "deltas": [
-    "R14"
+    "R14",
+    "R15"
    ],
    "kind": "flow",
    "authored": true,
@@ -5184,7 +5393,8 @@
    "t": "Risk question before: First screen",
    "src": null,
    "deltas": [
-    "R14"
+    "R14",
+    "R15"
    ],
    "kind": "flow",
    "authored": true,
@@ -6220,6 +6430,10 @@
   "R14": {
    "title": "D13: the universal risk question, the only way to a P1",
    "what": "Every flow asks \"Is there an immediate risk to trade or to anyone's health and safety?\" (Yes / No) where the problem is still not resolved on the call, before the ticket is made. Yes goes to the live P1 confirm step and cannot be raised until the agent has written why it is urgent. No is the normal ticket for the next working day (or the closed note where Lighthouse does not control the equipment). It replaces the kitchen \"is it needed for service\" question, the fridge \"is stock at risk\" question and the Something else \"is it urgent\" question, and it is now the only way to a P1 (lighting, contractor, hot water, fans, heating, air conditioning, connection, not-on-Lighthouse and site-not-identified paths all go through it)."
+  },
+  "R15": {
+   "title": "D14: the urgency window (fans, air conditioning, kitchen times and one-offs)",
+   "what": "Planned requests are filtered by whether they are urgent, judged against the IoT team's office hours and a 3 working hour response. Extractor fans: one-off or every week, then when it is needed; only a one-off that is urgent can be a P1. Kitchen \"different times every week\": only an urgent request can be a P1. Kitchen one-off: the \"will someone be there\" question is gone; an urgent one-off the dashboard can make is booked, and one it cannot make raises a P1 automatically. Air conditioning keeps the risk question and tells the agent where to put an ongoing schedule change."
   }
  },
  "groups": [

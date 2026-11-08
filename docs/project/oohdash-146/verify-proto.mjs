@@ -19,7 +19,7 @@ function normText(t, root) {
   const so = SITEOF[root];
   if (so) { t = t.split(so.name).join(SITE.name); t = t.replace(new RegExp('(?<![0-9])' + so.no + '(?![0-9])', 'g'), SITE.no); }
   t = t.replace(/\b4[5-9]\d{3}\b/g, '48213').split('Test Handler').join('Sam Okafor').split('Greene King · Test Street, Test Town').join('Greene King · 14 Mill Lane, Bury St Edmunds');
-  t = t.split('v1.6.6 · fixture data').join('Prototype · OOHDASH-146 rev 4 · live v1.6.6 screens');
+  t = t.split('v1.6.6 · fixture data').join('Prototype · OOHDASH-146 rev 4.2 · live v1.6.6 screens');
   t = t.replace(/^TH$/gm, 'SO').replace(/Greene King · [^\n]*/g, 'Greene King · 14 Mill Lane, Bury St Edmunds').replace(/^🔁 2 calls this month$/gm, '');
   return t;
 }
@@ -97,6 +97,10 @@ const RISK = "Is there an immediate risk to trade or to anyone's health and safe
 const DD = await page.evaluate(() => { const o = {}; Object.keys(D).forEach(k => { const n = D[k]; const set = new Set(); (n.e || []).forEach(x => x && set.add(x)); const re = /data-to="([^"]+)"/g; let m; [n.h, n.m].filter(Boolean).forEach(h => { re.lastIndex = 0; while ((m = re.exec(h))) set.add(m[1]); }); o[k] = { to: [...set], h: (n.h || '') }; }); return o; });
 const parentsOf = {}; Object.entries(DD).forEach(([k, n]) => n.to.forEach(t => { const r = t === '@end' ? null : t; if (r) (parentsOf[r] = parentsOf[r] || []).push(k); }));
 const riskSet = new Set(Object.keys(DD).filter(k => DD[k].h.includes(RISK)));
+const URGQ = 'When does the customer need this in place?';
+const urgSet = new Set(Object.keys(DD).filter(k => DD[k].h.includes(URGQ) || DD[k].h.includes('data-testid="urgency-kind"') || DD[k].h.includes('data-testid="urgency-banner"')));
+const uuSet = new Set(Object.keys(DD).filter(k => DD[k].h.includes('Urgent — outside office hours')));
+const unSet = new Set(Object.keys(DD).filter(k => DD[k].h.includes('Not urgent — the IoT team can pick this up in time')));
 const d13 = { questionScreens: riskSet.size, ticketScreens: 0, gated: 0, exempt: 0, ungated: [], confirms: 0, confirmBad: [], confirmUngated: [], askText: 0, askBad: [] };
 const TEXT_OK = { test: h => h.includes("<b>Ask the customer:</b> " + RISK + "</div>") };
 for (const k of riskSet) { d13.askText++; if (!TEXT_OK.test(DD[k].h)) d13.askBad.push(k); }
@@ -106,13 +110,13 @@ for (const n of meta.nodes) {
     d13.confirms++;
     const ps = (parentsOf[n.id] || []).filter(p => !(n.id === 'SH:p1fail'));
     if (n.id !== 'SH:p1fail' && !ps.length) d13.confirmUngated.push(n.id + ' (no parent)');
-    ps.forEach(p => { if (!riskSet.has(p)) d13.confirmUngated.push(n.id + ' <- ' + p); });
+    ps.forEach(p => { if (!riskSet.has(p) && !uuSet.has(p)) d13.confirmUngated.push(n.id + ' <- ' + p); });
   }
   if (n.tk && !n.p1) {
     d13.ticketScreens++;
     if (n.exempt) { d13.exempt++; continue; }
     const ps = (parentsOf[n.id] || []).filter(p => !(n.exemptParents || []).includes(p));
-    if (!ps.length || ps.some(p => !riskSet.has(p))) d13.ungated.push(n.id + ' <- ' + (ps.join(',') || 'nothing'));
+    if (!ps.length || ps.some(p => !riskSet.has(p) && !urgSet.has(p))) d13.ungated.push(n.id + ' <- ' + (ps.join(',') || 'nothing'));
     else d13.gated++;
   }
 }
@@ -135,6 +139,20 @@ for (const id of confirmIds) {
 // the button cannot be pressed with an empty comment even by clicking
 await page.evaluate(() => go('K8888~30'));
 const clickEmpty = await page.evaluate(() => { const b = document.querySelector('[data-testid="record-outcome"]'); b.click(); return S.id; });
+// D14 and the automatic exceptions
+const reachFrom = id => { const seen = new Set([id]), q = [id]; while (q.length) { const x = q.shift(); ((DD[x] || {}).to || []).forEach(t => { if (!seen.has(t) && DD[t]) { seen.add(t); q.push(t); } }); } return seen; };
+const isConfirm = id => DD[id] && DD[id].h.includes('data-testid="p1-confirm-warning"');
+const isP1After = id => DD[id] && DD[id].h.includes('data-testid="outcome-p1"');
+d13.urg = { question: [...urgSet].filter(k => DD[k].h.includes(URGQ)).length, urgent: uuSet.size, notUrgent: unSet.size, chipBad: [], unReachesP1: [], uuNoConfirm: [], p1Orphans: [], auto: [], autoBad: [] };
+for (const k of urgSet) if (DD[k].h.includes(URGQ)) { const to = (DD[k].h.match(/class="chip ans" data-to="([^"]+)"/g) || []).map(x => /data-to="([^"]+)"/.exec(x)[1]); if (to.length !== 4 || !to.slice(0, 2).every(t => uuSet.has(t) || t === 'K-auto-p1') || !to.slice(2).every(t => unSet.has(t) || t === 'K-normal')) d13.urg.chipBad.push(k + ' ' + to.join(',')); }
+for (const k of unSet) { if (/^K-normal/.test(k)) continue; const r = reachFrom(k); [...r].forEach(x => { if (isConfirm(x) || isP1After(x)) d13.urg.unReachesP1.push(k + ' -> ' + x); }); }
+for (const k of uuSet) { if (!/^UU:/.test(k)) continue; if (![...reachFrom(k)].some(isConfirm)) d13.urg.uuNoConfirm.push(k); }
+const autoIds = meta.nodes.filter(n => n.p1 && !(parentsOf[n.id] || []).some(isConfirm)).map(n => n.id);
+d13.urg.auto = autoIds; d13.urg.p1Orphans = autoIds.filter(id => id !== 'K-auto-p1');
+const ap = parentsOf['K-auto-p1'] || []; d13.urg.autoBad = ['K-when-unknown', 'K-book-fail'].filter(p => !ap.includes(p));
+// the retry screen (the 46th confirm screen): pre-filled, so the button starts enabled; clearing the comment disables it and typing enables it again
+await page.evaluate(() => go('SH:p1fail'));
+d13.p1failCheck = await page.evaluate(() => { const ta = document.querySelector('[data-p1c]'), b = document.querySelector('[data-testid="record-outcome"]'); const set = x => { ta.value = x; ta.dispatchEvent(new Event('input', { bubbles: true })); return b.disabled; }; const o = { initialEnabled: !b.disabled }; o.cleared = set(''); o.short = set('abc'); o.typed = set('Fryers off during Sunday lunch'); return o; });
 d13.p1Checked = p1cases.length; d13.p1Bad = p1bad; d13.clickEmptyStaysOn = clickEmpty === 'K8888~30';
 
 // reachability from HOME by clicking
@@ -162,6 +180,7 @@ md += '- **Unexplained differences: ' + unexplained + '.**\n';
 md += '- Live screens captured but not shown in the prototype: ' + notShown + ' (mostly control-window and duplicate crawl states; the replaced and removed live screens are listed under "Live screens replaced").\n';
 md += '- Click test: ' + clicks + ' clicks on ' + idsAll.length + ' screens; dead buttons: ' + dead.length + '; buttons that lead to a missing screen: ' + navDead.length + '; JS errors: ' + errors.length + '.\n\n';
 md += '## D13 (R14) checks\n\n- Screens that show the exact question: ' + d13.questionScreens + ' (exact text on all but: ' + (d13.askBad.join(', ') || 'none') + ').\n- Ticket screens (not P1): ' + d13.ticketScreens + '; each is either reached only from a risk question (' + d13.gated + ') or exempt because the problem was resolved on the call or the customer declined (' + d13.exempt + '); ungated: ' + (d13.ungated.join('; ') || 'none') + '.\n- P1 confirm screens: ' + d13.confirms + '; each reached only from a risk question; exceptions: ' + (d13.confirmUngated.join('; ') || 'none') + '.\n- P1 button disabled until the comment has real content: checked on ' + d13.p1Checked + ' confirm screens (empty, spaces only, 9 characters, cleared, ten characters padded with spaces stay disabled; real content enables); failures: ' + (d13.p1Bad.join('; ') || 'none') + '; clicking it with an empty comment stays on the confirm screen: ' + d13.clickEmptyStaysOn + '.\n\n';
+md += '- D14 urgency: ' + d13.urg.question + ' "when is it needed" screens (chip mapping wrong on: ' + (d13.urg.chipBad.join('; ') || 'none') + '); ' + d13.urg.urgent + ' urgent banners; ' + d13.urg.notUrgent + ' not-urgent banners; a not-urgent screen reaches a P1: ' + (d13.urg.unReachesP1.join('; ') || 'never') + '; an urgent screen with no P1 confirm ahead: ' + (d13.urg.uuNoConfirm.join('; ') || 'none') + '.' + String.fromCharCode(10) + '- Automatic P1 exceptions: P1 screens with no confirm step ahead of them: ' + d13.urg.auto.join(', ') + ' (only K-auto-p1 expected; others: ' + (d13.urg.p1Orphans.join(', ') || 'none') + '); K-auto-p1 reached only from the "cannot make the change" screens: ' + (d13.urg.autoBad.length ? 'NO, missing ' + d13.urg.autoBad.join(',') : 'yes') + '.' + String.fromCharCode(10) + '- The retry confirm screen (SH:p1fail, pre-filled): ' + JSON.stringify(d13.p1failCheck) + '.' + String.fromCharCode(10) + String.fromCharCode(10);
 md += '## Live screens not carried into the prototype (crawl states per scenario)\n\n' + Object.entries(replacedRoots).map(([r, c]) => r + ': ' + c).join(', ') + '. These are replaced by the changed screens named in the items below (HW-* by R3, O6832 by R2, CN7004 and CN-devoff by R5, the "Continue under Something else" dead ends in L-none, FAN-none, S-none by R4, the heating agent-button screens by R6), or are crawl states that only show a control window left open.\n\n';
 md += '## The "differs from live" list\n\n| Item | What changes |\n|---|---|\n' + Object.keys(dl).map(k => '| ' + k + ' | ' + dl[k].title + '. ' + dl[k].what.replace(/\|/g, '/') + ' |').join('\n') + '\n\n';
 md += '## Screens that differ from live, and why\n\n| Prototype screen | Live source | Items |\n|---|---|---|\n' + rows.filter(r => r.status !== 'identical').map(r => '| ' + r.id + ' | ' + (r.src || 'none (new)') + ' | ' + (r.items.join(', ') || 'UNEXPLAINED') + ' |').join('\n') + '\n\n';
