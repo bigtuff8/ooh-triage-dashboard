@@ -1,0 +1,69 @@
+[
+ {
+  "id": "CT6832",
+  "site": "6832",
+  "cat": "contractor",
+  "text": "",
+  "max": 40
+ },
+ {
+  "id": "CT-dd",
+  "site": "6832",
+  "cat": "contractor",
+  "text": "",
+  "setup": "()=>{state.workspace.site.siteNo='6786';}",
+  "max": 25
+ },
+ {
+  "id": "S6832",
+  "site": "6832",
+  "cat": "heating",
+  "text": "The bar is freezing",
+  "max": 45
+ },
+ {
+  "id": "S6832-cold",
+  "site": "6832",
+  "cat": "heating",
+  "text": "The bar is freezing",
+  "setup": "()=>{const d=state.workspace.devices.find(x=>x.deviceId==='IT500-BAR-6832');d.telemetry.localTemperature=16;d.telemetry.heatingSetpoint=20;}",
+  "max": 30
+ },
+ {
+  "id": "S6832-near",
+  "site": "6832",
+  "cat": "heating",
+  "text": "Heating not working",
+  "setup": "()=>{const d=state.workspace.devices.find(x=>x.deviceId==='IT500-BAR-6832');d.telemetry.localTemperature=19.5;d.telemetry.heatingSetpoint=20;}",
+  "max": 30
+ },
+ {
+  "id": "S7001",
+  "site": "7001",
+  "cat": "heating",
+  "text": "Rooms are cold",
+  "max": 25
+ },
+ {
+  "id": "S7003",
+  "site": "7003",
+  "cat": "heating",
+  "text": "Bar is cold",
+  "max": 25
+ },
+ {
+  "id": "S-none",
+  "site": "6832",
+  "cat": "heating",
+  "text": "The bar is freezing",
+  "setup": "()=>{state.workspace.devices=state.workspace.devices.filter(d=>d.kind!=='heating');}",
+  "max": 6
+ },
+ {
+  "id": "BP6234",
+  "site": "6234",
+  "cat": "heating",
+  "text": "The pub is cold",
+  "max": 40
+ }
+]
