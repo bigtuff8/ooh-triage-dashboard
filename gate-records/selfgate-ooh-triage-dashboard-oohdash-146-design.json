@@ -1,0 +1,15 @@
+{
+  "run": "selfgate-ooh-triage-dashboard-oohdash-146",
+  "phase": "design",
+  "pr": 178,
+  "approvedBy": [
+    "bigtuff8"
+  ],
+  "reviewComments": [
+    "bigtuff8: Notes made direct to Claude - session to update pr with responses for audit trail"
+  ],
+  "mergeCommit": "b5bf1f2657191dabf030adb26e93b53935d0c9e7",
+  "phaseBranch": "design/oohdash-146",
+  "releaseBranch": "main",
+  "stamp": 1794166295191
+}
