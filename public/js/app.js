@@ -41,7 +41,7 @@ function toast(msg) {
 /* ------------------------ OOHDASH-146 D15/D16: the customer on this call (B34) ------------------------ */
 /** One line of plain text: new lines and runs of spaces collapse to single spaces. */
 function callerOneLine(v) {
-    return String(v == null ? '' : v).replace(/[\r\n\t  ]+/g, ' ').replace(/\s+/g, ' ').trim();
+    return String(v == null ? '' : v).replace(/\s+/g, ' ').trim();
 }
 
 /**
@@ -86,6 +86,24 @@ function callerAnnounce(msg) {
     if (!el) return;
     el.textContent = '';
     el.textContent = msg;
+}
+
+/** B34: open the "Add / change contact details" overlay. */
+function showCdAdd() {
+    state.cdAdd = true;
+    render();
+    // B37: focus the first input after render
+    document.getElementById('cda-name')?.focus();
+}
+
+/** B34: save caller details from the overlay, close it, and announce to screen readers. */
+function saveCdAdd(name, role, phone) {
+    setCaller({ name: String(name || ''), role: String(role || ''), phone: String(phone || '') });
+    state.cdAdd = false;
+    render();
+    callerAnnounce('Customer details saved. The call banner is updated.');
+    // B37: return focus to the banner area
+    document.querySelector('.callbanner')?.focus();
 }
 
 /**
@@ -243,9 +261,15 @@ function render() {
   ${kill ? `<div class="banner kill" data-testid="kill-banner">⛔ ${kill} — control actions are disabled; passing issues to the IoT team still works.${isIot ? ' <button class="btn link" onclick="go(\'admin\')">Manage</button>' : ''}</div>` : ''}
   ${state.me.controlLive && !kill ? `<div class="banner live" data-testid="control-live-banner">🟢 <b>Device control is LIVE</b> — changes you send will reach real equipment. Confirm the site before every change.</div>` : ''}
   ${notice && (state.view === 'home' || state.view === 'site') ? `<div class="banner notice" data-testid="notice-banner">📣 <b>${esc(notice.OohNoticeTitle)}</b>&nbsp;${esc(notice.OohNoticeBody)}</div>` : ''}
+  ${state.confirmToken && state.workspace ? callerBanner(state) : ''}
   <div id="view"></div>
  </div>`;
-    ({ home: vHome, site: vSite, callback: vCallback, tonight: vTonight, admin: vAdmin })[state.view]();
+    // B34: "Add details" overlay replaces the view area while state.cdAdd is true
+    if (state.cdAdd) {
+        vCdAdd();
+    } else {
+        ({ home: vHome, site: vSite, callback: vCallback, tonight: vTonight, admin: vAdmin })[state.view]();
+    }
     paintDrawer();
     // OOHDASH-119: restore focus + caret to the notes textarea after re-render
     try {

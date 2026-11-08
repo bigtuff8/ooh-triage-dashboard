@@ -186,7 +186,8 @@ export const SCOPE_GROUPS = [
     // OOHDASH-135 Item 6: four-step hotwater scope evaluation (unchanged), except 'ctl' now also needs
     // the boiler panel to be online.
     { key: 'hotwater', label: 'Hot water', kinds: hotWaterDevices, level: s =>
-        hasControllableDhw(s) && (s.devices.some(d => isBoilerPanelDevice(d) && d.online) || !s.devices.some(isBoilerPanelDevice)) ? 'ctl' :
+        // B12: hot water scope is never 'ctl' — no OOH hot water control is offered from the dashboard.
+        hasControllableDhw(s) && (s.devices.some(d => isBoilerPanelDevice(d) && d.online) || !s.devices.some(isBoilerPanelDevice)) ? 'mon' :
         hasControllableDhw(s) ? 'mon' :
         hasHotWaterSignal(s) ? 'mon' :
         (s.devices.some(d => d.kind === 'heating') && !s.boilerControl?.present && !s.devices.some(d => d.deviceType === 'salus-it500-dhw')) ? 'not-lighthouse' :
@@ -525,13 +526,13 @@ export function buildOutcomeTranscript({ action, type, siteNo, siteName, detail,
     // OOHDASH-153: neutral, true-at-build-time step. The transcript is built (and the [TRG] first
     // comment baked) before recordP1Raised runs. The real paging is handled by the IoT Support
     // Dashboard watching the ooh_p1 tag (Approach B). Does not perturb the Outcome: anchor.
-    if (type === 'escalate-p1') steps.push({ time: hhmm(outcomeTime), text: 'P1 escalation raised — on-duty manager to be paged' });
+    if (type === 'escalate-p1') steps.push({ time: hhmm(outcomeTime), text: 'P1 escalation raised — text message sent to the on-call agent' });
     return steps;
 }
 
 router.post('/outcomes', wrap(async (req, res) => {
     const op = req.session.operator;
-    const { type, siteNo, siteName, subject, detail, callerWords, OohCaptureClass, actionId, holdText, p1Summary, additionalNotes, appendToHoldId, holdIds, actions: actionLines, relatedToTicketId, knownSoFar, callId, issueKey, closeOnCreate } = req.body;
+    const { type, siteNo, siteName, subject, detail, callerWords, OohCaptureClass, actionId, holdText, p1Summary, additionalNotes, appendToHoldId, holdIds, actions: actionLines, relatedToTicketId, knownSoFar, callId, issueKey, closeOnCreate, customerContact } = req.body;
     if (!type || !siteNo || !subject || !detail) {
         return res.status(400).json({ error: 'type, siteNo, subject and detail are required' });
     }
@@ -590,6 +591,8 @@ router.post('/outcomes', wrap(async (req, res) => {
         extraTags: isP1 ? ['ooh_p1'] : [],
         // OOHDASH-119: additional notes ride alongside but are NOT written to the P1 SMS or audit log.
         additionalNotes: additionalNotes || null,
+        // OOHDASH-146 B10: customer contact on every ticket, never in P1 SMS, Tonight or audit log.
+        customerContact: customerContact || null,
         // OOHDASH-159 rev 5: equipment Lighthouse doesn't control here → contact-history record created closed.
         status: (!isP1 && (type === 'scope-only' || closeOnCreate)) ? 'solved' : undefined
     });
@@ -611,7 +614,7 @@ router.post('/outcomes', wrap(async (req, res) => {
     if (isP1) {
         // OOHDASH-153 (Approach B): record a positive audit entry in OohSmsLog. The ticket with the
         // ooh_p1 tag already exists above — that tag is what triggers the IoT Support Dashboard to
-        // page the on-duty manager. recordP1Raised is fail-safe and never blocks the outcome.
+        // send a text message to the on-call agent. recordP1Raised is fail-safe and never blocks the outcome.
         p1 = await p1Log.recordP1Raised({ operator: op, siteNo, siteName, ticketId: ticket.id, summary: p1Summary || subject });
     }
 
@@ -667,7 +670,7 @@ router.get('/callback/:siteNo', wrap(async (req, res) => {
     try {
         res.json(await zendesk.callbackLookup(req.params.siteNo));
     } catch (err) {
-        res.status(503).json({ error: 'Zendesk is unreachable — take the caller’s details and capture the issue', degraded: true });
+        res.status(503).json({ error: 'Zendesk is unreachable — take the customer details and capture the issue', degraded: true });
     }
 }));
 

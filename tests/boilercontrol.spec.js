@@ -36,14 +36,14 @@ async function reachDirectionStep(page) {
 test.describe('OOHDASH-114-F1 boilerControl controllability', () => {
     test.beforeEach(async ({ page }) => { await signIn(page, 'Test Handler'); });
 
-    test('BC-E1: V2 site (9001) — hotwater scope row shows Controllable from here', async ({ page }) => {
+    test('BC-E1: V2 site (9001) — hotwater scope row shows monitored / not adjustable (OOHDASH-146-B12: hot water is never ctl)', async ({ page }) => {
         await confirmSite(page, '9001', 'Test BoilerControl V2 (DHW)');
-        await expect(page.locator('[data-testid="scope-list"] li:has-text("Hot water")')).toContainText('Controllable from here');
+        await expect(page.locator('[data-testid="scope-list"] li:has-text("Hot water")')).toContainText('not adjustable from here');
     });
 
-    test('BC-E2: V1 site (9002) — hotwater scope row shows Controllable from here', async ({ page }) => {
+    test('BC-E2: V1 site (9002) — hotwater scope row shows monitored / not adjustable (OOHDASH-146-B12: hot water is never ctl)', async ({ page }) => {
         await confirmSite(page, '9002', 'Test BoilerControl V1 (DHW)');
-        await expect(page.locator('[data-testid="scope-list"] li:has-text("Hot water")')).toContainText('Controllable from here');
+        await expect(page.locator('[data-testid="scope-list"] li:has-text("Hot water")')).toContainText('not adjustable from here');
     });
 
     test('BC-E3: no boilerControl (9003) — hotwater scope row shows Not controllable here', async ({ page }) => {

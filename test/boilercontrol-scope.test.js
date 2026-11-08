@@ -34,18 +34,18 @@ const V2_BC = { present: true, deviceId: 'gk-9001-boilercontrol-1', isV1: false,
 const V1_BC = { present: true, deviceId: 'gk-9002-boilercontrol-1', isV1: true, isV2: false, heatingControllable: true, dhwControllable: true };
 const NO_BC = { present: false, isV1: false, isV2: false, heatingControllable: false, dhwControllable: false, deviceId: null };
 
-/* ---- BC-1: V2 site → hotwater scope level is 'ctl' ---- */
-test('BC-1: V2 site with dhwControllable=true → hotwater scope level is ctl', () => {
+/* ---- BC-1: V2 site → hotwater scope level is 'mon' (OOHDASH-146-B12: hot water is never ctl) ---- */
+test('BC-1: V2 site with dhwControllable=true → hotwater scope level is mon (never ctl, OOHDASH-146-B12)', () => {
     const site = makeSite(V2_BC);
     const g = SCOPE_GROUPS.find(g => g.key === 'hotwater');
-    assert.equal(g.level(site), 'ctl');
+    assert.equal(g.level(site), 'mon');
 });
 
-/* ---- BC-2: V1 site → hotwater scope level is 'ctl' ---- */
-test('BC-2: V1 site with dhwControllable=true → hotwater scope level is ctl', () => {
+/* ---- BC-2: V1 site → hotwater scope level is 'mon' (OOHDASH-146-B12: hot water is never ctl) ---- */
+test('BC-2: V1 site with dhwControllable=true → hotwater scope level is mon (never ctl, OOHDASH-146-B12)', () => {
     const site = makeSite(V1_BC);
     const g = SCOPE_GROUPS.find(g => g.key === 'hotwater');
-    assert.equal(g.level(site), 'ctl');
+    assert.equal(g.level(site), 'mon');
 });
 
 /* ---- BC-3: no boilerControl → hotwater scope level is 'none' ---- */

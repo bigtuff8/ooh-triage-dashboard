@@ -23,12 +23,89 @@ function unverifiedNotice(s) {
         : '';
 }
 
+/* ------------------------ OOHDASH-146 D16 (B33): permanent caller banner ------------------------ */
+/**
+ * Renders the sticky caller banner shown on every in-call screen once the site is confirmed.
+ * State comes from state.caller (name, role, phone, declined) and state.workspace.site.
+ * NOT a live region — the banner is NOT announced on every screen change. Caller details updates
+ * are announced via the hidden #srlive role="status" node instead (B37).
+ */
+function callerBanner(s) {
+    const c = s.caller || {};
+    const site = s.workspace && s.workspace.site;
+    const siteLine = site ? `<span class="cb-site">${esc(site.siteName)} ${esc(site.siteNo)}</span>` : '';
+    const hasName = c.name && c.name.trim();
+    const hasRole = c.role && c.role.trim();
+    const hasPhone = c.phone && c.phone.trim();
+    const hasAny = hasName || hasRole || hasPhone;
+
+    let who = '';
+    if (hasAny) {
+        const namePart = hasName ? esc(c.name) : '';
+        const rolePart = hasRole ? `<span class="cb-role">${esc(c.role)}</span>` : '';
+        const phonePart = hasPhone ? esc(c.phone) : '<span class="cb-quiet">no number taken</span>';
+        const sep1 = namePart && (rolePart || phonePart) ? ' · ' : '';
+        const sep2 = (namePart || rolePart) && phonePart ? ' · ' : '';
+        who = `📞 ${namePart}${sep1}${rolePart}${sep2}${phonePart}`;
+    } else if (c.declined) {
+        who = `<span class="cb-quiet">(the customer declined)</span>`;
+    } else {
+        who = `<span class="cb-quiet">No contact details taken</span>`;
+    }
+
+    const addBtn = hasAny
+        ? `<button class="btn link cb-add" onclick="showCdAdd()">Change</button>`
+        : `<button class="btn link cb-add" onclick="showCdAdd()">Add details</button>`;
+
+    return `<div class="callbanner" role="region" aria-label="Call in progress"><span class="cb-who">${who}</span>${addBtn}${siteLine}</div>`;
+}
+
+/* ------------------------ OOHDASH-146 D15 (B35): "Add contact details" overlay screen ------------------------ */
+/**
+ * vCdAdd — the full-screen form shown when the agent clicks "Add details" or "Change" in the caller banner.
+ * Pre-fills from state.caller. Saves to state.caller via saveCdAdd(). Closing/saving returns to the previous screen.
+ */
+function vCdAdd() {
+    const c = state.caller || {};
+    $('#view').innerHTML = `<div class="content narrow">
+  <div class="card" style="padding:26px">
+   <h2>Customer contact details</h2>
+   <p class="sub" style="margin-bottom:12px">These are stored for this call only and go on the ticket. They are never shared outside the IoT team.</p>
+   <div class="cd-grid">
+    <div class="formrow"><label for="cda-name">Customer\'s name <span class="small">(optional)</span></label>
+     <input id="cda-name" data-testid="cda-name" maxlength="80" autocomplete="off" value="${esc(c.name || '')}"></div>
+    <div class="formrow"><label for="cda-role">Their role <span class="small">(optional)</span></label>
+     <input id="cda-role" data-testid="cda-role" maxlength="40" autocomplete="off" placeholder="e.g. duty manager" value="${esc(c.role || '')}"></div>
+    <div class="formrow"><label for="cda-phone">Best contact number <span class="small">(optional)</span></label>
+     <input id="cda-phone" data-testid="cda-phone" type="tel" autocomplete="off" value="${esc(c.phone || '')}"></div>
+   </div>
+   <div style="margin-top:14px;display:flex;gap:10px;flex-wrap:wrap">
+    <button class="btn primary" data-testid="cda-save" onclick="saveCdAdd(document.getElementById('cda-name').value,document.getElementById('cda-role').value,document.getElementById('cda-phone').value)">Save</button>
+    <button class="btn" onclick="state.cdAdd=false;render()">Cancel</button>
+    <button class="btn link" style="margin-left:auto" onclick="setCaller({declined:true});state.cdAdd=false;render()">Customer declined to give details</button>
+   </div>
+  </div></div>`;
+    // B37: focus the first input
+    document.getElementById('cda-name')?.focus();
+}
+
 /* ------------------------ home (§3.1) ------------------------ */
 function vHome() {
+    const c = state.caller || {};
     $('#view').innerHTML = `<div class="content narrow">
   <div class="card" style="padding:26px">
    <h2>Who\'s calling?</h2>
-   <p class="sub" style="margin-bottom:14px">Ask for the <b>house number</b> (4 digits) — or search by pub name. Use ↑ ↓ and Enter to pick.</p>
+   ${sayBox('Can I take your name, your role, and the best number to reach you on?')}
+   <div class="cd-grid" style="margin:10px 0 6px">
+    <div class="formrow"><label for="hq-name">Customer\'s name <span class="small">(optional)</span></label>
+     <input id="hq-name" data-testid="hq-name" maxlength="80" autocomplete="off" value="${esc(c.name || '')}" oninput="setCaller({name:this.value,role:document.getElementById('hq-role').value,phone:document.getElementById('hq-phone').value})"></div>
+    <div class="formrow"><label for="hq-role">Their role <span class="small">(optional)</span></label>
+     <input id="hq-role" data-testid="hq-role" maxlength="40" autocomplete="off" placeholder="e.g. duty manager" value="${esc(c.role || '')}" oninput="setCaller({name:document.getElementById('hq-name').value,role:this.value,phone:document.getElementById('hq-phone').value})"></div>
+    <div class="formrow"><label for="hq-phone">Best contact number <span class="small">(optional)</span></label>
+     <input id="hq-phone" data-testid="hq-phone" type="tel" autocomplete="off" value="${esc(c.phone || '')}" oninput="setCaller({name:document.getElementById('hq-name').value,role:document.getElementById('hq-role').value,phone:this.value})"></div>
+   </div>
+   <p style="margin:4px 0 14px"><button class="btn link" data-testid="hq-declined" onclick="setCaller({declined:true});document.getElementById('sq').focus()">The customer won\'t give these</button></p>
+   <p class="sub" style="margin-bottom:8px"><b>Which site is it?</b> Ask for the house number (4 digits) — or search by pub name. Use ↑ ↓ and Enter to pick.</p>
    <div class="searchwrap"><input id="sq" data-testid="site-search" placeholder="e.g. 6832 or Old Grey Mare" autocomplete="off"><div id="sres"></div></div>
    <p class="small" style="margin-top:12px">Customer ringing back about an earlier issue? <button class="btn link" onclick="go('callback')">Use Callback Lookup →</button></p>
   </div>
@@ -39,7 +116,7 @@ function vHome() {
         : '<p class="small">No calls yet this shift. The whole shift\'s activity is under <b>Tonight</b>.</p>'}
   </div></div>`;
     bindSearch('sq', 'sres', openSite);
-    $('#sq').focus();
+    // Don't focus the site search immediately — the agent needs to fill in caller details first
 }
 
 /* ------------------------ resolution + workspace (§3.2, F004) ------------------------ */
@@ -96,7 +173,7 @@ async function ambiguousCapture() {
             additionalNotes: notesValue('addnotes-amb'), // OOHDASH-119
             siteNo: a.siteNo,
             siteName: `Ambiguous (${a.matches.map(m => m.siteName).join(' / ')})`,
-            subject: `Ambiguous house ID ${a.siteNo} — caller could not be resolved to one site`,
+            subject: `Ambiguous house ID ${a.siteNo} — customer could not be resolved to one site`,
             detail: `OOH could not safely resolve house ID ${a.siteNo} (matches ${a.matches.map(m => m.siteName).join(' and ')}). Captured for IoT priority review.`,
             OohCaptureClass: 'data-quality'
         });
@@ -629,7 +706,7 @@ function paintAdmin() {
   </div>
   <div class="card"><h3>P1 escalation log</h3>
    ${a.sms.length ? `<table class="tbl">${a.sms.map(sl =>
-        `<tr><td>${esc(new Date(sl.dispatchedAt).toLocaleString('en-GB', { weekday: 'short', hour: '2-digit', minute: '2-digit' }))}</td><td><b>${esc(sl.siteName)}</b> <span class="mono">${esc(sl.siteNo)}</span></td><td>Raised with ooh_p1 tag · IoT Support Dashboard pages the manager</td><td>${tktLink(sl.ticketId)}</td><td>${sl.OohP1AckAt ? `<span class="tag green">ack ${esc(new Date(sl.OohP1AckAt).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }))}</span>` : `<button class="btn link" onclick="ackP1('${sl.id}')">Mark acknowledged</button>`}</td></tr>`).join('')}</table>` : '<p class="small">No P1 escalations raised yet.</p>'}
+        `<tr><td>${esc(new Date(sl.dispatchedAt).toLocaleString('en-GB', { weekday: 'short', hour: '2-digit', minute: '2-digit' }))}</td><td><b>${esc(sl.siteName)}</b> <span class="mono">${esc(sl.siteNo)}</span></td><td>Raised with ooh_p1 tag · IoT Support Dashboard sends a text message to the on-call agent</td><td>${tktLink(sl.ticketId)}</td><td>${sl.OohP1AckAt ? `<span class="tag green">ack ${esc(new Date(sl.OohP1AckAt).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }))}</span>` : `<button class="btn link" onclick="ackP1('${sl.id}')">Mark acknowledged</button>`}</td></tr>`).join('')}</table>` : '<p class="small">No P1 escalations raised yet.</p>'}
   </div>
   <div class="card"><h3>Capability &amp; guardrail registry <span class="tag grey">read-only mirror of server registry</span></h3>
    <table class="tbl" data-testid="admin-registry"><tr><th>Device type</th><th>Allowed commands</th><th>Ranges (app policy)</th></tr>

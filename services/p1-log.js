@@ -46,7 +46,7 @@ export async function recordP1Raised({ operator, siteNo, siteName, ticketId, sum
         raisedBy: operator.name,
         dispatchedAt: new Date().toISOString(), // kept for metrics.js SLA maths + legacy rows
         OohP1EscalationLink: link,
-        status: 'P1 ticket raised with ooh_p1 tag; OOH side complete; IoT Support Dashboard will page the on-duty manager.',
+        status: 'P1 ticket raised with ooh_p1 tag; OOH side complete; IoT Support Dashboard will send a text message to the on-call agent.',
         OohP1AckAt: null,
         OohP1AckBy: null
     };

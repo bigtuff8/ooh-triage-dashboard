@@ -23,7 +23,7 @@ function loadClient(workspace, { realFinishOutcome = false } = {}) {
     const captured = [];             // outcome payloads posted via finishOutcome
     const started = [];              // startFlow(k, freeText) calls
     const posts = [];                // api.post payloads (real-finishOutcome mode)
-    const state = { flow: null, workspace, smartEntryText: '', me: { operator: { name: 'Handler One' } }, call: null };
+    const state = { flow: null, workspace, smartEntryText: '', me: { operator: { name: 'Handler One' } }, call: null, caller: { name: '', role: '', phone: '', declined: false } };
     const sandbox = {
         state,
         $: () => ({ innerHTML: '', focus() {} }),
@@ -44,6 +44,9 @@ function loadClient(workspace, { realFinishOutcome = false } = {}) {
         notesField: () => '',
         notesPostBox: () => '',
         notesValue: () => '',
+        // OOHDASH-146: caller-contact helpers live in app.js; stub for unit isolation
+        callerContactFrom: () => null,
+        callFields: () => ({}),
         Promise, Date,
         window: {},
         console

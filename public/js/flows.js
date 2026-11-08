@@ -270,7 +270,7 @@ function warnBox(text, testid) {
 
 /** The stronger P1 warning (solid red heading). */
 function p1WarnBox() {
-    return '<div class="p1warn" data-testid="p1-confirm-warning"><div class="p1warn-head">🚨 This raises a P1</div><div class="p1warn-body">It pages the on-duty manager straight away.</div></div>';
+    return '<div class="p1warn" data-testid="p1-confirm-warning"><div class="p1warn-head">🚨 This raises a P1</div><div class="p1warn-body">It sends a text message to the on-call agent straight away.</div></div>';
 }
 
 /**
@@ -493,6 +493,7 @@ window.submitPendingOutcome = function submitPendingOutcome(key, auto) {
         additionalNotes: (f.data.additionalNotes || '').trim() || null, // OOHDASH-119; DF-01: trim so whitespace-only → null
         knownSoFar: knownSoFarLines(f), // OOHDASH-159 rev 4: written onto the ticket, never into the P1 text
         ...callFields(), // rev 5 (E1): link the ticket to the call record
+        customerContact: callerContactFrom(state.caller), // OOHDASH-146 B10
         ...payload
     }).then(res => {
         notesDraftClear(); // OOHDASH-119: clear sessionStorage draft on success
@@ -540,7 +541,7 @@ function outcomeP1(f, key, { subject, detail, script, p1Summary, OohCaptureClass
     return finishOutcome(f, key,
         { type: 'escalate-p1', subject, detail, p1Summary, OohCaptureClass: OohCaptureClass || null, issueLabel: subject, issueCls: 'red' },
         res => afterCard('outcome-p1', 'P1 raised', res.ticket.id,
-            `<p class="after-line" data-testid="p1-dispatch-status">The on-duty manager has been paged and will call the site back.</p><p class="after-line small">On the ticket: ${esc(subject)}</p>`,
+            `<p class="after-line" data-testid="p1-dispatch-status">The on-call agent has been sent a text message and will call the site back.</p><p class="after-line small">On the ticket: ${esc(subject)}</p>`,
             scriptText(script, res)), pre);
 }
 
@@ -1296,6 +1297,7 @@ function wrapUpSubmit() {
         callerWords: f.data.freeText || null,
         knownSoFar: knownSoFarLines(f), // OOHDASH-159 rev 4
         ...callFields(), // rev 5 (E1)
+        customerContact: callerContactFrom(state.caller), // OOHDASH-146 B10
         additionalNotes: f.data.additionalNotes || null,
         OohCaptureClass: 'boiler-panel-heating',
         actions: actionLines,

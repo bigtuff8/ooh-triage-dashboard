@@ -102,7 +102,7 @@ test('recordP1Raised: writes the positive status text to OohSmsLog', async () =>
     resetCaptures();
     const entry = await p1LogMod.recordP1Raised(P1_ARGS);
     assert.equal(logUpserts.length, 1, 'one upsert written');
-    assert.equal(logUpserts[0].status, 'P1 ticket raised with ooh_p1 tag; OOH side complete; IoT Support Dashboard will page the on-duty manager.');
+    assert.equal(logUpserts[0].status, 'P1 ticket raised with ooh_p1 tag; OOH side complete; IoT Support Dashboard will send a text message to the on-call agent.');
     assert.equal(entry.ticketId, 55501);
     assert.equal(entry.siteNo, '6832');
     assert.ok(entry.dispatchedAt, 'dispatchedAt is set (metrics SLA compat)');

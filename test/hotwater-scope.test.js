@@ -138,17 +138,17 @@ test('server: OOHDASH-114-F1 — hasControllableDhw is driven by boilerControl f
     assert.equal(api.hasControllableDhw(withBoilerControl), true, 'boilerControl.dhwControllable=true flips dhwControllable');
 });
 
-test('server OOHDASH-114-F1: hotwater scope is driven by boilerControl field — boilerControl.dhwControllable=true flips tile to ctl', async () => {
+test('server OOHDASH-114-F1 / OOHDASH-146-B12: hotwater scope is driven by boilerControl field — always mon, never ctl', async () => {
     const [site] = await bridge.getSitesByNumber('6261');
     assert.equal(scopeOf(site).find(g => g.key === 'hotwater').level, 'mon', 'baseline: 6261 combi with hotWater signal but no boilerControl → mon');
     // Old hwboost device injection no longer changes the scope level.
     const withOldDhw = { ...site, devices: [...site.devices, syntheticControllableDhw()] };
     assert.equal(scopeOf(withOldDhw).find(g => g.key === 'hotwater').level, 'mon',
         'old hwboost device injection no longer flips the tile — OOHDASH-114-F1 replaced the device-capability path');
-    // The boilerControl field IS the flip: a site with boilerControl.dhwControllable=true shows ctl.
+    // B12: hot water scope is never ctl — even with boilerControl.dhwControllable=true it stays mon.
     const withBoilerControl = { ...site, boilerControl: { present: true, dhwControllable: true, heatingControllable: true } };
-    assert.equal(scopeOf(withBoilerControl).find(g => g.key === 'hotwater').level, 'ctl',
-        'boilerControl.dhwControllable=true flips the hotwater tile to ctl');
+    assert.equal(scopeOf(withBoilerControl).find(g => g.key === 'hotwater').level, 'mon',
+        'boilerControl.dhwControllable=true: hotwater scope stays mon — OOHDASH-146-B12 hot water is never ctl');
 });
 
 test('view: out-of-scope-with-context (mon) hot-water tile reads "monitored — not adjustable from here", not a bare "Not on Lighthouse here"', async () => {
