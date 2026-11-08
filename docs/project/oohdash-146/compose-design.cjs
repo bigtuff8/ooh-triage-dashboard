@@ -28,13 +28,14 @@ function fix(t) {
   const starts = (l, p) => l.indexOf(p) === 0;
   t = t.split(NLc).map(l => {
     if (starts(l, '| Switching off fails |')) return l.replace(/ \|$/, ' **Accepted exception (Q11, James 2026-11-08):** this and an urgent one-off the dashboard cannot make (D14d) are the only P1s raised without a question, because nobody is on a call. The P1 carries p1Origin automatic and a fixed system reason ("Automatic: ..."), so the rule "a P1 needs a reason" holds. |');
-    if (starts(l, '- A failed switch-off pages the on-duty manager')) return '- A failed switch-off pages the on-duty manager after 10 minutes: an accepted automatic P1 (Q11).';
+    if (starts(l, '- A failed switch-off pages the on-duty manager')) return '- A failed switch-off sends a text message to the on-call agent after 10 minutes (an automatic P1, accepted, Q11).';
     if (starts(l, '4. Safety question:')) return '4. No "will someone be in the kitchen" question (D14d). PowerPause only controls the power to the equipment; starting it, stopping it and using it safely stays the site\'s responsibility. The agent info box and the Say both say so. The check card shows the urgency banner instead (section 2B). If the request is not urgent, nothing is booked and a normal ticket is logged (K-normal).';
     if (starts(l, '| No live read (flag off, read failed')) return '| No live read (flag off, read failed, the circuit isn\'t in §tuya-sites.json§, or the site has no one-off) | Today\'s legacy kitchen screen; "different times" goes to K-when-unknown | No. K-when-unknown asks when it is needed: urgent raises a P1 automatically (K-auto-p1, D14d); not urgent is a normal ticket (K-normal). The screen still offers the manual override for tonight. |'.split('§').join(String.fromCharCode(96));
     if (starts(l, '- Nothing is booked unless the customer says someone will be in the kitchen.')) return '- No attended question: PowerPause only controls the power, so safe use stays the site\'s responsibility (D14d). A one-off is booked only when it is urgent and the dashboard can make the change.';
     if (starts(l, '| Booking call |')) return l.split(' OohOneOffAttended: true,').join('').split('Checks in order:').join('Checks in order: the site and device are the ones confirmed on this call (§siteNo§ and §deviceId§ bound to the call, B29); urgency recomputed by §urgencyOf§ (a not-urgent request is refused with 409);'.split('§').join(String.fromCharCode(96)));
-    return l;
+    return l.split('so the on-duty manager is paged').join('so the on-call agent is sent a text message');
   }).join(NLc);
+  t = t.split('so the on-duty manager is paged').join('so the on-call agent is sent a text message');
   return t;
 }
 // section 17: drop rows about names that no longer exist, note the live closed-ticket mechanism
@@ -52,7 +53,7 @@ function dict(t) {
     '| `p1Origin` | `/api/outcomes` body, only with `type: \'escalate-p1\'` | \'agent\' or \'automatic\' | Who raised the P1. \'automatic\' is accepted only from the one-off server code (failed switch-off, Q11) and the urgent-one-off-cannot-be-made case (D14d), with a fixed system reason ("Automatic: ..."). A browser cannot send \'automatic\'. | none |',
     '| `neededAt` | browser and `/api/outcomes`, `/api/oneoffs` bodies | local date and time | When the customer needs a planned change to be in place (fans, kitchen times, one-off). Input to `urgencyOf`. | none |',
     '| `urgency` | derived, never stored from the browser | \'urgent\' or \'not-urgent\' | Result of `urgencyOf(neededAt, now)` (section 2B.1); the server recomputes it. Shown as "Urgent — outside office hours" or "Not urgent — the IoT team can pick this up in time". Written as a known-so-far line on the ticket. | none |',
-    '| `OOH_OFFICE_HOURS`, `OOH_RESPONSE_WORKING_HOURS` | `config.js` | \'Mon-Fri 09:00-17:00\' (assumed, Q14), 3 | The IoT office hours and response window used by `urgencyOf`. | none |',
+    '| `OOH_OFFICE_HOURS`, `OOH_RESPONSE_WORKING_HOURS` | `config.js` | \'Mon-Fri 09:00-17:00\' (confirmed, Q14), 3 | The IoT office hours and response window used by `urgencyOf`. | none |',
     '| `config/bank-holidays.json` | file | list of dates | Dates that count as non-working days for `urgencyOf`. | none |');
   return lines.join('\n');
 }
@@ -76,6 +77,7 @@ const results = [
   '| D16: caller banner on every in-call screen, in each of five states (full, name only, number only, none, declined) | ' + ver.d16.inCall + ' screens each: ' + Object.values(ver.d16.stateRows).join(', ') + '; missing ' + ver.d16.noBanner.length + '; wrong ' + ver.d16.bannerBad.length + '; on a screen outside a call ' + ver.d16.outsideWithBanner.length + ' |',
   '| D16: walk from the start screen to a kitchen flow, four ways of starting; add details mid-call | ' + ver.d16.flowPath.filter(x => x[1].ok).length + ' of ' + ver.d16.flowPath.length + ' walks keep the right banner; add details ' + (ver.d16.addDetails.ok ? 'ok' : 'FAILED') + ' |',
   '| D16: phone width (390 px) | banner ' + ver.d16.phone.bannerHeight + ' px high and sticky; it moves the say box down by ' + ver.d16.phone.pushedBy + ' px; with the real app (without the ' + ver.d16.phone.prototypeBarHeight + ' px prototype bar) the say box top is at ' + (ver.d16.phone.sayTopWith - ver.d16.phone.prototypeBarHeight) + ' px of ' + ver.d16.phone.viewport + ' |',
+  '| Q12 wording: screens, side panels and the prototype file containing "on-duty", "on-call manager", "paged" or "pages the" | ' + (ver.d16.q12Hits.length ? ver.d16.q12Hits.join(', ') : 'none') + ' |',
   '| D13: screens that show the exact question | ' + ver.d13.questionScreens + ' (wrong wording on ' + ver.d13.askBad.length + ') |',
   '| D13: ticket screens (not P1) reached only from the question | ' + ver.d13.gated + ' of ' + (ver.d13.gated + ver.d13.exempt) + '; the other ' + ver.d13.exempt + ' are resolved on the call or declined, listed in the screen-text diff; ungated: ' + ver.d13.ungated.length + ' |',
   '| D13: P1 confirm screens reached only from the question | ' + ver.d13.confirms + ' (exceptions: ' + ver.d13.confirmUngated.length + ') |',

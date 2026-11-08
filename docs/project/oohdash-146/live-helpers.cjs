@@ -27,7 +27,7 @@ module.exports = { addNote, btn, field, esc, dyn, tktLink, guideLink, answers, s
 
 // OOHDASH-146 rev 4 (D13): the universal risk question and the mandatory P1 comment.
 const RISK_ASK = "Is there an immediate risk to trade or to anyone's health and safety?";
-const RISK_INFO = "<b>Trade</b> means the site can't serve customers or can't open. <b>Health and safety</b> means anything that could hurt someone. <b>Yes</b> raises a P1: the IoT team's on-call agent is texted straight away and deals with it immediately. <b>No</b> logs it, and the IoT team picks it up the next working day.";
+const RISK_INFO = "<b>Trade</b> means the site can't serve customers or can't open. <b>Health and safety</b> means anything that could hurt someone. <b>Yes</b> raises a P1: the IoT team's on-call agent is sent a text message straight away and deals with it immediately. <b>No</b> logs it, and the IoT team picks it up the next working day.";
 const RISK_KNOWN = v => "Immediate risk to trade or to anyone's health and safety: " + v;
 const RISK_HELP = '<div class="gtk" data-testid="risk-help"><span class="gtk-label">ℹ For you (background, not to read out)</span>' + RISK_INFO + '</div>';
 const p1Reason = (prefill) => '<div class="formrow" style="margin-top:10px"><label for="p1reason">Why is this urgent? (required — goes on the P1 ticket)</label><textarea id="p1reason" data-testid="p1-reason" data-p1c="1" rows="3" maxlength="500" placeholder="e.g. Fryers off during Sunday lunch service, 80 covers booked">' + (prefill ? esc(prefill) : '') + '</textarea></div><p class="small p1-blocked-note" data-testid="p1-blocked-note"' + (prefill ? ' hidden' : '') + '>Type why this is urgent (at least 10 characters) before you can raise the P1.</p>';
