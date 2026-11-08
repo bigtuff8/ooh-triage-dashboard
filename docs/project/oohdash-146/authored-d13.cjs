@@ -224,4 +224,21 @@ const EXEMPT = {
 Object.entries(EXEMPT).forEach(([why, ids]) => ids.forEach(id => { if (!NODES[id]) throw new Error('exempt: no node ' + id); NODES[id].exempt = why; }));
 
 NODES['K-normal'].exemptParents = ['K-when'];
+
+/* ------------------------------------------------------------------ Q12 (2026-11-08): "on-call agent" and text message, never "on-duty manager" or "paged" */
+delta('R18', 'Q12: "on-call agent" and "text message" wording on the P1 screens', 'The P1 warning says "This raises a P1 — it sends a text message to the on-call agent straight away"; the after-card says "The on-call agent has been sent a text message and will call the site back."; the other P1 notes say "on-call agent" instead of manager; the failed-P1 alert says no text message has been sent. Every earlier reference to a duty manager or to paging is replaced. This deliberately supersedes the OOHDASH-153 D2 wording set. The customer-facing Say stays plain ("Someone from our on-call team will call you back shortly").');
+const Q12 = [
+  ['<div class="p1warn-head">🚨 This raises a P1</div><div class="p1warn-body">It pages the on-duty manager straight away.</div>', '<div class="p1warn-head">🚨 This raises a P1 — it sends a text message to the on-call agent straight away</div>'],
+  ['The on-duty manager has been paged and will call the site back.', 'The on-call agent has been sent a text message and will call the site back.'],
+  ['the on-call manager', 'the on-call agent'],
+  ['P1 escalation raised — on-duty manager to be paged', 'P1 escalation raised — text message sent to the on-call agent'],
+  ['Nobody has been paged yet.', 'No text message has been sent to the on-call agent yet.'],
+  ['nobody paged', 'no text message sent']
+];
+Object.values(NODES).forEach(n => {
+  let changed = false;
+  ['flowHtml', 'modalHtml', 'pageHtml'].forEach(k => { if (!n[k]) return; let h = n[k]; Q12.forEach(([a, b]) => { h = h.split(a).join(b); }); if (h !== n[k]) { n[k] = h; changed = true; } });
+  if (n.t) Q12.forEach(([a, b]) => { n.t = n.t.split(a).join(b); });
+  if (changed && !n.deltas.includes('R18')) n.deltas.push('R18');
+});
 module.exports = { GATED, EXEMPT };

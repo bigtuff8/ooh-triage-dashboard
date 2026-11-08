@@ -486,6 +486,7 @@
    "src": "K8888~30",
    "deltas": [
     "R14",
+    "R18",
     "R17"
    ],
    "kind": "flow",
@@ -520,6 +521,7 @@
    "src": "K8888~32",
    "deltas": [
     "R14",
+    "R18",
     "R17"
    ],
    "kind": "flow",
@@ -554,6 +556,7 @@
    "src": "K8888~34",
    "deltas": [
     "R14",
+    "R18",
     "R17"
    ],
    "kind": "flow",
@@ -588,6 +591,7 @@
    "src": "K8888~36",
    "deltas": [
     "R14",
+    "R18",
     "R17"
    ],
    "kind": "flow",
@@ -622,6 +626,7 @@
    "src": "K8888~38",
    "deltas": [
     "R14",
+    "R18",
     "R17"
    ],
    "kind": "flow",
@@ -656,6 +661,7 @@
    "src": "K8888~40",
    "deltas": [
     "R14",
+    "R18",
     "R17"
    ],
    "kind": "flow",
@@ -690,6 +696,7 @@
    "src": "K8888~42",
    "deltas": [
     "R14",
+    "R18",
     "R17"
    ],
    "kind": "flow",
@@ -724,6 +731,7 @@
    "src": "K8888~44",
    "deltas": [
     "R14",
+    "R18",
     "R17"
    ],
    "kind": "flow",
@@ -774,6 +782,7 @@
    "src": "K8888~47",
    "deltas": [
     "R14",
+    "R18",
     "R17"
    ],
    "kind": "flow",
@@ -808,6 +817,7 @@
    "src": "K8888~49",
    "deltas": [
     "R14",
+    "R18",
     "R17"
    ],
    "kind": "flow",
@@ -858,6 +868,7 @@
    "src": "K8888~52",
    "deltas": [
     "R14",
+    "R18",
     "R17"
    ],
    "kind": "flow",
@@ -875,6 +886,7 @@
    "src": "K8888~53",
    "deltas": [
     "R14",
+    "R18",
     "R17"
    ],
    "kind": "flow",
@@ -892,6 +904,7 @@
    "src": "K8888~54",
    "deltas": [
     "R14",
+    "R18",
     "R17"
    ],
    "kind": "flow",
@@ -909,6 +922,7 @@
    "src": "K8888~55",
    "deltas": [
     "R14",
+    "R18",
     "R17"
    ],
    "kind": "flow",
@@ -926,6 +940,7 @@
    "src": "K8888~56",
    "deltas": [
     "R14",
+    "R18",
     "R17"
    ],
    "kind": "flow",
@@ -943,6 +958,7 @@
    "src": "K8888~57",
    "deltas": [
     "R14",
+    "R18",
     "R17"
    ],
    "kind": "flow",
@@ -960,6 +976,7 @@
    "src": "K8888~58",
    "deltas": [
     "R14",
+    "R18",
     "R17"
    ],
    "kind": "flow",
@@ -977,6 +994,7 @@
    "src": "K8888~59",
    "deltas": [
     "R14",
+    "R18",
     "R17"
    ],
    "kind": "flow",
@@ -994,6 +1012,7 @@
    "src": "K8888~60",
    "deltas": [
     "R14",
+    "R18",
     "R17"
    ],
    "kind": "flow",
@@ -1011,6 +1030,7 @@
    "src": "K8888~61",
    "deltas": [
     "R14",
+    "R18",
     "R17"
    ],
    "kind": "flow",
@@ -1078,6 +1098,7 @@
    "src": "K8888-gw-B-unscheduled~4",
    "deltas": [
     "R14",
+    "R18",
     "R17"
    ],
    "kind": "flow",
@@ -1112,6 +1133,7 @@
    "src": "K8888-gw-B-unscheduled~6",
    "deltas": [
     "R14",
+    "R18",
     "R17"
    ],
    "kind": "flow",
@@ -1179,6 +1201,7 @@
    "src": "K8888-gw-B-outside~4",
    "deltas": [
     "R14",
+    "R18",
     "R17"
    ],
    "kind": "flow",
@@ -1213,6 +1236,7 @@
    "src": "K8888-gw-B-outside~6",
    "deltas": [
     "R14",
+    "R18",
     "R17"
    ],
    "kind": "flow",
@@ -1296,6 +1320,7 @@
    "src": "K8888-gw-off-unknown~5",
    "deltas": [
     "R14",
+    "R18",
     "R17"
    ],
    "kind": "flow",
@@ -1330,6 +1355,7 @@
    "src": "K8888-gw-off-unknown~7",
    "deltas": [
     "R14",
+    "R18",
     "R17"
    ],
    "kind": "flow",
@@ -1364,6 +1390,7 @@
    "src": "K8888-gw-off-unknown~9",
    "deltas": [
     "R14",
+    "R18",
     "R17"
    ],
    "kind": "flow",
@@ -1381,6 +1408,7 @@
    "src": "K8888-gw-off-unknown~10",
    "deltas": [
     "R14",
+    "R18",
     "R17"
    ],
    "kind": "flow",
@@ -1464,6 +1492,7 @@
    "src": "K8888-gw-fallback~5",
    "deltas": [
     "R14",
+    "R18",
     "R17"
    ],
    "kind": "flow",
@@ -1498,6 +1527,7 @@
    "src": "K8888-gw-fallback~7",
    "deltas": [
     "R14",
+    "R18",
     "R17"
    ],
    "kind": "flow",
@@ -1532,6 +1562,7 @@
    "src": "K8888-gw-fallback~9",
    "deltas": [
     "R14",
+    "R18",
     "R17"
    ],
    "kind": "flow",
@@ -1549,6 +1580,7 @@
    "src": "K8888-gw-fallback~10",
    "deltas": [
     "R14",
+    "R18",
     "R17"
    ],
    "kind": "flow",
@@ -1869,6 +1901,7 @@
    "src": "K6832~19",
    "deltas": [
     "R14",
+    "R18",
     "R17"
    ],
    "kind": "flow",
@@ -1903,6 +1936,7 @@
    "src": "K6832~21",
    "deltas": [
     "R14",
+    "R18",
     "R17"
    ],
    "kind": "flow",
@@ -1953,6 +1987,7 @@
    "src": "K6832~24",
    "deltas": [
     "R14",
+    "R18",
     "R17"
    ],
    "kind": "flow",
@@ -1987,6 +2022,7 @@
    "src": "K6832~26",
    "deltas": [
     "R14",
+    "R18",
     "R17"
    ],
    "kind": "flow",
@@ -2038,6 +2074,7 @@
    "deltas": [
     "G1",
     "R14",
+    "R18",
     "R17"
    ],
    "kind": "flow",
@@ -2074,6 +2111,7 @@
    "deltas": [
     "G1",
     "R14",
+    "R18",
     "R17"
    ],
    "kind": "flow",
@@ -2126,6 +2164,7 @@
    "src": "K6832~34",
    "deltas": [
     "R14",
+    "R18",
     "R17"
    ],
    "kind": "flow",
@@ -2143,6 +2182,7 @@
    "src": "K6832~35",
    "deltas": [
     "R14",
+    "R18",
     "R17"
    ],
    "kind": "flow",
@@ -2160,6 +2200,7 @@
    "src": "K6832~36",
    "deltas": [
     "R14",
+    "R18",
     "R17"
    ],
    "kind": "flow",
@@ -2177,6 +2218,7 @@
    "src": "K6832~37",
    "deltas": [
     "R14",
+    "R18",
     "R17"
    ],
    "kind": "flow",
@@ -2195,6 +2237,7 @@
    "deltas": [
     "G1",
     "R14",
+    "R18",
     "R17"
    ],
    "kind": "flow",
@@ -2213,6 +2256,7 @@
    "deltas": [
     "G1",
     "R14",
+    "R18",
     "R17"
    ],
    "kind": "flow",
@@ -2297,6 +2341,7 @@
    "deltas": [
     "R12",
     "R14",
+    "R18",
     "R17"
    ],
    "kind": "flow",
@@ -2315,6 +2360,7 @@
    "deltas": [
     "R12",
     "R14",
+    "R18",
     "R17"
    ],
    "kind": "flow",
@@ -2366,6 +2412,7 @@
    "deltas": [
     "R12",
     "R14",
+    "R18",
     "R17"
    ],
    "kind": "flow",
@@ -2384,6 +2431,7 @@
    "deltas": [
     "R12",
     "R14",
+    "R18",
     "R17"
    ],
    "kind": "flow",
@@ -2451,6 +2499,7 @@
    "deltas": [
     "R12",
     "R14",
+    "R18",
     "R17"
    ],
    "kind": "flow",
@@ -2469,6 +2518,7 @@
    "deltas": [
     "R12",
     "R14",
+    "R18",
     "R17"
    ],
    "kind": "flow",
@@ -2600,6 +2650,7 @@
    "src": "FR6851~2",
    "deltas": [
     "R14",
+    "R18",
     "R17"
    ],
    "kind": "flow",
@@ -2634,6 +2685,7 @@
    "src": "FR6851~4",
    "deltas": [
     "R14",
+    "R18",
     "R17"
    ],
    "kind": "flow",
@@ -2880,6 +2932,7 @@
    "src": "CT6832~4",
    "deltas": [
     "R14",
+    "R18",
     "R17"
    ],
    "kind": "flow",
@@ -2929,6 +2982,7 @@
    "src": "CT6832~7",
    "deltas": [
     "R14",
+    "R18",
     "R17"
    ],
    "kind": "flow",
@@ -2962,6 +3016,7 @@
    "src": "CT6832~9",
    "deltas": [
     "R14",
+    "R18",
     "R17"
    ],
    "kind": "flow",
@@ -2979,6 +3034,7 @@
    "src": "CT6832~10",
    "deltas": [
     "R14",
+    "R18",
     "R17"
    ],
    "kind": "flow",
@@ -2996,6 +3052,7 @@
    "src": "CT6832~11",
    "deltas": [
     "R14",
+    "R18",
     "R17"
    ],
    "kind": "flow",
@@ -3062,6 +3119,7 @@
    "src": "CT-dd~4",
    "deltas": [
     "R14",
+    "R18",
     "R17"
    ],
    "kind": "flow",
@@ -3079,6 +3137,7 @@
    "src": "CT-dd~5",
    "deltas": [
     "R14",
+    "R18",
     "R17"
    ],
    "kind": "flow",
@@ -3096,6 +3155,7 @@
    "src": "CT-dd~6",
    "deltas": [
     "R14",
+    "R18",
     "R17"
    ],
    "kind": "flow",
@@ -3113,6 +3173,7 @@
    "src": "CT-dd~7",
    "deltas": [
     "R14",
+    "R18",
     "R17"
    ],
    "kind": "flow",
@@ -3933,6 +3994,7 @@
    "deltas": [
     "R2",
     "R14",
+    "R18",
     "R17"
    ],
    "kind": "flow",
@@ -3951,6 +4013,7 @@
    "deltas": [
     "R2",
     "R14",
+    "R18",
     "R17"
    ],
    "kind": "flow",
@@ -4181,6 +4244,7 @@
     "R1",
     "R15",
     "R14",
+    "R18",
     "R17"
    ],
    "kind": "flow",
@@ -4934,7 +4998,8 @@
    "t": "Callback Lookup: ticket drawer",
    "src": null,
    "deltas": [
-    "R10"
+    "R10",
+    "R18"
    ],
    "kind": "page",
    "authored": true,
@@ -5009,11 +5074,12 @@
   {
    "id": "SH:p1fail",
    "g": "PAGES",
-   "t": "Kitchen P1: could not be raised (nobody paged, no ticket number)",
+   "t": "Kitchen P1: could not be raised (no text message sent, no ticket number)",
    "src": null,
    "deltas": [
     "R7",
     "R14",
+    "R18",
     "R17"
    ],
    "kind": "flow",
@@ -5048,6 +5114,7 @@
    "src": null,
    "deltas": [
     "R14",
+    "R18",
     "R17"
    ],
    "kind": "flow",
@@ -5065,6 +5132,7 @@
    "src": null,
    "deltas": [
     "R14",
+    "R18",
     "R17"
    ],
    "kind": "flow",
@@ -5201,6 +5269,7 @@
    "src": null,
    "deltas": [
     "R14",
+    "R18",
     "R17"
    ],
    "kind": "flow",
@@ -5218,6 +5287,7 @@
    "src": null,
    "deltas": [
     "R14",
+    "R18",
     "R17"
    ],
    "kind": "flow",
@@ -5490,6 +5560,7 @@
    "src": null,
    "deltas": [
     "R14",
+    "R18",
     "R17"
    ],
    "kind": "flow",
@@ -5507,6 +5578,7 @@
    "src": null,
    "deltas": [
     "R14",
+    "R18",
     "R17"
    ],
    "kind": "flow",
@@ -5763,6 +5835,7 @@
    "deltas": [
     "R14",
     "R15",
+    "R18",
     "R17"
    ],
    "kind": "flow",
@@ -5780,6 +5853,7 @@
    "src": null,
    "deltas": [
     "R14",
+    "R18",
     "R17"
    ],
    "kind": "flow",
@@ -5815,6 +5889,7 @@
    "src": null,
    "deltas": [
     "R14",
+    "R18",
     "R17"
    ],
    "kind": "flow",
@@ -5832,6 +5907,7 @@
    "src": null,
    "deltas": [
     "R14",
+    "R18",
     "R17"
    ],
    "kind": "flow",
@@ -6036,6 +6112,7 @@
    "src": null,
    "deltas": [
     "R14",
+    "R18",
     "R17"
    ],
    "kind": "flow",
@@ -6053,6 +6130,7 @@
    "src": null,
    "deltas": [
     "R14",
+    "R18",
     "R17"
    ],
    "kind": "flow",
@@ -6155,6 +6233,7 @@
    "src": null,
    "deltas": [
     "R14",
+    "R18",
     "R17"
    ],
    "kind": "flow",
@@ -6172,6 +6251,7 @@
    "src": null,
    "deltas": [
     "R14",
+    "R18",
     "R17"
    ],
    "kind": "flow",
@@ -6291,6 +6371,7 @@
    "src": null,
    "deltas": [
     "R14",
+    "R18",
     "R17"
    ],
    "kind": "flow",
@@ -6308,6 +6389,7 @@
    "src": null,
    "deltas": [
     "R14",
+    "R18",
     "R17"
    ],
    "kind": "flow",
@@ -6563,6 +6645,7 @@
    "src": null,
    "deltas": [
     "R14",
+    "R18",
     "R17"
    ],
    "kind": "flow",
@@ -6580,6 +6663,7 @@
    "src": null,
    "deltas": [
     "R14",
+    "R18",
     "R17"
    ],
    "kind": "flow",
@@ -6614,6 +6698,7 @@
    "src": null,
    "deltas": [
     "R14",
+    "R18",
     "R17"
    ],
    "kind": "flow",
@@ -6631,6 +6716,7 @@
    "src": null,
    "deltas": [
     "R14",
+    "R18",
     "R17"
    ],
    "kind": "flow",
@@ -6682,6 +6768,7 @@
    "src": null,
    "deltas": [
     "R14",
+    "R18",
     "R17"
    ],
    "kind": "flow",
@@ -6699,6 +6786,7 @@
    "src": null,
    "deltas": [
     "R14",
+    "R18",
     "R17"
    ],
    "kind": "flow",
@@ -6733,6 +6821,7 @@
    "src": null,
    "deltas": [
     "R14",
+    "R18",
     "R17"
    ],
    "kind": "flow",
@@ -6750,6 +6839,7 @@
    "src": null,
    "deltas": [
     "R14",
+    "R18",
     "R17"
    ],
    "kind": "flow",
@@ -6784,6 +6874,7 @@
    "src": null,
    "deltas": [
     "R14",
+    "R18",
     "R17"
    ],
    "kind": "flow",
@@ -6801,6 +6892,7 @@
    "src": null,
    "deltas": [
     "R14",
+    "R18",
     "R17"
    ],
    "kind": "flow",
@@ -6905,6 +6997,10 @@
   "R15": {
    "title": "D14: the urgency window (fans, air conditioning, kitchen times and one-offs)",
    "what": "Planned requests are filtered by whether they are urgent, judged against the IoT team's office hours and a 3 working hour response. Extractor fans: one-off or every week, then when it is needed; only a one-off that is urgent can be a P1. Kitchen \"different times every week\": only an urgent request can be a P1. Kitchen one-off: the \"will someone be there\" question is gone; an urgent one-off the dashboard can make is booked, and one it cannot make raises a P1 automatically. Air conditioning keeps the risk question and tells the agent where to put an ongoing schedule change."
+  },
+  "R18": {
+   "title": "Q12: \"on-call agent\" and \"text message\" wording on the P1 screens",
+   "what": "The P1 warning says \"This raises a P1 — it sends a text message to the on-call agent straight away\"; the after-card says \"The on-call agent has been sent a text message and will call the site back.\"; the other P1 notes say \"on-call agent\" instead of manager; the failed-P1 alert says no text message has been sent. Every earlier reference to a duty manager or to paging is replaced. This deliberately supersedes the OOHDASH-153 D2 wording set. The customer-facing Say stays plain (\"Someone from our on-call team will call you back shortly\")."
   }
  },
  "groups": [

@@ -396,7 +396,8 @@
    "prototypeBarHeight": 210,
    "viewport": 780,
    "ok": true
-  }
+  },
+  "q12Hits": []
  },
  "rows": [
   {
@@ -634,7 +635,8 @@
    "src": "K8888~30",
    "status": "differs",
    "items": [
-    "R14"
+    "R14",
+    "R18"
    ]
   },
   {
@@ -652,7 +654,8 @@
    "src": "K8888~32",
    "status": "differs",
    "items": [
-    "R14"
+    "R14",
+    "R18"
    ]
   },
   {
@@ -670,7 +673,8 @@
    "src": "K8888~34",
    "status": "differs",
    "items": [
-    "R14"
+    "R14",
+    "R18"
    ]
   },
   {
@@ -688,7 +692,8 @@
    "src": "K8888~36",
    "status": "differs",
    "items": [
-    "R14"
+    "R14",
+    "R18"
    ]
   },
   {
@@ -706,7 +711,8 @@
    "src": "K8888~38",
    "status": "differs",
    "items": [
-    "R14"
+    "R14",
+    "R18"
    ]
   },
   {
@@ -724,7 +730,8 @@
    "src": "K8888~40",
    "status": "differs",
    "items": [
-    "R14"
+    "R14",
+    "R18"
    ]
   },
   {
@@ -742,7 +749,8 @@
    "src": "K8888~42",
    "status": "differs",
    "items": [
-    "R14"
+    "R14",
+    "R18"
    ]
   },
   {
@@ -760,7 +768,8 @@
    "src": "K8888~44",
    "status": "differs",
    "items": [
-    "R14"
+    "R14",
+    "R18"
    ]
   },
   {
@@ -785,7 +794,8 @@
    "src": "K8888~47",
    "status": "differs",
    "items": [
-    "R14"
+    "R14",
+    "R18"
    ]
   },
   {
@@ -803,7 +813,8 @@
    "src": "K8888~49",
    "status": "differs",
    "items": [
-    "R14"
+    "R14",
+    "R18"
    ]
   },
   {
@@ -828,7 +839,8 @@
    "src": "K8888~52",
    "status": "differs",
    "items": [
-    "R14"
+    "R14",
+    "R18"
    ]
   },
   {
@@ -837,7 +849,8 @@
    "src": "K8888~53",
    "status": "differs",
    "items": [
-    "R14"
+    "R14",
+    "R18"
    ]
   },
   {
@@ -846,7 +859,8 @@
    "src": "K8888~54",
    "status": "differs",
    "items": [
-    "R14"
+    "R14",
+    "R18"
    ]
   },
   {
@@ -855,7 +869,8 @@
    "src": "K8888~55",
    "status": "differs",
    "items": [
-    "R14"
+    "R14",
+    "R18"
    ]
   },
   {
@@ -864,7 +879,8 @@
    "src": "K8888~56",
    "status": "differs",
    "items": [
-    "R14"
+    "R14",
+    "R18"
    ]
   },
   {
@@ -873,7 +889,8 @@
    "src": "K8888~57",
    "status": "differs",
    "items": [
-    "R14"
+    "R14",
+    "R18"
    ]
   },
   {
@@ -882,7 +899,8 @@
    "src": "K8888~58",
    "status": "differs",
    "items": [
-    "R14"
+    "R14",
+    "R18"
    ]
   },
   {
@@ -891,7 +909,8 @@
    "src": "K8888~59",
    "status": "differs",
    "items": [
-    "R14"
+    "R14",
+    "R18"
    ]
   },
   {
@@ -900,7 +919,8 @@
    "src": "K8888~60",
    "status": "differs",
    "items": [
-    "R14"
+    "R14",
+    "R18"
    ]
   },
   {
@@ -909,7 +929,8 @@
    "src": "K8888~61",
    "status": "differs",
    "items": [
-    "R14"
+    "R14",
+    "R18"
    ]
   },
   {
@@ -943,7 +964,8 @@
    "src": "K8888-gw-B-unscheduled~4",
    "status": "differs",
    "items": [
-    "R14"
+    "R14",
+    "R18"
    ]
   },
   {
@@ -961,7 +983,8 @@
    "src": "K8888-gw-B-unscheduled~6",
    "status": "differs",
    "items": [
-    "R14"
+    "R14",
+    "R18"
    ]
   },
   {
@@ -995,7 +1018,8 @@
    "src": "K8888-gw-B-outside~4",
    "status": "differs",
    "items": [
-    "R14"
+    "R14",
+    "R18"
    ]
   },
   {
@@ -1013,7 +1037,8 @@
    "src": "K8888-gw-B-outside~6",
    "status": "differs",
    "items": [
-    "R14"
+    "R14",
+    "R18"
    ]
   },
   {
@@ -1054,7 +1079,8 @@
    "src": "K8888-gw-off-unknown~5",
    "status": "differs",
    "items": [
-    "R14"
+    "R14",
+    "R18"
    ]
   },
   {
@@ -1072,7 +1098,8 @@
    "src": "K8888-gw-off-unknown~7",
    "status": "differs",
    "items": [
-    "R14"
+    "R14",
+    "R18"
    ]
   },
   {
@@ -1090,7 +1117,8 @@
    "src": "K8888-gw-off-unknown~9",
    "status": "differs",
    "items": [
-    "R14"
+    "R14",
+    "R18"
    ]
   },
   {
@@ -1099,7 +1127,8 @@
    "src": "K8888-gw-off-unknown~10",
    "status": "differs",
    "items": [
-    "R14"
+    "R14",
+    "R18"
    ]
   },
   {
@@ -1140,7 +1169,8 @@
    "src": "K8888-gw-fallback~5",
    "status": "differs",
    "items": [
-    "R14"
+    "R14",
+    "R18"
    ]
   },
   {
@@ -1158,7 +1188,8 @@
    "src": "K8888-gw-fallback~7",
    "status": "differs",
    "items": [
-    "R14"
+    "R14",
+    "R18"
    ]
   },
   {
@@ -1176,7 +1207,8 @@
    "src": "K8888-gw-fallback~9",
    "status": "differs",
    "items": [
-    "R14"
+    "R14",
+    "R18"
    ]
   },
   {
@@ -1185,7 +1217,8 @@
    "src": "K8888-gw-fallback~10",
    "status": "differs",
    "items": [
-    "R14"
+    "R14",
+    "R18"
    ]
   },
   {
@@ -1343,7 +1376,8 @@
    "src": "K6832~19",
    "status": "differs",
    "items": [
-    "R14"
+    "R14",
+    "R18"
    ]
   },
   {
@@ -1361,7 +1395,8 @@
    "src": "K6832~21",
    "status": "differs",
    "items": [
-    "R14"
+    "R14",
+    "R18"
    ]
   },
   {
@@ -1386,7 +1421,8 @@
    "src": "K6832~24",
    "status": "differs",
    "items": [
-    "R14"
+    "R14",
+    "R18"
    ]
   },
   {
@@ -1404,7 +1440,8 @@
    "src": "K6832~26",
    "status": "differs",
    "items": [
-    "R14"
+    "R14",
+    "R18"
    ]
   },
   {
@@ -1430,7 +1467,8 @@
    "status": "differs",
    "items": [
     "G1",
-    "R14"
+    "R14",
+    "R18"
    ]
   },
   {
@@ -1450,7 +1488,8 @@
    "status": "differs",
    "items": [
     "G1",
-    "R14"
+    "R14",
+    "R18"
    ]
   },
   {
@@ -1478,7 +1517,8 @@
    "src": "K6832~34",
    "status": "differs",
    "items": [
-    "R14"
+    "R14",
+    "R18"
    ]
   },
   {
@@ -1487,7 +1527,8 @@
    "src": "K6832~35",
    "status": "differs",
    "items": [
-    "R14"
+    "R14",
+    "R18"
    ]
   },
   {
@@ -1496,7 +1537,8 @@
    "src": "K6832~36",
    "status": "differs",
    "items": [
-    "R14"
+    "R14",
+    "R18"
    ]
   },
   {
@@ -1505,7 +1547,8 @@
    "src": "K6832~37",
    "status": "differs",
    "items": [
-    "R14"
+    "R14",
+    "R18"
    ]
   },
   {
@@ -1515,7 +1558,8 @@
    "status": "differs",
    "items": [
     "G1",
-    "R14"
+    "R14",
+    "R18"
    ]
   },
   {
@@ -1525,7 +1569,8 @@
    "status": "differs",
    "items": [
     "G1",
-    "R14"
+    "R14",
+    "R18"
    ]
   },
   {
@@ -1567,7 +1612,8 @@
    "status": "differs",
    "items": [
     "R12",
-    "R14"
+    "R14",
+    "R18"
    ]
   },
   {
@@ -1577,7 +1623,8 @@
    "status": "differs",
    "items": [
     "R12",
-    "R14"
+    "R14",
+    "R18"
    ]
   },
   {
@@ -1603,7 +1650,8 @@
    "status": "differs",
    "items": [
     "R12",
-    "R14"
+    "R14",
+    "R18"
    ]
   },
   {
@@ -1613,7 +1661,8 @@
    "status": "differs",
    "items": [
     "R12",
-    "R14"
+    "R14",
+    "R18"
    ]
   },
   {
@@ -1646,7 +1695,8 @@
    "status": "differs",
    "items": [
     "R12",
-    "R14"
+    "R14",
+    "R18"
    ]
   },
   {
@@ -1656,7 +1706,8 @@
    "status": "differs",
    "items": [
     "R12",
-    "R14"
+    "R14",
+    "R18"
    ]
   },
   {
@@ -1718,7 +1769,8 @@
    "src": "FR6851~2",
    "status": "differs",
    "items": [
-    "R14"
+    "R14",
+    "R18"
    ]
   },
   {
@@ -1736,7 +1788,8 @@
    "src": "FR6851~4",
    "status": "differs",
    "items": [
-    "R14"
+    "R14",
+    "R18"
    ]
   },
   {
@@ -1853,7 +1906,8 @@
    "src": "CT6832~4",
    "status": "differs",
    "items": [
-    "R14"
+    "R14",
+    "R18"
    ]
   },
   {
@@ -1876,7 +1930,8 @@
    "src": "CT6832~7",
    "status": "differs",
    "items": [
-    "R14"
+    "R14",
+    "R18"
    ]
   },
   {
@@ -1892,7 +1947,8 @@
    "src": "CT6832~9",
    "status": "differs",
    "items": [
-    "R14"
+    "R14",
+    "R18"
    ]
   },
   {
@@ -1901,7 +1957,8 @@
    "src": "CT6832~10",
    "status": "differs",
    "items": [
-    "R14"
+    "R14",
+    "R18"
    ]
   },
   {
@@ -1910,7 +1967,8 @@
    "src": "CT6832~11",
    "status": "differs",
    "items": [
-    "R14"
+    "R14",
+    "R18"
    ]
   },
   {
@@ -1942,7 +2000,8 @@
    "src": "CT-dd~4",
    "status": "differs",
    "items": [
-    "R14"
+    "R14",
+    "R18"
    ]
   },
   {
@@ -1951,7 +2010,8 @@
    "src": "CT-dd~5",
    "status": "differs",
    "items": [
-    "R14"
+    "R14",
+    "R18"
    ]
   },
   {
@@ -1960,7 +2020,8 @@
    "src": "CT-dd~6",
    "status": "differs",
    "items": [
-    "R14"
+    "R14",
+    "R18"
    ]
   },
   {
@@ -1969,7 +2030,8 @@
    "src": "CT-dd~7",
    "status": "differs",
    "items": [
-    "R14"
+    "R14",
+    "R18"
    ]
   },
   {
@@ -2351,7 +2413,8 @@
    "status": "new",
    "items": [
     "R2",
-    "R14"
+    "R14",
+    "R18"
    ]
   },
   {
@@ -2360,7 +2423,8 @@
    "status": "new",
    "items": [
     "R2",
-    "R14"
+    "R14",
+    "R18"
    ]
   },
   {
@@ -2471,7 +2535,8 @@
    "items": [
     "R1",
     "R15",
-    "R14"
+    "R14",
+    "R18"
    ]
   },
   {
@@ -2830,7 +2895,8 @@
    "g": "PAGES",
    "status": "new",
    "items": [
-    "R10"
+    "R10",
+    "R18"
    ]
   },
   {
@@ -2870,7 +2936,8 @@
    "status": "new",
    "items": [
     "R7",
-    "R14"
+    "R14",
+    "R18"
    ]
   },
   {
@@ -2887,7 +2954,8 @@
    "g": "K8888",
    "status": "new",
    "items": [
-    "R14"
+    "R14",
+    "R18"
    ]
   },
   {
@@ -2895,7 +2963,8 @@
    "g": "K8888",
    "status": "new",
    "items": [
-    "R14"
+    "R14",
+    "R18"
    ]
   },
   {
@@ -2959,7 +3028,8 @@
    "g": "K8888",
    "status": "new",
    "items": [
-    "R14"
+    "R14",
+    "R18"
    ]
   },
   {
@@ -2967,7 +3037,8 @@
    "g": "K8888",
    "status": "new",
    "items": [
-    "R14"
+    "R14",
+    "R18"
    ]
   },
   {
@@ -3095,7 +3166,8 @@
    "g": "FAN",
    "status": "new",
    "items": [
-    "R14"
+    "R14",
+    "R18"
    ]
   },
   {
@@ -3103,7 +3175,8 @@
    "g": "FAN",
    "status": "new",
    "items": [
-    "R14"
+    "R14",
+    "R18"
    ]
   },
   {
@@ -3224,7 +3297,8 @@
    "status": "new",
    "items": [
     "R14",
-    "R15"
+    "R15",
+    "R18"
    ]
   },
   {
@@ -3232,7 +3306,8 @@
    "g": "AC",
    "status": "new",
    "items": [
-    "R14"
+    "R14",
+    "R18"
    ]
   },
   {
@@ -3249,7 +3324,8 @@
    "g": "HW",
    "status": "new",
    "items": [
-    "R14"
+    "R14",
+    "R18"
    ]
   },
   {
@@ -3257,7 +3333,8 @@
    "g": "HW",
    "status": "new",
    "items": [
-    "R14"
+    "R14",
+    "R18"
    ]
   },
   {
@@ -3353,7 +3430,8 @@
    "g": "CONN",
    "status": "new",
    "items": [
-    "R14"
+    "R14",
+    "R18"
    ]
   },
   {
@@ -3361,7 +3439,8 @@
    "g": "CONN",
    "status": "new",
    "items": [
-    "R14"
+    "R14",
+    "R18"
    ]
   },
   {
@@ -3409,7 +3488,8 @@
    "g": "BP",
    "status": "new",
    "items": [
-    "R14"
+    "R14",
+    "R18"
    ]
   },
   {
@@ -3417,7 +3497,8 @@
    "g": "BP",
    "status": "new",
    "items": [
-    "R14"
+    "R14",
+    "R18"
    ]
   },
   {
@@ -3473,7 +3554,8 @@
    "g": "HEAT",
    "status": "new",
    "items": [
-    "R14"
+    "R14",
+    "R18"
    ]
   },
   {
@@ -3481,7 +3563,8 @@
    "g": "HEAT",
    "status": "new",
    "items": [
-    "R14"
+    "R14",
+    "R18"
    ]
   },
   {
@@ -3601,7 +3684,8 @@
    "g": "NLH",
    "status": "new",
    "items": [
-    "R14"
+    "R14",
+    "R18"
    ]
   },
   {
@@ -3609,7 +3693,8 @@
    "g": "NLH",
    "status": "new",
    "items": [
-    "R14"
+    "R14",
+    "R18"
    ]
   },
   {
@@ -3625,7 +3710,8 @@
    "g": "NLH",
    "status": "new",
    "items": [
-    "R14"
+    "R14",
+    "R18"
    ]
   },
   {
@@ -3633,7 +3719,8 @@
    "g": "NLH",
    "status": "new",
    "items": [
-    "R14"
+    "R14",
+    "R18"
    ]
   },
   {
@@ -3657,7 +3744,8 @@
    "g": "NLH",
    "status": "new",
    "items": [
-    "R14"
+    "R14",
+    "R18"
    ]
   },
   {
@@ -3665,7 +3753,8 @@
    "g": "NLH",
    "status": "new",
    "items": [
-    "R14"
+    "R14",
+    "R18"
    ]
   },
   {
@@ -3681,7 +3770,8 @@
    "g": "ELSE",
    "status": "new",
    "items": [
-    "R14"
+    "R14",
+    "R18"
    ]
   },
   {
@@ -3689,7 +3779,8 @@
    "g": "ELSE",
    "status": "new",
    "items": [
-    "R14"
+    "R14",
+    "R18"
    ]
   },
   {
@@ -3705,7 +3796,8 @@
    "g": "PAGES",
    "status": "new",
    "items": [
-    "R14"
+    "R14",
+    "R18"
    ]
   },
   {
@@ -3713,7 +3805,8 @@
    "g": "PAGES",
    "status": "new",
    "items": [
-    "R14"
+    "R14",
+    "R18"
    ]
   },
   {

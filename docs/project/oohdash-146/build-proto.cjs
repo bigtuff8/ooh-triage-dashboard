@@ -30,7 +30,7 @@ function norm(s, root) {
     s = s.replace(new RegExp('(?<![0-9])' + so.no + '(?![0-9])', 'g'), SITE.no);
   }
   s = s.replace(/\b4[5-9]\d{3}\b/g, EX);
-  s = s.split('v1.6.6 · fixture data').join('Prototype · OOHDASH-146 rev 4.3 · live v1.6.6 screens').split('Test Handler').join('Sam Okafor').replace(/>TH</g, '>SO<');
+  s = s.split('v1.6.6 · fixture data').join('Prototype · OOHDASH-146 rev 4.4 · live v1.6.6 screens').split('Test Handler').join('Sam Okafor').replace(/>TH</g, '>SO<');
   s = s.split('Greene King · Test Street, Test Town').join(SITE.addr);
   s = s.replace(/<div class="sub">Greene King · [^<]*<\/div>/g, '<div class="sub">' + SITE.addr + '</div>').replace(/<span class="tag amber" title="OOH tickets in the last 30 days">[^<]*<\/span>/g, '');
   return s;
