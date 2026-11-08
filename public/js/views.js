@@ -150,19 +150,89 @@ function vSite() {
     renderWorkspace();
 }
 
+// OOHDASH-146 B26: riskQuestion gates the IoT-team capture for the ambiguous-site view.
+// state.ambiguousRisk: undefined = show risk question; true = show P1 confirm step.
+// state.ambiguousNotes: saved notes value across re-renders.
+// state.ambiguousRiskReason: typed P1 reason.
+
 function renderAmbiguous() {
     const a = state.ambiguous;
-    $('#view').innerHTML = `<div class="content narrow"><div class="card" style="border-color:var(--warning)" data-testid="ambiguous-card">
-   <h2>⚠️ House ID ${esc(a.siteNo)} is ambiguous</h2>
-   <p class="sub" style="margin:8px 0">This ID matches more than one site (${a.matches.map(m => `<b>${esc(m.siteName)}</b>`).join(' and ')}). To protect against changing the wrong site, remote control is blocked for ambiguous IDs.</p>
-   ${sayBox('I can\'t safely make changes for this site number tonight — It\'s logged, and our IoT team picks it up the next working day.')}
+    const riskConfirm = state.ambiguousRisk === true;
+    const riskReason = state.ambiguousRiskReason || '';
+    const reasonOk = typeof p1ReasonValid === 'function' && p1ReasonValid(riskReason);
+    const savedNotes = state.ambiguousNotes || '';
 
-   ${notesField({ id: 'addnotes-amb' })}
+    let actionArea;
+    if (riskConfirm) {
+        const reasonBoxHtml = `<div class="formrow" style="margin-top:10px"><label for="p1-reason-input">Why is this urgent? (required, goes on the P1 ticket)</label>
+   <textarea id="p1-reason-input" data-testid="p1-reason" maxlength="500" rows="2" oninput="ambiguousRiskInput(this.value)">${esc(riskReason)}</textarea></div>`;
+        actionArea = `<div class="confirm-step" data-testid="confirm-step">
+   ${sayBox("Thanks. As there's an immediate risk to trade or to anyone's health and safety, I'm going to raise this as urgent with our on-call team.")}
+   ${reasonBoxHtml}
+   ${typeof p1WarnBox === 'function' ? p1WarnBox() : ''}
+   <button class="btn danger" data-testid="record-outcome" style="margin-top:4px" onclick="ambiguousP1Submit()"${reasonOk ? '' : ' disabled aria-disabled="true"'}>Raise the P1</button>
+  </div>`;
+    } else {
+        const riskNote = typeof infoBox === 'function'
+            ? infoBox('<p>Trade means the site cannot serve customers or cannot open. Health and safety means anything that could hurt someone.</p><p>Yes goes to an urgent P1; No gives a next-working-day ticket.</p>')
+            : '';
+        const riskQ = typeof RISK_ASK !== 'undefined' ? RISK_ASK : 'Is there an immediate risk to trade or to anyone\'s health and safety?';
+        const answerHtml = typeof answers === 'function'
+            ? answers(`<button class="chip" data-testid="risk-yes" onclick="state.ambiguousNotes=notesValue('addnotes-amb');state.ambiguousRisk=true;renderAmbiguous()">Yes</button><button class="chip" data-testid="risk-no" onclick="ambiguousCapture()">No</button>`)
+            : '';
+        actionArea = riskNote +
+            (typeof sayBox === 'function' ? sayBox('I can\'t safely make changes for this site number tonight — It\'s logged, and our IoT team picks it up the next working day.', riskQ) : '') +
+            answerHtml +
+            `<button class="btn" onclick="go('home')" style="margin-top:8px">Search again</button>`;
+    }
+
+    $('#view').innerHTML = `<div class="content narrow"><div class="card" style="border-color:var(--warning)" data-testid="ambiguous-card">
+   <h2>&#9888;&#65039; House ID ${esc(a.siteNo)} is ambiguous</h2>
+   <p class="sub" style="margin:8px 0">This ID matches more than one site (${a.matches.map(m => `<b>${esc(m.siteName)}</b>`).join(' and ')}). To protect against changing the wrong site, remote control is blocked for ambiguous IDs.</p>
+   ${notesField({ id: 'addnotes-amb', value: savedNotes })}
    <div style="margin-top:10px">
-    <button class="btn primary" data-testid="ambiguous-capture" onclick="ambiguousCapture()">Pass it to the IoT team</button>
-    <button class="btn" onclick="go('home')" style="margin-left:8px">Search again</button>
+    ${actionArea}
    </div>
   </div></div>`;
+}
+
+/** Oninput handler for the P1 reason textarea in the ambiguous view. */
+function ambiguousRiskInput(value) {
+    state.ambiguousRiskReason = value;
+    const ok = typeof p1ReasonValid === 'function' && p1ReasonValid(value);
+    const btn = document.querySelector('[data-testid="record-outcome"]');
+    if (btn) { btn.disabled = !ok; if (ok) btn.removeAttribute('aria-disabled'); else btn.setAttribute('aria-disabled', 'true'); }
+}
+
+/** Submits the P1 outcome for the ambiguous-site view. */
+async function ambiguousP1Submit() {
+    const a = state.ambiguous;
+    const reason = state.ambiguousRiskReason || '';
+    if (typeof p1ReasonValid === 'function' && !p1ReasonValid(reason)) return;
+    const btn = document.querySelector('[data-testid="record-outcome"]');
+    if (btn) btn.disabled = true;
+    try {
+        const { ticket } = await api.post('/api/outcomes', {
+            type: 'escalate-p1',
+            additionalNotes: notesValue('addnotes-amb'),
+            siteNo: a.siteNo,
+            siteName: `Ambiguous (${a.matches.map(m => m.siteName).join(' / ')})`,
+            subject: `Site not identified — risk to trade or health and safety — P1`,
+            detail: `OOH could not safely resolve house ID ${a.siteNo} (matches ${a.matches.map(m => m.siteName).join(' and ')}). Customer indicated immediate risk to trade or health and safety.`,
+            p1Reason: reason,
+            p1Summary: typeof p1SummaryFromReason === 'function' ? p1SummaryFromReason(reason) : reason.slice(0, 80),
+            OohCaptureClass: 'data-quality'
+        });
+        toast(`✅ Raised as P1 — ticket <b>#${ticket.id}</b> — on-call agent will call back`);
+    } catch (err) {
+        toast(`⚠️ ${esc(err.message)}`);
+        if (btn) btn.disabled = false;
+        return;
+    }
+    state.ambiguousRisk = undefined;
+    state.ambiguousRiskReason = undefined;
+    state.ambiguousNotes = undefined;
+    go('home');
 }
 
 async function ambiguousCapture() {
@@ -181,6 +251,9 @@ async function ambiguousCapture() {
     } catch (err) {
         toast(`⚠️ ${esc(err.message)}`);
     }
+    state.ambiguousRisk = undefined;
+    state.ambiguousRiskReason = undefined;
+    state.ambiguousNotes = undefined;
     go('home');
 }
 

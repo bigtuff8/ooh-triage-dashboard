@@ -78,8 +78,9 @@ test('dark-fleet: the bare-salus type is treated identically to iT500', () => {
 });
 
 test('dark-fleet: capture routes to a normal IoT-team capture (dark-fleet-heating), never openControl', () => {
+    // OOHDASH-146 B24: riskQuestion added before darkcap; simulate agent answering "No" (_riskAns=0).
     const { ctx, state, captured, opened } = loadClient(darkIt500Ws());
-    state.flow = { cat: 'heating', stage: 2, done: [], data: { area: 'Accommodation', need: 'darkcap' } };
+    state.flow = { cat: 'heating', stage: 2, done: [], data: { area: 'Accommodation', need: 'darkcap', _riskAns: 0 } };
     const html = ctx.FLOWR.heating(state.workspace, state.flow);
     assert.equal(captured.length, 1, 'exactly one capture recorded');
     assert.equal(captured[0].OohCaptureClass, 'dark-fleet-heating');

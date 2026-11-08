@@ -170,9 +170,11 @@ test('flow: before-compose out-of-scope — HW complaint front-loads "not contro
     state.flow = { stage: 0, done: [], data: {} };
     const html = ctx.FLOWR.hotwater(ws, state.flow);
     // OOHDASH-123 (J5/D-BOOST): hot water is now always capture-and-escalate — no boost, no compose.
+    // OOHDASH-146 B1: "Pass it to the IoT team" button replaced by universal riskQuestion chips.
     assert.match(html, /can't control|not controllable/i, 'the out-of-scope message is front-loaded before any compose affordance');
     assert.doesNotMatch(html, /hw-boost-yes/, 'the boost/compose chip is removed');
-    assert.match(html, /Pass it to the IoT team/, 'capture-and-escalate is the deterministic path');
+    assert.match(html, /risk-yes/, 'B1: riskQuestion is the deterministic path (replaces Pass-it-to-IoT button)');
+    assert.doesNotMatch(html, /Pass it to the IoT team/, 'B1: Pass-it-to-IoT button removed — riskQuestion shown');
 });
 
 test('flow: compose chip never renders from live-shaped inventory, and no boost/openControl path is reachable', async () => {
@@ -189,10 +191,12 @@ test('flow: compose chip never renders from live-shaped inventory, and no boost/
 });
 
 test('flow: capture-and-escalate outcome logs a hot-water class ticket (OohCaptureClass:hot-water)', async () => {
+    // OOHDASH-146 B1: stage 1 is removed; the no-risk (capture) path is now triggered by
+    // riskQuestion at stage 0 with _riskAns=0 (the "No" answer to the risk question).
     const [site] = await bridge.getSitesByNumber('6261');
     const ws = { site: { siteName: site.siteName }, devices: workspaceDevices(site), scope: scopeOf(site) };
     const { ctx, state, captured } = loadClient(ws);
-    state.flow = { stage: 1, done: [], data: { cap: 1 } };
+    state.flow = { stage: 0, done: [], data: { _riskAns: 0 } };
     ctx.FLOWR.hotwater(ws, state.flow);
     assert.equal(captured.length, 1, 'the capture path records exactly one outcome');
     assert.equal(captured[0].OohCaptureClass, 'hot-water');
@@ -212,5 +216,7 @@ test('flow OOHDASH-123 (J5/D-BOOST): the boost chip is GONE even when boilerCont
     state.flow = { stage: 0, done: [], data: {} };
     const html = ctx.FLOWR.hotwater(ws, state.flow);
     assert.doesNotMatch(html, /hw-boost-yes/, 'no boost chip — boost is removed (dishonest offer)');
-    assert.match(html, /hw-capture/, 'the capture-and-escalate chip is shown instead');
+    // OOHDASH-146 B1: hw-capture button replaced by riskQuestion chips.
+    assert.doesNotMatch(html, /hw-capture/, 'B1: hw-capture button is removed — riskQuestion shown instead');
+    assert.match(html, /risk-yes/, 'B1: risk question chip shown instead of hw-capture');
 });

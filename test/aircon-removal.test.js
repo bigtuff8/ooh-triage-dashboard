@@ -80,8 +80,9 @@ const ws = () => ({
 });
 
 test('flow: the aircon flow submits a capture with OohCaptureClass aircon-referral and never openControls', () => {
+    // OOHDASH-146 B24: riskQuestion added before capture; simulate agent answering "No" (_riskAns=0).
     const { ctx, state, captured, opened } = loadClient(ws());
-    state.flow = { cat: 'aircon', stage: 0, done: [], data: {} };
+    state.flow = { cat: 'aircon', stage: 0, done: [], data: { _riskAns: 0 } };
     ctx.FLOWR.aircon(state.workspace, state.flow);
     assert.equal(captured.length, 1, 'exactly one capture recorded');
     assert.equal(captured[0].OohCaptureClass, 'aircon-referral');

@@ -1446,7 +1446,19 @@ function boilerPanelHeatingBranch(ws, f, panelDevice, site) {
     var need = f.data.need;
 
     // Check and log step (§9)
+    // OOHDASH-146 B24: gate with riskQuestion when no heating actions were taken this call.
     if (need === 'bp-wrap') {
+        if ((f.data.actions || []).length === 0) {
+            return riskQuestion(f, {
+                yes: () => outcomeP1(f, 'bp-p1', {
+                    subject: 'Pub heating — risk to trade or health and safety — P1',
+                    detail: 'Customer raised a pub heating issue; no heating changes were made from the dashboard this call. Customer indicated immediate risk to trade or health and safety.',
+                    pre: sayBox("Thanks. As there's an immediate risk to trade or to anyone's health and safety, I'm going to raise this as urgent with our on-call team."),
+                    script: res => 'That\'s raised as urgent, reference ' + dyn(res.ticket.id) + '. Someone from our on-call team will call you back shortly.'
+                }),
+                no: () => wrapUpStep(ws, f, heating)
+            });
+        }
         return wrapUpStep(ws, f, heating);
     }
 
@@ -1900,10 +1912,37 @@ const FLOWR = {
             }
             if (!areas.length && !unmapped) {
                 // OOHDASH-128 (C5): reworded alert when only unplaced bare-salus exist.
+                // OOHDASH-146 B3: riskQuestion replaces otherShortcut for not-on-Lighthouse paths.
                 if (unplacedCount > 0) {
-                    return '<div class="alert warn">No heating area can be checked on Lighthouse at this site.</div>' + unplacedNoteHtml + otherShortcut();
+                    return '<div class="alert warn">No heating area can be checked on Lighthouse at this site.</div>' + unplacedNoteHtml +
+                        riskQuestion(f, {
+                            yes: () => outcomeP1(f, 'nlh-p1', {
+                                subject: 'Heating not on Lighthouse — risk to trade or health and safety — P1',
+                                detail: 'No heating area can be checked on Lighthouse at this site. Customer indicated immediate risk to trade or health and safety.',
+                                pre: sayBox("Thanks. As there's an immediate risk to trade or to anyone's health and safety, I'm going to raise this as urgent with our on-call team."),
+                                script: res => 'That\'s raised as urgent, reference ' + dyn(res.ticket.id) + '. Someone from our on-call team will call you back shortly.'
+                            }),
+                            no: () => outcomeScope(f, 'nlh', {
+                                subject: 'Heating — not on Lighthouse at this site',
+                                evidence: 'No heating area can be checked on Lighthouse at this site.',
+                                script: res => 'Lighthouse doesn\'t manage the heating at your site. Please contact your heating contractor through your usual route. I\'ve noted the call, reference ' + dyn(res.ticket.id) + '.'
+                            })
+                        });
                 }
-                return '<div class="alert warn">No heating on Lighthouse at this site.</div>' + otherShortcut();
+                return '<div class="alert warn">No heating on Lighthouse at this site.</div>' +
+                    riskQuestion(f, {
+                        yes: () => outcomeP1(f, 'nlh-p1', {
+                            subject: 'Heating not on Lighthouse — risk to trade or health and safety — P1',
+                            detail: 'No heating devices found at this site on Lighthouse. Customer indicated immediate risk to trade or health and safety.',
+                            pre: sayBox("Thanks. As there's an immediate risk to trade or to anyone's health and safety, I'm going to raise this as urgent with our on-call team."),
+                            script: res => 'That\'s raised as urgent, reference ' + dyn(res.ticket.id) + '. Someone from our on-call team will call you back shortly.'
+                        }),
+                        no: () => outcomeScope(f, 'nlh', {
+                            subject: 'Heating — not on Lighthouse at this site',
+                            evidence: 'No heating devices found at this site on Lighthouse.',
+                            script: res => 'Lighthouse doesn\'t manage the heating at your site. Please contact your heating contractor through your usual route. I\'ve noted the call, reference ' + dyn(res.ticket.id) + '.'
+                        })
+                    });
             }
             const areaChips = areas.map(a =>
                 `<button class="chip" data-testid="area-${a === 'Accommodation' ? 'accommodation' : 'bar-restaurant'}" onclick="flowStep({area:'${a}'})">${esc(a)}</button>`).join('');
@@ -1939,12 +1978,21 @@ const FLOWR = {
             // generic gateway "not responding" connectivity branch. The outcome (offline, no controls,
             // captured for the IoT team) is unchanged; only the wording matches James\'s binding decision.
             if (set.length > 0 && set.every(isDarkFleet)) {
+                // OOHDASH-146 B24: riskQuestion added before darkcap outcomeCaptured.
                 if (f.data.need === 'darkcap') {
-                    return outcomeCaptured(f, 'darkcap', {
-                        subject: `Heating device not reporting (${areaLabel})`,
-                        detail: `The ${areaLabel} heating controller is a Salus unit that is not reporting to Lighthouse (no live data), so it cannot be read or adjusted remotely. Logged for the IoT team to check the device and its connection.`,
-                        script: "That heating controller isn\'t sending us any data at the moment, so I can\'t read or change it remotely tonight. It\'s logged, and our IoT team picks it up the next working day.",
-                        OohCaptureClass: 'dark-fleet-heating'
+                    return riskQuestion(f, {
+                        yes: () => outcomeP1(f, 'dark-p1', {
+                            subject: `Heating device not reporting — risk to trade or health and safety — P1 (${areaLabel})`,
+                            detail: `The ${areaLabel} heating controller is a Salus unit that is not reporting to Lighthouse (no live data). Customer indicated immediate risk to trade or health and safety.`,
+                            pre: sayBox("Thanks. As there's an immediate risk to trade or to anyone's health and safety, I'm going to raise this as urgent with our on-call team."),
+                            script: res => 'That\'s raised as urgent, reference ' + dyn(res.ticket.id) + '. Someone from our on-call team will call you back shortly.'
+                        }),
+                        no: () => outcomeCaptured(f, 'darkcap', {
+                            subject: `Heating device not reporting (${areaLabel})`,
+                            detail: `The ${areaLabel} heating controller is a Salus unit that is not reporting to Lighthouse (no live data), so it cannot be read or adjusted remotely. Logged for the IoT team to check the device and its connection.`,
+                            script: 'That heating controller isn\'t sending us any data at the moment, so I can\'t read or change it remotely tonight. It\'s logged, and our IoT team picks it up the next working day.',
+                            OohCaptureClass: 'dark-fleet-heating'
+                        })
                     });
                 }
                 if (f.data.need === 'darknoact') {
@@ -2001,10 +2049,39 @@ const FLOWR = {
         }
         if (f.stage === 2) {
             const need = f.data.need;
+            // OOHDASH-146 B4: replaced agent buttons with radiator question + riskQuestion.
             if (need === 'warm' && temp != null && sp != null && temp <= sp - 2) {
                 doneLine('The customer wants it warmer', 'customer');
                 doneLine('The heating is already asking for heat', 'check');
-                return `<div class="reco" data-testid="reco-building-heat"><b class="hd">Raising the setpoint won\'t help here.</b>The zone is reading <b>${temp}°C against a ${sp}°C setpoint</b> with the device online — the system is already asking for more heat than the building is delivering. That usually means radiators/TRVs or the boiler.<div class="outbtns"><button class="btn primary" onclick="flowStep({buildheat:1})">Give the radiator advice</button><button class="btn" onclick="flowStep({forceCtl:1})">Adjust the setpoint anyway</button></div></div>`;
+                if (f.data.rads === 'warm') {
+                    doneLine('The customer says radiators are warm', 'customer');
+                    return outcomeScope(f, 'bh', {
+                        subject: `Heating — system running and radiators warm (${z.zone})`,
+                        evidence: `Zone reading ${temp}°C against a ${sp}°C setpoint with the device online. Customer confirms radiators are warm — the system is working and the building is warming up normally.`,
+                        script: 'The heating is running and the radiators are warm, so it\'s working as it should. The room will get there in time. I\'ve noted the call on your site\'s record.'
+                    });
+                }
+                if (f.data.rads === 'cold') {
+                    doneLine('The customer says radiators are cold', 'customer');
+                    return riskQuestion(f, {
+                        yes: () => outcomeP1(f, 'rad-p1', {
+                            subject: `Heating — radiators cold — risk to trade or health and safety — P1 (${z.zone})`,
+                            detail: `Zone reading ${temp}°C against a ${sp}°C setpoint — the system is asking for heat but radiators are cold. Customer indicated immediate risk to trade or health and safety.`,
+                            pre: sayBox("Thanks. As there's an immediate risk to trade or to anyone's health and safety, I'm going to raise this as urgent with our on-call team."),
+                            script: res => 'That\'s raised as urgent, reference ' + dyn(res.ticket.id) + '. Someone from our on-call team will call you back shortly.'
+                        }),
+                        no: () => outcomeCaptured(f, 'rad-cap', {
+                            subject: `Heating — radiators not heating up (${z.zone})`,
+                            detail: `Zone reading ${temp}°C against a ${sp}°C setpoint — the system is asking for heat but radiators are reported cold. No immediate risk to trade or health and safety. Likely radiators/TRVs or boiler-side limitation.`,
+                            script: res => 'It\'s logged, reference ' + dyn(res.ticket.id) + '. Our IoT team picks it up the next working day and will be in touch.',
+                            OohCaptureClass: 'heating'
+                        })
+                    });
+                }
+                return `<div class="reco" data-testid="reco-building-heat"><b class="hd">Raising the setpoint won\'t help here.</b>The zone is reading <b>${temp}°C against a ${sp}°C setpoint</b> with the device online — the system is already asking for more heat than the building is delivering.</div>` +
+                    sayBox('', 'are the radiators in that area warm?') +
+                    answers('<button class="chip" data-testid="rads-warm" onclick="state.flow.data.rads=\'warm\';render()">Yes, they\'re warm</button>' +
+                            '<button class="chip" data-testid="rads-cold" onclick="state.flow.data.rads=\'cold\';render()">No, they\'re cold</button>');
             }
             if (need === 'warm' || need === 'cool') {
                 doneLine('The customer wants it ' + (need === 'warm' ? 'warmer' : 'cooler'), 'customer');
@@ -2021,12 +2098,56 @@ const FLOWR = {
             }
             if (need === 'broken') {
                 doneLine('The customer says the heating isn\'t working', 'customer');
+                // OOHDASH-146 B4: replaced agent buttons with radiator question for keeping-up; riskQuestion for under-target.
                 if (temp != null && sp != null && temp >= sp - 1) {
-                    return `<div class="reco"><b class="hd">The system is keeping up.</b>This zone is reading <b>${temp}°C at a ${sp}°C setpoint</b>. If the customer still reports cold, it\'s likely a radiator/TRV or zoning issue rather than the controls.<div class="outbtns"><button class="btn primary" onclick="flowStep({buildheat:1})">Give the radiator advice</button><button class="btn" onclick="flowStep({forceCtl:1})">Raise the setpoint anyway</button></div></div>`;
+                    if (f.data.rads === 'warm') {
+                        doneLine('The customer says radiators are warm', 'customer');
+                        return outcomeScope(f, 'bh', {
+                            subject: `Heating — system performing to setpoint — radiators confirmed warm (${z.zone})`,
+                            evidence: `Zone reading ${temp}°C against a ${sp}°C setpoint — keeping up. Customer confirms radiators are warm.`,
+                            script: 'The heating is keeping up and the radiators are warm, so the system is working. I\'ve noted the call on your site\'s record.'
+                        });
+                    }
+                    if (f.data.rads === 'cold') {
+                        doneLine('The customer says radiators are cold', 'customer');
+                        return riskQuestion(f, {
+                            yes: () => outcomeP1(f, 'rad-p1', {
+                                subject: `Heating — radiators cold despite keeping up — risk to trade or health and safety — P1 (${z.zone})`,
+                                detail: `Zone reading ${temp}°C against a ${sp}°C setpoint — the system is keeping up but radiators are reported cold. Customer indicated immediate risk to trade or health and safety.`,
+                                pre: sayBox("Thanks. As there's an immediate risk to trade or to anyone's health and safety, I'm going to raise this as urgent with our on-call team."),
+                                script: res => 'That\'s raised as urgent, reference ' + dyn(res.ticket.id) + '. Someone from our on-call team will call you back shortly.'
+                            }),
+                            no: () => outcomeCaptured(f, 'rad-cap', {
+                                subject: `Heating — radiators not heating up despite thermostat reading (${z.zone})`,
+                                detail: `Zone reading ${temp}°C against a ${sp}°C setpoint — the system is keeping up but radiators are reported cold. No immediate risk. Likely radiators/TRVs or boiler-side issue.`,
+                                script: res => 'It\'s logged, reference ' + dyn(res.ticket.id) + '. Our IoT team picks it up the next working day.',
+                                OohCaptureClass: 'heating'
+                            })
+                        });
+                    }
+                    return `<div class="reco"><b class="hd">The system is keeping up.</b>This zone is reading <b>${temp}°C at a ${sp}°C setpoint</b>. If the customer still reports cold, it\'s likely a radiator/TRV or zoning issue rather than the controls.</div>` +
+                        sayBox('', 'are the radiators in that area warm?') +
+                        answers('<button class="chip" data-testid="rads-warm" onclick="state.flow.data.rads=\'warm\';render()">Yes, they\'re warm</button>' +
+                                '<button class="chip" data-testid="rads-cold" onclick="state.flow.data.rads=\'cold\';render()">No, they\'re cold</button>');
                 }
-                return `<div class="alert warn">Reading ${temp != null ? temp + '°C' : '—'} vs setpoint ${sp != null ? sp + '°C' : '—'} — under target. Try raising the setpoint; if it doesn\'t respond, this becomes an escalation.</div><div class="chips"><button class="chip" onclick="flowStep({forceCtl:1})">Raise setpoint</button><button class="chip" onclick="flowStep({buildheat:1})">Pass it to the IoT team instead</button></div>`;
+                return riskQuestion(f, {
+                    yes: () => outcomeP1(f, 'ht-p1', {
+                        subject: `Heating not reaching setpoint — risk to trade or health and safety — P1 (${z.zone})`,
+                        detail: `Reading ${temp != null ? temp + '°C' : '—'} vs setpoint ${sp != null ? sp + '°C' : '—'} — under target. Customer indicated immediate risk to trade or health and safety.`,
+                        pre: sayBox("Thanks. As there's an immediate risk to trade or to anyone's health and safety, I'm going to raise this as urgent with our on-call team."),
+                        script: res => 'That\'s raised as urgent, reference ' + dyn(res.ticket.id) + '. Someone from our on-call team will call you back shortly.'
+                    }),
+                    no: () => outcomeCaptured(f, 'ht-cap', {
+                        subject: `Heating below target — not at setpoint (${z.zone})`,
+                        detail: `Reading ${temp != null ? temp + '°C' : '—'} vs setpoint ${sp != null ? sp + '°C' : '—'} — under target. No immediate risk to trade or health and safety. Logged for IoT team investigation.`,
+                        script: res => 'It\'s logged, reference ' + dyn(res.ticket.id) + '. Our IoT team picks it up the next working day.',
+                        OohCaptureClass: 'heating'
+                    })
+                });
             }
         }
+        // OOHDASH-146 B4: stage 3 retains only frost-hold and no-action outcomes.
+        // forceCtl and buildheat are removed — B4 replaces them with the radiator question path.
         if (f.stage === 3) {
             if (f.data.frost) { openControl(z, 'frost'); return ctlPlaceholder(); }
             if (f.data.offnoact) {
@@ -2034,14 +2155,6 @@ const FLOWR = {
                     subject: `Heating-off request — no action taken (${z.zone})`,
                     detail: 'Customer asked for the heating off; the frost-hold option was offered and declined. Nothing was changed.',
                     script: 'No changes made tonight. If you change your mind, call us again and we can set it straight away.'
-                });
-            }
-            if (f.data.forceCtl) { openControl(z, f.data.need === 'cool' ? 'down' : 'up'); return ctlPlaceholder(); }
-            if (f.data.buildheat) {
-                return outcomeScope(f, 'bh', {
-                    subject: `Heating complaint — system performing to setpoint (${z.zone})`,
-                    evidence: `Zone reading ${temp}°C against a ${sp}°C setpoint with the device online and responding — consistent with a building/TRV/boiler-side limitation, not a Lighthouse control fault.`,
-                    script: `The system here is already asking for full heat — it\'s reaching ${temp} degrees against a higher target, which usually means radiator valves or the boiler itself. It\'s worth having your service contractor check the radiators; I\'ve noted tonight\'s reading on your site\'s record either way.`
                 });
             }
         }
@@ -2053,12 +2166,21 @@ const FLOWR = {
     // with the new capture class `aircon-referral`. No setpoint, no openControl, no write — aircon is
     // not controllable from the dashboard; every request is captured and referred to the IoT team.
     aircon(ws, f) {
+        // OOHDASH-146 B24: riskQuestion added before outcomeCaptured.
         doneLine('Air conditioning can\'t be changed from here', 'check');
-        return outcomeCaptured(f, 'aircon', {
-            subject: `Air conditioning request (${ws.site.siteName})`,
-            detail: 'Customer raised an air-conditioning issue. Aircon is not controllable from the dashboard, so it is captured and referred to the IoT team rather than actioned here.',
-            script: 'Air conditioning isn\'t something I can adjust from here. It\'s logged, and our IoT team picks it up the next working day.',
-            OohCaptureClass: 'aircon-referral'
+        return riskQuestion(f, {
+            yes: () => outcomeP1(f, 'aircon-p1', {
+                subject: `Air conditioning — risk to trade or health and safety — P1 (${ws.site.siteName})`,
+                detail: 'Customer raised an air-conditioning issue. Aircon is not controllable from the dashboard. Customer indicated immediate risk to trade or health and safety.',
+                pre: sayBox("Thanks. As there's an immediate risk to trade or to anyone's health and safety, I'm going to raise this as urgent with our on-call team."),
+                script: res => 'That\'s raised as urgent, reference ' + dyn(res.ticket.id) + '. Someone from our on-call team will call you back shortly.'
+            }),
+            no: () => outcomeCaptured(f, 'aircon', {
+                subject: `Air conditioning request (${ws.site.siteName})`,
+                detail: 'Customer raised an air-conditioning issue. Aircon is not controllable from the dashboard, so it is captured and referred to the IoT team rather than actioned here.',
+                script: 'Air conditioning isn\'t something I can adjust from here. It\'s logged, and our IoT team picks it up the next working day.',
+                OohCaptureClass: 'aircon-referral'
+            })
         });
     },
 
@@ -2067,71 +2189,61 @@ const FLOWR = {
         // (Sam Day spec - V1/V2 shared-attribute check). The old devices.find was testing for a device
         // type that live inventory never emits. ws.boilerControl is always present (defaulted server-side).
         // OOHDASH-135 Item 6: not-lighthouse scope path — pure-heating site, hot water not on Lighthouse.
+        // OOHDASH-146 B1: removed agent buttons; first screen is now the DHW reading with riskQuestion.
         const hwLevel = (ws.scope || []).filter(function(s) { return s.key === 'hotwater'; }).map(function(s) { return s.level; })[0];
         if (f.stage === 0) {
             if (hwLevel === 'not-lighthouse') {
                 doneLine('Hot water isn\'t on Lighthouse here', 'check');
-                return `<div data-testid="hw-not-lighthouse">${infoBox('Hot water at this site isn\'t on Lighthouse. It runs on the site\'s own boiler or system and isn\'t connected here.')}</div>
-   <div class="chips"><button class="chip" data-testid="hw-nlh-capture" onclick="flowStep({nlh:1})">Pass it to the IoT team</button></div>`;
+                return `<div data-testid="hw-not-lighthouse">${infoBox('Hot water at this site isn\'t on Lighthouse. It runs on the site\'s own boiler or system and isn\'t connected here.')}</div>` +
+                    riskQuestion(f, {
+                        yes: () => outcomeP1(f, 'nlh-p1', {
+                            subject: 'Hot water issue — risk to trade or health and safety — P1',
+                            detail: 'Customer reports hot-water problems. Hot water at this site is not connected to Lighthouse — no remote monitoring or control available. Customer indicated immediate risk to trade or health and safety.',
+                            pre: sayBox("Thanks. As there's an immediate risk to trade or to anyone's health and safety, I'm going to raise this as urgent with our on-call team."),
+                            script: res => 'That\'s raised as urgent, reference ' + dyn(res.ticket.id) + '. Someone from our on-call team will call you back shortly.'
+                        }),
+                        no: () => outcomeCaptured(f, 'nlh', {
+                            subject: 'Hot water issue — not on Lighthouse',
+                            detail: 'Customer reports hot-water problems. Hot water at this site is not connected to Lighthouse — no remote monitoring or control available. Logged for IoT team follow-up.',
+                            script: 'Hot water at this site isn\'t on Lighthouse, so I can\'t see it from here. It\'s logged, and our IoT team picks it up the next working day.',
+                            OohCaptureClass: 'hot-water'
+                        })
+                    });
             }
             doneLine('Hot water can\'t be changed from here', 'check');
             // OOHDASH-136: DHW override card — shown before the blue note when visible.
+            // _hwDhwTs is captured by closure in the riskQuestion callbacks below.
             var _hwDhwOv = ws.boilerControl && ws.boilerControl.dhwOverride;
             var _hwDhwCard = '';
+            var _hwDhwTs = '';
             if (_hwDhwOv && _hwDhwOv.visible === true) {
                 var _hwDhwOc = dhwOverrideOutcome(_hwDhwOv, Date.now());
                 if (_hwDhwOc) {
                     var _hwTagColor = {auto:'green','auto-ended':'green','on-until':'blue','on-v1':'blue','off-until':'amber','off-v1':'amber','cant-confirm':'grey'}[_hwDhwOc.state] || 'grey';
-                    var _hwTagText = {auto:'Auto','auto-ended':'Auto','on-until':'Override ON','on-v1':'Override ON','off-until':'Override OFF','off-v1':'Override OFF','cant-confirm':"Can\'t confirm"}[_hwDhwOc.state] || "Can\'t confirm";
+                    var _hwTagText = {auto:'Auto','auto-ended':'Auto','on-until':'Override ON','on-v1':'Override ON','off-until':'Override OFF','off-v1':'Override OFF','cant-confirm':"Can't confirm"}[_hwDhwOc.state] || "Can't confirm";
                     _hwDhwCard = '<div class="reco" data-testid="hw-dhw-override">' +
                         '<b class="hd">' + _hwDhwOc.headline + ' <span class="tag ' + _hwTagColor + '" data-testid="hw-dhw-override-tag">' + _hwTagText + '</span></b>' +
                         '<p>' + _hwDhwOc.explanation + '</p>' +
                         sayBox(_hwDhwOc.script) +
                         '</div>';
+                    _hwDhwTs = ' ' + _hwDhwOc.ticketSentence;
                 }
             }
-            return _hwDhwCard + infoBox('Hot water here runs on the boiler panel, which this dashboard watches but can\'t control, so there\'s no remote boost. The IoT team picks it up the next working day.') + `
-   <div class="chips"><button class="chip" data-testid="hw-capture" onclick="flowStep({cap:1})">Pass it to the IoT team</button><button class="chip" data-testid="hw-scope" onclick="flowStep({sc:1})">Scope guidance (boiler fault?)</button></div>`;
-        }
-        if (f.stage === 1) {
-            // OOHDASH-135 Item 6: not-lighthouse capture — must come before the !f.data.sc check.
-            if (f.data.nlh) {
-                return outcomeCaptured(f, 'nlh', {
-                    subject: 'Hot water issue — not on Lighthouse',
-                    detail: 'Customer reports hot-water problems. Hot water at this site is not connected to Lighthouse — no remote monitoring or control available. Logged for IoT team follow-up.',
-                    script: "Hot water at this site isn\'t on Lighthouse, so I can\'t see it from here. It\'s logged, and our IoT team picks it up the next working day.",
-                    OohCaptureClass: 'hot-water'
+            return _hwDhwCard + infoBox('Hot water here runs on the boiler panel, which this dashboard watches but can\'t control, so there\'s no remote boost. The IoT team picks it up the next working day.') +
+                riskQuestion(f, {
+                    yes: () => outcomeP1(f, 'hw-p1', {
+                        subject: 'Hot water issue — risk to trade or health and safety — P1',
+                        detail: 'Customer reports hot-water problems. Hot water is boiler-side (monitor-only on Lighthouse) — no remote boost available. Customer indicated immediate risk to trade or health and safety.' + _hwDhwTs,
+                        pre: sayBox("Thanks. As there's an immediate risk to trade or to anyone's health and safety, I'm going to raise this as urgent with our on-call team."),
+                        script: res => 'That\'s raised as urgent, reference ' + dyn(res.ticket.id) + '. Someone from our on-call team will call you back shortly.'
+                    }),
+                    no: () => outcomeCaptured(f, 'cap', {
+                        subject: 'Hot water issue — not resolvable remotely tonight',
+                        detail: 'Customer reports hot-water problems. Hot water is boiler-side (monitor-only on Lighthouse) — there is no remote boost. Needs IoT/boiler-side investigation.' + _hwDhwTs,
+                        script: 'It\'s logged, and our IoT team picks it up the next working day. If it\'s urgent tonight, the boiler\'s own controls may help, and if a boiler engineer attends, a visit can be chargeable if the fault isn\'t Lighthouse equipment.',
+                        OohCaptureClass: 'hot-water'
+                    })
                 });
-            }
-            if (!f.data.sc) {
-                // OOHDASH-136: append DHW override ticket sentence when the card was shown.
-                var _hwDhwOv1 = ws.boilerControl && ws.boilerControl.dhwOverride;
-                var _hwDhwTs1 = '';
-                if (_hwDhwOv1 && _hwDhwOv1.visible === true) {
-                    var _hwOc1 = dhwOverrideOutcome(_hwDhwOv1, Date.now());
-                    if (_hwOc1) _hwDhwTs1 = ' ' + _hwOc1.ticketSentence;
-                }
-                return outcomeCaptured(f, 'cap', {
-                    subject: 'Hot water issue - not resolvable remotely tonight',
-                    detail: 'Customer reports hot-water problems. Hot water is boiler-side (monitor-only on Lighthouse) - there is no remote boost. Needs IoT/boiler-side investigation.' + _hwDhwTs1,
-                    script: "It\'s logged, and our IoT team picks it up the next working day. If it\'s urgent tonight, the boiler\'s own controls may help, and if a boiler engineer attends, a visit can be chargeable if the fault isn\'t Lighthouse equipment.",
-                    OohCaptureClass: 'hot-water'
-                });
-            }
-            if (f.data.sc) {
-                // OOHDASH-136: append DHW override ticket sentence when the card was shown.
-                var _hwDhwOv2 = ws.boilerControl && ws.boilerControl.dhwOverride;
-                var _hwDhwTs2 = '';
-                if (_hwDhwOv2 && _hwDhwOv2.visible === true) {
-                    var _hwOc2 = dhwOverrideOutcome(_hwDhwOv2, Date.now());
-                    if (_hwOc2) _hwDhwTs2 = ' ' + _hwOc2.ticketSentence;
-                }
-                return outcomeScope(f, 'sc', {
-                    subject: 'Hot water — likely boiler fault',
-                    evidence: 'Lighthouse monitors demand here; the boiler itself (pressure, PCB, pilot) is not Lighthouse equipment.' + _hwDhwTs2,
-                    script: 'From what you\'re describing this looks like the boiler itself rather than the Lighthouse controls — that\'s one for your boiler company. I\'ll note tonight\'s call so there\'s a record.'
-                });
-            }
         }
         return '';
     },
@@ -2357,7 +2469,21 @@ const FLOWR = {
         if (f.stage === 0) {
             const anyOnline = lgs.some(d => d.online);
             doneLine(lgs.length ? (anyOnline ? 'The outside lighting controller is connecting to us' : 'The outside lighting controller isn\'t connecting to us') : 'Outside lighting isn\'t on Lighthouse here', 'check');
-            if (!lgs.length) return '<div class="alert info">External lighting at this site isn\'t on Lighthouse.</div>' + otherShortcut();
+            // OOHDASH-146 B3: riskQuestion replaces otherShortcut for not-on-Lighthouse paths.
+            if (!lgs.length) return '<div class="alert info">External lighting at this site isn\'t on Lighthouse.</div>' +
+                riskQuestion(f, {
+                    yes: () => outcomeP1(f, 'nlh-p1', {
+                        subject: 'External lighting not on Lighthouse — risk to trade or health and safety — P1',
+                        detail: 'External lighting at this site is not connected to Lighthouse — no Lighthouse device found. Customer indicated immediate risk to trade or health and safety.',
+                        pre: sayBox("Thanks. As there's an immediate risk to trade or to anyone's health and safety, I'm going to raise this as urgent with our on-call team."),
+                        script: res => 'That\'s raised as urgent, reference ' + dyn(res.ticket.id) + '. Someone from our on-call team will call you back shortly.'
+                    }),
+                    no: () => outcomeScope(f, 'nlh', {
+                        subject: 'External lighting — not on Lighthouse at this site',
+                        evidence: 'No Lighthouse lighting device found at this site — lighting is not in the Lighthouse estate here.',
+                        script: res => 'Lighthouse doesn\'t manage the external lighting at your site. Please contact your lighting contractor through your usual route. I\'ve noted the call, reference ' + dyn(res.ticket.id) + '.'
+                    })
+                });
             const lgSwitches = lgs.map(lg =>
                 canSwitch(lg)
                     ? `<div class="zoneread"><span style="font-size:20px">💡</span><div><div><b>${esc(lg.zone)}</b> — ${lg.telemetry?.switch_1 ? 'currently ON' : 'currently OFF'}</div><div class="small">${esc(lg.deviceId)}</div></div>${switchButtons(lg, 'lighting-switch')}<span class="tag ${lg.telemetry?.switch_1 ? 'green' : 'grey'}">${lg.telemetry?.switch_1 ? 'on' : 'off'}</span></div>`
@@ -2409,7 +2535,21 @@ const FLOWR = {
         if (f.stage === 0) {
             const anyOnline = fans.some(d => d.online);
             doneLine(fans.length ? (anyOnline ? 'The fan controller is connecting to us' : 'The fan controller isn\'t connecting to us') : 'Extractor fans aren\'t on Lighthouse here', 'check');
-            if (!fans.length) return '<div class="alert info">Extractor fans at this site aren\'t on Lighthouse.</div>' + otherShortcut();
+            // OOHDASH-146 B3: riskQuestion replaces otherShortcut for not-on-Lighthouse paths.
+            if (!fans.length) return '<div class="alert info">Extractor fans at this site aren\'t on Lighthouse.</div>' +
+                riskQuestion(f, {
+                    yes: () => outcomeP1(f, 'nlh-p1', {
+                        subject: 'Extractor fans not on Lighthouse — risk to trade or health and safety — P1',
+                        detail: 'Extractor fans at this site are not connected to Lighthouse — no Lighthouse device found. Customer indicated immediate risk to trade or health and safety.',
+                        pre: sayBox("Thanks. As there's an immediate risk to trade or to anyone's health and safety, I'm going to raise this as urgent with our on-call team."),
+                        script: res => 'That\'s raised as urgent, reference ' + dyn(res.ticket.id) + '. Someone from our on-call team will call you back shortly.'
+                    }),
+                    no: () => outcomeScope(f, 'nlh', {
+                        subject: 'Extractor fans — not on Lighthouse at this site',
+                        evidence: 'No Lighthouse fan device found at this site — extractor fans are not in the Lighthouse estate here.',
+                        script: res => 'Lighthouse doesn\'t manage the extractor fans at your site. Please contact your contractor through your usual route. I\'ve noted the call, reference ' + dyn(res.ticket.id) + '.'
+                    })
+                });
             const anySwitchable = fans.some(canSwitch);
             const fanSwitches = fans.map(fan =>
                 canSwitch(fan)
@@ -2533,32 +2673,57 @@ const FLOWR = {
                 OohCaptureClass: 'connectivity'
             });
         }
+        // OOHDASH-146 B24: riskQuestion added to gcap, dcap, and cap paths.
         // Group-offline capture (anchor up): carries the group context; no remote action possible.
         if (f.data.ofq === 'gcap') {
             const plain = offlineGroups.map(equipmentGroupLabel);
             const labelStr = grammaticalList(plain);
             const multi = plain.length > 1;
-            return outcomeCaptured(f, 'gcap', {
-                subject: `Equipment group gateway offline — ${labelStr} unreachable`,
-                detail: `Site reachable, but the ${labelStr} equipment group gateway${multi ? 's are' : ' is'} offline; that equipment cannot be reached remotely. No remote action possible; needs IoT connectivity investigation${f.data.from ? ` (raised from ${f.data.from} flow)` : ''}.`,
-                script: res => 'I can\'t reach that equipment from here tonight. It\'s logged, reference ' + dyn(res.ticket.id) + ', and our IoT team picks it up the next working day.',
-                OohCaptureClass: 'connectivity'
+            return riskQuestion(f, {
+                yes: () => outcomeP1(f, 'gcap-p1', {
+                    subject: 'Equipment group gateway offline — risk to trade or health and safety — P1',
+                    detail: `Site reachable, but the ${labelStr} equipment group gateway${multi ? 's are' : ' is'} offline; that equipment cannot be reached remotely. Customer indicated immediate risk to trade or health and safety.`,
+                    pre: sayBox("Thanks. As there's an immediate risk to trade or to anyone's health and safety, I'm going to raise this as urgent with our on-call team."),
+                    script: res => 'That\'s raised as urgent, reference ' + dyn(res.ticket.id) + '. Someone from our on-call team will call you back shortly.'
+                }),
+                no: () => outcomeCaptured(f, 'gcap', {
+                    subject: `Equipment group gateway offline — ${labelStr} unreachable`,
+                    detail: `Site reachable, but the ${labelStr} equipment group gateway${multi ? 's are' : ' is'} offline; that equipment cannot be reached remotely. No remote action possible; needs IoT connectivity investigation${f.data.from ? ` (raised from ${f.data.from} flow)` : ''}.`,
+                    script: res => 'I can\'t reach that equipment from here tonight. It\'s logged, reference ' + dyn(res.ticket.id) + ', and our IoT team picks it up the next working day.',
+                    OohCaptureClass: 'connectivity'
+                })
             });
         }
         // Gateway-less capture: per-device unreachable at a direct-connection site; NO gateway framing.
         if (f.data.ofq === 'dcap') {
-            return outcomeCaptured(f, 'dcap', {
-                subject: 'Equipment unreachable — direct-connection site',
-                detail: `This site uses direct device connections (no site hub). The equipment the customer reported is not responding on its own connection. No remote action possible; needs IoT connectivity investigation${f.data.from ? ` (raised from ${f.data.from} flow)` : ''}.`,
-                script: res => 'I can\'t reach that equipment from here tonight. It\'s logged, reference ' + dyn(res.ticket.id) + ', and our IoT team picks it up the next working day.',
-                OohCaptureClass: 'connectivity'
+            return riskQuestion(f, {
+                yes: () => outcomeP1(f, 'dcap-p1', {
+                    subject: 'Equipment unreachable — risk to trade or health and safety — P1',
+                    detail: `This site uses direct device connections (no site hub). The equipment the customer reported is not responding on its own connection. Customer indicated immediate risk to trade or health and safety.`,
+                    pre: sayBox("Thanks. As there's an immediate risk to trade or to anyone's health and safety, I'm going to raise this as urgent with our on-call team."),
+                    script: res => 'That\'s raised as urgent, reference ' + dyn(res.ticket.id) + '. Someone from our on-call team will call you back shortly.'
+                }),
+                no: () => outcomeCaptured(f, 'dcap', {
+                    subject: 'Equipment unreachable — direct-connection site',
+                    detail: `This site uses direct device connections (no site hub). The equipment the customer reported is not responding on its own connection. No remote action possible; needs IoT connectivity investigation${f.data.from ? ` (raised from ${f.data.from} flow)` : ''}.`,
+                    script: res => 'I can\'t reach that equipment from here tonight. It\'s logged, reference ' + dyn(res.ticket.id) + ', and our IoT team picks it up the next working day.',
+                    OohCaptureClass: 'connectivity'
+                })
             });
         }
-        return outcomeCaptured(f, 'cap', {
-            subject: 'Lighthouse gateway / equipment offline',
-            detail: `Equipment unreachable after on-site power/router checks. No remote action possible; needs IoT connectivity investigation${f.data.from ? ` (raised from ${f.data.from} flow)` : ''}.`,
-            script: res => 'I can\'t fix that from here while the Lighthouse unit is offline. It\'s logged, reference ' + dyn(res.ticket.id) + ', and our IoT team picks it up the next working day. Anything electrical, like a tripped switch that won\'t reset, is one for your own electrician tonight.',
-            OohCaptureClass: 'connectivity'
+        return riskQuestion(f, {
+            yes: () => outcomeP1(f, 'cap-p1', {
+                subject: 'Lighthouse gateway offline — risk to trade or health and safety — P1',
+                detail: `Equipment unreachable after on-site power/router checks. Customer indicated immediate risk to trade or health and safety.`,
+                pre: sayBox("Thanks. As there's an immediate risk to trade or to anyone's health and safety, I'm going to raise this as urgent with our on-call team."),
+                script: res => 'That\'s raised as urgent, reference ' + dyn(res.ticket.id) + '. Someone from our on-call team will call you back shortly.'
+            }),
+            no: () => outcomeCaptured(f, 'cap', {
+                subject: 'Lighthouse gateway / equipment offline',
+                detail: `Equipment unreachable after on-site power/router checks. No remote action possible; needs IoT connectivity investigation${f.data.from ? ` (raised from ${f.data.from} flow)` : ''}.`,
+                script: res => 'I can\'t fix that from here while the Lighthouse unit is offline. It\'s logged, reference ' + dyn(res.ticket.id) + ', and our IoT team picks it up the next working day. Anything electrical, like a tripped switch that won\'t reset, is one for your own electrician tonight.',
+                OohCaptureClass: 'connectivity'
+            })
         });
     },
 
@@ -2678,12 +2843,12 @@ const FLOWR = {
         });
     },
     other(ws, f) {
+        // OOHDASH-146 B2: single Continue button at stage 0; scope chips + None-of-these at stage 1.
         if (f.stage === 0) {
             return `${sayBox('', 'what\'s the problem? (Type it in their words.)')}
-   <div class="formrow"><textarea id="otxt" data-testid="other-text" rows="2" placeholder="e.g. "the voltage optimiser needs resetting — is that you?"">${esc(f.data.freeText || '')}</textarea></div>
+   <div class="formrow"><textarea id="otxt" data-testid="other-text" rows="2" placeholder="e.g. the voltage optimiser needs resetting — is that you?">${esc(f.data.freeText || '')}</textarea></div>
    <div class="chips">
-    <button class="chip" data-testid="other-check" onclick="flowStep({q:document.getElementById('otxt').value||'(not specified)',path:'check'})">Check if it\'s Lighthouse-controlled</button>
-    <button class="chip" data-testid="other-capture" onclick="flowStep({q:document.getElementById('otxt').value||'(not specified)',qraw:document.getElementById('otxt').value,path:'cap'})">Pass it to the IoT team as described</button>
+    <button class="chip" data-testid="other-continue" onclick="flowStep({q:document.getElementById('otxt').value||'(not specified)'})">Continue</button>
    </div>`;
         }
         if (f.stage === 1) {
@@ -2708,7 +2873,8 @@ const FLOWR = {
                 })
             });
             return `<div class="stepq agentq">Which of these is it closest to?</div><div class="chips">
-    ${state.workspace.scope.map(g => `<button class="chip" data-testid="scope-${g.key}" onclick="flowStep({g:'${g.key}'})">${esc(g.label)}</button>`).join('')}</div>
+    ${state.workspace.scope.map(g => `<button class="chip" data-testid="scope-${g.key}" onclick="flowStep({g:'${g.key}'})">${esc(g.label)}</button>`).join('')}
+    <button class="chip" data-testid="scope-none-of-these" onclick="state.flow.data.path='cap';render()">None of these</button></div>
    <p class="small" style="margin-top:8px">This checks the live device inventory for <b>this site</b> — it can say with certainty what is and isn\'t on Lighthouse here. What it can\'t always settle is a fault <i>inside</i> shared kit (e.g. the boiler behind our controls).</p>`;
         }
         if (f.stage === 2) {
@@ -2720,18 +2886,36 @@ const FLOWR = {
                 doneLine(esc(g.label) + ': ' + (g.level === 'ctl' ? 'controlled from here' : g.level === 'mon' ? 'monitored only' + reachTxt : 'not on Lighthouse here'), 'check');
                 f.data._gline = 1;
             }
-            if (g.level === 'ctl') return infoBox(`<b>${esc(g.label)} is controlled by Lighthouse at this site.</b> Use the matching tile to deal with it.`) + `<button class="btn" onclick="anotherIssue()">Back to the issue picker</button>`;
+            // OOHDASH-146 B2: ctl → startFlow that issue's own flow; mon/none → riskQuestion.
+            if (g.level === 'ctl') return infoBox(`<b>${esc(g.label)} is controlled by Lighthouse at this site.</b> Use the flow for ${esc(g.label.toLowerCase())} to handle it.`) +
+                `<div class="chips"><button class="chip" data-testid="scope-ctl-start" onclick="startFlow('${g.key}', state.flow.data.q||'', {carryNotes:true})">Start the ${esc(g.label)} flow</button></div>`;
             if (g.level === 'mon') {
-                return outcomeScope(f, 'mon', {
-                    subject: `${g.label} — monitored only`,
-                    evidence: `${g.label} is monitored by Lighthouse at this site but not remotely controllable. Customer\'s issue: ${f.data.q}`,
-                    script: res => 'Lighthouse watches that here but doesn\'t control it from here. I\'ve noted your request on your site\'s record, reference ' + dyn(res.ticket.id) + '.'
+                return riskQuestion(f, {
+                    yes: () => outcomeP1(f, 'mon-p1', {
+                        subject: `${g.label} — monitored only — risk to trade or health and safety — P1`,
+                        detail: `${g.label} is monitored by Lighthouse at this site but not remotely controllable. Customer\'s issue: ${f.data.q}. Customer indicated immediate risk to trade or health and safety.`,
+                        pre: sayBox("Thanks. As there's an immediate risk to trade or to anyone's health and safety, I'm going to raise this as urgent with our on-call team."),
+                        script: res => 'That\'s raised as urgent, reference ' + dyn(res.ticket.id) + '. Someone from our on-call team will call you back shortly.'
+                    }),
+                    no: () => outcomeScope(f, 'mon', {
+                        subject: `${g.label} — monitored only`,
+                        evidence: `${g.label} is monitored by Lighthouse at this site but not remotely controllable. Customer\'s issue: ${f.data.q}`,
+                        script: res => 'Lighthouse watches that here but doesn\'t control it from here. I\'ve noted your request on your site\'s record, reference ' + dyn(res.ticket.id) + '.'
+                    })
                 });
             }
-            return outcomeScope(f, 'none', {
-                subject: `${g.label} — not on Lighthouse at this site`,
-                evidence: `Live inventory shows no Lighthouse ${g.label.toLowerCase()} devices at ${state.workspace.site.siteName}. Customer\'s issue: ${f.data.q}`,
-                script: res => 'That isn\'t part of the Lighthouse system at your site, so please contact your service contractor through your usual route. I\'ve noted the call on your site\'s record, reference ' + dyn(res.ticket.id) + '.'
+            return riskQuestion(f, {
+                yes: () => outcomeP1(f, 'none-p1', {
+                    subject: `${g.label} — not on Lighthouse — risk to trade or health and safety — P1`,
+                    detail: `Live inventory shows no Lighthouse ${g.label.toLowerCase()} devices at ${state.workspace.site.siteName}. Customer\'s issue: ${f.data.q}. Customer indicated immediate risk to trade or health and safety.`,
+                    pre: sayBox("Thanks. As there's an immediate risk to trade or to anyone's health and safety, I'm going to raise this as urgent with our on-call team."),
+                    script: res => 'That\'s raised as urgent, reference ' + dyn(res.ticket.id) + '. Someone from our on-call team will call you back shortly.'
+                }),
+                no: () => outcomeScope(f, 'none', {
+                    subject: `${g.label} — not on Lighthouse at this site`,
+                    evidence: `Live inventory shows no Lighthouse ${g.label.toLowerCase()} devices at ${state.workspace.site.siteName}. Customer\'s issue: ${f.data.q}`,
+                    script: res => 'That isn\'t part of the Lighthouse system at your site, so please contact your service contractor through your usual route. I\'ve noted the call on your site\'s record, reference ' + dyn(res.ticket.id) + '.'
+                })
             });
         }
         return '';
