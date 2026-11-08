@@ -30,7 +30,7 @@ function frameFor(root) {
   if (frames[root]) return root;
   let pre = B.norm(B.stripOn(PK.frames[root].pre), root), post = B.stripOn(PK.frames[root].post);
   pre = pre.replace(/data-testid="nav-home"/, 'data-testid="nav-home" data-to="HOME"').replace(/data-testid="nav-callback"/, 'data-testid="nav-callback" data-to="CB-list"').replace(/data-testid="nav-tonight"/, 'data-testid="nav-tonight" data-to="TONIGHT"')
-    .replace('v1.6.6 · fixture data', 'Prototype · OOHDASH-146 rev 4.2 · live v1.6.6 screens');
+    .replace('v1.6.6 · fixture data', 'Prototype · OOHDASH-146 rev 4.3 · live v1.6.6 screens');
   frames[root] = { pre, post };
   const first = PK.nodes[B.rootFirst[root]];
   heads[root] = B.norm(B.stripOn(first.head || ''), root).replace(/<button class="btn link" style="margin-left:auto">End call<\/button>/, '<button class="btn link" style="margin-left:auto" data-to="@end">End call</button>');
@@ -68,7 +68,7 @@ function rightFor(n, root) {
 const P1BANNER = '<div class="statusstrip p1-banner" data-testid="p1-escalation-banner" style="display:flex;align-items:flex-start;gap:10px"><span style="font-size:1.2em;flex-shrink:0">🚨</span><div><b>Active P1 escalation on record for this site — review before advising.</b> Ticket ' + H.tktLink(EX) + ': Just received — not yet picked up.</div></div>';
 
 /* ---- order screens inside groups (breadth-first from each group's first screen) */
-const START = { K8888: 'K-what', K6832: 'K6832~1', KGW: 'K8888-gw-B-unscheduled~1', KD8: 'K-what', HW: 'RQ:HW:HW-nodhw', NLH: 'K-none~1', LIGHT: 'L6749~1', FAN: 'FAN6851~1', FR: 'FR6851~1', CONN: 'WS-offline', CONT: 'CT6832~1', ELSE: 'O-0', AC: 'RQ:AC6218~1', HEAT: 'S6832-cold~1', BP: 'BP9001-read~1', CTL: 'CTL:compose-up', CD: 'CD-ws', PAGES: 'HOME' };
+const START = { K8888: 'K-what', K6832: 'K6832~1', KGW: 'K8888-gw-B-unscheduled~1', KD8: 'K-what', HW: 'RQ:HW:HW-nodhw', NLH: 'K-none~1', LIGHT: 'L6749~1', FAN: 'FAN6851~1', FR: 'FR6851~1', CONN: 'WS-offline', CONT: 'CT6832~1', ELSE: 'O-0', AC: 'RQ:AC6218~1', HEAT: 'S6832-cold~1', BP: 'BP9001-read~1', CTL: 'CTL:compose-up', CD: 'CD-partial', PAGES: 'HOME' };
 const order = {};
 GROUPS.forEach(g => {
   const ids = Object.values(NODES).filter(n => n.g === g.id).map(n => n.id);
@@ -86,15 +86,18 @@ order['KD8'] = ['K-what'].concat(order['KD8'].filter(x => x !== 'K-what'));
 // show K-what first in the main kitchen group too: copy the entry id into that list's head
 order['K8888'].unshift('K-what');
 
+const IN_CALL_PAGES = ['WORKSPACE', 'WS-offline', 'K-banner', 'CD-add'];
+Object.values(NODES).forEach(n => { if ((n.kind === 'page' ? IN_CALL_PAGES.includes(n.id) : true) && !n.deltas.includes('R17')) n.deltas.push('R17'); });
+
 /* ---- compact data */
 const D = {}, GR = {};
 GROUPS.forEach(g => { GR[g.id] = order[g.id] || []; });
 Object.values(NODES).forEach(n => {
   const root = frameFor(frameRoot(n));
   const rec = { g: n.g, t: n.t, k: n.kind === 'page' ? 'page' : 'flow', d: n.deltas, src: n.src || null };
-  if (n.kind === 'page') { rec.h = n.pageHtml; if (n.cust) rec.cust = true; }
+  if (n.kind === 'page') { rec.h = n.pageHtml; if (IN_CALL_PAGES.includes(n.id)) rec.ic = 1; }
   else {
-    rec.h = n.flowHtml; rec.fr = root; rec.r = rightFor(n, root);
+    rec.h = n.flowHtml; rec.fr = root; rec.r = rightFor(n, root); rec.ic = 1;
     if (n.isP1) rec.p1 = 1;
     rec.e = n.edges.map(e => e.to || null);
     if (n.modalHtml) rec.m = n.modalHtml;
@@ -111,11 +114,11 @@ Object.values(D).forEach(r => { if (r.h) r.h = r.h.split('/guides/powerpause-con
 const css = fs.readFileSync(path.join(SC, 'live', 'public', 'css', 'styles.css'), 'utf8');
 const protoCss = fs.readFileSync(path.join(__dirname, 'proto.css'), 'utf8');
 const runtime = fs.readFileSync(path.join(__dirname, 'proto-runtime.js'), 'utf8');
-const DL = {}; Object.entries(DELTAS).forEach(([k, v]) => { DL[k] = { title: v.title, what: v.what, note: /^(N1|R11)$/.test(k) }; });
+const DL = {}; Object.entries(DELTAS).forEach(([k, v]) => { DL[k] = { title: v.title, what: v.what, note: /^(N1|R11|R17)$/.test(k) }; });
 const GL = GROUPS.map(g => ({ id: g.id, label: g.label }));
-const head = '<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>OOHDASH-146 prototype, rev 4.2 (live v1.6.6 plus the 146 changes)</title><link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' viewBox=\'0 0 100 100\'%3E%3Ctext y=\'.9em\' font-size=\'90\'%3E%F0%9F%8C%99%3C/text%3E%3C/svg%3E"><style>' + css + '\n' + protoCss + '</style></head><body>';
-const bar = '<div id="proto"><button class="ptog" id="ptog" onclick="togProto()">Hide</button><b>OOHDASH-146 prototype, rev 4.2</b> <span id="badge"></span><span class="pdesc"> · every screen is the live v1.6.6 screen (captured from the real app, fixture mode) with only the 146 changes applied. Pick a flow, then a screen, or just click the buttons. Example data only. <label><input type="checkbox" id="showdiff"> Show what differs from live</label><label class="sim"><input type="checkbox" id="simfail"> Make the next P1 fail once</label></span><div class="row"><span style="color:#94A3B8">Flow:</span><select id="gsel"></select><button class="pb" id="gstart">Start of this flow</button><span style="color:#94A3B8">Screen:</span><select id="ssel"></select></div></div>';
-const body = bar + '<div id="app-stage"><div id="stage"></div></div><div id="diffpanel"></div><div id="toasts"></div><div id="modalroot"></div>';
+const head = '<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>OOHDASH-146 prototype, rev 4.3 (live v1.6.6 plus the 146 changes)</title><link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' viewBox=\'0 0 100 100\'%3E%3Ctext y=\'.9em\' font-size=\'90\'%3E%F0%9F%8C%99%3C/text%3E%3C/svg%3E"><style>' + css + '\n' + protoCss + '</style></head><body>';
+const bar = '<div id="proto"><button class="ptog" id="ptog" onclick="togProto()">Hide</button><b>OOHDASH-146 prototype, rev 4.3</b> <span id="badge"></span><span class="pdesc"> · every screen is the live v1.6.6 screen (captured from the real app, fixture mode) with only the 146 changes applied. Pick a flow, then a screen, or just click the buttons. Example data only. <label><input type="checkbox" id="showdiff"> Show what differs from live</label><label class="sim"><input type="checkbox" id="simfail"> Make the next P1 fail once</label></span><div class="row"><span style="color:#94A3B8">Flow:</span><select id="gsel"></select><button class="pb" id="gstart">Start of this flow</button><span style="color:#94A3B8">Screen:</span><select id="ssel"></select><span style="color:#94A3B8">Caller banner:</span><select id="bsel"><option value="full">Full details</option><option value="name">Partial: name only</option><option value="number">Partial: number only</option><option value="none">None taken</option><option value="declined">None: the customer declined</option></select></div></div>';
+const body = bar + '<div id="app-stage"><div id="stage"></div></div><div id="diffpanel"></div><div id="toasts"></div><div id="srlive" class="sr-only" role="status" aria-live="polite"></div><div id="modalroot"></div>';
 const data = 'var D=' + JSON.stringify(D) + ';\nvar GR=' + JSON.stringify(GR) + ';\nvar GL=' + JSON.stringify(GL) + ';\nvar DL=' + JSON.stringify(DL) + ';\nvar PB={"1":' + JSON.stringify(P1BANNER) + '};\nvar FR=' + JSON.stringify(frames) + ';\nvar HEAD=' + JSON.stringify(heads) + ';\nvar RT=' + JSON.stringify(rightKeys) + ';\n';
 const html = head + body + '<script>\n' + data + runtime + '\n</script></body></html>\n';
 fs.writeFileSync(OUTHTML, html);

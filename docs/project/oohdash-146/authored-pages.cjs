@@ -25,28 +25,47 @@ const vsrc = (id, vw) => { NODES[id].src = 'view:' + vw; NODES[id].authored = fa
 
 /* live pages */
 const wsPage = cleanPage(VW['workspace'].app);
-page('HOME', 'PAGES', 'New call: search for the site', cleanPage(VW['home'].app).replace('data-testid="site-search"', 'data-testid="site-search" data-search="1"'));
 page('SEARCH-none', 'PAGES', 'Search: no site matches', cleanPage(VW['search-none'].app));
 page('SITE-confirm', 'PAGES', 'Confirm the site', cleanPage(VW['site-confirm'].app));
 page('SITE-ambiguous', 'PAGES', 'House number matches two sites', cleanPage(VW['site-ambiguous'].app));
 page('WORKSPACE', 'PAGES', 'Site screen: what is the customer reporting?', wsPage);
-vsrc('HOME', 'home'); vsrc('SEARCH-none', 'search-none'); vsrc('SITE-confirm', 'site-confirm'); vsrc('SITE-ambiguous', 'site-ambiguous'); vsrc('WORKSPACE', 'workspace');
+vsrc('SEARCH-none', 'search-none'); vsrc('SITE-confirm', 'site-confirm'); vsrc('SITE-ambiguous', 'site-ambiguous'); vsrc('WORKSPACE', 'workspace');
 
 /* R5 / R13: offline banner without the button */
 let off = cleanPage(VW['workspace-offline'].app);
 off = off.replace(/<button class="btn" style="margin-left:auto">Run connection check<\/button>/, '').replace('This step is optional — you can go straight to the issue.', 'If the customer\'s issue involves it, the questions check the equipment for you.');
 page('WS-offline', 'CONN', 'Site screen: some equipment not responding (button removed)', off, ['R5', 'R13']);
 
-/* R8: customer details (non-blocking), after the site is confirmed */
-const detailsForm = '<div class="card" data-testid="customer-details" style="padding:16px">' +
-  '<h3>Who\'s calling?</h3>' + H.sayBox('<p>Can I take your name, your role, and the best number to reach you on?</p>', '') +
-  H.field('Customer\'s name <span class="small">(required)</span>', 'e.g. Priya Shah') + H.field('Their role <span class="small">(optional, e.g. duty manager, chef, contractor)</span>', '') + H.field('Best contact number <span class="small">(required)</span>', 'e.g. 07700 900123') +
-  H.infoBox('Name and contact number go on every ticket from this call, in the ticket\'s internal notes, so our team can call back. They are not sent in the P1 text and not shown in Tonight. You can start an issue without them: the call record has already started.') +
-  '<div class="outbtns">' + H.btn('Save and continue', 'CD-saved', 'primary') + H.btn('The customer won\'t give these', 'CD-declined') + '</div></div>';
+/* R8 / R16 (D15): "Who's calling?" is the start screen, with the site search on the same screen. Details are optional and never block. */
+const homeLive = cleanPage(VW['home'].app);
+page('HOME-old', 'PAGES', 'New call: the old live landing page (kept for comparison; no longer the start)', homeLive);
+vsrc('HOME-old', 'home');
+const fld = (id, label, ph, v) => '<div class="formrow"><label for="' + id + '">' + label + '</label><input id="' + id + '" placeholder="' + esc(ph) + '"' + (v ? ' value="' + esc(v) + '"' : '') + '></div>';
+const RESULT = '<div class="stepdone" style="cursor:pointer;margin-top:6px" data-act="pick-site"><b>The Wheatsheaf</b> <span class="mono">7412</span> · Greene King · Bury St Edmunds</div>';
+function whosCalling(o) {
+  o = o || {};
+  const card = '<div class="card" style="padding:26px" data-testid="whos-calling">' +
+    '<h2>Who\'s calling?</h2>' +
+    H.sayBox('<p>Can I take your name, your role, and the best number to reach you on?</p>', '') +
+    '<div class="cd-grid">' + fld('cd-name', 'Customer\'s name <span class="small">(optional)</span>', 'e.g. Priya Shah', o.name) + fld('cd-role', 'Their role <span class="small">(optional)</span>', 'e.g. duty manager, chef, contractor', o.role) + fld('cd-phone', 'Best contact number <span class="small">(optional)</span>', 'e.g. 07700 900123', o.phone) + '</div>' +
+    '<p class="small" data-testid="details-optional">Optional: you can search for the site without them. If you take them, they go on every ticket from this call, in the ticket\'s internal notes, so our team can call back. They are not sent in the P1 text and not shown in Tonight. The call record starts when the site is confirmed.</p>' +
+    '<button class="btn link" data-act="decline" data-testid="cd-decline" style="padding:2px 0">The customer won\'t give these</button>' +
+    '<h3 style="margin-top:18px">Which site is it?</h3>' +
+    '<p class="sub" style="margin-bottom:10px">Ask for the <b>house number</b> (4 digits) — or search by pub name. Use ↑ ↓ and Enter to pick.</p>' +
+    '<div class="searchwrap"><input id="sq" data-testid="site-search" data-search="1" placeholder="e.g. 6832 or Old Grey Mare" autocomplete="off"' + (o.results ? ' value="wheat"' : '') + '><div id="sres">' + (o.results ? RESULT : '') + '</div></div>' +
+    '<p class="small" style="margin-top:12px">Customer ringing back about an earlier issue? <button class="btn link" data-to="CB-list">Use Callback Lookup →</button></p>' +
+    '</div>\n  <div class="card">';
+  return homeLive.replace(/<div class="card" style="padding:26px">[\s\S]*?<\/div>\n  <div class="card">/, () => card);
+}
+page('HOME', 'PAGES', 'New call: Who\'s calling? with the site search on the same screen (the start, D15)', whosCalling({}), ['R16']);
+page('CD-partial', 'CD', 'Who\'s calling?: partly filled (name and role, no number yet)', whosCalling({ name: 'Priya Shah', role: 'duty manager' }), ['R16']);
+page('CD-results', 'CD', 'Who\'s calling?: details given, site search showing a result', whosCalling({ name: 'Priya Shah', role: 'duty manager', phone: '07700 900123', results: true }), ['R16']);
 const entryAt = '<div class="card">\n   \n   <h3>What is the customer reporting?</h3>';
-page('CD-ws', 'CD', 'Site confirmed: details asked next (issue buttons stay available)', wsPage.replace(entryAt, detailsForm + entryAt), ['R8']);
-page('CD-saved', 'CD', 'Details saved: the customer line shows on every issue screen', wsPage, ['R8'], { cust: true });
-page('CD-declined', 'CD', 'The customer won\'t give details: recorded, call carries on', wsPage.replace(entryAt, '<div class="alert info" data-testid="details-declined">Recorded: "Customer declined to give their details". This goes on every ticket from this call.</div>' + entryAt), ['R8']);
+const addCard = '<div class="card" data-testid="add-details" style="padding:16px"><h3>Add or change the customer\'s details</h3>' +
+  '<div class="cd-grid">' + fld('cd-name', 'Customer\'s name', 'e.g. Priya Shah') + fld('cd-role', 'Their role', 'e.g. duty manager') + fld('cd-phone', 'Best contact number', 'e.g. 07700 900123') + '</div>' +
+  H.infoBox('Optional and never blocks the call. The banner above updates as soon as you save. The details go on any ticket raised from now on.') +
+  '<div class="outbtns"><button class="btn primary" data-act="save-details" data-testid="cd-save">Save details</button><button class="btn" data-act="cancel-add">Back to the call</button></div></div>';
+page('CD-add', 'CD', 'Add details during the call (from the banner "Add details" or "Change"); the banner updates', wsPage.replace(entryAt, addCard + entryAt), ['R16', 'R17']);
 /* R1: site screen while a one-off is booked */
 page('K-banner', 'KD8', 'Site screen while a one-off is booked (with Cancel)', wsPage.replace(entryAt, '<div class="oneoff-banner" data-testid="oneoff-banner">⏱ Fryer: booked to stay on until midnight tonight (ticket ' + H.tktLink(EX) + '). ' + H.btn('Cancel', 'K-cancelled') + '</div>' + entryAt), ['R1']);
 

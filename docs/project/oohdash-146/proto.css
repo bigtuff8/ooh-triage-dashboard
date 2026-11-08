@@ -15,8 +15,6 @@ body{padding-top:var(--proto-h,0px)}
 #proto .bd.diff{background:#78350F;color:#FDE68A}
 .oldtext{margin:12px 16px;border:1px dashed #F59E0B;background:#FFFBEB;border-radius:8px;padding:8px 12px;font-size:12.5px;color:#78350F;white-space:pre-line}
 .oldtext b{display:block;margin-bottom:4px}
-.callerline{display:flex;align-items:center;gap:8px;background:var(--surface-variant);border:1px solid var(--border);border-radius:var(--radius-md);padding:6px 12px;margin:0 0 10px;font-size:13px}
-.callerline a{margin-left:auto;color:var(--primary);cursor:pointer;font-size:12.5px}
 .oneoff-banner{display:flex;align-items:center;gap:10px;flex-wrap:wrap;background:var(--info-light);border:1px solid #BFDBFE;border-radius:var(--radius-md);padding:10px 14px;margin-bottom:10px;color:#1E40AF;font-weight:500}
 .oneoff-banner .btn{margin-left:auto}
 .protohint{padding:8px 16px 12px;font-size:12px;color:var(--text-secondary);border-top:1px dashed var(--border)}
@@ -25,3 +23,13 @@ body{padding-top:var(--proto-h,0px)}
 .drawer{top:var(--proto-h,0px)!important}
 .toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:#0F172A;color:#fff;padding:10px 16px;border-radius:8px;z-index:90;font-size:13px;max-width:90vw}
 .tile,.stepdone[data-to],[data-to]{cursor:pointer}
+
+/* D16: the caller banner (also goes into styles.css in the build) */
+.callbanner{display:flex;align-items:center;flex-wrap:wrap;gap:4px 12px;background:var(--surface-variant);border:1px solid var(--border);border-radius:var(--radius-md);padding:7px 12px;margin:0 0 10px;font-size:13px;position:sticky;top:calc(52px + var(--proto-h,0px));z-index:5;color:var(--text-primary)}
+.callbanner .cb-who{min-width:0}.callbanner .cb-site{margin-left:auto;min-width:0;color:var(--text-primary)}
+.callbanner .cb-quiet{color:var(--text-secondary)}
+.callbanner .cb-add{font-size:12.5px;padding:2px 4px;margin:0}
+.cd-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:0 12px}
+.sr-only{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+@media(max-width:640px){.callbanner{flex-wrap:nowrap;gap:2px 8px;padding:4px 10px;font-size:12.5px;overflow:hidden}.callbanner .cb-who{flex:1 1 auto;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.callbanner .cb-site,.callbanner .cb-role{display:none}.callbanner .cb-add{flex:0 0 auto}}
+@media print{.callbanner{position:static;border:1px solid #999}}

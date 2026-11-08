@@ -4,13 +4,13 @@ Method: the real app (origin/main 916f6e3, v1.6.6) was run in fixture mode with 
 
 ## Result
 
-- Prototype screens: 402 (211 taken from live, 185 authored for 146).
+- Prototype screens: 403 (211 taken from live, 186 authored for 146).
 - Identical to live after example-data normalisation: 83.
 - Differ from live, every difference mapped to an item below: 134.
-- New in 146 (no live screen), each mapped to an item: 185 of 185.
+- New in 146 (no live screen), each mapped to an item: 186 of 186.
 - **Unexplained differences: 0.**
 - Live screens captured but not shown in the prototype: 244 (mostly control-window and duplicate crawl states; the replaced and removed live screens are listed under "Live screens replaced").
-- Click test: 3431 clicks on 402 screens; dead buttons: 0; buttons that lead to a missing screen: 0; JS errors: 0.
+- Click test: 3811 clicks on 403 screens; dead buttons: 0; buttons that lead to a missing screen: 0; JS errors: 0.
 
 ## D13 (R14) checks
 
@@ -22,6 +22,14 @@ Method: the real app (origin/main 916f6e3, v1.6.6) was run in fixture mode with 
 - D14 urgency: 8 "when is it needed" screens (chip mapping wrong on: none); 9 urgent banners; 7 not-urgent banners; a not-urgent screen reaches a P1: never; an urgent screen with no P1 confirm ahead: none.
 - Automatic P1 exceptions: P1 screens with no confirm step ahead of them: K-auto-p1 (only K-auto-p1 expected; others: none); K-auto-p1 reached only from the "cannot make the change" screens: yes.
 - The retry confirm screen (SH:p1fail, pre-filled): {"initialEnabled":true,"cleared":true,"short":true,"typed":false}.
+
+## D15 / D16 checks
+
+- Start screen (HOME): {"whos":true,"nameField":true,"phoneField":true,"roleField":true,"search":true,"optional":true,"banner":false,"bootId":"HOME"}.
+- Caller banner on every in-call screen (388 screens) in each state: {"full":"388 of 388","name":"388 of 388","number":"388 of 388","none":"388 of 388","declined":"388 of 388"}; missing: none; wrong text or role: none; shown on a screen that is not in a call: none.
+- Walk-throughs (start screen, site search, confirm, kitchen flow): full ok; name only ok; no details (proceed without) ok; declined ok.
+- Add details mid-call (none, then name, then number): ok, banner updates and the agent returns to the same screen.
+- Phone width (390): {"bannerHeight":36,"sticky":true,"sayTopWith":796,"sayTopWithout":750,"pushedBy":46,"prototypeBarHeight":210,"viewport":780,"ok":true}.
 
 ## Live screens not carried into the prototype (crawl states per scenario)
 
@@ -38,7 +46,9 @@ L6961: 1, L-none: 7, FAN-switch: 5, FAN-none: 7, HW-nodhw: 3, HW-auto: 3, HW-aut
 | R5 | Connection check: no button, divert corrected (D10). The "Run connection check" button on the site screen and the typed keywords are removed (the automatic divert stays). The divert no longer says "Everything at this site is online" when the customer's own thermostat is the thing that is offline. The all-online screen is no longer reachable. |
 | R6 | Heating (thermostats): customer questions, no agent buttons (D5, D12). The agent buttons "Give the radiator advice", "Raise the setpoint anyway" and "Adjust the setpoint anyway" are replaced by plain questions to the customer (for example "Are the radiators in that area warm?"); the turn-it-off card asks the customer. The area picker and readings are live. |
 | R7 | Device control window: plain wording and an honest ticket line (D2, D4). Window titles and buttons in plain words ("Make it warmer", "Send"), no raw device codes, and "I've logged it" only when a ticket number came back (a failed ticket shows "Try logging again"). Results use the live after-card. The repeated "not confirmed yet" pop-up shows once (not visible on a screen). |
-| R8 | Customer details: name, role and number (D9, non-blocking). Asked on the site screen after the site is confirmed. The call record still starts at site confirm (live E1), so the issue buttons are never blocked. "The customer won't give these" records that instead. Once saved, a customer line appears above every issue screen. |
+| R8 | Customer details: name, role and number (D9, optional, on the start screen). Asked on the start screen (D15) together with the site search, optional and never blocking; "The customer won't give these" records that. The call record still starts at site confirm (live E1), so nothing is held back. Added or changed mid-call from the banner. |
+| R16 | D15: "Who's calling?" is the start screen. "New call" opens "Who's calling?" with the customer name, role and number and the site search on one screen. The details are optional; the agent can go straight to the site search. The old live landing page stays under Other screens, for comparison. |
+| R17 | D16: the caller banner on every in-call screen. A permanent banner at the top of every screen once the site is confirmed: the caller's name, number and role if given, and the site. States: full, partial, none taken (with a quiet "No contact details taken" and an optional "Add details"), and updated when details are added mid-call. Display only; it replaces the live-style caller line from revision 4.2. |
 | R9 | Tonight: plain outcome chips and "What happened". Raw codes replaced by plain chips (including the boiler-boost key, closed note and the kitchen one-off chips). |
 | R10 | "Caller" becomes "customer" in ticket text (B4). The words "caller" and "Caller" in ticket subjects, ticket notes and the ticket status label (views.js:99, zendesk.js:255, 388-389, 588). Shown on the "Ticket wording" screen and on the callback ticket drawer. |
 | R11 | Boiler-panel (pub heating) screens added to the prototype (C6a). These screens are live and unchanged apart from the shared text key; they were missing from the earlier prototype. The two duration results ("Heating turned on/off") are captured from live; the transient "Sending…" screens are not shown. |
@@ -256,9 +266,10 @@ L6961: 1, L-none: 7, FAN-switch: 5, FAN-none: 7, HW-nodhw: 3, HW-auto: 3, HW-aut
 | CTL:escalate-indet | none (new) | R7, R14 |
 | CTL:escalate-nondel | none (new) | R7, R14 |
 | WS-offline | none (new) | R5, R13 |
-| CD-ws | none (new) | R8 |
-| CD-saved | none (new) | R8 |
-| CD-declined | none (new) | R8 |
+| HOME | none (new) | R16 |
+| CD-partial | none (new) | R16 |
+| CD-results | none (new) | R16 |
+| CD-add | none (new) | R16 |
 | K-banner | none (new) | R1 |
 | CB-list | none (new) | R10 |
 | CB-drawer | none (new) | R10 |
@@ -1610,4 +1621,4 @@ L6961: 1, L-none: 7, FAN-switch: 5, FAN-none: 7, HW-nodhw: 3, HW-auto: 3, HW-aut
 
 ## Identical screens
 
-K8888~1, K8888~2, K8888~3, K8888~4, K8888~5, K8888~6, K8888~7, K8888~8, K8888~9, K8888~14, K8888~17, K8888~20, K8888~23, K8888~24, K8888~27, K8888~28, K8888~46, K8888~51, K8888-gw-B-unscheduled~1, K8888-gw-B-outside~1, K8888-gw-off-unknown~1, K8888-gw-off-unknown~2, K8888-gw-fallback~1, K8888-gw-fallback~2, K6832~1, K6832~2, K6832~3, K6832~5, K6832~6, K6832~9, K6832~10, K6832~13, K6832~23, K6832~28, K-none~1, L6749~1, L6360~1, L6961~1, L6961~2, FAN6851~1, FAN6851~2, FAN-switch~1, FAN-switch~2, FAN-switch~3, CN6832~1, CN5198~1, CN6771~1, CN6771~2, CN6772~1, CN6773~1, CT6832~1, CT6832~2, CT6832~3, CT6832~5, CT6832~6, CT6832~8, CT-dd~1, CT-dd~2, BP9001~1, BP9001~2, BP9001~3, BP9001~4, BP9001-read~1, BP9001-read~2, BP9001-read~3, BP9001-read~4, BP9001-read~5, BP9001-read~7, S7001~1, S7001~2, S7001~5, S6832-cold~1, S6832-cold~2, S6832-cold~3, S6832-near~3, BPdone-on, BPdone-off, HOME, SEARCH-none, SITE-confirm, SITE-ambiguous, WORKSPACE, CB-empty
+K8888~1, K8888~2, K8888~3, K8888~4, K8888~5, K8888~6, K8888~7, K8888~8, K8888~9, K8888~14, K8888~17, K8888~20, K8888~23, K8888~24, K8888~27, K8888~28, K8888~46, K8888~51, K8888-gw-B-unscheduled~1, K8888-gw-B-outside~1, K8888-gw-off-unknown~1, K8888-gw-off-unknown~2, K8888-gw-fallback~1, K8888-gw-fallback~2, K6832~1, K6832~2, K6832~3, K6832~5, K6832~6, K6832~9, K6832~10, K6832~13, K6832~23, K6832~28, K-none~1, L6749~1, L6360~1, L6961~1, L6961~2, FAN6851~1, FAN6851~2, FAN-switch~1, FAN-switch~2, FAN-switch~3, CN6832~1, CN5198~1, CN6771~1, CN6771~2, CN6772~1, CN6773~1, CT6832~1, CT6832~2, CT6832~3, CT6832~5, CT6832~6, CT6832~8, CT-dd~1, CT-dd~2, BP9001~1, BP9001~2, BP9001~3, BP9001~4, BP9001-read~1, BP9001-read~2, BP9001-read~3, BP9001-read~4, BP9001-read~5, BP9001-read~7, S7001~1, S7001~2, S7001~5, S6832-cold~1, S6832-cold~2, S6832-cold~3, S6832-near~3, BPdone-on, BPdone-off, SEARCH-none, SITE-confirm, SITE-ambiguous, WORKSPACE, HOME-old, CB-empty

@@ -7,7 +7,7 @@ const rev2 = fs.readFileSync(rev2f, 'utf8');
 const meta = JSON.parse(fs.readFileSync(nodesf, 'utf8'));
 const ver = JSON.parse(fs.readFileSync(verf, 'utf8'));
 const tpl = fs.readFileSync(require('path').join(__dirname, 'design-rev4-template.md'), 'utf8');
-const NOTE = new Set(['N1', 'R11']);
+const NOTE = new Set(['N1', 'R11', 'R17']);
 
 function sec(n) {
   const re = new RegExp('^## ' + n + '\\. .*$', 'm');
@@ -60,7 +60,7 @@ const real = Object.entries(meta.deltas).filter(([k]) => !NOTE.has(k));
 const allDelta = Object.entries(meta.deltas);
 const diffTable = '| Item | What changes |\n|---|---|\n' + allDelta.map(([k, v]) => '| ' + k + ' | **' + v.title.replace(/\|/g, '/') + '.** ' + v.what.replace(/\|/g, '/') + ' |').join('\n');
 const byItem = {}; meta.nodes.forEach(n => n.deltas.forEach(d => { (byItem[d] = byItem[d] || []).push(n.id); }));
-const screenTable = '| Item | Screens | Count |\n|---|---|---|\n' + Object.keys(meta.deltas).map(k => '| ' + k + ' | ' + ((byItem[k] || []).map(x => '`' + x + '`').join(', ') || 'none') + ' | ' + (byItem[k] || []).length + ' |').join('\n');
+const screenTable = '| Item | Screens | Count |\n|---|---|---|\n' + Object.keys(meta.deltas).map(k => '| ' + k + ' | ' + (k === 'R17' ? 'every in-call screen (all flows, the site screen and Add details)' : ((byItem[k] || []).map(x => '`' + x + '`').join(', ') || 'none')) + ' | ' + (byItem[k] || []).length + ' |').join('\n');
 const nLive = meta.nodes.filter(n => n.live).length, nAuth = meta.nodes.filter(n => n.authored).length;
 const results = [
   '| Check | Result |', '|---|---|',
@@ -72,6 +72,10 @@ const results = [
   '| Buttons clicked | ' + ver.clicks + ' |',
   '| Dead buttons / JS errors | ' + ver.dead.length + ' / ' + ver.errors.length + ' |',
   '| Failed P1 simulated | lands on ' + ver.p1sim + ' |',
+  '| D15: the prototype starts on "Who\'s calling?" with name, role, number and the site search on one screen | ' + (ver.d16.startScreen.whos && ver.d16.startScreen.nameField && ver.d16.startScreen.roleField && ver.d16.startScreen.phoneField && ver.d16.startScreen.search && ver.d16.startScreen.bootId === 'HOME' ? 'yes' : 'NO') + ' |',
+  '| D16: caller banner on every in-call screen, in each of five states (full, name only, number only, none, declined) | ' + ver.d16.inCall + ' screens each: ' + Object.values(ver.d16.stateRows).join(', ') + '; missing ' + ver.d16.noBanner.length + '; wrong ' + ver.d16.bannerBad.length + '; on a screen outside a call ' + ver.d16.outsideWithBanner.length + ' |',
+  '| D16: walk from the start screen to a kitchen flow, four ways of starting; add details mid-call | ' + ver.d16.flowPath.filter(x => x[1].ok).length + ' of ' + ver.d16.flowPath.length + ' walks keep the right banner; add details ' + (ver.d16.addDetails.ok ? 'ok' : 'FAILED') + ' |',
+  '| D16: phone width (390 px) | banner ' + ver.d16.phone.bannerHeight + ' px high and sticky; it moves the say box down by ' + ver.d16.phone.pushedBy + ' px; with the real app (without the ' + ver.d16.phone.prototypeBarHeight + ' px prototype bar) the say box top is at ' + (ver.d16.phone.sayTopWith - ver.d16.phone.prototypeBarHeight) + ' px of ' + ver.d16.phone.viewport + ' |',
   '| D13: screens that show the exact question | ' + ver.d13.questionScreens + ' (wrong wording on ' + ver.d13.askBad.length + ') |',
   '| D13: ticket screens (not P1) reached only from the question | ' + ver.d13.gated + ' of ' + (ver.d13.gated + ver.d13.exempt) + '; the other ' + ver.d13.exempt + ' are resolved on the call or declined, listed in the screen-text diff; ungated: ' + ver.d13.ungated.length + ' |',
   '| D13: P1 confirm screens reached only from the question | ' + ver.d13.confirms + ' (exceptions: ' + ver.d13.confirmUngated.length + ') |',
@@ -79,8 +83,8 @@ const results = [
   '| Scenario-only screens (reached by the Screen picker, not by clicking from the first call screen) | ' + ver.unreachable.length + ' |'
 ].join('\n');
 const sub = {
-  NSCREENS: meta.nodes.length, NLIVE: nLive, NAUTH: meta.nodes.length - nLive, NDELTAS: Object.keys(meta.deltas).length - 2,
-  NQ: ver.d13.questionScreens, NCONF: ver.d13.confirms, NP1: ver.d13.p1Checked, NTK: ver.d13.ticketScreens, NGATED: ver.d13.gated, NEXEMPT: ver.d13.exempt,
+  NSCREENS: meta.nodes.length, NLIVE: nLive, NAUTH: meta.nodes.length - nLive, NDELTAS: Object.keys(meta.deltas).length - 3,
+  NINCALL: ver.d16.inCall, NQ: ver.d13.questionScreens, NCONF: ver.d13.confirms, NP1: ver.d13.p1Checked, NTK: ver.d13.ticketScreens, NGATED: ver.d13.gated, NEXEMPT: ver.d13.exempt,
   NIDENT: ver.identical, NEXPL: ver.explained, NNEW: ver.isNew, NUNEXPL: ver.unexplained, NCLICKS: ver.clicks,
   DIFFTABLE: diffTable, SCREENTABLE: screenTable, RESULTS: results,
   S7: fix(sec(7)).replace(/^Today the card[^\n]*\n/, m => m), S8: fix(sec(8)), S10: fix(sec(10)), S11: fix(sec(11)), S13: fix(sec(13)), S17: dict(fix(sec(17)))

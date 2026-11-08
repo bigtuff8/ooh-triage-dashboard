@@ -1,24 +1,49 @@
 /* OOHDASH-146 rev 4 prototype runtime. Data (D, GR, FR, HEAD, RT, DL) is injected by build-proto. No network, no build step. */
-var S = { id: null, sim: false, failed: false, cust: false, diff: false, last: 'WORKSPACE' };
+var S = { id: null, sim: false, failed: false, cust: false, diff: false, last: 'WORKSPACE', caller: { name: 'Priya Shah', role: 'duty manager', phone: '07700 900123', declined: false }, addFrom: null };
 var TILE = { heating: 'S6832-cold~1', hotwater: 'RQ:HW:HW-auto', kitchen: 'K-what', lighting: 'L6749~1', fan: 'FAN6851~1', fridge: 'FR6851~1', contractor: 'CT6832~1', other: 'O-0' };
-var LABELTO = { '✓ This is the right site': 'CD-ws', 'Search again': 'HOME', 'Pass it to the IoT team': 'RQ:SITE-ambiguous-logged', 'Use Callback Lookup →': 'CB-list', 'start a new call': 'HOME', '❓ Raise a query with the IoT team': 'TONIGHT-query', 'Cancel': 'TONIGHT', 'Send query': 'TONIGHT', '✕': 'TONIGHT' };
+var LABELTO = { '✓ This is the right site': 'WORKSPACE', 'Search again': 'HOME', 'Pass it to the IoT team': 'RQ:SITE-ambiguous-logged', 'Use Callback Lookup →': 'CB-list', 'start a new call': 'HOME', '❓ Raise a query with the IoT team': 'TONIGHT-query', 'Cancel': 'TONIGHT', 'Send query': 'TONIGHT', '✕': 'TONIGHT' };
 function $(s, r) { return (r || document).querySelector(s); }
 function esc(s) { return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
 function toast(t) { var el = $('#toasts'); el.innerHTML = '<div class="toast">' + t + '</div>'; clearTimeout(toast._t); toast._t = setTimeout(function () { el.innerHTML = ''; }, 2600); }
 function groupNodes(g) { return GR[g] || []; }
-function callerLine() { return '<div class="callerline" data-testid="caller-line">👤 <b>Priya Shah</b> · duty manager · 07700 900123<a data-to="CD-ws">Change</a></div>'; }
+// D16: the permanent caller banner (display only; state lives in S.caller, in memory, for the call)
+var SITEB = 'The Wheatsheaf <span class="mono">7412</span>';
+function bannerHtml() {
+  var c = S.caller || {}, n = (c.name || '').trim(), ro = (c.role || '').trim(), p = (c.phone || '').trim(), who, state, act;
+  var role = ro ? '<span class="cb-role"> · ' + esc(ro) + '</span>' : '';
+  if (n && p) { who = '<b>' + esc(n) + '</b>' + role + ' · <span class="mono">' + esc(p) + '</span>'; state = 'full'; act = 'Change'; }
+  else if (n) { who = '<b>' + esc(n) + '</b>' + role + ' · <span class="cb-quiet">no number taken</span>'; state = 'partial'; act = 'Add details'; }
+  else if (p) { who = '<span class="mono">' + esc(p) + '</span>' + role + ' · <span class="cb-quiet">no name taken</span>'; state = 'partial'; act = 'Add details'; }
+  else if (ro) { who = esc(ro) + ' · <span class="cb-quiet">no name or number taken</span>'; state = 'partial'; act = 'Add details'; }
+  else { who = '<span class="cb-quiet">No contact details taken' + (c.declined ? ' (the customer declined)' : '') + '</span>'; state = 'none'; act = 'Add details'; }
+  return '<div class="callbanner" data-testid="caller-banner" data-state="' + state + '" role="region" aria-label="Call in progress"><span class="cb-ico" aria-hidden="true">📞</span><span class="cb-who">' + who + '</span><span class="cb-site"><span class="cb-quiet">Call in progress ·</span> ' + SITEB + '</span><button class="btn link cb-add" data-testid="cb-add" data-to="CD-add">' + act + '</button></div>';
+}
+function readCaller() {
+  var g = function (id) { var el = document.getElementById(id); return el ? el.value : null; };
+  var n = g('cd-name'), ro = g('cd-role'), p = g('cd-phone'); if (n === null && ro === null && p === null) return;
+  var any = ((n || '') + (ro || '') + (p || '')).trim() !== '';
+  S.caller = { name: n || '', role: ro || '', phone: p || '', declined: !any && !!(S.caller && S.caller.declined) };
+}
+function act(el) {
+  var a = el.getAttribute('data-act');
+  if (a === 'pick-site') { readCaller(); go('SITE-confirm'); }
+  else if (a === 'decline') { readCaller(); S.caller.declined = !S.caller.declined; el.textContent = S.caller.declined ? '✓ Recorded: the customer won\'t give details (press again to undo)' : 'The customer won\'t give these'; }
+  else if (a === 'save-details') { readCaller(); var any = ((S.caller.name || '') + (S.caller.role || '') + (S.caller.phone || '')).trim() !== ''; if (any) S.caller.declined = false; go(S.addFrom || 'WORKSPACE'); var sr = $('#srlive'); if (sr) sr.textContent = 'Customer details saved. The call banner is updated.'; }
+  else if (a === 'cancel-add') go(S.addFrom || 'WORKSPACE');
+}
 function go(id, from) {
   var n = D[id]; if (!n) { toast('That screen is not in this prototype.'); return; }
-  S.id = id; if (n.k === 'flow' || id === 'WORKSPACE') S.last = id === 'WORKSPACE' ? 'WORKSPACE' : S.last;
-  if (n.cust) S.cust = true;
+  var prevId = S.id; S.id = id; if (n.k === 'flow' || id === 'WORKSPACE') S.last = id === 'WORKSPACE' ? 'WORKSPACE' : S.last;
+  if (id === 'CD-add' && prevId && prevId !== 'CD-add') S.addFrom = prevId;
   draw(); window.scrollTo(0, 0);
 }
 function stage(n) {
-  if (n.k === 'page') return n.h;
+  if (n.k === 'page') return n.ic ? n.h.replace(/(<div class="wsgrid">\s*<div>)/, function (m) { return m + bannerHtml(); }) : n.h;
   var f = FR[n.fr] || FR[Object.keys(FR)[0]];
-  var left = (HEAD[n.fr] || '') + (n.p1 ? PB[n.p1] || '' : '') + (S.cust && !n.nocust ? callerLine() : '') + n.h;
+  var left = (n.ic ? bannerHtml() : '') + (HEAD[n.fr] || '') + (n.p1 ? PB[n.p1] || '' : '') + n.h;
   return f.pre + '<div>' + left + '</div><div>' + (RT[n.r] || '') + '</div>' + f.post;
 }
+function id0() { return S.id; }
 function draw() {
   var n = D[S.id];
   var gsel = $('#gsel'), ssel = $('#ssel');
@@ -37,6 +62,7 @@ function draw() {
       (n.d || []).map(function (x) { return '\n' + x + ': ' + esc(DL[x] ? DL[x].title + '. ' + DL[x].what : ''); }).join('') + '</div>';
   }
   $('#diffpanel').innerHTML = panel;
+  if (id0() === 'CD-add') { var c = S.caller || {}; ['name', 'role', 'phone'].forEach(function (k) { var el = document.getElementById('cd-' + k); if (el) el.value = c[k] || ''; }); }
   protoH();
   var sr = $('#sres'); if (sr && S.id !== 'SEARCH-none') sr.innerHTML = '';
 }
@@ -48,7 +74,7 @@ function startOf(g) { return (groupNodes(g) || [])[0]; }
 function togProto() { var p = $('#proto'); p.classList.toggle('min'); $('#ptog').textContent = p.classList.contains('min') ? 'Show controls' : 'Hide'; protoH(); }
 function protoH() { document.documentElement.style.setProperty('--proto-h', $('#proto').offsetHeight + 'px'); }
 function resolve(to, btn) {
-  if (to === '@end') { S.cust = false; return 'HOME'; }
+  if (to === '@end') { S.caller = { name: '', role: '', phone: '', declined: false }; return 'HOME'; }
   if (to === '@another') return 'WORKSPACE';
   if (to === '@cancel') return 'WORKSPACE';
   if (to === '@back') return D[S.id].back || (S.id.indexOf('CTL:') === 0 ? (S.id.indexOf('switch') > 0 ? 'L6961~1' : 'S6832-cold~3') : 'WORKSPACE');
@@ -58,6 +84,7 @@ function resolve(to, btn) {
 }
 document.addEventListener('click', function (e) {
   if (e.target.closest('#proto')) return;
+  var actEl = e.target.closest('[data-act]'); if (actEl) { e.preventDefault(); act(actEl); return; }
   var a = e.target.closest('a');
   if (a) {
     var href = a.getAttribute('href') || '';
@@ -95,7 +122,7 @@ document.addEventListener('click', function (e) {
 document.addEventListener('input', function (e) {
   if (e.target && e.target.getAttribute && e.target.getAttribute('data-search')) {
     var v = e.target.value.trim().toLowerCase(), r = $('#sres');
-    r.innerHTML = (v.length >= 3 && ('7412'.indexOf(v) === 0 || 'the wheatsheaf'.indexOf(v) >= 0 || v.indexOf('wheat') >= 0)) ? '<div class="stepdone" style="cursor:pointer;margin-top:6px" data-to="SITE-confirm"><b>The Wheatsheaf</b> <span class="mono">7412</span> · Greene King · Bury St Edmunds</div>' : (v.length >= 3 ? '<div class="stepdone" style="cursor:pointer;margin-top:6px" data-to="SEARCH-none">No site matches "' + esc(e.target.value) + '"</div>' : '');
+    r.innerHTML = (v.length >= 3 && ('7412'.indexOf(v) === 0 || 'the wheatsheaf'.indexOf(v) >= 0 || v.indexOf('wheat') >= 0)) ? '<div class="stepdone" style="cursor:pointer;margin-top:6px" data-act="pick-site"><b>The Wheatsheaf</b> <span class="mono">7412</span> · Greene King · Bury St Edmunds</div>' : (v.length >= 3 ? '<div class="stepdone" style="cursor:pointer;margin-top:6px" data-to="SEARCH-none">No site matches "' + esc(e.target.value) + '"</div>' : '');
   }
 });
 // D13: the P1 button stays disabled until the agent's comment has real content (trimmed, at least 10 characters)
@@ -114,6 +141,7 @@ document.addEventListener('input', function (e) {
   $('#gsel').addEventListener('change', function () { fillScreens(); go(startOf(this.value)); });
   $('#ssel').addEventListener('change', function () { go(this.value); });
   $('#showdiff').addEventListener('change', function () { S.diff = this.checked; draw(); });
+  $('#bsel').addEventListener('change', function () { var v = this.value; S.caller = v === 'full' ? { name: 'Priya Shah', role: 'duty manager', phone: '07700 900123', declined: false } : v === 'name' ? { name: 'Priya Shah', role: '', phone: '', declined: false } : v === 'number' ? { name: '', role: '', phone: '07700 900123', declined: false } : v === 'declined' ? { name: '', role: '', phone: '', declined: true } : { name: '', role: '', phone: '', declined: false }; draw(); });
   $('#simfail').addEventListener('change', function () { S.sim = this.checked; S.failed = false; });
   $('#gstart').addEventListener('click', function () { go(startOf($('#gsel').value)); });
   window.addEventListener('resize', protoH);

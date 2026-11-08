@@ -1,10 +1,10 @@
 {
- "screens": 402,
+ "screens": 403,
  "identical": 83,
  "explained": 134,
- "isNew": 185,
+ "isNew": 186,
  "unexplained": 0,
- "clicks": 3431,
+ "clicks": 3811,
  "dead": [],
  "navDead": [],
  "errors": [],
@@ -170,6 +170,7 @@
   "BPdone-off",
   "SITE-ambiguous",
   "WS-offline",
+  "HOME-old",
   "K-banner",
   "CB-empty",
   "TONIGHT-query",
@@ -278,6 +279,124 @@
   "p1Checked": 45,
   "p1Bad": [],
   "clickEmptyStaysOn": true
+ },
+ "d16": {
+  "startScreen": {
+   "whos": true,
+   "nameField": true,
+   "phoneField": true,
+   "roleField": true,
+   "search": true,
+   "optional": true,
+   "banner": false,
+   "bootId": "HOME"
+  },
+  "inCall": 388,
+  "noBanner": [],
+  "bannerBad": [],
+  "stateRows": {
+   "full": "388 of 388",
+   "name": "388 of 388",
+   "number": "388 of 388",
+   "none": "388 of 388",
+   "declined": "388 of 388"
+  },
+  "outsideWithBanner": [],
+  "flowPath": [
+   [
+    "full",
+    {
+     "afterPick": "SITE-confirm",
+     "seq": [
+      "WORKSPACE",
+      "K-what",
+      "K8888~1"
+     ],
+     "states": [
+      "full",
+      "full",
+      "full"
+     ],
+     "ok": true
+    }
+   ],
+   [
+    "name only",
+    {
+     "afterPick": "SITE-confirm",
+     "seq": [
+      "WORKSPACE",
+      "K-what",
+      "K8888~1"
+     ],
+     "states": [
+      "partial",
+      "partial",
+      "partial"
+     ],
+     "ok": true
+    }
+   ],
+   [
+    "no details (proceed without)",
+    {
+     "afterPick": "SITE-confirm",
+     "seq": [
+      "WORKSPACE",
+      "K-what",
+      "K8888~1"
+     ],
+     "states": [
+      "none",
+      "none",
+      "none"
+     ],
+     "ok": true
+    }
+   ],
+   [
+    "declined",
+    {
+     "afterPick": "SITE-confirm",
+     "seq": [
+      "WORKSPACE",
+      "K-what",
+      "K8888~1"
+     ],
+     "states": [
+      "none",
+      "none",
+      "none"
+     ],
+     "ok": true
+    }
+   ]
+  ],
+  "addDetails": {
+   "before": "none",
+   "onAdd": "CD-add",
+   "back1": {
+    "id": "K8888~2",
+    "st": "partial",
+    "live": "Customer details saved. The call banner is updated."
+   },
+   "back2": {
+    "id": "K8888~2",
+    "st": "full",
+    "t": "📞 Priya Shah · 07700 900123 Call in progress · The Wheatsheaf 7412 Change"
+   },
+   "ok": true
+  },
+  "phone": {
+   "bannerHeight": 36,
+   "sticky": true,
+   "sayTopWith": 796,
+   "sayTopWithout": 750,
+   "pushedBy": 46,
+   "prototypeBarHeight": 210,
+   "viewport": 780,
+   "ok": true
+  }
  },
  "rows": [
   {
@@ -2615,13 +2734,6 @@
    "items": []
   },
   {
-   "id": "HOME",
-   "g": "PAGES",
-   "src": "view:home",
-   "status": "identical",
-   "items": []
-  },
-  {
    "id": "SEARCH-none",
    "g": "PAGES",
    "src": "view:search-none",
@@ -2659,27 +2771,42 @@
    ]
   },
   {
-   "id": "CD-ws",
-   "g": "CD",
+   "id": "HOME-old",
+   "g": "PAGES",
+   "src": "view:home",
+   "status": "identical",
+   "items": []
+  },
+  {
+   "id": "HOME",
+   "g": "PAGES",
    "status": "new",
    "items": [
-    "R8"
+    "R16"
    ]
   },
   {
-   "id": "CD-saved",
+   "id": "CD-partial",
    "g": "CD",
    "status": "new",
    "items": [
-    "R8"
+    "R16"
    ]
   },
   {
-   "id": "CD-declined",
+   "id": "CD-results",
    "g": "CD",
    "status": "new",
    "items": [
-    "R8"
+    "R16"
+   ]
+  },
+  {
+   "id": "CD-add",
+   "g": "CD",
+   "status": "new",
+   "items": [
+    "R16"
    ]
   },
   {

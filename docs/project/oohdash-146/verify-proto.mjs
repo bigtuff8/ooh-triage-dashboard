@@ -13,13 +13,13 @@ const meta = JSON.parse(fs.readFileSync(NODES, 'utf8'));
 const PK = JSON.parse(fs.readFileSync(PACKED, 'utf8'));
 const SITEOF = {};
 for (const [root, f] of Object.entries(PK.frames)) { const m = /<span class="ctx">([^<]*?) · <span class="mono">(\d+)<\/span>/.exec(f.pre); SITEOF[root] = m ? { name: m[1], no: m[2] } : null; }
-const NOTE = new Set(['N1', 'R11']);
+const NOTE = new Set(['N1', 'R11', 'R17']);
 const SITE = { name: 'The Wheatsheaf', no: '7412' };
 function normText(t, root) {
   const so = SITEOF[root];
   if (so) { t = t.split(so.name).join(SITE.name); t = t.replace(new RegExp('(?<![0-9])' + so.no + '(?![0-9])', 'g'), SITE.no); }
   t = t.replace(/\b4[5-9]\d{3}\b/g, '48213').split('Test Handler').join('Sam Okafor').split('Greene King · Test Street, Test Town').join('Greene King · 14 Mill Lane, Bury St Edmunds');
-  t = t.split('v1.6.6 · fixture data').join('Prototype · OOHDASH-146 rev 4.2 · live v1.6.6 screens');
+  t = t.split('v1.6.6 · fixture data').join('Prototype · OOHDASH-146 rev 4.3 · live v1.6.6 screens');
   t = t.replace(/^TH$/gm, 'SO').replace(/Greene King · [^\n]*/g, 'Greene King · 14 Mill Lane, Bury St Edmunds').replace(/^🔁 2 calls this month$/gm, '');
   return t;
 }
@@ -39,7 +39,7 @@ const idsAll = meta.nodes.map(n => n.id);
 const protoText = {};
 for (const id of idsAll) {
   await page.evaluate(i => go(i), id);
-  protoText[id] = await page.evaluate(() => { const f = document.querySelector('[data-testid="flow-panel"]'); const m = document.getElementById('modalroot'); return f ? f.innerText : (document.getElementById('stage').innerText + (m ? m.innerText : '')); });
+  protoText[id] = await page.evaluate(() => { document.querySelectorAll('[data-testid="caller-banner"]').forEach(x => x.remove()); const f = document.querySelector('[data-testid="flow-panel"]'); const m = document.getElementById('modalroot'); return f ? f.innerText : (document.getElementById('stage').innerText + (m ? m.innerText : '')); });
 }
 // ---- diff
 const rows = []; let unexplained = 0, identical = 0, explained = 0, isNew = 0;
@@ -82,7 +82,7 @@ for (const id of idsAll) {
     if (info.after && info.after !== info.before) reach.add(info.after);
     if (info.after === info.before && !info.toast) {
       // allowed: toggles inside forms, notes, fields
-      const ok = await page.evaluate(k => { const els = [...document.querySelectorAll('#stage button, #stage [data-to], #stage .tile, #modalroot button, #modalroot [data-to]')]; const el = els[k]; return !el || !!el.closest('.formrow') || !!el.closest('.notes-group') || el.tagName === 'A' || /^Raise the P1$|^Try again$/.test((el.textContent || '').trim()); }, k);
+      const ok = await page.evaluate(k => { const els = [...document.querySelectorAll('#stage button, #stage [data-to], #stage .tile, #modalroot button, #modalroot [data-to]')]; const el = els[k]; return !el || !!el.closest('.formrow') || !!el.closest('.notes-group') || el.tagName === 'A' || el.hasAttribute('data-act') || /^Raise the P1$|^Try again$/.test((el.textContent || '').trim()); }, k);
       if (!ok) dead.push(id + ' :: ' + info.lab);
     }
     if (info.toast && /not part of this change|That screen is not in this prototype/.test(await page.evaluate(() => document.getElementById('toasts').innerText))) navDead.push(id + ' :: ' + info.lab);
@@ -155,6 +155,59 @@ await page.evaluate(() => go('SH:p1fail'));
 d13.p1failCheck = await page.evaluate(() => { const ta = document.querySelector('[data-p1c]'), b = document.querySelector('[data-testid="record-outcome"]'); const set = x => { ta.value = x; ta.dispatchEvent(new Event('input', { bubbles: true })); return b.disabled; }; const o = { initialEnabled: !b.disabled }; o.cleared = set(''); o.short = set('abc'); o.typed = set('Fryers off during Sunday lunch'); return o; });
 d13.p1Checked = p1cases.length; d13.p1Bad = p1bad; d13.clickEmptyStaysOn = clickEmpty === 'K8888~30';
 
+
+// ---- D15 / D16 checks: the start screen and the caller banner
+const d16 = { startScreen: null, inCall: 0, noBanner: [], bannerBad: [], stateRows: {}, outsideWithBanner: [], flowPath: [], addDetails: [], phone: null };
+const ICMAP = await page.evaluate(() => Object.fromEntries(Object.keys(D).map(k => [k, !!D[k].ic])));
+d16.startScreen = await page.evaluate(() => { go('HOME'); const t = document.getElementById('stage').innerText; return { whos: /Who's calling\?/.test(t), nameField: !!document.getElementById('cd-name'), phoneField: !!document.getElementById('cd-phone'), roleField: !!document.getElementById('cd-role'), search: !!document.querySelector('[data-testid="site-search"]'), optional: /optional/i.test(t), banner: !!document.querySelector('[data-testid="caller-banner"]'), bootId: S.id }; });
+const STATES = { full: v => /Priya Shah/.test(v.t) && /07700 900123/.test(v.t) && /duty manager/.test(v.t) && v.s === 'full' && /The Wheatsheaf/.test(v.t), name: v => /Priya Shah/.test(v.t) && /no number taken/.test(v.t) && !/07700/.test(v.t) && v.s === 'partial', number: v => /07700 900123/.test(v.t) && /no name taken/.test(v.t) && !/Priya/.test(v.t) && v.s === 'partial', none: v => /No contact details taken/.test(v.t) && v.s === 'none' && /Add details/.test(v.t) && /The Wheatsheaf/.test(v.t), declined: v => /No contact details taken \(the customer declined\)/.test(v.t) && v.s === 'none' };
+for (const [st, ok] of Object.entries(STATES)) {
+  await page.selectOption('#bsel', st);
+  let good = 0, n = 0;
+  for (const id of idsAll) {
+    await page.evaluate(i => go(i), id);
+    const r = await page.evaluate(() => { const b = document.querySelector('[data-testid="caller-banner"]'); return b ? { t: b.innerText.replace(/\s+/g, ' '), s: b.getAttribute('data-state'), role: b.getAttribute('role') } : null; });
+    if (ICMAP[id]) { n++; if (!r) d16.noBanner.push(st + ':' + id); else if (!ok(r) || r.role !== 'region') d16.bannerBad.push(st + ':' + id + ' ' + JSON.stringify(r)); else good++; }
+    else if (r) d16.outsideWithBanner.push(st + ':' + id);
+  }
+  d16.stateRows[st] = good + ' of ' + n; d16.inCall = n;
+}
+await page.selectOption('#bsel', 'full');
+// a full pass through the start screen, then a kitchen flow, details added in the middle
+const walk = async (fill, expectState) => {
+  await page.evaluate(() => { S.caller = { name: '', role: '', phone: '', declined: false }; go('HOME'); });
+  if (fill.name) await page.fill('#cd-name', fill.name); if (fill.role) await page.fill('#cd-role', fill.role); if (fill.phone) await page.fill('#cd-phone', fill.phone);
+  if (fill.decline) await page.click('[data-act="decline"]');
+  await page.fill('#sq', 'wheat'); await page.click('[data-act="pick-site"]');
+  const afterPick = await page.evaluate(() => S.id);
+  await page.click('[data-testid="confirm-site"], button:has-text("This is the right site")');
+  const seq = [await page.evaluate(() => S.id)];
+  await page.click('[data-testid="tile-kitchen"]'); seq.push(await page.evaluate(() => S.id));
+  await page.click('button:has-text("It\'s not working")'); seq.push(await page.evaluate(() => S.id));
+  const states = [];
+  for (const id of seq) { await page.evaluate(i => go(i), id); states.push(await page.evaluate(() => { const b = document.querySelector('[data-testid="caller-banner"]'); return b ? b.getAttribute('data-state') : null; })); }
+  return { afterPick, seq, states, ok: afterPick === 'SITE-confirm' && seq[0] === 'WORKSPACE' && states.every(x => x === expectState) };
+};
+d16.flowPath.push(['full', await walk({ name: 'Priya Shah', role: 'duty manager', phone: '07700 900123' }, 'full')]);
+d16.flowPath.push(['name only', await walk({ name: 'Priya Shah' }, 'partial')]);
+d16.flowPath.push(['no details (proceed without)', await walk({}, 'none')]);
+d16.flowPath.push(['declined', await walk({ decline: true }, 'none')]);
+// add details mid-call from the banner (none -> name only -> full), on a kitchen flow screen, returns to the same screen
+await page.evaluate(() => { S.caller = { name: '', role: '', phone: '', declined: false }; go('K8888~2'); });
+const before = await page.evaluate(() => document.querySelector('[data-testid="caller-banner"]').getAttribute('data-state'));
+await page.click('[data-testid="cb-add"]'); const onAdd = await page.evaluate(() => S.id);
+await page.fill('#cd-name', 'Priya Shah'); await page.click('[data-act="save-details"]');
+const back1 = await page.evaluate(() => ({ id: S.id, st: document.querySelector('[data-testid="caller-banner"]').getAttribute('data-state'), live: document.getElementById('srlive').textContent }));
+await page.click('[data-testid="cb-add"]'); await page.fill('#cd-phone', '07700 900123'); await page.click('[data-act="save-details"]');
+const back2 = await page.evaluate(() => ({ id: S.id, st: document.querySelector('[data-testid="caller-banner"]').getAttribute('data-state'), t: document.querySelector('[data-testid="caller-banner"]').innerText.replace(/\s+/g, ' ') }));
+d16.addDetails = { before, onAdd, back1, back2, ok: before === 'none' && onAdd === 'CD-add' && back1.id === 'K8888~2' && back1.st === 'partial' && /saved/i.test(back1.live) && back2.id === 'K8888~2' && back2.st === 'full' && /07700 900123/.test(back2.t) };
+// phone width: compact, one line, sticky, does not push the say box off the screen
+await page.setViewportSize({ width: 390, height: 780 });
+await page.selectOption('#bsel', 'full'); await page.evaluate(() => go('K8888~2'));
+d16.phone = await page.evaluate(() => { const b = document.querySelector('[data-testid="caller-banner"]'), sb = document.querySelector('[data-testid="say-block"]'); const br = b.getBoundingClientRect(), cs = getComputedStyle(b); const withTop = sb ? Math.round(sb.getBoundingClientRect().top) : null; b.style.display = 'none'; const withoutTop = sb ? Math.round(sb.getBoundingClientRect().top) : null; b.style.display = ''; const chrome = document.getElementById('proto').offsetHeight; return { bannerHeight: Math.round(br.height), sticky: cs.position === 'sticky', sayTopWith: withTop, sayTopWithout: withoutTop, pushedBy: withTop - withoutTop, prototypeBarHeight: chrome, viewport: innerHeight }; });
+d16.phone.ok = d16.phone.bannerHeight <= 44 && d16.phone.sticky;
+await page.setViewportSize({ width: 1280, height: 900 });
+
 // reachability from HOME by clicking
 const adj = {}; // computed from the in-page data
 const D = await page.evaluate(() => { const o = {}; Object.keys(D).forEach(k => { const n = D[k]; const set = new Set(); (n.e || []).forEach(x => x && set.add(x)); const re = /data-to="([^"]+)"/g; let m; [n.h, n.m].filter(Boolean).forEach(h => { re.lastIndex = 0; while ((m = re.exec(h))) set.add(m[1]); }); o[k] = [...set]; }); return o; });
@@ -162,7 +215,7 @@ const TILE = await page.evaluate(() => TILE);
 const seen = new Set(['HOME']); const q = ['HOME', 'WORKSPACE'];
 const resolveTo = t => t === '@end' ? 'HOME' : t === '@another' || t === '@cancel' || t === '@back' ? 'WORKSPACE' : /^TILE:/.test(t) ? TILE[t.slice(5)] : t;
 // seed: HOME -> SITE-confirm via search, -> CD-ws -> WORKSPACE
-['SITE-confirm', 'CD-ws', 'CD-saved', 'CD-declined', 'SEARCH-none', 'CB-list', 'TONIGHT'].forEach(x => q.push(x));
+['SITE-confirm', 'CD-partial', 'CD-results', 'CD-add', 'SEARCH-none', 'CB-list', 'TONIGHT'].forEach(x => q.push(x));
 while (q.length) { const x = q.shift(); if (seen.has(x) && x !== 'HOME') continue; seen.add(x); (D[x] || []).forEach(t => { const r = resolveTo(t); if (r && !seen.has(r)) q.push(r); }); }
 // live nodes' button targets are in e[]; dead = no edge
 const unreachable = idsAll.filter(i => !seen.has(i));
@@ -181,16 +234,18 @@ md += '- Live screens captured but not shown in the prototype: ' + notShown + ' 
 md += '- Click test: ' + clicks + ' clicks on ' + idsAll.length + ' screens; dead buttons: ' + dead.length + '; buttons that lead to a missing screen: ' + navDead.length + '; JS errors: ' + errors.length + '.\n\n';
 md += '## D13 (R14) checks\n\n- Screens that show the exact question: ' + d13.questionScreens + ' (exact text on all but: ' + (d13.askBad.join(', ') || 'none') + ').\n- Ticket screens (not P1): ' + d13.ticketScreens + '; each is either reached only from a risk question (' + d13.gated + ') or exempt because the problem was resolved on the call or the customer declined (' + d13.exempt + '); ungated: ' + (d13.ungated.join('; ') || 'none') + '.\n- P1 confirm screens: ' + d13.confirms + '; each reached only from a risk question; exceptions: ' + (d13.confirmUngated.join('; ') || 'none') + '.\n- P1 button disabled until the comment has real content: checked on ' + d13.p1Checked + ' confirm screens (empty, spaces only, 9 characters, cleared, ten characters padded with spaces stay disabled; real content enables); failures: ' + (d13.p1Bad.join('; ') || 'none') + '; clicking it with an empty comment stays on the confirm screen: ' + d13.clickEmptyStaysOn + '.\n\n';
 md += '- D14 urgency: ' + d13.urg.question + ' "when is it needed" screens (chip mapping wrong on: ' + (d13.urg.chipBad.join('; ') || 'none') + '); ' + d13.urg.urgent + ' urgent banners; ' + d13.urg.notUrgent + ' not-urgent banners; a not-urgent screen reaches a P1: ' + (d13.urg.unReachesP1.join('; ') || 'never') + '; an urgent screen with no P1 confirm ahead: ' + (d13.urg.uuNoConfirm.join('; ') || 'none') + '.' + String.fromCharCode(10) + '- Automatic P1 exceptions: P1 screens with no confirm step ahead of them: ' + d13.urg.auto.join(', ') + ' (only K-auto-p1 expected; others: ' + (d13.urg.p1Orphans.join(', ') || 'none') + '); K-auto-p1 reached only from the "cannot make the change" screens: ' + (d13.urg.autoBad.length ? 'NO, missing ' + d13.urg.autoBad.join(',') : 'yes') + '.' + String.fromCharCode(10) + '- The retry confirm screen (SH:p1fail, pre-filled): ' + JSON.stringify(d13.p1failCheck) + '.' + String.fromCharCode(10) + String.fromCharCode(10);
+md += '## D15 / D16 checks' + String.fromCharCode(10) + String.fromCharCode(10) + '- Start screen (HOME): ' + JSON.stringify(d16.startScreen) + '.' + String.fromCharCode(10) + '- Caller banner on every in-call screen (' + d16.inCall + ' screens) in each state: ' + JSON.stringify(d16.stateRows) + '; missing: ' + (d16.noBanner.length || 'none') + '; wrong text or role: ' + (d16.bannerBad.length || 'none') + '; shown on a screen that is not in a call: ' + (d16.outsideWithBanner.join(', ') || 'none') + '.' + String.fromCharCode(10) + '- Walk-throughs (start screen, site search, confirm, kitchen flow): ' + d16.flowPath.map(x => x[0] + ' ' + (x[1].ok ? 'ok' : 'FAILED ' + JSON.stringify(x[1]))).join('; ') + '.' + String.fromCharCode(10) + '- Add details mid-call (none, then name, then number): ' + (d16.addDetails.ok ? 'ok, banner updates and the agent returns to the same screen' : 'FAILED ' + JSON.stringify(d16.addDetails)) + '.' + String.fromCharCode(10) + '- Phone width (390): ' + JSON.stringify(d16.phone) + '.' + String.fromCharCode(10) + String.fromCharCode(10);
 md += '## Live screens not carried into the prototype (crawl states per scenario)\n\n' + Object.entries(replacedRoots).map(([r, c]) => r + ': ' + c).join(', ') + '. These are replaced by the changed screens named in the items below (HW-* by R3, O6832 by R2, CN7004 and CN-devoff by R5, the "Continue under Something else" dead ends in L-none, FAN-none, S-none by R4, the heating agent-button screens by R6), or are crawl states that only show a control window left open.\n\n';
 md += '## The "differs from live" list\n\n| Item | What changes |\n|---|---|\n' + Object.keys(dl).map(k => '| ' + k + ' | ' + dl[k].title + '. ' + dl[k].what.replace(/\|/g, '/') + ' |').join('\n') + '\n\n';
 md += '## Screens that differ from live, and why\n\n| Prototype screen | Live source | Items |\n|---|---|---|\n' + rows.filter(r => r.status !== 'identical').map(r => '| ' + r.id + ' | ' + (r.src || 'none (new)') + ' | ' + (r.items.join(', ') || 'UNEXPLAINED') + ' |').join('\n') + '\n\n';
 md += '## Line-by-line differences (each line is either only in live or only in the prototype)\n\n' + detail.map(x => '### ' + x.id + ' (live ' + x.src + '; items ' + (x.items.join(', ') || 'UNEXPLAINED') + ')\n\n' + x.d.map(l => (l[0] === '-' ? '- Live: ' : '- Prototype: ') + l.slice(2)).join('\n')).join('\n\n') + '\n';
 md += '\n## Identical screens\n\n' + rows.filter(r => r.status === 'identical').map(r => r.id).join(', ') + '\n';
 fs.writeFileSync(OUT + '.md', md);
-fs.writeFileSync(OUT + '.json', JSON.stringify({ screens: meta.nodes.length, identical, explained, isNew, unexplained, clicks, dead, navDead, errors, unreachable, p1sim: p1, d13, rows }, null, 1));
+fs.writeFileSync(OUT + '.json', JSON.stringify({ screens: meta.nodes.length, identical, explained, isNew, unexplained, clicks, dead, navDead, errors, unreachable, p1sim: p1, d13, d16, rows }, null, 1));
 console.log(JSON.stringify({ screens: meta.nodes.length, identical, explained, isNew, unexplained, notShown, clicks, dead: dead.length, navDead: navDead.length, errors: errors.length, unreachable: unreachable.length, p1sim: p1 }));
 if (dead.length) console.log('DEAD:', dead.slice(0, 30));
 if (navDead.length) console.log('NAVDEAD:', navDead.slice(0, 30));
 if (unreachable.length) console.log('UNREACHABLE:', unreachable.slice(0, 40));
 console.log('D13:', JSON.stringify(d13));
+console.log('D16:', JSON.stringify(d16));
 console.log('UNEXPLAINED:', rows.filter(r => r.status === 'UNEXPLAINED').map(r => r.id).slice(0, 40));
