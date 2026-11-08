@@ -532,7 +532,7 @@ export function buildOutcomeTranscript({ action, type, siteNo, siteName, detail,
 
 router.post('/outcomes', wrap(async (req, res) => {
     const op = req.session.operator;
-    const { type, siteNo, siteName, subject, detail, callerWords, OohCaptureClass, actionId, holdText, p1Summary, additionalNotes, appendToHoldId, holdIds, actions: actionLines, relatedToTicketId, knownSoFar, callId, issueKey, closeOnCreate, customerContact } = req.body;
+    const { type, siteNo, siteName, subject, detail, callerWords, OohCaptureClass, actionId, holdText, p1Summary, additionalNotes, appendToHoldId, holdIds, actions: actionLines, relatedToTicketId, knownSoFar, callId, issueKey, closeOnCreate, customerContact, p1Reason, p1Origin } = req.body;
     if (!type || !siteNo || !subject || !detail) {
         return res.status(400).json({ error: 'type, siteNo, subject and detail are required' });
     }
@@ -576,6 +576,15 @@ router.post('/outcomes', wrap(async (req, res) => {
 
     const isP1 = type === 'escalate-p1';
 
+    // B21: validate p1Reason for manual P1s (p1Origin !== 'automatic').
+    const p1Automatic = p1Origin === 'automatic';
+    if (isP1 && !p1Automatic) {
+        const normReason = zendesk.normaliseP1Reason(p1Reason);
+        if (!normReason) {
+            return res.status(400).json({ error: 'p1Reason required', message: 'A reason of at least 10 characters is required for a manual P1.' });
+        }
+    }
+
     // F001 — build the timestamped [TRG] transcript from the control action (if any) + context.
     const action = actionId ? control.getAction(actionId) : null;
     const outcomeTime = new Date().toISOString();
@@ -594,7 +603,10 @@ router.post('/outcomes', wrap(async (req, res) => {
         // OOHDASH-146 B10: customer contact on every ticket, never in P1 SMS, Tonight or audit log.
         customerContact: customerContact || null,
         // OOHDASH-159 rev 5: equipment Lighthouse doesn't control here → contact-history record created closed.
-        status: (!isP1 && (type === 'scope-only' || closeOnCreate)) ? 'solved' : undefined
+        status: (!isP1 && (type === 'scope-only' || closeOnCreate)) ? 'solved' : undefined,
+        // B21: p1Reason and p1Automatic for manual vs automatic P1s.
+        p1Reason: isP1 ? (p1Reason || null) : undefined,
+        p1Automatic: isP1 ? p1Automatic : undefined
     });
     // OOHDASH-159 rev 5 (E1): link the ticket to its issue so the call record is appended, not duplicated.
     if (callId) callRecord.recordProgress(callId, op.id, { issueKey, outcome: subject, ticketId: ticket.id, knownSoFar: sanitiseKnownSoFar(knownSoFar) });

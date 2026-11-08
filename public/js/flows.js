@@ -461,12 +461,16 @@ function finishOutcome(f, key, payload, renderCard, pre) {
     // Confirm step (OOHDASH-159 rev 4): optional script/info for this step, the ticket box, then the
     // warning directly above the button. A P1 gets the stronger warning and the only red button.
     // (The FLOW-BOX is injected by renderFlow outside this function so it stays live during the step)
-    const isP1 = payload.type === 'escalate-p1';
+    // B20: reason box for manual P1s; button disabled until reason is valid
+    const isAuto = !!(f.data.p1Origin === 'automatic');
+    const reasonOk = isAuto || p1ReasonValid(f.data.p1Reason);
+    const reasonBoxHtml = isAuto ? '' : p1ReasonBox(f);
     return `<div class="confirm-step" data-testid="confirm-step">
   ${pre || ''}
   ${ticketBox(payload.subject, payload.detail)}
+  ${reasonBoxHtml}
   ${p1WarnBox()}
-  <button class="btn danger" data-testid="record-outcome" style="margin-top:4px" onclick="submitPendingOutcome('${key}')">Raise the P1</button>
+  <button class="btn danger" data-testid="record-outcome" style="margin-top:4px" onclick="submitPendingOutcome('${key}')"${reasonOk ? '' : ' disabled aria-disabled="true"'}>Raise the P1</button>
  </div>`;
 }
 
@@ -494,6 +498,12 @@ window.submitPendingOutcome = function submitPendingOutcome(key, auto) {
         knownSoFar: knownSoFarLines(f), // OOHDASH-159 rev 4: written onto the ticket, never into the P1 text
         ...callFields(), // rev 5 (E1): link the ticket to the call record
         customerContact: callerContactFrom(state.caller), // OOHDASH-146 B10
+        // B20: p1Reason typed in confirm step; p1Summary cut to 80 chars; p1Origin for automatic P1s
+        ...(payload.type === 'escalate-p1' ? {
+            p1Reason: f.data.p1Reason || null,
+            p1Summary: p1SummaryFromReason(f.data.p1Reason) || payload.p1Summary || null,
+            p1Origin: f.data.p1Origin || null
+        } : {}),
         ...payload
     }).then(res => {
         notesDraftClear(); // OOHDASH-119: clear sessionStorage draft on success
@@ -545,6 +555,76 @@ function outcomeP1(f, key, { subject, detail, script, p1Summary, OohCaptureClass
             scriptText(script, res)), pre);
 }
 
+/* ------------------------ OOHDASH-146 D13: universal risk question (B19 / B20) --------------- */
+
+const RISK_ASK = 'Is there an immediate risk to trade or to anyone\'s health and safety?';
+const P1_REASON_BOX_MAX = 500;
+const P1_REASON_MIN_LEN = 10;
+
+/** True when text (trimmed, spaces collapsed) is at least 10 characters. */
+function p1ReasonValid(text) {
+    return String(text || '').replace(/\s+/g, ' ').trim().length >= P1_REASON_MIN_LEN;
+}
+
+/**
+ * Input handler for the P1 reason textarea: persists the value and enables / disables the
+ * "Raise the P1" button. Global so it can be called from the inline oninput attribute.
+ */
+function p1ReasonInput(value) {
+    const f = state.flow;
+    if (!f) return;
+    f.data.p1Reason = value;
+    const ok = p1ReasonValid(value);
+    const btn = document.querySelector('[data-testid="record-outcome"]');
+    if (btn) { btn.disabled = !ok; if (ok) btn.removeAttribute('aria-disabled'); else btn.setAttribute('aria-disabled', 'true'); }
+}
+
+/** Renders the mandatory "Why is this urgent?" comment box above p1WarnBox. */
+function p1ReasonBox(f) {
+    const val = esc(f.data.p1Reason || '');
+    return `<div class="formrow" style="margin-top:10px"><label for="p1-reason-input">Why is this urgent? (required, goes on the P1 ticket)</label>
+   <textarea id="p1-reason-input" data-testid="p1-reason" maxlength="${P1_REASON_BOX_MAX}" rows="2" oninput="p1ReasonInput(this.value)">${val}</textarea></div>`;
+}
+
+/** Cuts a P1 reason to at most 80 characters for the SMS summary. */
+function p1SummaryFromReason(text) {
+    const t = String(text || '').replace(/\s+/g, ' ').trim();
+    return t.length > 80 ? t.slice(0, 77) + '...' : t;
+}
+
+/**
+ * Onclick handler for the universal risk question chips. Sets f.data._riskAns and re-renders
+ * without advancing the stage, so the same call to riskQuestion delivers the Yes / No result.
+ */
+function riskAns(isYes) {
+    const f = state.flow;
+    if (!f) return;
+    f.data._riskAns = isYes ? 1 : 0;
+    render();
+}
+
+/**
+ * D13: the universal risk question. Shows the question with a grey "for you" note and Yes / No
+ * chips on first call; on re-render after the agent clicks, records the known-so-far line and
+ * delegates to the yes() or no() callback.
+ * @param {object} f - flow state
+ * @param {{yes: Function, no: Function}} callbacks - called when the customer answers
+ */
+function riskQuestion(f, { yes, no }) {
+    if (f.data._riskAns === undefined) {
+        const note = infoBox('<p>Trade means the site cannot serve customers or cannot open. Health and safety means anything that could hurt someone.</p><p>Yes goes to an urgent P1; No gives a next-working-day ticket.</p>');
+        return note + sayBox('', RISK_ASK) +
+            answers('<button class="chip" data-testid="risk-yes" onclick="riskAns(1)">Yes</button>' +
+                    '<button class="chip" data-testid="risk-no" onclick="riskAns(0)">No</button>');
+    }
+    if (f.data._riskAns) {
+        if (!f.data._riskLine) { doneLine('Immediate risk to trade or to anyone\'s health and safety: yes', 'customer'); f.data._riskLine = 1; }
+        return yes();
+    }
+    if (!f.data._riskLine) { doneLine('Immediate risk to trade or to anyone\'s health and safety: no', 'customer'); f.data._riskLine = 1; }
+    return no();
+}
+
 /* ------------------------ OOHDASH-134: P1 Escalation in "Something else" ------------------------ */
 
 const OTHER_P1_SUMMARY_MAX = 80;
@@ -564,50 +644,6 @@ function otherP1Summary(text) {
 function otherP1Reason(f) {
     const typed = String(f.data.qraw || '').trim();
     return typed || String(f.data.p1reason || '').trim();
-}
-
-/** Choice step after "Capture & escalate as described": P1 Escalation or Raise a Normal Priority ticket. */
-function otherP1Choice(f) {
-    const hasStage0Text = !!String(f.data.qraw || '').trim();
-    const blocked = !otherP1Reason(f);
-    const reasonBox = hasStage0Text ? '' : `<div class="formrow" style="margin-top:10px"><label for="op1reason">Reason for a P1 (required to escalate)</label>
-   <textarea id="op1reason" data-testid="other-p1-reason" rows="2" oninput="otherP1ReasonInput(this.value)">${esc(f.data.p1reason || '')}</textarea></div>
-   <p class="small p1-blocked-note" data-testid="other-p1-blocked-note"${blocked ? '' : ' hidden'}>Type the reason this is a P1 before escalating.</p>`;
-    return `<div class="stepq">How should this be raised?</div>${reasonBox}
-   <div class="chips">
-    <button class="chip p1" data-testid="other-p1" onclick="raiseOtherP1()"${blocked ? ' disabled aria-disabled="true"' : ''}>P1 Escalation</button>
-    <button class="chip" data-testid="other-normal" onclick="flowStep({path:'normal'})">Not urgent: pass it to the IoT team</button>
-   </div>
-   <div class="p1-explainer" data-testid="other-p1-explainer">
-    <p>A P1 is anything that is immediately health and safety or business trading affecting.</p>
-    <p>Please only use this option after you\'ve attempted to follow through one of the circumstance tiles.</p>
-    <p>P1 escalation will send a text to the escalation manager on the IoT Support team immediately upon submission.</p>
-   </div>`;
-}
-
-/** Inline reason box handler: keeps the value across re-renders and enables P1 only for a non-blank reason. */
-function otherP1ReasonInput(value) {
-    const f = state.flow;
-    if (!f) return;
-    f.data.p1reason = value;
-    const ok = !!otherP1Reason(f);
-    const btn = document.querySelector('[data-testid="other-p1"]');
-    if (btn) { btn.disabled = !ok; if (ok) btn.removeAttribute('aria-disabled'); else btn.setAttribute('aria-disabled', 'true'); }
-    const note = document.querySelector('[data-testid="other-p1-blocked-note"]');
-    if (note) note.hidden = ok;
-}
-
-/** P1 button: re-checks the reason guard (D4) so a blank reason can never be escalated. */
-function raiseOtherP1() {
-    const f = state.flow;
-    if (!f) return;
-    const reason = otherP1Reason(f);
-    if (!reason) {
-        const note = document.querySelector('[data-testid="other-p1-blocked-note"]');
-        if (note) note.hidden = false;
-        return;
-    }
-    flowStep({ path: 'p1', p1reason: reason });
 }
 
 function outcomeScope(f, key, { subject, evidence, script, pre }) {
@@ -2111,7 +2147,7 @@ const FLOWR = {
         const isAre = list => list.length === 1 ? 'is' : 'are';
         const itThem = list => list.length === 1 ? 'it' : 'them';
         const INTERLOCK = /fry|bain|gantr|super ?pass/i; // the guide: fryers and heated gantries / bain-marie
-        const SERVICE_ASK = 'is the kitchen needed for service right now, with food being served or breakfast on?';
+
         const OFF_VERDICTS = ['A', 'C', 'D', 'off-unknown'];
         function tFmt(t) { return t ? t.time : '?'; }
         function dayFmt(t) { if (!t) return ''; return t.dayText && t.dayText !== 'today' ? ` ${t.dayText}` : ''; }
@@ -2295,31 +2331,23 @@ const FLOWR = {
             if (f.data.ov === 'nopanel') doneLine('The customer can\'t find the PowerPause panel', 'customer');
             f.data._kFailLine = 1;
         }
-        if (f.data.crit === undefined) {
-            const lead = f.data.ov === 'on-insist' ? 'Thanks.' : f.data.ov === 'nopanel' ? 'No problem.' : 'Sorry it hasn\'t come on.';
-            return `<div data-testid="kitchen-service-question">${sayBox(lead, SERVICE_ASK)}
-   ${answers(`<button class="chip" data-testid="kitchen-critical" onclick="flowStep({crit:1})">Yes, it's needed now</button><button class="chip" data-testid="kitchen-notcritical" onclick="flowStep({crit:0})">No, it can wait</button>`)}</div>`;
-        }
         const tried = f.data.ov === 'fail' ? 'The manual override on the PowerPause panel didn\'t bring it on.'
             : f.data.ov === 'nopanel' ? 'The customer couldn\'t find the PowerPause panel to use the override.'
                 : 'Power reaches the equipment but the customer still thinks it\'s ours.';
-        if (f.data.crit) {
-            doneLine('Kitchen needed for service now: yes', 'customer');
-            return outcomeP1(f, 'crit', {
-                subject: 'Kitchen equipment off during service — P1',
-                detail: `Kitchen equipment off while the site is serving: ${namesText(S)}. ${tried} ${facts}`,
-                pre: sayBox(`Thanks. As you need the kitchen now and ${f.data.ov === 'nopanel' ? 'we can\'t use the override' : f.data.ov === 'on-insist' ? 'it still isn\'t working' : 'the override hasn\'t brought it on'}, I'm going to raise this as urgent with our on-call team.`) +
-                    infoBox(`${namesDyn(S)}: ${offline.length ? 'not connecting to us, so the on-call manager can\'t see or switch ' + itThem(S) + ' either.' : 'the on-call manager will call the site back.'}`),
-                script: res => 'That\'s raised as urgent, reference ' + dyn(res.ticket.id) + '. Someone from our on-call team will call you back shortly.',
-                p1Summary: 'Kitchen equipment off during service'
-            });
-        }
-        doneLine('Kitchen needed for service now: no, it can wait', 'customer');
-        return outcomeCaptured(f, 'ncrit', {
-            subject: 'Kitchen equipment off — not needed until later',
-            detail: `${namesText(S)} off; not needed for service until later. ${tried} ${facts}`,
-            script: res => 'Thanks. It\'s logged, reference ' + dyn(res.ticket.id) + '. Our IoT team picks it up the next working day and will be in touch.',
-            OohCaptureClass: 'kitchen-powerpause'
+        return riskQuestion(f, {
+            yes: () => outcomeP1(f, 'crit', {
+                subject: 'Kitchen equipment off — risk to trade or health and safety — P1',
+                detail: `Kitchen equipment off; immediate risk to trade or health and safety: ${namesText(S)}. ${tried} ${facts}`,
+                pre: sayBox("Thanks. As there's an immediate risk to trade or to anyone's health and safety, I'm going to raise this as urgent with our on-call team.") +
+                    infoBox(`${namesDyn(S)}: ${offline.length ? 'not connecting to us, so the on-call agent can\'t see or switch ' + itThem(S) + ' either.' : 'the on-call agent will call the site back.'}`),
+                script: res => 'That\'s raised as urgent, reference ' + dyn(res.ticket.id) + '. Someone from our on-call team will call you back shortly.'
+            }),
+            no: () => outcomeCaptured(f, 'ncrit', {
+                subject: 'Kitchen equipment off — no immediate risk',
+                detail: `${namesText(S)} off; no immediate risk to trade or health and safety. ${tried} ${facts}`,
+                script: res => 'Thanks. It\'s logged, reference ' + dyn(res.ticket.id) + '. Our IoT team picks it up the next working day and will be in touch.',
+                OohCaptureClass: 'kitchen-powerpause'
+            })
         });
     },
 
@@ -2357,12 +2385,19 @@ const FLOWR = {
                 });
             }
             doneLine('The lights are still off after the on-site switch', 'customer');
-            return outcomeP1(f, 'cap', {
-                subject: 'External lighting not working — P1',
-                detail: 'The manual override on the PowerPause panel did not bring the outside lights on; possible tripped supply or failed controller. Remote switching not available; needs immediate IoT/electrical follow-up.',
-                pre: sayBox('Thanks. As the lights are still off after the override, I\'m going to raise this as urgent with our on-call team.'),
-                script: res => 'That\'s raised as urgent, reference ' + dyn(res.ticket.id) + '. Someone from our on-call team will call you back shortly. If the dark frontage is a safety concern right now, your site\'s procedure for calling an electrician still applies.',
-                p1Summary: 'External lighting not responding'
+            return riskQuestion(f, {
+                yes: () => outcomeP1(f, 'cap', {
+                    subject: 'External lighting not working — risk to trade or health and safety — P1',
+                    detail: 'The manual override on the PowerPause panel did not bring the outside lights on; possible tripped supply or failed controller. Immediate risk to trade or health and safety. Remote switching not available; needs immediate IoT/electrical follow-up.',
+                    pre: sayBox("Thanks. As there's an immediate risk to trade or to anyone's health and safety, I'm going to raise this as urgent with our on-call team."),
+                    script: res => 'That\'s raised as urgent, reference ' + dyn(res.ticket.id) + '. Someone from our on-call team will call you back shortly. If the dark frontage is a safety concern right now, your site\'s procedure for calling an electrician still applies.'
+                }),
+                no: () => outcomeCaptured(f, 'capno', {
+                    subject: 'External lighting not working — no immediate risk',
+                    detail: 'The manual override on the PowerPause panel did not bring the outside lights on; possible tripped supply or failed controller. No immediate risk to trade or health and safety. IoT team to investigate next working day.',
+                    script: res => 'Thanks. It\'s logged, reference ' + dyn(res.ticket.id) + '. Our IoT team picks it up the next working day and will be in touch.',
+                    OohCaptureClass: 'lighting'
+                })
             });
         }
         return '';
@@ -2398,25 +2433,20 @@ const FLOWR = {
     fridge(ws, f) {
         if (f.stage === 0) {
             doneLine('Lighthouse watches fridge temperatures but doesn\'t control the fridges', 'check');
-            return infoBox('Lighthouse <b>monitors</b> fridge and freezer temperatures but doesn\'t control them, so a warm fridge is an appliance fault. There is no override for fridges.') + sayBox('', 'is stock at risk right now, for example a freezer warming up or a big temperature alarm?') +
-   answers(`<button class="chip" data-testid="fridge-risk" onclick="flowStep({risk:1})">Yes, stock is at risk</button><button class="chip" data-testid="fridge-query" onclick="flowStep({risk:0})">No, it's just a query</button>`);
-        }
-        if (f.stage === 1) {
-            if (f.data.risk) {
-                doneLine('Stock is at risk right now', 'customer');
-                return outcomeP1(f, 'risk', {
-                    subject: 'Refrigeration temperature alarm — stock at risk',
-                    detail: 'Customer reports refrigeration failure with stock at risk. Monitoring-only on Lighthouse; escalated for immediate advice + appliance callout guidance.',
-                    pre: sayBox('Thanks. As stock is at risk, I\'m going to raise this as urgent with our on-call team.'),
-                    script: res => 'That\'s raised as urgent, reference ' + dyn(res.ticket.id) + '. Someone from our on-call team will call you back shortly. The fridge itself isn\'t controlled by Lighthouse, so please also contact your service contractor.',
-                    p1Summary: 'Refrigeration failure — stock at risk'
+            return infoBox('Lighthouse <b>monitors</b> fridge and freezer temperatures but doesn\'t control them, so a warm fridge is an appliance fault. There is no override for fridges.') +
+                riskQuestion(f, {
+                    yes: () => outcomeP1(f, 'risk', {
+                        subject: 'Refrigeration alarm — risk to trade or health and safety — P1',
+                        detail: 'Customer reports refrigeration failure with immediate risk to trade or health and safety. Monitoring-only on Lighthouse; escalated for immediate advice + appliance callout guidance.',
+                        pre: sayBox("Thanks. As there's an immediate risk to trade or to anyone's health and safety, I'm going to raise this as urgent with our on-call team."),
+                        script: res => 'That\'s raised as urgent, reference ' + dyn(res.ticket.id) + '. Someone from our on-call team will call you back shortly. The fridge itself isn\'t controlled by Lighthouse, so please also contact your service contractor.'
+                    }),
+                    no: () => outcomeScope(f, 'q', {
+                        subject: 'Refrigeration query — monitored only',
+                        evidence: 'Lighthouse monitors refrigeration temperatures for alerting; the appliances themselves are maintained via the site\'s normal repair route.',
+                        script: res => 'Lighthouse keeps an eye on the temperatures but doesn\'t control the fridges, so for a faulty unit please contact your service contractor. I\'ve noted the call on your site\'s record, reference ' + dyn(res.ticket.id) + '.'
+                    })
                 });
-            }
-            return outcomeScope(f, 'q', {
-                subject: 'Refrigeration query — monitored only',
-                evidence: 'Lighthouse monitors refrigeration temperatures for alerting; the appliances themselves are maintained via the site\'s normal repair route.',
-                script: res => 'Lighthouse keeps an eye on the temperatures but doesn\'t control the fridges, so for a faulty unit please contact your service contractor. I\'ve noted the call on your site\'s record, reference ' + dyn(res.ticket.id) + '.'
-            });
         }
         return '';
     },
@@ -2534,7 +2564,7 @@ const FLOWR = {
 
     contractor(ws, f) {
         if (f.stage === 0) {
-            return `<div class="alert warn"><b>Contractor on site</b> calls are always treated as urgent — an engineer is standing there waiting.</div>
+            return `<div class="alert warn"><b>Contractor on site</b> — an engineer is waiting. Capture the details below, then the question determines how to raise this.</div>
    <div class="formrow"><label>Contractor / company</label><input id="cn" data-testid="contractor-name" placeholder="e.g. the attending engineer\'s name and company"></div>
    <div class="formrow"><label>What do they need?</label><input id="cw" data-testid="contractor-need" placeholder="e.g. needs BMS access to the heating"></div>
    <div class="chips"><button class="chip" data-testid="contractor-next" onclick="flowStep({cn:document.getElementById('cn').value||'(name not given)',cw:document.getElementById('cw').value||'(not specified)'})">Continue</button></div>`;
@@ -2546,33 +2576,44 @@ const FLOWR = {
    ${answers(`<button class="chip" data-testid="contractor-pp-yes" onclick="flowStep({ppguidance:'yes'})">Yes, the override</button>
     <button class="chip" data-testid="contractor-pp-no" onclick="flowStep({ppguidance:'no'})">No, something else</button>`)}`;
         }
-        // No path: fall straight through to P1 outcome (unchanged behaviour)
+        // No path: B19 universal risk question then P1 or next-working-day ticket
         if (f.data.ppguidance === 'no') {
-            return outcomeP1(f, 'p1', {
-                subject: 'Contractor on site needs IoT support — P1',
-                detail: `Contractor ${f.data.cn} on site now: ${f.data.cw}. Escalated immediately.`,
-                pre: sayBox('As the engineer is on site now, I\'m going to raise this as urgent with our on-call team.'),
-                script: res => 'That\'s raised as urgent, reference ' + dyn(res.ticket.id) + '. Someone from our on-call team will call you back shortly. Please ask the engineer to hold on.',
-                p1Summary: `Contractor on site: ${f.data.cw}`
+            return riskQuestion(f, {
+                yes: () => outcomeP1(f, 'p1', {
+                    subject: 'Contractor on site — risk to trade or health and safety — P1',
+                    detail: `Contractor ${f.data.cn} on site now: ${f.data.cw}. Immediate risk to trade or health and safety. Escalated immediately.`,
+                    pre: sayBox("Thanks. As there's an immediate risk to trade or to anyone's health and safety, I'm going to raise this as urgent with our on-call team."),
+                    script: res => 'That\'s raised as urgent, reference ' + dyn(res.ticket.id) + '. Someone from our on-call team will call you back shortly. Please ask the engineer to hold on.'
+                }),
+                no: () => outcomeCaptured(f, 'p1no', {
+                    subject: 'Contractor on site — no immediate risk',
+                    detail: `Contractor ${f.data.cn} on site: ${f.data.cw}. No immediate risk to trade or health and safety. Logged for the IoT team.`,
+                    script: res => 'Thanks. It\'s logged, reference ' + dyn(res.ticket.id) + '. Our IoT team picks it up the next working day and will be in touch.',
+                    OohCaptureClass: 'general'
+                })
             });
         }
         // Yes path: site 6786 (Donkey Derby) exception
         const isDonkeyDerby = Number(ws.site.siteNo) === 6786;
         if (f.data.ppguidance === 'yes' && isDonkeyDerby) {
-            if (f.data.ppesc) {
-                return outcomeP1(f, 'ppesc', {
-                    subject: 'PowerPause override — Donkey Derby (site 6786) — IoT team escalation',
-                    detail: `Contractor ${f.data.cn} on site at Donkey Derby (6786). Local PowerPause override not available at this site. Escalated to IoT team.`,
-                    pre: sayBox('This site\'s override doesn\'t work, so I\'m going to raise this as urgent with our on-call team.'),
-                    script: res => 'That\'s raised as urgent, reference ' + dyn(res.ticket.id) + '. Someone from our on-call team will call you back shortly. The IoT team\'s direct line is 023 814 0228.',
-                    p1Summary: 'Contractor: PowerPause — Donkey Derby — IoT escalation',
-                    OohCaptureClass: 'kitchen-powerpause'
-                });
-            }
             if (!f.data._ddline) { doneLine('The override doesn\'t work at this site (Donkey Derby)', 'check'); f.data._ddline = 1; }
-            return `${infoBox('<b>Donkey Derby (site 6786): the override on site doesn\'t work here.</b> This site uses a different type of panel, so the override button does not apply. This is the one case where you go straight to a P1.')}
-  ${sayBox(`I\'m sorry, this site can\'t be overridden on site. I\'ll raise it as urgent so the IoT team contacts the site directly. Their direct line is <b>023 814 0228</b>, email <b>iot@airedale-group.co.uk</b>.`)}
-  <button class="btn primary" data-testid="contractor-pp-escalate" onclick="flowStep({ppesc:1})">Continue to the P1</button>`;
+            return infoBox('<b>Donkey Derby (site 6786): the override on site doesn\'t work here.</b> This site uses a different type of panel, so the override button does not apply.') +
+                sayBox(`I\'m sorry, this site can\'t be overridden on site. The IoT team\'s direct line is <b>023 814 0228</b>, email <b>iot@airedale-group.co.uk</b>.`) +
+                riskQuestion(f, {
+                    yes: () => outcomeP1(f, 'ppesc', {
+                        subject: 'Contractor on site (Donkey Derby), override unavailable — risk to trade or health and safety — P1',
+                        detail: `Contractor ${f.data.cn} on site at Donkey Derby (6786). Local PowerPause override not available at this site. Immediate risk to trade or health and safety. Escalated to IoT team.`,
+                        pre: sayBox("Thanks. As there's an immediate risk to trade or to anyone's health and safety, I'm going to raise this as urgent with our on-call team."),
+                        script: res => 'That\'s raised as urgent, reference ' + dyn(res.ticket.id) + '. Someone from our on-call team will call you back shortly. The IoT team\'s direct line is 023 814 0228.',
+                        OohCaptureClass: 'kitchen-powerpause'
+                    }),
+                    no: () => outcomeCaptured(f, 'ppescno', {
+                        subject: 'Contractor on site — no immediate risk',
+                        detail: `Contractor ${f.data.cn} on site at Donkey Derby (6786). Override unavailable; no immediate risk to trade or health and safety. Logged for the IoT team.`,
+                        script: res => 'Thanks. It\'s logged, reference ' + dyn(res.ticket.id) + '. Our IoT team picks it up the next working day and will be in touch.',
+                        OohCaptureClass: 'kitchen-powerpause'
+                    })
+                });
         }
         // Yes path: standard sites — device-type picker then override instruction
         if (f.data.ppguidance === 'yes' && !f.data.pptype) {
@@ -2600,25 +2641,40 @@ const FLOWR = {
                 OohCaptureClass: 'kitchen-powerpause'
             });
         }
-        // The override didn't work → THEN the P1.
+        // The override didn't work → risk question then P1 or next-working-day ticket.
         if (f.data.ppdone === 'fail') {
             doneLine('The engineer used the override and it didn\'t come on', 'customer');
-            return outcomeP1(f, 'ppfail', {
-                subject: 'PowerPause override failed — contractor on site — P1',
-                detail: `Contractor ${f.data.cn} on site used the PowerPause override (${f.data.pptype} device) and the equipment did not come on. Needs immediate IoT action.`,
-                pre: sayBox('Thanks. As the override hasn\'t brought it on, I\'m going to raise this as urgent with our on-call team.'),
-                script: res => 'That\'s raised as urgent, reference ' + dyn(res.ticket.id) + '. Someone from our on-call team will call you back shortly. Please ask the engineer to hold on.',
-                p1Summary: `Contractor on site: PowerPause override failed (${f.data.pptype})`,
-                OohCaptureClass: 'kitchen-powerpause'
+            return riskQuestion(f, {
+                yes: () => outcomeP1(f, 'ppfail', {
+                    subject: 'Contractor on site, PowerPause override failed — risk to trade or health and safety — P1',
+                    detail: `Contractor ${f.data.cn} on site used the PowerPause override (${f.data.pptype} device) and the equipment did not come on. Immediate risk to trade or health and safety. Needs immediate IoT action.`,
+                    pre: sayBox("Thanks. As there's an immediate risk to trade or to anyone's health and safety, I'm going to raise this as urgent with our on-call team."),
+                    script: res => 'That\'s raised as urgent, reference ' + dyn(res.ticket.id) + '. Someone from our on-call team will call you back shortly. Please ask the engineer to hold on.',
+                    OohCaptureClass: 'kitchen-powerpause'
+                }),
+                no: () => outcomeCaptured(f, 'ppfailno', {
+                    subject: 'Contractor on site — no immediate risk',
+                    detail: `Contractor ${f.data.cn} on site: PowerPause override (${f.data.pptype}) did not bring equipment on. No immediate risk to trade or health and safety. Logged for IoT team.`,
+                    script: res => 'Thanks. It\'s logged, reference ' + dyn(res.ticket.id) + '. Our IoT team picks it up the next working day and will be in touch.',
+                    OohCaptureClass: 'kitchen-powerpause'
+                })
             });
         }
         // Fallback: should not be reached in normal flow
         if (!f.data._cline) { doneLine('Contractor: ' + esc(f.data.cn) + ', needs ' + esc(String(f.data.cw).replace(/^needs\s+/i, '')), 'customer'); f.data._cline = 1; }
-        return outcomeP1(f, 'p1', {
-            subject: 'Contractor on site needs IoT support — P1',
-            detail: `Contractor ${f.data.cn} on site now: ${f.data.cw}. Escalated immediately.`,
-            script: res => 'That\'s raised as urgent, reference ' + dyn(res.ticket.id) + '. Someone from our on-call team will call you back shortly. Please ask the engineer to hold on.',
-            p1Summary: `Contractor on site: ${f.data.cw}`
+        return riskQuestion(f, {
+            yes: () => outcomeP1(f, 'p1', {
+                subject: 'Contractor on site — risk to trade or health and safety — P1',
+                detail: `Contractor ${f.data.cn} on site now: ${f.data.cw}. Escalated immediately.`,
+                pre: sayBox("Thanks. As there's an immediate risk to trade or to anyone's health and safety, I'm going to raise this as urgent with our on-call team."),
+                script: res => 'That\'s raised as urgent, reference ' + dyn(res.ticket.id) + '. Someone from our on-call team will call you back shortly. Please ask the engineer to hold on.'
+            }),
+            no: () => outcomeCaptured(f, 'p1no', {
+                subject: 'Contractor on site — no immediate risk',
+                detail: `Contractor ${f.data.cn} on site: ${f.data.cw}. No immediate risk to trade or health and safety.`,
+                script: res => 'Thanks. It\'s logged, reference ' + dyn(res.ticket.id) + '. Our IoT team picks it up the next working day.',
+                OohCaptureClass: 'general'
+            })
         });
     },
     other(ws, f) {
@@ -2636,32 +2692,24 @@ const FLOWR = {
                 if (String(f.data.q || '').trim() !== String(f.data.freeText || '').trim()) doneLine('The customer says: "' + esc(f.data.q) + '"', 'customer');
                 f.data._oline = 1;
             }
-            // OOHDASH-134: Capture now opens a two-button choice (P1 Escalation / normal priority).
-            if (f.data.path === 'cap') return otherP1Choice(f);
+            // B19: replaced otherP1Choice with the universal risk question.
+            if (f.data.path === 'cap') return riskQuestion(f, {
+                yes: () => outcomeP1(f, 'p1', {
+                    subject: 'Something else — risk to trade or health and safety — P1',
+                    detail: `Customer reported: ${f.data.q}. Did not fit a specific tile; immediate risk to trade or health and safety.`,
+                    pre: sayBox("Thanks. As there's an immediate risk to trade or to anyone's health and safety, I'm going to raise this as urgent with our on-call team."),
+                    script: res => 'That\'s raised as urgent, reference ' + dyn(res.ticket.id) + '. Someone from our on-call team will call you back shortly.'
+                }),
+                no: () => outcomeCaptured(f, 'cap', {
+                    subject: 'Something else — no immediate risk',
+                    detail: `Customer reported: ${f.data.q}. No immediate risk to trade or health and safety. Passed verbatim for the IoT team.`,
+                    script: res => 'I\'ve passed exactly what you\'ve described to our IoT team, reference ' + dyn(res.ticket.id) + '. They pick it up the next working day.',
+                    OohCaptureClass: 'general'
+                })
+            });
             return `<div class="stepq agentq">Which of these is it closest to?</div><div class="chips">
     ${state.workspace.scope.map(g => `<button class="chip" data-testid="scope-${g.key}" onclick="flowStep({g:'${g.key}'})">${esc(g.label)}</button>`).join('')}</div>
    <p class="small" style="margin-top:8px">This checks the live device inventory for <b>this site</b> — it can say with certainty what is and isn\'t on Lighthouse here. What it can\'t always settle is a fault <i>inside</i> shared kit (e.g. the boiler behind our controls).</p>`;
-        }
-        if (f.stage === 2 && f.data.path === 'normal') {
-            // OOHDASH-134: identical to the pre-v1.4.2 Capture outcome.
-            return outcomeCaptured(f, 'cap', {
-                subject: 'General issue captured',
-                detail: `Customer reported: ${f.data.q}. Captured verbatim for the IoT team.`,
-                script: res => 'I\'ve passed exactly what you\'ve described to our IoT team, reference ' + dyn(res.ticket.id) + '. They pick it up the next working day.',
-                OohCaptureClass: 'general'
-            });
-        }
-        if (f.stage === 2 && f.data.path === 'p1') {
-            // OOHDASH-134: same shared P1 signal as the lighting/kitchen/contractor flows
-            // (escalate-p1 via outcomeP1; no capture class, no actionId).
-            const reason = f.data.p1reason;
-            return outcomeP1(f, 'p1', {
-                subject: 'Something else - urgent, escalated as P1',
-                detail: `Customer reported: ${reason}. Did not fit a specific tile; handler judged it urgent tonight.`,
-                pre: sayBox('Thanks. I\'m going to raise this as urgent with our on-call team.'),
-                script: res => 'That\'s raised as urgent, reference ' + dyn(res.ticket.id) + '. Someone from our on-call team will call you back shortly.',
-                p1Summary: otherP1Summary(reason)
-            });
         }
         if (f.stage === 2) {
             const g0 = state.workspace.scope.find(x => x.key === f.data.g);
