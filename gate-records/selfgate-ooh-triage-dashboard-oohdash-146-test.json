@@ -1,0 +1,21 @@
+{
+  "run": "selfgate-ooh-triage-dashboard-oohdash-146",
+  "phase": "test",
+  "pr": 194,
+  "approvedBy": [
+    "bigtuff8"
+  ],
+  "reviewComments": [
+    "bigtuff8: - Approve — proceed to release: Approve - proceed to release\n\n(submitted via the interactive gate review)\n\n<!-- gate:selected [{\"question\":\"Approve — proceed to release\",\"answer\":\"Approve - proceed to release\"}] -->"
+  ],
+  "mergeCommit": "4a43da179f5ea636cde56f192bbea0cf4b19cbd3",
+  "phaseBranch": "test/oohdash-146",
+  "releaseBranch": "main",
+  "stamp": 1794241456665,
+  "selectedOptions": [
+    {
+      "question": "Approve — proceed to release",
+      "answer": "Approve - proceed to release"
+    }
+  ]
+}
