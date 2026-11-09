@@ -498,13 +498,15 @@ window.submitPendingOutcome = function submitPendingOutcome(key, auto) {
         knownSoFar: knownSoFarLines(f), // OOHDASH-159 rev 4: written onto the ticket, never into the P1 text
         ...callFields(), // rev 5 (E1): link the ticket to the call record
         customerContact: callerContactFrom(state.caller), // OOHDASH-146 B10
+        ...payload,
         // B20: p1Reason typed in confirm step; p1Summary cut to 80 chars; p1Origin for automatic P1s
+        // Must come AFTER ...payload so the computed values win over payload.p1Summary (which is
+        // undefined for flows that don't pass an explicit p1Summary to outcomeP1).
         ...(payload.type === 'escalate-p1' ? {
             p1Reason: f.data.p1Reason || null,
             p1Summary: p1SummaryFromReason(f.data.p1Reason) || payload.p1Summary || null,
             p1Origin: f.data.p1Origin || null
-        } : {}),
-        ...payload
+        } : {})
     }).then(res => {
         notesDraftClear(); // OOHDASH-119: clear sessionStorage draft on success
         const echo = ''; // rev 4: the customer's words are already the first line of What we know so far

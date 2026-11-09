@@ -34,7 +34,8 @@ test.describe('OOHDASH-123 dark-fleet copy + PowerPause schedule', () => {
         await expect(page.locator('[data-testid="connectivity-alert"]')).toHaveCount(0);
 
         // Capture routes to a normal IoT-team capture (offline, no controls - the unchanged outcome).
-        await page.locator('[data-testid="dark-capture"]').click(); // E1: auto-submits for non-P1
+        await page.locator('[data-testid="dark-capture"]').click(); // riskQuestion gate (OOHDASH-146 B24)
+        await page.locator('[data-testid="risk-no"]').click();
         await expect(page.locator('[data-testid="outcome-captured"]')).toBeVisible();
         await expect(page.locator('[data-testid="outcome-captured"]')).toContainText('not reporting');
     });
