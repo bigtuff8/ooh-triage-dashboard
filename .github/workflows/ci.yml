@@ -33,38 +33,7 @@ jobs:
 
       - run: npm run test:unit
 
-  e2e:
-    # REQUIRED CHECK (OOHDASH-109, 2026-10-06). The browser suite is the only end-to-end safety
-    # net over the confirm-gate → triage-flow → control/escalate chain.
-    #
-    # It had rotted while non-required: OOHDASH-89/91 removed the `device-board` test id (device
-    # state is now triage-question-led), which broke the shared confirmSite helper and took 30 of
-    # the specs down at the confirm step — invisible because e2e was not gating. The older
-    # 2026-09-24 pair (control.spec.js:229 500-path, tonight-callback.spec.js:136 P1 wording) were
-    # the same class of stale-harness drift against the OOHDASH-72 log-mode honesty copy. All fixed
-    # in OOHDASH-109; the suite is green on a clean main, so e2e now gates like the unit check.
-    name: e2e (playwright)
-    runs-on: ubuntu-24.04
-    timeout-minutes: 45
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/setup-node@v4
-        with:
-          node-version: '24'
-          cache: npm
-
-      - run: npm ci
-
-      # The suite runs the real server itself in fixture mode (playwright.config.js webServer),
-      # so no external services, secrets or network access are needed — only a browser.
-      - run: npx playwright install --with-deps chromium
-
-      - run: npm test
-
-      - uses: actions/upload-artifact@v4
-        if: failure()
-        with:
-          name: playwright-results
-          path: test-results/
-          retention-days: 7
+  # e2e (playwright) was removed 2026-11-09 (OOHDASH-146). The browser suite is owned by the
+  # harness test gate, which runs it as a governed step in the build lifecycle. Running it again
+  # in GitHub Actions was duplicate cost with no additional safety signal. The harness gate is the
+  # authoritative e2e check; this CI workflow only carries the unit interlock.
