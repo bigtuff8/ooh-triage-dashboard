@@ -27,10 +27,10 @@ function tbSession({ username, password, apiKey }, label) {
     // it not-ok. Freshness is judged against config.control.healthProbeTtlMs at read time.
     let probe = { ok: false, checkedAt: 0 };
     function markProbe(ok) { probe = { ok, checkedAt: Date.now() }; }
-    async function getToken() {
-        // OOHDASH-161: API key mode — no login needed, key is used directly as the bearer token.
-        if (apiKey) return apiKey;
-        if (token && Date.now() < expiry) return token;
+    // Returns the X-Authorization header value: 'ApiKey <key>' for API key mode, 'Bearer <jwt>' for JWT mode.
+    async function authHeader() {
+        if (apiKey) return `ApiKey ${apiKey}`;
+        if (token && Date.now() < expiry) return `Bearer ${token}`;
         const res = await axios.post(`${config.thingsboard.url}/api/auth/login`, { username, password }, { timeout: 10000 });
         const data = res.data;
         // MFA guard: a PRE_VERIFICATION_TOKEN means MFA is required but can't be completed here.
@@ -39,14 +39,14 @@ function tbSession({ username, password, apiKey }, label) {
         expiry = Date.now() + 2 * 60 * 60 * 1000;
         markProbe(true);
         console.log(`[TB] Authenticated (${label})`);
-        return token;
+        return `Bearer ${token}`;
     }
     async function request(method, path, data) {
         try {
             const res = await axios({
                 method,
                 url: `${config.thingsboard.url}${path}`,
-                headers: { 'X-Authorization': `Bearer ${await getToken()}` },
+                headers: { 'X-Authorization': await authHeader() },
                 data,
                 timeout: 15000
             });
@@ -69,7 +69,7 @@ function tbSession({ username, password, apiKey }, label) {
             // API key mode: verify the key is still valid via a cheap authenticated read.
             try {
                 await axios.get(`${config.thingsboard.url}/api/auth/user`, {
-                    headers: { 'X-Authorization': `Bearer ${apiKey}` },
+                    headers: { 'X-Authorization': `ApiKey ${apiKey}` },
                     timeout: 10000
                 });
                 markProbe(true);
