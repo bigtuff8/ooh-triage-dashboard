@@ -340,7 +340,7 @@ function renderWorkspace() {
     const ws = state.workspace;
     const s = ws.site;
     const flowHtml = state.flow ? renderFlow() : `
-   ${ws.anyOffline ? `<div class="alert err" data-testid="offline-banner" style="display:flex;flex-direction:column;gap:6px;margin:0 0 10px"><div style="display:flex;align-items:center;gap:10px">📡 <b>Some Lighthouse equipment at this site is not responding.</b><button class="btn" style="margin-left:auto" onclick="startFlow('connectivity')">Run connection check</button></div><p class="small" data-testid="offline-banner-optional-hint" style="margin:0">This step is optional — you can go straight to the issue.</p></div>` : ''}
+   ${ws.anyOffline ? `<div class="alert err" data-testid="offline-banner" style="display:flex;flex-direction:column;gap:6px;margin:0 0 10px"><div style="display:flex;align-items:center;gap:10px">📡 <b>Some Lighthouse equipment at this site is not responding.</b></div><p class="small" data-testid="offline-banner-optional-hint" style="margin:0">The questions check the equipment for you if your issue involves it.</p></div>` : ''}
    ${ws.degraded ? `<div class="alert warn" data-testid="degraded-banner">⚠️ Live reads are unavailable — flows will pass issues to the IoT team rather than make changes.</div>` : ''}
    <div class="card">
    ${callSoFar()}
@@ -651,7 +651,7 @@ const OUTCOME_CHIP = {
     pending: '<span class="tag amber">confirming…</span>',
     captured: '<span class="tag blue">captured</span>',
     p1: '<span class="tag red">P1 escalated</span>',
-    scope: '<span class="tag grey">not Lighthouse</span>',
+    scope: '<span class="tag grey">closed note</span>',
     'no-action': '<span class="tag grey">no action</span>',
     timeout: '<span class="tag amber">timeout</span>',
     failed: '<span class="tag red">failed</span>',
@@ -661,6 +661,59 @@ const OUTCOME_CHIP = {
     admin: '<span class="tag grey">admin</span>',
     'revert-failed': '<span class="tag red">revert failed</span>'
 };
+
+/* B7 R9: tonightChip and tonightWhat — richer outcome chip + detail for the Tonight table */
+function tonightChip(a) {
+    const oc = a.outcome;
+    const cls = a.OohCaptureClass || '';
+    if (cls === 'boiler-boost-on' || cls === 'boiler-boost-off') {
+        if (oc === 'NON-DELIVERY') return '<span class="tag red">not delivered</span>';
+        if (cls === 'boiler-boost-on') return '<span class="tag blue">heating turned on</span>';
+        return '<span class="tag blue">heating turned off</span>';
+    }
+    if (cls === 'boiler-boost-cancel') {
+        if (oc === 'reverted' || oc === 'synced' || oc === 'confirmed') return '<span class="tag green">back to normal</span>';
+        if (oc === 'already-auto') return '<span class="tag grey">changed on site</span>';
+        if (oc === 'left-forced') return '<span class="tag amber">left as found</span>';
+        if (oc === 'pending') return '<span class="tag amber">confirming…</span>';
+    }
+    if (cls === 'boiler-revert') {
+        if (oc === 'confirmed') return '<span class="tag green">back to normal</span>';
+        if (oc === 'revert-failed') return '<span class="tag red">did not go back</span>';
+    }
+    if (cls === 'kitchen-oneoff') {
+        if (oc === 'booked' || oc === 'on') return '<span class="tag blue">one-off booked/on</span>';
+        if (oc === 'done' || oc === 'handed-back') return '<span class="tag green">one-off done</span>';
+        if (oc === 'missed' || oc === 'off-failed') return '<span class="tag red">not carried out</span>';
+        if (oc === 'cancelled') return '<span class="tag grey">cancelled</span>';
+    }
+    if (oc === 'appended') return '<span class="tag blue">added to ticket</span>';
+    if (oc === 'synced') return '<span class="tag green">applied ✓</span>';
+    if (oc === 'indeterminate') return '<span class="tag amber">not confirmed</span>';
+    if (oc === 'scope') return '<span class="tag grey">closed note</span>';
+    return OUTCOME_CHIP[oc] || '<span class="tag grey">logged</span>';
+}
+
+function tonightWhat(a) {
+    const cls = a.OohCaptureClass || '';
+    const zone = a.zone ? ' (' + esc(a.zone) + ')' : '';
+    const oc = a.outcome;
+    if (cls === 'boiler-boost-on') {
+        return oc === 'NON-DELIVERY'
+            ? 'Tried to turn the heating on' + zone
+            : 'Heating turned on' + zone;
+    }
+    if (cls === 'boiler-boost-off') {
+        return oc === 'NON-DELIVERY'
+            ? 'Tried to turn the heating off' + zone
+            : 'Heating turned off' + zone;
+    }
+    if (cls === 'boiler-boost-cancel') return 'Heating put back to normal' + zone;
+    if (cls === 'boiler-revert') return 'Heating went back to normal by itself' + zone;
+    if (cls === 'kitchen-oneoff') return esc(a.detail || '');
+    // strip control-failure annotation for all other classes
+    return esc((a.detail || '').replace(/\s*·\s*class:\s*control-failure/g, ''));
+}
 
 async function vTonight() {
     $('#view').innerHTML = `<div class="content"><div class="card"><h2>Tonight</h2><p class="sub">Loading…</p></div></div>`;
@@ -687,8 +740,8 @@ function paintTonight() {
    ${rows.length ? `<table class="tbl" data-testid="tonight-table"><tr><th>Time</th><th>Site</th><th>Agent</th><th>What happened</th><th>Outcome</th><th>Ticket</th></tr>
    ${rows.map(a => `<tr><td>${esc(new Date(a.OohActionAt).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }))}</td>
     <td>${a.siteName ? `<b>${esc(a.siteName)}</b> <span class="mono">${esc(a.siteNo || '')}</span>` : '—'}</td>
-    <td>${esc(a.operatorName)}</td><td>${esc(a.detail)}</td>
-    <td>${OUTCOME_CHIP[a.outcome] || esc(a.outcome || '')}</td>
+    <td>${esc(a.operatorName)}</td><td>${tonightWhat(a)}</td>
+    <td>${tonightChip(a)}</td>
     <td>${a.ticketId ? `${tktLink(a.ticketId)}` : '—'}</td></tr>`).join('')}</table>`
         : `<p class="small" style="padding:10px 0" data-testid="tonight-empty">${q ? 'No activity matching that filter tonight.' : 'No activity yet tonight.'}</p>`}
    <p class="small" style="margin-top:10px">The IoT team\'s morning review (mark-as-reviewed, P1 acknowledgements, feedback) happens in the <b>IoT Support dashboard</b>, which receives all of this automatically.</p>

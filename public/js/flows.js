@@ -667,6 +667,41 @@ function outcomeNoAction(f, key, { subject, detail, script, pre }) {
 // The next screen is only the confirmation: ticket number, and the team contacts them the next working day.
 const SCHED_APPROVAL = 'Permanent changes to the timetable need approval from the pub\'s management, usually the Area Manager. Our team will check that with them before anything changes.';
 
+/* ------------------------ OOHDASH-146 D14: urgency helper (B28) ----------------------------- */
+/**
+ * Maps the agent's "when needed" answer (tonight/tmrw-before12/tmrw-12plus/later) to a Date
+ * for urgencyOf. Used by the fan and kitchen flows.
+ */
+function neededAtFromWhen(when) {
+    const now = new Date();
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    switch (when) {
+        case 'tonight':       return new Date(today.getTime() + 23 * 3600000 + 59 * 60000);
+        case 'tmrw-before12': return new Date(today.getTime() + 24 * 3600000 + 11 * 3600000);
+        case 'tmrw-12plus':   return new Date(today.getTime() + 24 * 3600000 + 12 * 3600000);
+        case 'later':         return new Date(today.getTime() + 48 * 3600000 + 12 * 3600000);
+        default:              return new Date(today.getTime() + 23 * 3600000 + 59 * 60000);
+    }
+}
+
+/** Renders the urgency banner for planned requests (D14). */
+function urgencyBannerHtml(isUrgent, testid) {
+    const tid = testid || 'urgency-banner';
+    const cls = isUrgent ? 'err' : 'ok';
+    const label = isUrgent ? 'Urgent — outside office hours' : 'Not urgent — the IoT team can pick this up in time';
+    return '<div class="alert ' + cls + '" data-testid="' + tid + '"><b>' + label + '</b></div>';
+}
+
+/** The four "when is it needed?" chips used in D14 flows. stateKey is the flowStep key to set. */
+function whenNeededChips(stateKey) {
+    return answers(
+        '<button class="chip" data-testid="when-tonight" onclick="flowStep({' + stateKey + ':\'tonight\'})">Tonight</button>' +
+        '<button class="chip" data-testid="when-tmrw-before12" onclick="flowStep({' + stateKey + ':\'tmrw-before12\'})">Tomorrow before 12:00</button>' +
+        '<button class="chip" data-testid="when-tmrw-12plus" onclick="flowStep({' + stateKey + ':\'tmrw-12plus\'})">Tomorrow at 12:00 or later</button>' +
+        '<button class="chip" data-testid="when-later" onclick="flowStep({' + stateKey + ':\'later\'})">A later day this week</button>'
+    );
+}
+
 function scheduleCollect(f, key, { equipment, preselect, timetableHtml, subject, OohCaptureClass, lead }) {
     const d = f.data;
     if (!d.schEq) d.schEq = (preselect || []).slice();
@@ -2012,6 +2047,8 @@ const FLOWR = {
             }
             doneLine(`Area: <b>${esc(areaLabel)}</b>`, 'customer');
             doneLine('The thermostat in this area isn\'t connecting to us', 'check');
+            // B9: pass the zone name so the connectivity flow names the device, not "Everything is online"
+            f.data.offlineZone = areaLabel;
             f.cat = 'connectivity'; f.stage = 0; f.data.from = 'heating';
             return FLOWR.connectivity(ws, f);
         }
@@ -2021,7 +2058,7 @@ const FLOWR = {
         const nInArea = set.length;
         if (f.stage === 1) {
             doneLine(`Area: <b>${esc(areaLabel)}</b>`, 'customer');
-            if (!z.online) { doneLine('The thermostat in this area isn\'t connecting to us', 'check'); f.cat = 'connectivity'; f.stage = 0; f.data.from = 'heating'; return FLOWR.connectivity(ws, f); }
+            if (!z.online) { doneLine('The thermostat in this area isn\'t connecting to us', 'check'); f.data.offlineZone = areaLabel; f.cat = 'connectivity'; f.stage = 0; f.data.from = 'heating'; return FLOWR.connectivity(ws, f); }
             // OOHDASH-128 (OQ4): compute online/offline counts for mixed-health copy and the note.
             const nOn = set.filter(d => d.online).length;
             const nOff = nInArea - nOn;
@@ -2167,8 +2204,10 @@ const FLOWR = {
     // not controllable from the dashboard; every request is captured and referred to the IoT team.
     aircon(ws, f) {
         // OOHDASH-146 B24: riskQuestion added before outcomeCaptured.
+        // B28: schedule-change hint so the agent knows where to put ongoing change details.
         doneLine('Air conditioning can\'t be changed from here', 'check');
-        return riskQuestion(f, {
+        return infoBox('If the customer needs an ongoing schedule change, ask for the details and put them in the notes box that appears with the ticket — the IoT team will see them on the ticket.') +
+            riskQuestion(f, {
             yes: () => outcomeP1(f, 'aircon-p1', {
                 subject: `Air conditioning — risk to trade or health and safety — P1 (${ws.site.siteName})`,
                 detail: 'Customer raised an air-conditioning issue. Aircon is not controllable from the dashboard. Customer indicated immediate risk to trade or health and safety.',
@@ -2258,6 +2297,9 @@ const FLOWR = {
         const areWord = list => list.length === 1 ? 'isn\'t' : 'aren\'t';
         const isAre = list => list.length === 1 ? 'is' : 'are';
         const itThem = list => list.length === 1 ? 'it' : 'them';
+        // B15 G1: grammatically correct pronoun and auxiliary for plural circuits
+        const itThey = list => list.length === 1 ? 'it' : 'they';
+        const hasHave = list => list.length === 1 ? 'has' : 'have';
         const INTERLOCK = /fry|bain|gantr|super ?pass/i; // the guide: fryers and heated gantries / bain-marie
 
         const OFF_VERDICTS = ['A', 'C', 'D', 'off-unknown'];
@@ -2379,7 +2421,7 @@ const FLOWR = {
         if (!f.data._kChecked) {
             if (offline.length) doneLine(`${namesDyn(offline)} ${areWord(offline)} connecting to us`, 'check');
             off.forEach(d => doneLine(`${dyn(kName(d))} is off; ${reasonWords(d, dynWrap)}`, 'check'));
-            if (unknown.length) doneLine(`${namesDyn(unknown)} ${isAre(unknown)} connecting to us (this site can't show whether ${itThem(unknown)} ${isAre(unknown)} on)`, 'check');
+            if (unknown.length) doneLine(`${namesDyn(unknown)} ${isAre(unknown)} connecting to us (this site can't show whether ${itThey(unknown)} ${isAre(unknown)} on)`, 'check');
             f.data._kChecked = 1;
         }
         if (f.data.ov === undefined) {
@@ -2399,9 +2441,9 @@ const FLOWR = {
             unknown.forEach(d => { if (d.schedule) why.push(`${dyn(kName(d))} timetable: ${dyn(d.schedule)}.`); });
             const info = (why.length ? why.join('<br>') + '<br>' : '') + 'Pressing the button once brings the circuit on until the next timetable change. Holding it down takes the circuit off the system, so ask them not to.<div style="margin-top:6px">' + guideLink() + '</div>';
             const timetableAns = (off.some(d => d.tuya?.verdict === 'C') || unknown.length)
-                ? '<button class="chip" data-testid="kitchen-needs-times" onclick="flowStep({ov:\'sched\'})">It\'s fine, but we need it at different times</button>' : '';
+                ? '<button class="chip" data-testid="kitchen-needs-times" onclick="flowStep({ov:\'kwhen\'})">It\'s fine, but we need it at different times</button>' : '';
             const fuseAns = always.length ? '<button class="chip" data-testid="kitchen-fuse-fixed" onclick="flowStep({ov:\'fuse\'})">The fuse board had tripped; resetting it fixed it</button>' : '';
-            return `<div data-testid="kitchen-override-step">${sayBox(script, `has the ${names} come on?`)}${infoBox(info)}
+            return `<div data-testid="kitchen-override-step">${sayBox(script, `${hasHave(problem)} the ${names} come on?`)}${infoBox(info)}
    ${answers(`<button class="chip" data-testid="kitchen-override-ok" onclick="flowStep({ov:'ok'})">Yes, it's come on</button><button class="chip" data-testid="kitchen-override-fail" onclick="flowStep({ov:'fail'})">No, it hasn't come on</button><button class="chip" data-testid="kitchen-no-panel" onclick="flowStep({ov:'nopanel'})">They can't find the panel</button>${fuseAns}${timetableAns}`)}</div>`;
         }
         const facts = S.map(factText).join(' ');
@@ -2425,9 +2467,86 @@ const FLOWR = {
                 OohCaptureClass: 'kitchen-powerpause'
             });
         }
+        // B5: K-when-unknown — the production path when the one-off book isn't available.
+        // The agent picks when the customer needs the change; urgency determines the outcome.
+        if (f.data.ov === 'kwhen') {
+            if (!f.data._kKwhenLine) { doneLine('The equipment is working, but the customer needs it at a different time', 'customer'); f.data._kKwhenLine = 1; }
+            if (!f.data.kOneoffWhen) {
+                return sayBox(null, 'When does the customer need this in place?') +
+                    answers(
+                        '<button class="chip" data-testid="koneoff-tonight" onclick="flowStep({kOneoffWhen:\'tonight\'})">Tonight</button>' +
+                        '<button class="chip" data-testid="koneoff-tmrw-before12" onclick="flowStep({kOneoffWhen:\'tmrw-before12\'})">Tomorrow before 12:00</button>' +
+                        '<button class="chip" data-testid="koneoff-tmrw-12plus" onclick="flowStep({kOneoffWhen:\'tmrw-12plus\'})">Tomorrow at 12:00 or later</button>' +
+                        '<button class="chip" data-testid="koneoff-later" onclick="flowStep({kOneoffWhen:\'later\'})">A later day this week</button>' +
+                        '<button class="chip" data-testid="koneoff-everyweek" onclick="flowStep({ov:\'sched\'})">Different times every week</button>'
+                    );
+            }
+            const neededAt = neededAtFromWhen(f.data.kOneoffWhen);
+            const urg = typeof OohUrgency !== 'undefined' ? OohUrgency.urgencyOf(neededAt, Date.now()) : null;
+            const isUrgent = urg && urg.urgent;
+            if (isUrgent) {
+                // D14d: auto P1 — the one-off cannot be booked from here and the request is urgent
+                if (!f.data.p1Origin) { f.data.p1Origin = 'automatic'; f.data.p1Reason = 'Automatic: urgent kitchen one-off requested but cannot be booked from this site.'; }
+                return urgencyBannerHtml(true, 'koneoff-urgency-banner') +
+                    outcomeP1(f, 'k-auto-p1', {
+                        subject: 'Kitchen one-off could not be set up — urgent request — P1',
+                        detail: 'Customer needs kitchen equipment at a different time urgently, but this change cannot be booked from here. P1 raised automatically for the on-call agent.',
+                        pre: sayBox('I need to raise this urgently for our on-call team, as this site\'s one-off booking isn\'t set up yet.'),
+                        script: res => 'That\'s raised as urgent, reference ' + dyn(res.ticket.id) + '. Someone from our on-call team will call you back shortly.',
+                        p1Summary: 'Auto: urgent kitchen one-off - cannot book'
+                    });
+            }
+            return urgencyBannerHtml(false, 'koneoff-urgency-banner') +
+                outcomeCaptured(f, 'k-normal', {
+                    subject: 'Kitchen equipment: different times needed',
+                    detail: 'Customer needs kitchen equipment at a different time just this once. Not urgent; IoT team to contact site the next working day.',
+                    script: res => 'Thanks, it\'s logged, reference ' + dyn(res.ticket.id) + '. Our IoT team picks it up the next working day.',
+                    line: 'The customer needs the equipment at a different time. Nothing was changed tonight. IoT team picks up the <b>next working day</b>.',
+                    OohCaptureClass: 'kitchen-powerpause'
+                });
+        }
+
         if (f.data.ov === 'sched') {
-            if (!f.data._kSchLine) { doneLine('The equipment is working, but the customer needs it at different times', 'customer'); f.data._kSchLine = 1; }
+            if (!f.data._kSchLine) { doneLine('The equipment is working, but the customer needs it at different times every week', 'customer'); f.data._kSchLine = 1; }
             const tt = problem.map(d => d.tuya ? `${dyn(kName(d))}: ${reasonWords(d, dynWrap)}` : `${dyn(kName(d))}: ${dyn(d.schedule || 'timetable not shown')}`).join('<br>');
+            // B28c: urgency filter for permanent (every week) changes after the form is filled
+            if (f.data.schDone && f.data.schKind === 'permanent') {
+                if (!f.data.kSchWhen) {
+                    return sayBox(null, 'When does the customer need this in place?') + whenNeededChips('kSchWhen');
+                }
+                const neededAt = neededAtFromWhen(f.data.kSchWhen);
+                const urg = typeof OohUrgency !== 'undefined' ? OohUrgency.urgencyOf(neededAt, Date.now()) : null;
+                const isUrgent = urg && urg.urgent;
+                const banner = urgencyBannerHtml(isUrgent, 'kperm-urgency-banner');
+                if (!f.data.kSchOutcome) {
+                    if (isUrgent) {
+                        return banner +
+                            infoBox('If you raise a P1, write the full schedule request in the comment so the on-call agent can sort it out.') +
+                            answers(
+                                '<button class="chip" data-testid="kperm-p1" onclick="flowStep({kSchOutcome:\'p1\'})">Raise a P1</button>' +
+                                '<button class="chip" data-testid="kperm-ticket" onclick="flowStep({kSchOutcome:\'ticket\'})">Log a normal ticket</button>'
+                            );
+                    }
+                    return banner + answers('<button class="chip" data-testid="kperm-ticket" onclick="flowStep({kSchOutcome:\'ticket\'})">Log a normal ticket</button>');
+                }
+                if (f.data.kSchOutcome === 'p1') {
+                    return outcomeP1(f, 'k-perm-p1', {
+                        subject: 'Kitchen equipment — risk to trade or health and safety — P1',
+                        detail: `Customer needs kitchen equipment at different times every week. Urgent — before the IoT team can respond. Equipment: ${(f.data.schEq || []).join(', ') || 'not specified'}; times: ${String(f.data.schTimes || '').trim() || 'not specified'}.`,
+                        pre: sayBox("Thanks. As there's an immediate risk to trade or to anyone's health and safety, I'm going to raise this as urgent with our on-call team."),
+                        script: res => 'That\'s raised as urgent, reference ' + dyn(res.ticket.id) + '. Someone from our on-call team will call you back shortly.'
+                    });
+                }
+                // kSchOutcome === 'ticket': normal ticket
+                const eq = (f.data.schEq || []).length ? f.data.schEq.join(', ') : 'not specified';
+                return outcomeCaptured(f, 'k-perm', {
+                    subject: 'Kitchen timetable request — permanent change',
+                    detail: `Customer needs: ${eq}; ${String(f.data.schTimes || '').trim()}; every week (permanent change: needs management approval).${String(f.data.schMore || '').trim() ? ' Also said: ' + String(f.data.schMore).trim() + '.' : ''} Collected on the call; not changed out of hours.`,
+                    script: res => 'Thanks, that\'s with our IoT team, reference ' + dyn(res.ticket.id) + '. They\'ll contact you the next working day to arrange it. As it\'s a permanent change, they\'ll check it with your management first.',
+                    line: 'Nothing was changed tonight. The IoT team contacts the site the <b>next working day</b>.',
+                    OohCaptureClass: 'kitchen-powerpause'
+                });
+            }
             return scheduleCollect(f, 'k-sched', {
                 equipment: ks.map(kName),
                 preselect: problem.map(kName),
@@ -2501,7 +2620,7 @@ const FLOWR = {
         }
         if (f.stage === 1) {
             if (f.data.r === 'ok') {
-                doneLine('The lights came on with the on-site switch', 'customer');
+                doneLine('The lights came on with the manual override', 'customer');
                 return outcomeCaptured(f, 'ok', {
                     subject: 'External lighting — on with the manual override',
                     detail: 'Customer used the manual override on the PowerPause panel and the outside lights came on. Override monitored; the IoT team checks why they didn\'t come on automatically.',
@@ -2510,7 +2629,7 @@ const FLOWR = {
                     OohCaptureClass: 'lighting'
                 });
             }
-            doneLine('The lights are still off after the on-site switch', 'customer');
+            doneLine('The lights are still off after the manual override', 'customer');
             return riskQuestion(f, {
                 yes: () => outcomeP1(f, 'cap', {
                     subject: 'External lighting not working — risk to trade or health and safety — P1',
@@ -2550,24 +2669,80 @@ const FLOWR = {
                         script: res => 'Lighthouse doesn\'t manage the extractor fans at your site. Please contact your contractor through your usual route. I\'ve noted the call, reference ' + dyn(res.ticket.id) + '.'
                     })
                 });
-            const anySwitchable = fans.some(canSwitch);
-            const fanSwitches = fans.map(fan =>
-                canSwitch(fan)
-                    ? `<div class="zoneread"><span style="font-size:20px">🌀</span><div><div><b>${dyn(fan.zone)}</b> — ${fan.telemetry?.switch_1 ? 'currently ON' : 'currently OFF'}</div><div class="small">${esc(fan.deviceId)}</div></div>${switchButtons(fan, 'fan-switch')}<span class="tag ${fan.telemetry?.switch_1 ? 'green' : 'grey'}">${fan.telemetry?.switch_1 ? 'on' : 'off'}</span></div>`
-                    : ''
-            ).join('');
-            // rev 5 (i): a fan request is a timetable request — collect it first, then confirm with the ticket number.
-            return fanSwitches + scheduleCollect(f, 'fan-sched', {
+            // B28: D14 urgency filter — fall through to the state machine below
+        }
+        // B28: D14 urgency filter for extractor fans (one-off vs every week, then when needed)
+        const anySwitchable = fans.some(canSwitch);
+        const fanSwitches = fans.map(fan =>
+            canSwitch(fan)
+                ? `<div class="zoneread"><span style="font-size:20px">🌀</span><div><div><b>${dyn(fan.zone)}</b> — ${fan.telemetry?.switch_1 ? 'currently ON' : 'currently OFF'}</div><div class="small">${esc(fan.deviceId)}</div></div>${switchButtons(fan, 'fan-switch')}<span class="tag ${fan.telemetry?.switch_1 ? 'green' : 'grey'}">${fan.telemetry?.switch_1 ? 'on' : 'off'}</span></div>`
+                : ''
+        ).join('');
+        const fanTimetableInfo = (anySwitchable ? 'You can switch a fan above if the customer needs it on or off right now; the change only counts once the controller confirms it. ' : 'Fans can\'t be switched from here. ') +
+            'If they need the fans on right now, the override button on the PowerPause panel brings them on until the next timetable change.<div style="margin-top:6px">' + guideLink() + '</div>';
+
+        if (!f.data.fanKind) {
+            return fanSwitches + infoBox(fanTimetableInfo) +
+                sayBox(null, 'Is it just this once, or does the customer need this every week?') +
+                answers(
+                    '<button class="chip" data-testid="fan-kind-once" onclick="flowStep({fanKind:\'once\'})">Just this once</button>' +
+                    '<button class="chip" data-testid="fan-kind-everyweek" onclick="flowStep({fanKind:\'everyweek\'})">Every week</button>'
+                );
+        }
+
+        if (f.data.fanKind === 'everyweek') {
+            if (!f.data._fanEveryweekLine) { doneLine('The customer needs the fans at different times every week', 'customer'); f.data._fanEveryweekLine = 1; }
+            return scheduleCollect(f, 'fan-sched', {
                 equipment: fans.map(x => x.zone || 'Extractor fan'),
                 preselect: fans.length === 1 ? [fans[0].zone || 'Extractor fan'] : [],
-                timetableHtml: (anySwitchable ? 'You can switch a fan above if the customer needs it on or off right now; the change only counts once the controller confirms it. ' : 'Fans can\'t be switched from here. ') +
-                    'If they need the fans on right now, the override button on the PowerPause panel brings them on until the next timetable change.<div style="margin-top:6px">' + guideLink() + '</div>',
+                timetableHtml: fanTimetableInfo,
                 lead: 'If you need the fans on right now, the override button on the PowerPause panel brings them on until the next timetable change. Press it once; please don\'t hold it down.',
                 subject: 'Extractor fan timetable request',
                 OohCaptureClass: 'fans'
             });
         }
-        return scheduleCollect(f, 'fan-sched', { equipment: fans.map(x => x.zone || 'Extractor fan'), subject: 'Extractor fan timetable request', OohCaptureClass: 'fans' });
+
+        // fanKind === 'once'
+        if (!f.data._fanOnceLine) { doneLine('The customer needs the fans adjusted just this once', 'customer'); f.data._fanOnceLine = 1; }
+
+        if (!f.data.fanWhen) {
+            return sayBox(null, 'When does the customer need this in place?') + whenNeededChips('fanWhen');
+        }
+
+        const fanNeededAt = neededAtFromWhen(f.data.fanWhen);
+        const fanUrg = typeof OohUrgency !== 'undefined' ? OohUrgency.urgencyOf(fanNeededAt, Date.now()) : null;
+        const fanIsUrgent = fanUrg && fanUrg.urgent;
+
+        if (!f.data.fanOutcome) {
+            const fanBanner = urgencyBannerHtml(fanIsUrgent, 'fan-urgency-banner');
+            if (fanIsUrgent) {
+                return fanBanner +
+                    infoBox('If you raise a P1, write why it\'s urgent in the comment — for example, what opening time the fans are needed for.') +
+                    answers(
+                        '<button class="chip" data-testid="fan-outcome-p1" onclick="flowStep({fanOutcome:\'p1\'})">Raise a P1</button>' +
+                        '<button class="chip" data-testid="fan-outcome-ticket" onclick="flowStep({fanOutcome:\'ticket\'})">Log a normal ticket</button>'
+                    );
+            }
+            return fanBanner +
+                answers('<button class="chip" data-testid="fan-outcome-ticket" onclick="flowStep({fanOutcome:\'ticket\'})">Log a normal ticket</button>');
+        }
+
+        if (f.data.fanOutcome === 'p1') {
+            return outcomeP1(f, 'fan-urgent-p1', {
+                subject: 'Extractor fans — urgent one-off — P1',
+                detail: 'Customer needs extractor fans adjusted urgently for a one-off occasion. Requested before the IoT team can respond.',
+                pre: sayBox("Thanks. As there's an immediate risk to trade or to anyone's health and safety, I'm going to raise this as urgent with our on-call team."),
+                script: res => 'That\'s raised as urgent, reference ' + dyn(res.ticket.id) + '. Someone from our on-call team will call you back shortly.'
+            });
+        }
+
+        return outcomeCaptured(f, 'fan-ticket', {
+            subject: 'Extractor fan timetable request',
+            detail: 'Customer needs extractor fans at a different time just this once. Logged for the IoT team to pick up the next working day.',
+            script: res => 'Thanks, it\'s logged, reference ' + dyn(res.ticket.id) + '. Our IoT team picks it up the next working day.',
+            line: 'Nothing was switched from here. The IoT team picks it up the <b>next working day</b>.',
+            OohCaptureClass: 'fans'
+        });
     },
 
     fridge(ws, f) {
@@ -2657,7 +2832,14 @@ const FLOWR = {
    ${answers(`<button class="chip" data-testid="group-offline-back" onclick="flowStep({ofq:'gback'})">Yes, it's working again</button><button class="chip" data-testid="group-offline-capture" onclick="flowStep({ofq:'gcap'})">No, it's still not working</button>`)}`;
             }
 
-            // Anchor ONLINE, no group gateway offline → site reachable (green, existing all-good callout).
+            // Anchor ONLINE, no group gateway offline.
+            // B9: if diverted from heating with a known offline zone, name the device instead of saying all is well.
+            if (f.data.offlineZone) {
+                return infoBox(`<b>${esc(f.data.offlineZone)}</b> — the thermostat in this area isn\'t connecting to us. The site itself is reachable.`) +
+                    sayBox('The site is connecting to us, but the heating controller in that area isn\'t responding. This can be a temporary glitch, or the device may have lost power or its connection.', 'would you like our IoT team to look into it?') +
+                    answers(`<button class="chip" data-testid="connectivity-zone-capture" onclick="flowStep({ofq:'cap'})">Yes, please</button>` +
+                        `<button class="chip" data-testid="connectivity-zone-noact" onclick="flowStep({ofq:'noact'})">No, leave it</button>`);
+            }
             return infoBox('Everything at this site is connecting to us, so the Lighthouse equipment looks healthy. If the customer says nothing is working, it may be a different fault.') +
                 sayBox('Everything on our side is connecting normally at the moment.', 'what is still not working for you?') +
                 answers(`<button class="chip" data-testid="connectivity-allok-continue" onclick="flowStep({ofq:'cap'})">They've told me; continue</button>`);
@@ -2671,6 +2853,15 @@ const FLOWR = {
                 detail: 'Gateway was offline; customer checked fuse board/power and it recovered. Logged for the IoT team to verify overnight stability.',
                 script: res => 'That\'s it back on. Give it ten minutes to settle. It\'s logged, reference ' + dyn(res.ticket.id) + ', and our team checks the next working day that it stayed connected.',
                 OohCaptureClass: 'connectivity'
+            });
+        }
+        // B9: zone-specific "no action" when diverted from heating and customer declines to log
+        if (f.data.ofq === 'noact') {
+            doneLine('The customer doesn\'t want it logged', 'customer');
+            return outcomeNoAction(f, 'zone-noact', {
+                subject: 'Heating thermostat not responding — no action taken',
+                detail: `Thermostat in ${f.data.offlineZone ? esc(f.data.offlineZone) : 'area'} not responding. Customer declined to log it.`,
+                script: res => 'No problem. It\'s noted on the call record, reference ' + dyn(res.ticket.id) + '. If it\'s still not working, give us a call back.'
             });
         }
         // OOHDASH-146 B24: riskQuestion added to gcap, dcap, and cap paths.
