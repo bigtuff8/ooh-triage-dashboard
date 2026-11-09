@@ -50,6 +50,7 @@ test('E3: notes field present during aircon shortcut chip flow', async ({ page }
     const shortcut = page.locator('[data-testid="aircon-shortcut"]');
     await expect(shortcut).toBeVisible();
     await shortcut.click(); // E1: auto-submits for non-P1
+    await page.locator('[data-testid="risk-no"]').click();
     await expect(page.locator('[data-testid="outcome-captured"]')).toBeVisible();
 });
 
@@ -59,10 +60,11 @@ test('E4: confirm step shown on chip click; Record outcome fires the POST', asyn
     await confirmSite(page, '6832', 'Old Grey Mare');
     await page.locator('[data-testid="tile-other"]').click();
     await page.locator('[data-testid="other-text"]').pressSequentially('test confirm step', { delay: 20 });
-    await page.locator('[data-testid="other-capture"]').click();
-    // E1: clicking other-normal auto-submits without a confirm step
+    await page.locator('[data-testid="other-continue"]').click();
+    await page.locator('[data-testid="scope-none-of-these"]').click();
+    // E1: clicking risk-no auto-submits without a confirm step
     const postPromise = page.waitForRequest(r => r.url().includes('/api/outcomes') && r.method() === 'POST');
-    await page.locator('[data-testid="other-normal"]').click(); // auto-submits for non-P1
+    await page.locator('[data-testid="risk-no"]').click(); // auto-submits for non-P1
     const req = await postPromise;
     expect(req.postData()).toBeTruthy();
     // No confirm-step or record-outcome button for non-P1
@@ -78,9 +80,10 @@ test('E5: additionalNotes carried in the POST body when notes are entered', asyn
     await page.locator('[data-testid="tile-other"]').click();
     await page.locator('[data-testid="other-text"]').pressSequentially('fryer issue', { delay: 20 });
     await page.locator('#addnotes').fill(NOTE);
-    await page.locator('[data-testid="other-capture"]').click();
+    await page.locator('[data-testid="other-continue"]').click();
+    await page.locator('[data-testid="scope-none-of-these"]').click();
     const postPromise = page.waitForRequest(r => r.url().includes('/api/outcomes') && r.method() === 'POST');
-    await page.locator('[data-testid="other-normal"]').click(); // E1: auto-submits for non-P1
+    await page.locator('[data-testid="risk-no"]').click(); // E1: auto-submits for non-P1
     const req = await postPromise;
     const body = JSON.parse(req.postData());
     expect(body.additionalNotes).toBe(NOTE);
@@ -94,8 +97,9 @@ test('E6: addnotes-echo element present when notes were entered', async ({ page 
     await page.locator('[data-testid="tile-other"]').click();
     await page.locator('[data-testid="other-text"]').pressSequentially('boiler issue', { delay: 20 });
     await page.locator('#addnotes').fill(NOTE);
-    await page.locator('[data-testid="other-capture"]').click();
-    await page.locator('[data-testid="other-normal"]').click(); // E1: auto-submits for non-P1
+    await page.locator('[data-testid="other-continue"]').click();
+    await page.locator('[data-testid="scope-none-of-these"]').click();
+    await page.locator('[data-testid="risk-no"]').click(); // E1: auto-submits for non-P1
 
     const echo = page.locator('[data-testid="addnotes-echo"]');
     await expect(echo).toBeVisible();
@@ -108,8 +112,9 @@ test('E7: no addnotes-echo when notes field left empty', async ({ page }) => {
     await confirmSite(page, '6832', 'Old Grey Mare');
     await page.locator('[data-testid="tile-other"]').click();
     await page.locator('[data-testid="other-text"]').pressSequentially('no notes test', { delay: 20 });
-    await page.locator('[data-testid="other-capture"]').click();
-    await page.locator('[data-testid="other-normal"]').click(); // E1: auto-submits for non-P1
+    await page.locator('[data-testid="other-continue"]').click();
+    await page.locator('[data-testid="scope-none-of-these"]').click();
+    await page.locator('[data-testid="risk-no"]').click(); // E1: auto-submits for non-P1
     await expect(page.locator('[data-testid="outcome-captured"]')).toBeVisible();
     await expect(page.locator('[data-testid="addnotes-echo"]')).toHaveCount(0);
 });
@@ -120,9 +125,10 @@ test('E8: additionalNotes is null in POST when field is empty', async ({ page })
     await confirmSite(page, '6832', 'Old Grey Mare');
     await page.locator('[data-testid="tile-other"]').click();
     await page.locator('[data-testid="other-text"]').pressSequentially('null notes test', { delay: 20 });
-    await page.locator('[data-testid="other-capture"]').click();
+    await page.locator('[data-testid="other-continue"]').click();
+    await page.locator('[data-testid="scope-none-of-these"]').click();
     const postPromise = page.waitForRequest(r => r.url().includes('/api/outcomes') && r.method() === 'POST');
-    await page.locator('[data-testid="other-normal"]').click(); // E1: auto-submits for non-P1
+    await page.locator('[data-testid="risk-no"]').click(); // E1: auto-submits for non-P1
     const req = await postPromise;
     const body = JSON.parse(req.postData());
     expect(body.additionalNotes).toBeNull();
@@ -134,8 +140,9 @@ test('E9: post-submit notes link/box rendered after outcome captured', async ({ 
     await confirmSite(page, '6832', 'Old Grey Mare');
     await page.locator('[data-testid="tile-other"]').click();
     await page.locator('[data-testid="other-text"]').pressSequentially('e9 post-submit', { delay: 20 });
-    await page.locator('[data-testid="other-capture"]').click();
-    await page.locator('[data-testid="other-normal"]').click(); // E1: auto-submits for non-P1
+    await page.locator('[data-testid="other-continue"]').click();
+    await page.locator('[data-testid="scope-none-of-these"]').click();
+    await page.locator('[data-testid="risk-no"]').click(); // E1: auto-submits for non-P1
     await expect(page.locator('[data-testid="outcome-captured"]')).toBeVisible();
     // Post-submit notes box (or its link) must appear after the outcome
     const postBox = page.locator('[data-testid="addnotes-post-open"]');
@@ -148,8 +155,9 @@ test('E10: post-submit notes box fires POST /api/tickets/:id/notes', async ({ pa
     await confirmSite(page, '6832', 'Old Grey Mare');
     await page.locator('[data-testid="tile-other"]').click();
     await page.locator('[data-testid="other-text"]').pressSequentially('e10 test', { delay: 20 });
-    await page.locator('[data-testid="other-capture"]').click();
-    await page.locator('[data-testid="other-normal"]').click(); // E1: auto-submits for non-P1
+    await page.locator('[data-testid="other-continue"]').click();
+    await page.locator('[data-testid="scope-none-of-these"]').click();
+    await page.locator('[data-testid="risk-no"]').click(); // E1: auto-submits for non-P1
     await expect(page.locator('[data-testid="outcome-captured"]')).toBeVisible();
 
     // Open the post-submit notes box and submit a note
@@ -194,8 +202,9 @@ test('E12: draft cleared after "Add another issue"', async ({ page }) => {
     await page.locator('[data-testid="tile-other"]').click();
     await page.locator('[data-testid="other-text"]').pressSequentially('first issue', { delay: 20 });
     await page.locator('#addnotes').fill('E12 note that should be gone after another issue');
-    await page.locator('[data-testid="other-capture"]').click();
-    await page.locator('[data-testid="other-normal"]').click(); // E1: auto-submits for non-P1
+    await page.locator('[data-testid="other-continue"]').click();
+    await page.locator('[data-testid="scope-none-of-these"]').click();
+    await page.locator('[data-testid="risk-no"]').click(); // E1: auto-submits for non-P1
     await expect(page.locator('[data-testid="outcome-captured"]')).toBeVisible();
 
     // Click "Add another issue"
@@ -223,7 +232,7 @@ test('E13: notes carried into POST for ambiguous site capture', async ({ page })
     const NOTE = 'E13 ambiguous note';
     await noteField.fill(NOTE);
     const postPromise = page.waitForRequest(r => r.url().includes('/api/outcomes') && r.method() === 'POST');
-    await page.locator('[data-testid="ambiguous-capture"]').click();
+    await page.locator('[data-testid="risk-no"]').click();
     const req = await postPromise;
     const body = JSON.parse(req.postData());
     expect(body.additionalNotes).toBe(NOTE);
@@ -260,9 +269,10 @@ test('E15: whitespace-only notes sends null in POST (not empty string)', async (
     await page.locator('[data-testid="tile-other"]').click();
     await page.locator('[data-testid="other-text"]').pressSequentially('whitespace notes test', { delay: 20 });
     await page.locator('#addnotes').fill('   ');
-    await page.locator('[data-testid="other-capture"]').click();
+    await page.locator('[data-testid="other-continue"]').click();
+    await page.locator('[data-testid="scope-none-of-these"]').click();
     const postPromise = page.waitForRequest(r => r.url().includes('/api/outcomes') && r.method() === 'POST');
-    await page.locator('[data-testid="other-normal"]').click(); // E1: auto-submits for non-P1
+    await page.locator('[data-testid="risk-no"]').click(); // E1: auto-submits for non-P1
     const req = await postPromise;
     const body = JSON.parse(req.postData());
     // DF-01 fix: client trims before sending; whitespace-only must arrive as null, not '   ' or ''.
@@ -281,6 +291,7 @@ test('E16: notes carried in POST for lighting P1 escalation', async ({ page }) =
     await notes.fill(NOTE);
     const postPromise = page.waitForRequest(r => r.url().includes('/api/outcomes') && r.method() === 'POST');
     await page.locator('[data-testid="lighting-still-off"]').click(); // J1: P1 chip
+    await page.locator('[data-testid="risk-yes"]').click();
     await page.locator('[data-testid="record-outcome"]').click();
     const req = await postPromise;
     const body = JSON.parse(req.postData());
@@ -305,6 +316,7 @@ test('E17: P1 wording — helper text includes P1 notice and echo shows morning-
 
     await page.locator('#addnotes').fill(NOTE);
     await page.locator('[data-testid="lighting-still-off"]').click(); // J1: P1 chip
+    await page.locator('[data-testid="risk-yes"]').click();
     await page.locator('[data-testid="record-outcome"]').click();
     // P1 outcomes render outcome-p1 card (not outcome-captured)
     await expect(page.locator('[data-testid="outcome-p1"]')).toBeVisible({ timeout: 8000 });
@@ -343,8 +355,9 @@ test('E19: confirm step shows outcome subject and Record outcome button', async 
     await confirmSite(page, '6832', 'Old Grey Mare');
     await page.locator('[data-testid="tile-other"]').click();
     await page.locator('[data-testid="other-text"]').pressSequentially('confirm step ui test', { delay: 20 });
-    await page.locator('[data-testid="other-capture"]').click();
-    await page.locator('[data-testid="other-normal"]').click(); // E1: auto-submits for non-P1
+    await page.locator('[data-testid="other-continue"]').click();
+    await page.locator('[data-testid="scope-none-of-these"]').click();
+    await page.locator('[data-testid="risk-no"]').click(); // E1: auto-submits for non-P1
     // E1: no confirm step for non-P1 — verify the new auto-submit behavior
     await expect(page.locator('[data-testid="confirm-step"]')).toHaveCount(0);
     await expect(page.locator('[data-testid="record-outcome"]')).toHaveCount(0);
@@ -357,15 +370,16 @@ test('E20: double-click on Record outcome does not fire two POSTs', async ({ pag
     await confirmSite(page, '6832', 'Old Grey Mare');
     await page.locator('[data-testid="tile-other"]').click();
     await page.locator('[data-testid="other-text"]').pressSequentially('double fire guard', { delay: 20 });
-    await page.locator('[data-testid="other-capture"]').click();
+    await page.locator('[data-testid="other-continue"]').click();
+    await page.locator('[data-testid="scope-none-of-these"]').click();
 
     let postCount = 0;
     page.on('request', req => {
         if (req.url().includes('/api/outcomes') && req.method() === 'POST') postCount++;
     });
 
-    // E1: clicking other-normal auto-submits; verify only one POST fires
-    await page.locator('[data-testid="other-normal"]').click(); // auto-submits for non-P1
+    // E1: clicking risk-no auto-submits; verify only one POST fires
+    await page.locator('[data-testid="risk-no"]').click(); // auto-submits for non-P1
     await expect(page.locator('[data-testid="outcome-captured"]')).toBeVisible();
     expect(postCount).toBe(1);
     // No record-outcome button is present (auto-submit, no manual confirm step)
@@ -394,8 +408,9 @@ test('E22: post-submit save failure keeps typed text in the box for retry', asyn
     await confirmSite(page, '6832', 'Old Grey Mare');
     await page.locator('[data-testid="tile-other"]').click();
     await page.locator('[data-testid="other-text"]').pressSequentially('e22 test', { delay: 20 });
-    await page.locator('[data-testid="other-capture"]').click();
-    await page.locator('[data-testid="other-normal"]').click(); // E1: auto-submits for non-P1
+    await page.locator('[data-testid="other-continue"]').click();
+    await page.locator('[data-testid="scope-none-of-these"]').click();
+    await page.locator('[data-testid="risk-no"]').click(); // E1: auto-submits for non-P1
     await expect(page.locator('[data-testid="outcome-captured"]')).toBeVisible({ timeout: 8000 });
 
     // Open the post-submit notes box and type text
@@ -438,8 +453,9 @@ test('E23: XSS payload in notes field is escaped — no element or script create
     await page.locator('#addnotes').fill(XSS);
 
     // Sink 2: subject escape — no confirm-step with E1 auto-log; verify no XSS bleed
-    await page.locator('[data-testid="other-capture"]').click();
-    await page.locator('[data-testid="other-normal"]').click(); // E1: auto-submits for non-P1
+    await page.locator('[data-testid="other-continue"]').click();
+    await page.locator('[data-testid="scope-none-of-these"]').click();
+    await page.locator('[data-testid="risk-no"]').click(); // E1: auto-submits for non-P1
     await expect(page.locator('[data-testid="outcome-captured"]')).toBeVisible({ timeout: 8000 });
 
     // No alert dialog (onerror / script) must have fired by now
@@ -488,8 +504,9 @@ test('E24: two different notes saved sequentially on the same ticket — both wr
     // Complete the flow so the post-submit box is available.
     await page.locator('[data-testid="tile-other"]').click();
     await page.locator('[data-testid="other-text"]').pressSequentially('e24 idempotency test', { delay: 20 });
-    await page.locator('[data-testid="other-capture"]').click();
-    await page.locator('[data-testid="other-normal"]').click(); // E1: auto-submits for non-P1
+    await page.locator('[data-testid="other-continue"]').click();
+    await page.locator('[data-testid="scope-none-of-these"]').click();
+    await page.locator('[data-testid="risk-no"]').click(); // E1: auto-submits for non-P1
     await expect(page.locator('[data-testid="outcome-captured"]')).toBeVisible({ timeout: 8000 });
     await expect(page.locator('[data-testid="addnotes-post-open"]')).toBeVisible({ timeout: 4000 });
 
@@ -532,8 +549,9 @@ test('E25: server 500 on first save does not deduplicate the retry — note is w
 
     await page.locator('[data-testid="tile-other"]').click();
     await page.locator('[data-testid="other-text"]').pressSequentially('e25 retry test', { delay: 20 });
-    await page.locator('[data-testid="other-capture"]').click();
-    await page.locator('[data-testid="other-normal"]').click(); // E1: auto-submits for non-P1
+    await page.locator('[data-testid="other-continue"]').click();
+    await page.locator('[data-testid="scope-none-of-these"]').click();
+    await page.locator('[data-testid="risk-no"]').click(); // E1: auto-submits for non-P1
     await expect(page.locator('[data-testid="outcome-captured"]')).toBeVisible({ timeout: 8000 });
     await expect(page.locator('[data-testid="addnotes-post-open"]')).toBeVisible({ timeout: 4000 });
 
@@ -579,9 +597,10 @@ test('E26: whitespace-only notes sends null (DF-01 trim fix) and no echo is show
     await page.locator('[data-testid="tile-other"]').click();
     await page.locator('[data-testid="other-text"]').pressSequentially('DF-01 whitespace test', { delay: 20 });
     await page.locator('#addnotes').fill('   ');
-    await page.locator('[data-testid="other-capture"]').click();
+    await page.locator('[data-testid="other-continue"]').click();
+    await page.locator('[data-testid="scope-none-of-these"]').click();
     const postPromise = page.waitForRequest(r => r.url().includes('/api/outcomes') && r.method() === 'POST');
-    await page.locator('[data-testid="other-normal"]').click(); // E1: auto-submits for non-P1
+    await page.locator('[data-testid="risk-no"]').click(); // E1: auto-submits for non-P1
     const req = await postPromise;
     const body = JSON.parse(req.postData());
     // Client must send null (not '   ')

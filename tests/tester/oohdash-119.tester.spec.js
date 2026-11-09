@@ -59,8 +59,9 @@ test('TF-01: E1 auto-submit — POST fires immediately on chip click for non-P1;
         r => r.url().includes('/api/outcomes') && r.method() === 'POST'
     );
 
-    await page.locator('[data-testid="other-capture"]').click();
-    await page.locator('[data-testid="other-normal"]').click(); // E1: auto-submits for non-P1
+    await page.locator('[data-testid="other-continue"]').click();
+    await page.locator('[data-testid="scope-none-of-these"]').click();
+    await page.locator('[data-testid="risk-no"]').click(); // E1: auto-submits for non-P1
 
     // Step 4: E1 auto-submit — no confirm step for non-P1
     await expect(page.locator('[data-testid="confirm-step"]')).toHaveCount(0);
@@ -90,8 +91,9 @@ test('TF-02: N1 appears in echo and in the fixture ticket body (TRG-STEP)', asyn
     const requestPromise = page.waitForRequest(
         r => r.url().includes('/api/outcomes') && r.method() === 'POST'
     );
-    await page.locator('[data-testid="other-capture"]').click();
-    await page.locator('[data-testid="other-normal"]').click(); // E1: auto-submits for non-P1
+    await page.locator('[data-testid="other-continue"]').click();
+    await page.locator('[data-testid="scope-none-of-these"]').click();
+    await page.locator('[data-testid="risk-no"]').click(); // E1: auto-submits for non-P1
     const req = await requestPromise;
     const reqBody = JSON.parse(req.postData());
 
@@ -139,8 +141,9 @@ test('TF-03: XSS — N6 is escaped in echo; no script executes; raw in sessionSt
     expect(stored).toBeTruthy();
     expect(stored.value).toBe(N6); // raw, unescaped
 
-    await page.locator('[data-testid="other-capture"]').click();
-    await page.locator('[data-testid="other-normal"]').click(); // E1: auto-submits for non-P1
+    await page.locator('[data-testid="other-continue"]').click();
+    await page.locator('[data-testid="scope-none-of-these"]').click();
+    await page.locator('[data-testid="risk-no"]').click(); // E1: auto-submits for non-P1
     await expect(page.locator('[data-testid="outcome-captured"]')).toBeVisible();
 
     // No alert should have fired at any point
@@ -166,8 +169,9 @@ test('TF-04: whitespace-only note sends null; no TRG-STEP in ticket body', async
     const postPromise = page.waitForRequest(
         r => r.url().includes('/api/outcomes') && r.method() === 'POST'
     );
-    await page.locator('[data-testid="other-capture"]').click();
-    await page.locator('[data-testid="other-normal"]').click(); // E1: auto-submits for non-P1
+    await page.locator('[data-testid="other-continue"]').click();
+    await page.locator('[data-testid="scope-none-of-these"]').click();
+    await page.locator('[data-testid="risk-no"]').click(); // E1: auto-submits for non-P1
 
     const req = await postPromise;
     const reqBody = JSON.parse(req.postData());
@@ -263,7 +267,7 @@ test('TF-07: heating flow carries additionalNotes in POST (aircon-shortcut path)
 
     // aircon-shortcut is a chip in the heating flow at site 6218
     await page.locator('[data-testid="aircon-shortcut"]').click();
-    // E1: aircon-shortcut auto-submits for non-P1
+    await page.locator('[data-testid="risk-no"]').click();
 
     const req = await postPromise;
     const body = JSON.parse(req.postData());
@@ -357,8 +361,9 @@ test('TF-10: delimiter-injection strings are neutralised in the ticket body', as
     const postPromise = page.waitForRequest(
         r => r.url().includes('/api/outcomes') && r.method() === 'POST'
     );
-    await page.locator('[data-testid="other-capture"]').click();
-    await page.locator('[data-testid="other-normal"]').click(); // E1: auto-submits for non-P1
+    await page.locator('[data-testid="other-continue"]').click();
+    await page.locator('[data-testid="scope-none-of-these"]').click();
+    await page.locator('[data-testid="risk-no"]').click(); // E1: auto-submits for non-P1
     const req = await postPromise;
     const reqBody = JSON.parse(req.postData());
 
@@ -440,8 +445,10 @@ test('TF-12: lighting P1 confirm step then removal — outcome card replaces it'
     const p1Chip = page.locator('[data-testid="lighting-still-off"]');
     await expect(p1Chip).toBeVisible();
     await p1Chip.click();
+    // riskQuestion shown: click risk-yes to confirm P1
+    await page.locator('[data-testid="risk-yes"]').click();
 
-    // Intermediate: confirm step must appear
+    // Intermediate: confirm step (record-outcome) must appear after risk-yes
     const confirmStep = page.locator('[data-testid="confirm-step"]');
     await expect(confirmStep).toBeVisible();
     await expect(page.locator('[data-testid="outcome-p1"]')).toHaveCount(0);
@@ -468,8 +475,9 @@ test('TF-13: post-submit box: open → save → saved state; save button absent'
     await confirmSite(page, '6832', 'Old Grey Mare');
     await page.locator('[data-testid="tile-other"]').click();
     await page.locator('[data-testid="other-text"]').pressSequentially('post box test', { delay: 20 });
-    await page.locator('[data-testid="other-capture"]').click();
-    await page.locator('[data-testid="other-normal"]').click(); // E1: auto-submits for non-P1
+    await page.locator('[data-testid="other-continue"]').click();
+    await page.locator('[data-testid="scope-none-of-these"]').click();
+    await page.locator('[data-testid="risk-no"]').click(); // E1: auto-submits for non-P1
     await expect(page.locator('[data-testid="outcome-captured"]')).toBeVisible();
 
     // Step 1: post-submit open link must be present
@@ -515,8 +523,9 @@ test('TF-14: post-submit save 500 error shows user-visible error state', async (
     await confirmSite(page, '6832', 'Old Grey Mare');
     await page.locator('[data-testid="tile-other"]').click();
     await page.locator('[data-testid="other-text"]').pressSequentially('error path test', { delay: 20 });
-    await page.locator('[data-testid="other-capture"]').click();
-    await page.locator('[data-testid="other-normal"]').click(); // E1: auto-submits for non-P1
+    await page.locator('[data-testid="other-continue"]').click();
+    await page.locator('[data-testid="scope-none-of-these"]').click();
+    await page.locator('[data-testid="risk-no"]').click(); // E1: auto-submits for non-P1
     await expect(page.locator('[data-testid="outcome-captured"]')).toBeVisible();
 
     // Intercept the notes POST to return 500
@@ -561,7 +570,7 @@ test('TF-15: aircon shortcut carries notes from heating flow (endpoint 4)', asyn
         r => r.url().includes('/api/outcomes') && r.method() === 'POST'
     );
     await shortcut.click();
-    // E1: aircon-shortcut auto-submits for non-P1
+    await page.locator('[data-testid="risk-no"]').click();
 
     const req = await postPromise;
     const body = JSON.parse(req.postData());
@@ -592,7 +601,7 @@ test('TF-16: ambiguous site 6758 — notes field present; additionalNotes in POS
     const postPromise = page.waitForRequest(
         r => r.url().includes('/api/outcomes') && r.method() === 'POST'
     );
-    await page.locator('[data-testid="ambiguous-capture"]').click();
+    await page.locator('[data-testid="risk-no"]').click();
     const req = await postPromise;
     const body = JSON.parse(req.postData());
     expect(body.additionalNotes).toBe(N1);
@@ -793,8 +802,9 @@ test('TF-22: sessionStorage cleared after outcome is recorded', async ({ page })
     await page.locator('#addnotes').pressSequentially(N1, { delay: 5 });
     await page.waitForTimeout(700);
 
-    await page.locator('[data-testid="other-capture"]').click();
-    await page.locator('[data-testid="other-normal"]').click(); // E1: auto-submits for non-P1
+    await page.locator('[data-testid="other-continue"]').click();
+    await page.locator('[data-testid="scope-none-of-these"]').click();
+    await page.locator('[data-testid="risk-no"]').click(); // E1: auto-submits for non-P1
     await expect(page.locator('[data-testid="outcome-captured"]')).toBeVisible();
 
     const stored = await page.evaluate(() => sessionStorage.getItem('ooh_note_draft'));
@@ -839,8 +849,9 @@ test('TF-24: draft cleared on Add another issue; second flow starts empty', asyn
     await page.locator('[data-testid="tile-other"]').click();
     await page.locator('[data-testid="other-text"]').pressSequentially('first issue', { delay: 20 });
     await page.locator('#addnotes').fill(N1);
-    await page.locator('[data-testid="other-capture"]').click();
-    await page.locator('[data-testid="other-normal"]').click(); // E1: auto-submits for non-P1
+    await page.locator('[data-testid="other-continue"]').click();
+    await page.locator('[data-testid="scope-none-of-these"]').click();
+    await page.locator('[data-testid="risk-no"]').click(); // E1: auto-submits for non-P1
     await expect(page.locator('[data-testid="outcome-captured"]')).toBeVisible();
 
     // Click Add another issue
@@ -926,15 +937,16 @@ test('TF-27: double-click Record outcome fires exactly one POST', async ({ page 
     await confirmSite(page, '6832', 'Old Grey Mare');
     await page.locator('[data-testid="tile-other"]').click();
     await page.locator('[data-testid="other-text"]').pressSequentially('double fire', { delay: 20 });
-    await page.locator('[data-testid="other-capture"]').click();
+    await page.locator('[data-testid="other-continue"]').click();
+    await page.locator('[data-testid="scope-none-of-these"]').click();
 
     let postCount = 0;
     page.on('request', req => {
         if (req.url().includes('/api/outcomes') && req.method() === 'POST') postCount++;
     });
 
-    // E1: clicking other-normal auto-submits; verify only one POST fires
-    await page.locator('[data-testid="other-normal"]').click(); // auto-submits for non-P1
+    // E1: clicking risk-no auto-submits; verify only one POST fires
+    await page.locator('[data-testid="risk-no"]').click(); // auto-submits for non-P1
     await expect(page.locator('[data-testid="outcome-captured"]')).toBeVisible();
     expect(postCount).toBe(1);
     // No record-outcome button is present (E1 auto-submit for non-P1)
@@ -1011,8 +1023,9 @@ test('TF-30: empty notes produces null in POST and no TRG-STEP in ticket body', 
         page.waitForRequest(r => r.url().includes('/api/outcomes') && r.method() === 'POST'),
         page.waitForResponse(r => r.url().includes('/api/outcomes') && r.request().method() === 'POST')
     ];
-    await page.locator('[data-testid="other-capture"]').click();
-    await page.locator('[data-testid="other-normal"]').click(); // E1: auto-submits for non-P1
+    await page.locator('[data-testid="other-continue"]').click();
+    await page.locator('[data-testid="scope-none-of-these"]').click();
+    await page.locator('[data-testid="risk-no"]').click(); // E1: auto-submits for non-P1
     const [req, resp] = await Promise.all([reqPromise, respPromise]);
 
     const reqBody = JSON.parse(req.postData());
@@ -1040,8 +1053,9 @@ test('TF-31: two sequential post-submit notes on the same ticket both reach the 
     await confirmSite(page, '6832', 'Old Grey Mare');
     await page.locator('[data-testid="tile-other"]').click();
     await page.locator('[data-testid="other-text"]').pressSequentially('two-note test', { delay: 20 });
-    await page.locator('[data-testid="other-capture"]').click();
-    await page.locator('[data-testid="other-normal"]').click(); // E1: auto-submits for non-P1
+    await page.locator('[data-testid="other-continue"]').click();
+    await page.locator('[data-testid="scope-none-of-these"]').click();
+    await page.locator('[data-testid="risk-no"]').click(); // E1: auto-submits for non-P1
     await expect(page.locator('[data-testid="outcome-captured"]')).toBeVisible();
 
     // Collect all notes POSTs
@@ -1181,8 +1195,9 @@ test('TF-34: note with pipe — POST body has raw pipe; echo renders note safely
     const requestPromise = page.waitForRequest(
         r => r.url().includes('/api/outcomes') && r.method() === 'POST'
     );
-    await page.locator('[data-testid="other-capture"]').click();
-    await page.locator('[data-testid="other-normal"]').click(); // E1: auto-submits for non-P1
+    await page.locator('[data-testid="other-continue"]').click();
+    await page.locator('[data-testid="scope-none-of-these"]').click();
+    await page.locator('[data-testid="risk-no"]').click(); // E1: auto-submits for non-P1
     const req = await requestPromise;
     const reqBody = JSON.parse(req.postData());
 

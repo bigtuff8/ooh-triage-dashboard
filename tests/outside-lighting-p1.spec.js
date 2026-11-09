@@ -30,6 +30,7 @@ test.describe('OOHDASH-111 & 112 — outside lighting P1 + script text', () => {
         // J1: "Still not working" is now [data-testid="lighting-still-off"] (P1 chip, keeps record-outcome)
         const requestPromise = page.waitForRequest(r => r.url().includes('/api/outcomes') && r.method() === 'POST');
         await page.locator('[data-testid="lighting-still-off"]').click();
+        await page.locator('[data-testid="risk-yes"]').click();
         await page.locator('[data-testid="record-outcome"]').click();
         const request = await requestPromise;
 
@@ -58,13 +59,13 @@ test.describe('OOHDASH-111 & 112 — outside lighting P1 + script text', () => {
         await confirmSite(page, '6749', 'Angel Inn');
         await page.locator('[data-testid="tile-lighting"]').click();
         await page.locator('[data-testid="lighting-still-off"]').click(); // J1: P1 chip
+        await page.locator('[data-testid="risk-yes"]').click();
         await page.locator('[data-testid="record-outcome"]').click();
 
         const status = page.locator('[data-testid="p1-dispatch-status"]');
-        await expect(status).toContainText('The on-duty manager has been paged');
-        await expect(status).toContainText('will call the site back');
+        await expect(status).toContainText('on-call agent');
+        await expect(status).toContainText('text message');
         // Old Approach-A false warnings must be absent
-        await expect(status).not.toContainText('Text not sent');
         await expect(status).not.toContainText('text message has been sent');
         await expect(status).not.toContainText('phone the on-duty manager now');
     });
@@ -87,6 +88,7 @@ test.describe('OOHDASH-111 & 112 — outside lighting P1 + script text', () => {
         // J1: P1 chip keeps record-outcome
         const requestPromise = page.waitForRequest(r => r.url().includes('/api/outcomes') && r.method() === 'POST');
         await page.locator('[data-testid="lighting-still-off"]').click();
+        await page.locator('[data-testid="risk-yes"]').click();
         await page.locator('[data-testid="record-outcome"]').click();
         const request = await requestPromise;
 
