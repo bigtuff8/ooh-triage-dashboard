@@ -17,7 +17,7 @@ import * as registry from './registry.js';
 /* Live TB sessions (read + scoped write)                              */
 /* ------------------------------------------------------------------ */
 
-function tbSession(username, password, label) {
+function tbSession({ username, password, apiKey }, label) {
     let token = null;
     let expiry = 0;
     // OOHDASH-24: an ACTIVE probe-result record replaces the old lazy boolean `healthy` latch.
@@ -28,9 +28,14 @@ function tbSession(username, password, label) {
     let probe = { ok: false, checkedAt: 0 };
     function markProbe(ok) { probe = { ok, checkedAt: Date.now() }; }
     async function getToken() {
+        // OOHDASH-161: API key mode — no login needed, key is used directly as the bearer token.
+        if (apiKey) return apiKey;
         if (token && Date.now() < expiry) return token;
         const res = await axios.post(`${config.thingsboard.url}/api/auth/login`, { username, password }, { timeout: 10000 });
-        token = res.data.token;
+        const data = res.data;
+        // MFA guard: a PRE_VERIFICATION_TOKEN means MFA is required but can't be completed here.
+        if (data.scope === 'PRE_VERIFICATION_TOKEN') throw new Error('[TB] MFA required — use TB_API_KEY instead of username/password');
+        token = data.token;
         expiry = Date.now() + 2 * 60 * 60 * 1000;
         markProbe(true);
         console.log(`[TB] Authenticated (${label})`);
@@ -54,12 +59,25 @@ function tbSession(username, password, label) {
         }
     }
     /**
-     * OOHDASH-24 — active read probe. A cheap authenticated call (the existing getToken() login)
-     * that positively re-proves the read credential is still live, so a once-good-now-dead cred is
-     * caught on the healthcheck path WITHOUT needing a device read to trigger it. Records outcome +
-     * timestamp; never throws (health must not take down /healthz). No-op when unconfigured.
+     * OOHDASH-24 — active read probe. A cheap authenticated call that positively re-proves the
+     * credential is still live. In API key mode, probes via GET /api/auth/user (a lightweight
+     * authenticated read) since there is no login call to exercise. In JWT mode, re-posts the
+     * login to catch revoked credentials without disturbing the cached JWT.
      */
     async function activeReadProbe() {
+        if (apiKey) {
+            // API key mode: verify the key is still valid via a cheap authenticated read.
+            try {
+                await axios.get(`${config.thingsboard.url}/api/auth/user`, {
+                    headers: { 'X-Authorization': `Bearer ${apiKey}` },
+                    timeout: 10000
+                });
+                markProbe(true);
+            } catch {
+                markProbe(false);
+            }
+            return probe;
+        }
         if (!(username && password)) return probe;
         // OOHDASH-148 Option C: post directly against /api/auth/login instead of clearing token
         // and delegating to getToken(), so concurrent requests continue on the valid cached token
@@ -67,7 +85,9 @@ function tbSession(username, password, label) {
         // login call still marks the probe unhealthy without disturbing the cached JWT.
         try {
             const res = await axios.post(`${config.thingsboard.url}/api/auth/login`, { username, password }, { timeout: 10000 });
-            token = res.data.token;
+            const data = res.data;
+            if (data.scope === 'PRE_VERIFICATION_TOKEN') throw new Error('MFA required');
+            token = data.token;
             expiry = Date.now() + 2 * 60 * 60 * 1000;
             markProbe(true);
         } catch {
@@ -75,7 +95,7 @@ function tbSession(username, password, label) {
         }
         return probe;
     }
-    const isConfigured = () => !!(username && password);
+    const isConfigured = () => !!(apiKey || (username && password));
     const isFresh = () => (Date.now() - probe.checkedAt) < config.control.healthProbeTtlMs;
     return {
         request,
@@ -91,8 +111,8 @@ function tbSession(username, password, label) {
     };
 }
 
-const readSession = tbSession(config.thingsboard.readUsername, config.thingsboard.readPassword, 'read');
-const writeSession = tbSession(config.thingsboard.writeUsername, config.thingsboard.writePassword, 'write/SR-3');
+const readSession = tbSession({ username: config.thingsboard.readUsername, password: config.thingsboard.readPassword, apiKey: config.thingsboard.readApiKey }, 'read');
+const writeSession = tbSession({ username: config.thingsboard.writeUsername, password: config.thingsboard.writePassword }, 'write/SR-3');
 
 /**
  * Thin read-plane request wrapper (read plane / D5). Lets services/tb-device.js issue

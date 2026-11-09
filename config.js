@@ -71,6 +71,7 @@ export const config = {
         url: env('TB_URL', 'https://portal.lhlive.co.uk'),
         readUsername: env('TB_USERNAME'),
         readPassword: env('TB_PASSWORD'),
+        readApiKey: env('TB_API_KEY'),
         writeUsername: env('TB_WRITE_USERNAME'),
         writePassword: env('TB_WRITE_PASSWORD')
     },
