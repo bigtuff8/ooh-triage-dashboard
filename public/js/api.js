@@ -34,9 +34,21 @@
         return data;
     }
 
+    // OOHDASH-146 D15/D16 (B34): ticket-creating posts carry the customer's contact, built from state.caller
+    // (memory only). Left out when empty or invalid; a body that already has one is not touched.
+    const CONTACT_PATHS = ['/api/outcomes', '/api/oneoffs'];
+    function withContact(path, body) {
+        try {
+            if (!body || !CONTACT_PATHS.includes(path) || body.customerContact) return body;
+            if (typeof callerContactFrom !== 'function' || typeof state === 'undefined') return body;
+            const cc = callerContactFrom(state.caller);
+            return cc ? Object.assign({}, body, { customerContact: cc }) : body;
+        } catch (e) { return body; }
+    }
+
     window.api = {
         get: path => request('GET', path),
-        post: (path, body) => request('POST', path, body || {}),
+        post: (path, body) => request('POST', path, withContact(path, body || {})),
         del: path => request('DELETE', path)
     };
 })();

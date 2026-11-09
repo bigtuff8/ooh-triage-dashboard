@@ -26,8 +26,9 @@ test('SS-02: confirm step with note text filled', async ({ page }) => {
     await page.locator('[data-testid="tile-other"]').click();
     await page.locator('[data-testid="other-text"]').pressSequentially('boiler not working', { delay: 20 });
     await page.locator('#addnotes').pressSequentially('Engineer due at 7am - called ahead', { delay: 5 });
-    await page.locator('[data-testid="other-capture"]').click();
-    await page.locator('[data-testid="other-normal"]').click(); // E1: auto-submits for non-P1
+    await page.locator('[data-testid="other-continue"]').click();
+    await page.locator('[data-testid="scope-none-of-these"]').click();
+    await page.locator('[data-testid="risk-no"]').click(); // E1: auto-submits for non-P1
     await expect(page.locator('[data-testid="outcome-captured"]')).toBeVisible();
     await page.screenshot({ path: DIR + '/02-outcome-captured.png' });
 });
@@ -50,8 +51,9 @@ test('SS-04: post-submit box — idle state', async ({ page }) => {
     await page.locator('[data-testid="tile-other"]').click();
     await page.locator('[data-testid="other-text"]').pressSequentially('fryer issue', { delay: 20 });
     await page.locator('#addnotes').pressSequentially('Note for post-submit test', { delay: 5 });
-    await page.locator('[data-testid="other-capture"]').click();
-    await page.locator('[data-testid="other-normal"]').click(); // E1: auto-submits for non-P1
+    await page.locator('[data-testid="other-continue"]').click();
+    await page.locator('[data-testid="scope-none-of-these"]').click();
+    await page.locator('[data-testid="risk-no"]').click(); // E1: auto-submits for non-P1
     await expect(page.locator('[data-testid="outcome-captured"]')).toBeVisible();
     await page.screenshot({ path: DIR + '/04-outcome-captured.png' });
     // Open post-submit box
@@ -68,8 +70,9 @@ test('SS-05: 500 error state from post-submit save', async ({ page }) => {
     await confirmSite(page, '6832', 'Old Grey Mare');
     await page.locator('[data-testid="tile-other"]').click();
     await page.locator('[data-testid="other-text"]').pressSequentially('error test', { delay: 20 });
-    await page.locator('[data-testid="other-capture"]').click();
-    await page.locator('[data-testid="other-normal"]').click(); // E1: auto-submits for non-P1
+    await page.locator('[data-testid="other-continue"]').click();
+    await page.locator('[data-testid="scope-none-of-these"]').click();
+    await page.locator('[data-testid="risk-no"]').click(); // E1: auto-submits for non-P1
     await expect(page.locator('[data-testid="outcome-captured"]')).toBeVisible();
     // Open post-submit notes box
     await page.locator('[data-testid="addnotes-post-open"]').click();

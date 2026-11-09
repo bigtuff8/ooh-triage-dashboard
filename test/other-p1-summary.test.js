@@ -13,7 +13,7 @@ function loadClient() {
     sandbox.window = sandbox;
     const ctx = vm.createContext(sandbox);
     const src = readFileSync(new URL('../public/js/flows.js', import.meta.url), 'utf8')
-        + '\n;globalThis.otherP1Summary = otherP1Summary; globalThis.otherP1Reason = otherP1Reason; globalThis.otherP1Choice = otherP1Choice;';
+        + '\n;globalThis.otherP1Summary = otherP1Summary; globalThis.otherP1Reason = otherP1Reason;';
     vm.runInContext(src, ctx, { filename: 'flows.js' });
     return sandbox;
 }
@@ -57,16 +57,4 @@ test('reason guard: stage-0 text wins; blank/whitespace is no reason; placeholde
     assert.equal(c.otherP1Reason({ data: { qraw: '', p1reason: 'Ceiling leak' } }), 'Ceiling leak');
 });
 
-test('choice step: labels exact; P1 disabled when no reason, enabled with stage-0 text', () => {
-    const blocked = c.otherP1Choice({ data: { qraw: '' } });
-    assert.match(blocked, />P1 Escalation</);
-    assert.match(blocked, />Not urgent: pass it to the IoT team</); // OOHDASH-159 rev 5 (E1 no log wording)
-    assert.match(blocked, /data-testid="other-p1" onclick="raiseOtherP1\(\)" disabled aria-disabled="true"/);
-    assert.match(blocked, /data-testid="other-p1-reason"/);
-    const open = c.otherP1Choice({ data: { qraw: 'Leak' } });
-    assert.doesNotMatch(open, /disabled/);
-    assert.doesNotMatch(open, /other-p1-reason/);
-    // Explainer is ASCII-safe
-    const ex = open.slice(open.indexOf('p1-explainer'));
-    assert.ok(/^[\x00-\x7F]*$/.test(ex));
-});
+// otherP1Choice removed in OOHDASH-146 B19 (replaced by universal riskQuestion)

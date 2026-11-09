@@ -23,6 +23,7 @@ import * as liveness from '../services/liveness.js';
 import * as notices from '../services/notices.js';
 import * as callRecord from '../services/call-record.js';
 import { zoneTimetable } from '../services/schedule.js';
+import * as oneoffs from '../services/oneoffs.js';
 
 const router = Router();
 
@@ -186,7 +187,8 @@ export const SCOPE_GROUPS = [
     // OOHDASH-135 Item 6: four-step hotwater scope evaluation (unchanged), except 'ctl' now also needs
     // the boiler panel to be online.
     { key: 'hotwater', label: 'Hot water', kinds: hotWaterDevices, level: s =>
-        hasControllableDhw(s) && (s.devices.some(d => isBoilerPanelDevice(d) && d.online) || !s.devices.some(isBoilerPanelDevice)) ? 'ctl' :
+        // B12: hot water scope is never 'ctl' — no OOH hot water control is offered from the dashboard.
+        hasControllableDhw(s) && (s.devices.some(d => isBoilerPanelDevice(d) && d.online) || !s.devices.some(isBoilerPanelDevice)) ? 'mon' :
         hasControllableDhw(s) ? 'mon' :
         hasHotWaterSignal(s) ? 'mon' :
         (s.devices.some(d => d.kind === 'heating') && !s.boilerControl?.present && !s.devices.some(d => d.deviceType === 'salus-it500-dhw')) ? 'not-lighthouse' :
@@ -525,13 +527,13 @@ export function buildOutcomeTranscript({ action, type, siteNo, siteName, detail,
     // OOHDASH-153: neutral, true-at-build-time step. The transcript is built (and the [TRG] first
     // comment baked) before recordP1Raised runs. The real paging is handled by the IoT Support
     // Dashboard watching the ooh_p1 tag (Approach B). Does not perturb the Outcome: anchor.
-    if (type === 'escalate-p1') steps.push({ time: hhmm(outcomeTime), text: 'P1 escalation raised — on-duty manager to be paged' });
+    if (type === 'escalate-p1') steps.push({ time: hhmm(outcomeTime), text: 'P1 escalation raised — text message sent to the on-call agent' });
     return steps;
 }
 
 router.post('/outcomes', wrap(async (req, res) => {
     const op = req.session.operator;
-    const { type, siteNo, siteName, subject, detail, callerWords, OohCaptureClass, actionId, holdText, p1Summary, additionalNotes, appendToHoldId, holdIds, actions: actionLines, relatedToTicketId, knownSoFar, callId, issueKey, closeOnCreate } = req.body;
+    const { type, siteNo, siteName, subject, detail, callerWords, OohCaptureClass, actionId, holdText, p1Summary, additionalNotes, appendToHoldId, holdIds, actions: actionLines, relatedToTicketId, knownSoFar, callId, issueKey, closeOnCreate, customerContact, p1Reason, p1Origin } = req.body;
     if (!type || !siteNo || !subject || !detail) {
         return res.status(400).json({ error: 'type, siteNo, subject and detail are required' });
     }
@@ -575,6 +577,15 @@ router.post('/outcomes', wrap(async (req, res) => {
 
     const isP1 = type === 'escalate-p1';
 
+    // B21: validate p1Reason for manual P1s (p1Origin !== 'automatic').
+    const p1Automatic = p1Origin === 'automatic';
+    if (isP1 && !p1Automatic) {
+        const normReason = zendesk.normaliseP1Reason(p1Reason);
+        if (!normReason) {
+            return res.status(400).json({ error: 'p1Reason required', message: 'A reason of at least 10 characters is required for a manual P1.' });
+        }
+    }
+
     // F001 — build the timestamped [TRG] transcript from the control action (if any) + context.
     const action = actionId ? control.getAction(actionId) : null;
     const outcomeTime = new Date().toISOString();
@@ -590,8 +601,13 @@ router.post('/outcomes', wrap(async (req, res) => {
         extraTags: isP1 ? ['ooh_p1'] : [],
         // OOHDASH-119: additional notes ride alongside but are NOT written to the P1 SMS or audit log.
         additionalNotes: additionalNotes || null,
+        // OOHDASH-146 B10: customer contact on every ticket, never in P1 SMS, Tonight or audit log.
+        customerContact: customerContact || null,
         // OOHDASH-159 rev 5: equipment Lighthouse doesn't control here → contact-history record created closed.
-        status: (!isP1 && (type === 'scope-only' || closeOnCreate)) ? 'solved' : undefined
+        status: (!isP1 && (type === 'scope-only' || closeOnCreate)) ? 'solved' : undefined,
+        // B21: p1Reason and p1Automatic for manual vs automatic P1s.
+        p1Reason: isP1 ? (p1Reason || null) : undefined,
+        p1Automatic: isP1 ? p1Automatic : undefined
     });
     // OOHDASH-159 rev 5 (E1): link the ticket to its issue so the call record is appended, not duplicated.
     if (callId) callRecord.recordProgress(callId, op.id, { issueKey, outcome: subject, ticketId: ticket.id, knownSoFar: sanitiseKnownSoFar(knownSoFar) });
@@ -611,7 +627,7 @@ router.post('/outcomes', wrap(async (req, res) => {
     if (isP1) {
         // OOHDASH-153 (Approach B): record a positive audit entry in OohSmsLog. The ticket with the
         // ooh_p1 tag already exists above — that tag is what triggers the IoT Support Dashboard to
-        // page the on-duty manager. recordP1Raised is fail-safe and never blocks the outcome.
+        // send a text message to the on-call agent. recordP1Raised is fail-safe and never blocks the outcome.
         p1 = await p1Log.recordP1Raised({ operator: op, siteNo, siteName, ticketId: ticket.id, summary: p1Summary || subject });
     }
 
@@ -661,13 +677,79 @@ router.post('/outcomes', wrap(async (req, res) => {
     });
 }));
 
+/* ---------------- OOHDASH-146 B13: kitchen one-off (section 9) ---- */
+
+/**
+ * POST /api/oneoffs — book a kitchen one-off.
+ *
+ * Body: { confirmToken, siteNo, deviceId, OohOneOffKind, OohOneOffMinutes,
+ *         customerContact, callerWords, additionalNotes }
+ *
+ * Guards (B29): siteNo and deviceId are bound to the site confirmed on the current call
+ * (non-consuming hasSiteConfirmation check). The device must belong to that site. The
+ * server recomputes urgency server-side and refuses a not-urgent request with 409.
+ *
+ * Returns: { bookingId, ticketId, startTime, endTime, deviceName }
+ */
+router.post('/oneoffs', wrap(async (req, res) => {
+    const op = req.session.operator;
+    const { siteNo, deviceId, OohOneOffKind, OohOneOffMinutes, customerContact, callerWords, additionalNotes } = req.body || {};
+
+    if (!siteNo || !deviceId || !OohOneOffKind || OohOneOffMinutes == null) {
+        return res.status(400).json({ error: 'siteNo, deviceId, OohOneOffKind and OohOneOffMinutes are required' });
+    }
+
+    // B29: bind siteNo to the site confirmed on this call (non-consuming — same as heating append).
+    if (!resolution.hasSiteConfirmation(siteNo, op.id)) {
+        return res.status(409).json({ error: 'Site not confirmed on this call. Confirm the site first.' });
+    }
+
+    const result = await oneoffs.bookOneOff({
+        siteNo, deviceId, OohOneOffKind, OohOneOffMinutes: Number(OohOneOffMinutes),
+        customerContact: customerContact || null,
+        callerWords: callerWords || null,
+        additionalNotes: additionalNotes || null,
+        operator: op
+    });
+
+    res.json(result);
+}));
+
+/**
+ * POST /api/oneoffs/:id/cancel — cancel a booked or active one-off.
+ *
+ * Allowed for any agent whose current call has confirmed the site (non-consuming check,
+ * same as the heating append). Done or handed-back one-offs return 409.
+ */
+router.post('/oneoffs/:id/cancel', wrap(async (req, res) => {
+    const op = req.session.operator;
+    const id = req.params.id;
+
+    // Load the booking to check the site (we need siteNo for the confirmation check).
+    const { collection: storeCollection } = await import('../services/store.js');
+    const col = await storeCollection('OohOverrides');
+    const doc = await col.get(id);
+
+    if (!doc || doc.OohOneOffKind === undefined) {
+        return res.status(404).json({ error: 'One-off not found' });
+    }
+
+    // Non-consuming site confirmation check (same as heating append — B29/section 9.3 Cancel).
+    if (!resolution.hasSiteConfirmation(doc.siteNo, op.id)) {
+        return res.status(409).json({ error: 'Site not confirmed on this call. You can only cancel a one-off for a site your current call has confirmed.' });
+    }
+
+    const result = await oneoffs.cancelOneOff(id, op);
+    res.json(result);
+}));
+
 /* ---------------- callback lookup (F013) + tickets ---------------- */
 
 router.get('/callback/:siteNo', wrap(async (req, res) => {
     try {
         res.json(await zendesk.callbackLookup(req.params.siteNo));
     } catch (err) {
-        res.status(503).json({ error: 'Zendesk is unreachable — take the caller’s details and capture the issue', degraded: true });
+        res.status(503).json({ error: 'Zendesk is unreachable — take the customer details and capture the issue', degraded: true });
     }
 }));
 

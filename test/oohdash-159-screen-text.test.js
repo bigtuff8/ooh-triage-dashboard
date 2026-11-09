@@ -28,55 +28,53 @@ import { fileURLToPath } from 'node:url';
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const src = readFileSync(resolve(__dirname, '../public/js/flows.js'), 'utf8');
 
-/* ── ST-1: Kitchen P1 ticket subject and p1Summary ──────────────────────── */
+/* ── ST-1: Kitchen P1 ticket subject (B22 / OOHDASH-146 D13) ────────────── */
 
-test('ST-1a: kitchen P1 subject is "Kitchen equipment off during service — P1"', () => {
+test('ST-1a: kitchen P1 subject is the OOHDASH-146 risk-to-trade subject (B22)', () => {
     assert.ok(
-        src.includes("subject: 'Kitchen equipment off during service — P1'"),
-        'kitchen crit subject must match design rev-5 exactly (em-dash, not hyphen)'
+        src.includes("subject: 'Kitchen equipment off — risk to trade or health and safety — P1'"),
+        'kitchen crit subject must match OOHDASH-146 B22 design (em-dash, risk-to-trade wording)'
     );
 });
 
-test('ST-1b: kitchen P1 p1Summary is "Kitchen equipment off during service"', () => {
+test('ST-1b: kitchen P1 pre say uses the standard risk wording (B20)', () => {
     assert.ok(
-        src.includes("p1Summary: 'Kitchen equipment off during service'"),
-        'kitchen P1 p1Summary must be present for the pager message'
+        src.includes("As there's an immediate risk to trade or to anyone's health and safety, I'm going to raise this as urgent with our on-call team."),
+        'kitchen P1 pre say must use the standard OOHDASH-146 B20 wording'
     );
 });
 
-/* ── ST-2: Kitchen ncrit ticket subject ──────────────────────────────────── */
+/* ── ST-2: Kitchen ncrit ticket subject (B22) ────────────────────────────── */
 
-test('ST-2: kitchen ncrit subject is "Kitchen equipment off — not needed until later"', () => {
+test('ST-2: kitchen ncrit subject is "Kitchen equipment off — no immediate risk" (B22)', () => {
     assert.ok(
-        src.includes("subject: 'Kitchen equipment off — not needed until later'"),
-        'kitchen ncrit subject must match design rev-5'
+        src.includes("subject: 'Kitchen equipment off — no immediate risk'"),
+        'kitchen ncrit subject must match OOHDASH-146 B22 design'
     );
 });
 
-/* ── ST-3: Kitchen service question (SERVICE_ASK) ────────────────────────── */
+/* ── ST-3: Universal risk question (B19) ─────────────────────────────────── */
 
-test('ST-3: SERVICE_ASK constant text includes "kitchen needed for service right now"', () => {
+test('ST-3: RISK_ASK constant includes the universal risk-to-trade question (B19)', () => {
     assert.ok(
-        src.includes('is the kitchen needed for service right now'),
-        'SERVICE_ASK must ask about service right now'
+        src.includes('Is there an immediate risk to trade or to anyone'),
+        'RISK_ASK must include the universal risk question (B19 D13)'
     );
 });
 
-/* ── ST-4: Kitchen service question chip text ────────────────────────────── */
+/* ── ST-4: Universal risk question chip test-ids (B19) ──────────────────── */
 
-test('ST-4a: kitchen-critical chip text is "Yes, it\'s needed now"', () => {
+test('ST-4a: risk-yes chip (data-testid="risk-yes") is present (B19)', () => {
     assert.ok(
-        src.includes("data-testid=\"kitchen-critical\"") &&
-        src.includes("Yes, it's needed now"),
-        'kitchen-critical chip must be present with correct text'
+        src.includes('data-testid="risk-yes"'),
+        'risk-yes chip must be present — replaces the old kitchen-critical chip (B19)'
     );
 });
 
-test('ST-4b: kitchen-notcritical chip text is "No, it can wait"', () => {
+test('ST-4b: risk-no chip (data-testid="risk-no") is present (B19)', () => {
     assert.ok(
-        src.includes("data-testid=\"kitchen-notcritical\"") &&
-        src.includes("No, it can wait"),
-        'kitchen-notcritical chip must be present with correct text'
+        src.includes('data-testid="risk-no"'),
+        'risk-no chip must be present — replaces the old kitchen-notcritical chip (B19)'
     );
 });
 

@@ -81,8 +81,9 @@ test.describe('OOHDASH-128 legacy bare-salus load', () => {
         await expect(page.locator('[data-testid="need-cool"]')).toHaveCount(0);
         await expect(page.locator('[data-testid="need-off"]')).toHaveCount(0);
 
-        // Capture outcome (E1: dark-capture auto-submits for non-P1).
+        // Capture outcome — dark-capture triggers riskQuestion (OOHDASH-146 B24); risk-no submits.
         await page.locator('[data-testid="dark-capture"]').click();
+        await page.locator('[data-testid="risk-no"]').click();
 
         const outcome = page.locator('[data-testid="outcome-captured"]');
         await expect(outcome).toBeVisible();

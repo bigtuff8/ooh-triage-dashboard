@@ -36,7 +36,7 @@ test.describe('F004 resolution', () => {
         await expect(page.locator('[data-testid="confirm-site"]')).toHaveCount(0);
         await expect(page.locator('[data-testid="category-tiles"]')).toHaveCount(0);
         // capture path produces a ticket
-        await page.locator('[data-testid="ambiguous-capture"]').click();
+        await page.locator('[data-testid="risk-no"]').click();
         await expect(page.locator('.toast')).toContainText('Captured as ticket');
     });
 

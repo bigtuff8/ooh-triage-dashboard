@@ -17,10 +17,11 @@
 window.ctl = null;
 let ctlPollTimer = null;
 let ctlBgTimer = null; // detached background watch for a released (slow) action — toasts the late result
+let ctlReleasePending = null; // stored post data for the "Try logging again" retry (B6/D2)
 
-const CTL_TITLES = { up: 'Raise setpoint', down: 'Lower setpoint', frost: 'Turn heating off (frost-hold)', modeoff: 'Turn off (mode)', switchon: 'Turn ON', switchoff: 'Turn OFF' };
-const CTL_WHAT = { up: 'Setpoint raise', down: 'Setpoint lower', frost: 'Heating off (frost-hold)', modeoff: 'Heating off (mode)', switchon: 'Switch ON', switchoff: 'Switch OFF' };
-const CTL_VERB = { up: 'raise the setpoint', down: 'lower the setpoint', frost: 'set a frost-hold', modeoff: 'turn off', switchon: 'switch on', switchoff: 'switch off' };
+const CTL_TITLES = { up: 'Make it warmer', down: 'Make it cooler', frost: 'Turn heating off', modeoff: 'Turn off', switchon: 'Turn on', switchoff: 'Turn off' };
+const CTL_WHAT = { up: 'Target temperature raised', down: 'Target temperature lowered', frost: 'Heating turned off (5°C)', modeoff: 'Turned off', switchon: 'Turned on', switchoff: 'Turned off' };
+const CTL_VERB = { up: 'raise the target temperature', down: 'lower the target temperature', frost: 'turn the heating off', modeoff: 'turn off', switchon: 'turn on', switchoff: 'turn off' };
 // The "not confirmed yet" sentence (mirrors services/errors.js NOT_CONFIRMED_MESSAGE).
 const CTL_NOT_CONFIRMED = "We sent the command but the device hasn\'t confirmed it yet. It may still take effect — check again in a few minutes, or raise a ticket if it does not respond.";
 
@@ -268,50 +269,104 @@ async function ctlRelease() {
     clearInterval(ctlPollTimer);
     const action = c.action;
     const what = CTL_WHAT[c.mode];
+    const valTxt = ctlValTxt(c);
+    const devId = c.device.deviceId;
+    const mins = action?.copyMinutes;
     const additionalNotes = state.flow?.data?.additionalNotes || null;
     const holdTxt = c.hold !== 'none' ? `Hold until ${holdRevertText(c.hold)} — will revert automatically (durable)` : null;
+
+    const postData = {
+        type: 'capture',
+        additionalNotes,
+        actionId: action?.actionId,
+        siteNo: state.workspace.site.siteNo,
+        siteName: state.workspace.site.siteName,
+        subject: `${what} — sent, awaiting device confirmation`,
+        detail: `${what} (${valTxt}) sent to ${devId}. This unit can take a few minutes to confirm; the result will be added to this ticket when the device confirms. Treat as not-yet-applied until confirmed.`,
+        callerWords: state.flow?.data?.freeText || null,
+        knownSoFar: state.flow ? knownSoFarLines(state.flow) : [], // OOHDASH-159 rev 4
+        ...callFields(), // rev 5 (E1)
+        customerContact: callerContactFrom(state.caller),
+        holdText: holdTxt,
+        OohCaptureClass: 'control-awaiting-confirm'
+    };
+    // Store for retry (D2 — "Try logging again")
+    ctlReleasePending = { postData, what, valTxt, mins };
+
     let ticketId = null;
     try {
-        const res = await api.post('/api/outcomes', {
-            type: 'capture',
-            additionalNotes,
-            actionId: action?.actionId,
-            siteNo: state.workspace.site.siteNo,
-            siteName: state.workspace.site.siteName,
-            subject: `${what} — sent, awaiting device confirmation`,
-            detail: `${what} (${ctlValTxt(c)}) sent to ${c.device.deviceId}. This unit can take a few minutes to confirm; the result will be added to this ticket when the device confirms. Treat as not-yet-applied until confirmed.`,
-            callerWords: state.flow?.data?.freeText || null,
-            knownSoFar: state.flow ? knownSoFarLines(state.flow) : [], // OOHDASH-159 rev 4
-            ...callFields(), // rev 5 (E1)
-            holdText: holdTxt,
-            OohCaptureClass: 'control-awaiting-confirm'
-        });
+        // additionalNotes is in postData above (D2 awaiting-confirm outcome)
+        const res = await api.post('/api/outcomes', postData);
         ticketId = res?.ticket?.id || null;
         notesDraftClear();
         if (state.flow?.data) state.flow.data._ticketId = ticketId;
         registerIssue(`${what} — awaiting confirmation`, 'blue', ticketId);
+        if (ticketId) ctlReleasePending = null; // no retry needed
     } catch (err) {
         toast(`⚠️ ${esc(err.message)}`);
     }
     // Detached background watch — toast the result; the server also writes it to the ticket.
     startCtlBgWatch(action?.actionId, what);
+
+    // D2: branch on ticket success. ticketId not null = logged; null = show "Try logging again".
+    const bodyHtml = ticketId
+        ? `<p class="after-line">${esc(what)} (${esc(valTxt)}) has been sent. It should take effect within about <b>${mins} minutes</b>. We\'re watching it and will add the result to ticket #${ticketId}.</p>`
+        : `<p class="after-line">${esc(what)} (${esc(valTxt)}) has been sent. It should take effect within about <b>${mins} minutes</b>.</p>`;
+    const sayScript = ticketId
+        ? 'That\'s gone to the thermostat now. It can take a few minutes to take effect. I\'ve logged it, and we\'ll keep an eye on it. If it doesn\'t respond, we\'ll follow it up.'
+        : 'That\'s gone to the thermostat now. It can take a few minutes to take effect. We\'ll keep an eye on it, and I\'ll make sure it\'s logged for our team.';
+    const extraHtml = ticketId
+        ? ''
+        : '<div class="alert err" data-testid="awaiting-ticket-failed"><b>The ticket didn\'t save.</b> <button class="btn" data-testid="ctl-release-retry" onclick="ctlReleaseRetry()">Try logging again</button></div>';
+
     const html = afterCard('outcome-awaiting', 'Sent, waiting for the device to confirm', ticketId,
-        `<p class="after-line">${what} (${ctlValTxt(c)}) is on its way to <span class="mono">${esc(c.device.deviceId)}</span>. It should take effect within about <b>${action?.copyMinutes} minutes</b>. We\'re watching in the background and will update the ticket when the device confirms.</p>`,
-        ticketId
-            ? 'That\'s gone to the thermostat now. It can take a few minutes to take effect. It\'s logged, and we\'ll keep an eye on it; if it doesn\'t respond, our IoT team follows it up the next working day.'
-            : 'That\'s gone to the thermostat now. It can take a few minutes to take effect.',
-        ticketId ? '' : '<div class="alert err" data-testid="awaiting-ticket-failed">The change was sent, but saving the ticket failed. It is still in the call record, which is published when you end the call.</div>') + (ticketId ? '%%NOTESPOST%%' : '') + outButtons();
+        bodyHtml, sayScript, extraHtml) + (ticketId ? '%%NOTESPOST%%' : '') + outButtons();
     window.ctl = null;
     closeModal();
     if (state.flow) { state.flow.stage = 99; state.flow.data._outcomeHtml = html; }
     render();
 }
 
+/**
+ * D2 retry: re-posts the same outcome ticket when the first attempt failed (ticket ID was null).
+ * Disabled while in-flight. On success rebuilds the outcome card with the ticket number.
+ */
+async function ctlReleaseRetry() {
+    if (!ctlReleasePending) return;
+    const btn = document.querySelector('[data-testid="ctl-release-retry"]');
+    if (btn) btn.disabled = true;
+    try {
+        // additionalNotes is carried inside ctlReleasePending.postData (set in ctlRelease)
+        const res = await api.post('/api/outcomes', ctlReleasePending.postData);
+        const ticketId = res?.ticket?.id || null;
+        if (ticketId) {
+            const { what, valTxt, mins } = ctlReleasePending;
+            notesDraftClear();
+            if (state.flow?.data) state.flow.data._ticketId = ticketId;
+            registerIssue(`${what} — awaiting confirmation`, 'blue', ticketId);
+            const html = afterCard('outcome-awaiting', 'Sent, waiting for the device to confirm', ticketId,
+                `<p class="after-line">${esc(what)} (${esc(valTxt)}) has been sent. It should take effect within about <b>${mins} minutes</b>. We\'re watching it and will add the result to ticket #${ticketId}.</p>`,
+                'That\'s gone to the thermostat now. It can take a few minutes to take effect. I\'ve logged it, and we\'ll keep an eye on it. If it doesn\'t respond, we\'ll follow it up.',
+                '') + '%%NOTESPOST%%' + outButtons();
+            ctlReleasePending = null;
+            if (state.flow) state.flow.data._outcomeHtml = html;
+            toast(`✅ Logged — ticket #${ticketId}`);
+            render();
+        } else {
+            if (btn) btn.disabled = false;
+            toast('⚠️ Still couldn\'t save the ticket — please try again or raise it via Tonight');
+        }
+    } catch (err) {
+        if (btn) btn.disabled = false;
+        toast(`⚠️ ${esc(err.message)}`);
+    }
+}
+
 /** Detached watch for a released action — toasts the final outcome (CONFIRMED / NOT DELIVERED / NOT CONFIRMED). */
 function startCtlBgWatch(actionId, what) {
     clearInterval(ctlBgTimer);
     if (!actionId) return;
-    let elapsed = 0;
+    let elapsed = 0; let warned = false; // OOHDASH-146 D4: warn once
     ctlBgTimer = setInterval(async () => {
         elapsed += 15000;
         let action;
@@ -323,7 +378,7 @@ function startCtlBgWatch(actionId, what) {
         } else if (action.state === 'non-delivery') {
             toast(`❌ <b>Not delivered</b> — ${esc(what)}: ${esc(action.operatorError || 'the device rejected it')}. It\'s on the ticket.`);
             clearInterval(ctlBgTimer);
-        } else if (action.state === 'indeterminate' && elapsed > 2 * 60000) {
+        } else if (action.state === 'indeterminate' && elapsed > 2 * 60000 && !warned) { warned = true;
             toast(`⚠️ <b>Not confirmed yet</b> — ${esc(what)} hasn\'t confirmed. Still watching; it\'s on the ticket.`);
         }
         if (elapsed > 95 * 60000) clearInterval(ctlBgTimer);
@@ -374,6 +429,7 @@ async function ctlFinish() {
             callerWords: state.flow?.data?.freeText || null,
             knownSoFar: state.flow ? knownSoFarLines(state.flow) : [], // OOHDASH-159 rev 4
             ...callFields(), // rev 5 (E1)
+            customerContact: callerContactFrom(state.caller),
             holdText: holdTxt
         });
         notesDraftClear();
@@ -423,6 +479,7 @@ async function ctlEscalate() {
             callerWords: state.flow?.data?.freeText || null,
             knownSoFar: state.flow ? knownSoFarLines(state.flow) : [], // OOHDASH-159 rev 4
             ...callFields(), // rev 5 (E1)
+            customerContact: callerContactFrom(state.caller),
             OohCaptureClass: 'control-failure'
         });
         notesDraftClear();

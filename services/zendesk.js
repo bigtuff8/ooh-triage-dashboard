@@ -239,7 +239,7 @@ export function hhmm(iso) {
  *  4. Delimiter-injection defences (prevents forging IoT-parser anchor fields or step timestamps):
  *     a. \bOperator:\s* (gi) -> "Operator - "
  *     b. \bOutcome:\s* (gi)  -> "Outcome - "
- *     c. Caller'?s words\s*: (gi) -> "caller's words -"
+ *     c. Caller'?s words\s*: (gi) -> "customer's words -"
  *     d. (\b\d{1,2}:\d{2}\s*)[|en-dash|em-dash] (g) -> "$1-" (neutralise HH:MM| step-lookalikes)
  *  5. Empty after defences → return null.
  *  6. Over maxChars (UTF-16 code units): slice, drop lone high surrogate, append "…".
@@ -252,11 +252,11 @@ export function normaliseAdditionalNotes(raw, cfg = config) {
     // Delimiter-injection defences
     s = s.replace(/\bOperator:\s*/gi, 'Operator - ');
     s = s.replace(/\bOutcome:\s*/gi, 'Outcome - ');
-    s = s.replace(/Caller'?s words\s*:/gi, "caller's words -");
+    s = s.replace(/Caller'?s words\s*:/gi, "customer's words -");
     s = s.replace(/(\b\d{1,2}:\d{2}\s*)[|–—]/g, '$1-');
     // CT fix #2: replace every remaining literal '|' with '¦' (U+00A6, BROKEN BAR).
     // The TRG-STEP line uses '|' as a field separator; a free-text '|' inside the note
-    // (e.g. "bar area | caller says very cold") must not reach the IoT-parser as a field boundary.
+    // (e.g. "bar area | customer says very cold") must not reach the IoT-parser as a field boundary.
     s = s.replace(/\|/g, '¦');
     if (!s) return null;
     const max = cfg?.notes?.maxChars ?? 1000;
@@ -282,14 +282,76 @@ function sanitizeOutcomeCode(outcomeType) {
 }
 
 /**
+ * OOHDASH-146 B31: neutralises a typed value (the agent's P1 reason, the customer contact fields) before it
+ * is written into the [TRG] first comment. Carriage returns and line feeds collapse to single spaces, and
+ * any text that looks like a ticket anchor ("Operator:", "Outcome:", "Caller's words:", "Customer contact:",
+ * "Why urgent (agent):", case-insensitive) is stripped, repeatedly, so a typed value can never forge a line
+ * the IoT Support Dashboard parses. Embedded code fences are escaped. Cut to maxLen characters (default 500).
+ */
+const TRG_ANCHOR_RE = /\b(?:operator|outcome|(?:caller|customer)'?s words|customer contact|why urgent(?:\s*\((?:agent|automatic)\))?)\s*:/gi;
+export function sanitiseTrgValue(raw, maxLen = 500) {
+    let s = String(raw == null ? '' : raw).replace(/[\r\n\u2028\u2029\t\v\f]+/g, ' ').replace(/\s+/g, ' ').trim();
+    let prev;
+    let guard = 0;
+    do {
+        prev = s;
+        s = s.replace(TRG_ANCHOR_RE, ' ').replace(/\s+/g, ' ').trim();
+    } while (s !== prev && ++guard < 20);
+    s = escFence(s);
+    if (s.length > maxLen) s = s.slice(0, maxLen).trim();
+    return s;
+}
+
+/**
+ * OOHDASH-146 B10: the one labelled "Customer contact:" line (after the Operator line). Input is the
+ * browser's customerContact object { OohCustomerName, OohCustomerRole, OohCustomerPhone, OohCustomerDeclined }.
+ * Returns null when nothing was taken and the customer did not decline. Personal data: this line lives
+ * ONLY in the Zendesk internal first comment (never the subject, the P1 text, OohSmsLog, audit or Tonight).
+ */
+export function customerContactLine(c) {
+    if (!c || typeof c !== 'object') return null;
+    const name = sanitiseTrgValue(c.OohCustomerName, 80);
+    const role = sanitiseTrgValue(c.OohCustomerRole, 40);
+    const phone = sanitiseTrgValue(String(c.OohCustomerPhone == null ? '' : c.OohCustomerPhone).replace(/[^0-9 +()\-]/g, ''), 20);
+    const phoneOk = phone.replace(/[^0-9]/g, '').length >= 7 ? phone : '';
+    if (!name && !role && !phoneOk) {
+        return c.OohCustomerDeclined === true || c.OohCustomerDeclined === 'true'
+            ? 'Customer contact: declined to give details' : null;
+    }
+    const who = name ? name + (role ? ' (' + role + ')' : '') : (role ? role + ' (no name taken)' : 'no name taken');
+    return 'Customer contact: ' + who + ' · ' + (phoneOk || 'no number taken');
+}
+
+/**
+ * OOHDASH-146 B21: validates and normalises the agent's P1 reason. Whitespace is collapsed first; the result
+ * must be 10 to 500 characters (after the B31 anchor stripping for the lower bound). Returns the safe single
+ * line, or null when it is missing, too short or too long.
+ */
+export const P1_REASON_MIN = 10;
+export const P1_REASON_MAX = 500;
+export function normaliseP1Reason(raw) {
+    if (typeof raw !== 'string') return null;
+    const collapsed = raw.replace(/\s+/g, ' ').trim();
+    if (collapsed.length > P1_REASON_MAX) return null;
+    const s = sanitiseTrgValue(collapsed, P1_REASON_MAX);
+    return s.length >= P1_REASON_MIN ? s : null;
+}
+
+/**
  * Builds the canonical [TRG] first-comment body (design-spec §2.1). ORDER IS FREEZE-CRITICAL:
  * summary → Operator → Caller's words → Outcome → Transcript. The three anchor lines MUST precede
  * the (unbounded) transcript so they survive Zendesk's ~1500-char description truncation (CT-I1),
  * which is what the consumer's oversight parser reads.
  */
-function buildTrgBody({ operator, summary, callerWords, outcomeType, transcript, defaultTime, dataQualityNote, additionalNotes }) {
+function buildTrgBody({ operator, summary, callerWords, outcomeType, transcript, defaultTime, dataQualityNote, additionalNotes, customerContact, p1Reason, p1Automatic }) {
     const lines = [`[TRG] ${oneLine(summary).slice(0, 180)}`];
     lines.push(`Operator: ${oneLine(operator?.name) || 'OOH'} (OOH)`);
+    // OOHDASH-146 B10 / B21: the customer contact line and the P1 reason sit right after the Operator line
+    // (still before Caller's words / Outcome, so the anchors the consumer parses are not renamed or moved).
+    const contactLine = customerContactLine(customerContact);
+    if (contactLine) lines.push(contactLine);
+    const reason = p1Reason ? sanitiseTrgValue(p1Reason, P1_REASON_MAX) : '';
+    if (reason) lines.push(`Why urgent (${p1Automatic ? 'automatic' : 'agent'}): ${reason}`);
     if (callerWords) lines.push(`Caller's words: "${escFence(oneLine(callerWords))}"`);
     lines.push(`Outcome: ${sanitizeOutcomeCode(outcomeType)}`);
 
@@ -316,7 +378,7 @@ function buildTrgBody({ operator, summary, callerWords, outcomeType, transcript,
  * and the full timestamped action transcript (the ticket requester is the API service account,
  * so identity always lives in the comment body).
  */
-export async function createOutcomeTicket({ operator, siteNo, siteName, subject, summary, transcript = [], detail, callerWords, outcomeType, priority = 'normal', extraTags = [], additionalNotes: rawNotes, status: createStatus }) {
+export async function createOutcomeTicket({ operator, siteNo, siteName, subject, summary, transcript = [], detail, callerWords, outcomeType, priority = 'normal', extraTags = [], additionalNotes: rawNotes, status: createStatus, customerContact = null, p1Reason = null, p1Automatic = false }) {
     const summaryLine = summary || subject || detail || 'OOH outcome';
     const defaultTime = hhmm(new Date().toISOString());
     // If no structured transcript was supplied but a detail string exists, keep at least one step
@@ -329,7 +391,7 @@ export async function createOutcomeTicket({ operator, siteNo, siteName, subject,
     const additionalNotes = normaliseAdditionalNotes(rawNotes);
 
     const buildBody = dataQualityNote =>
-        buildTrgBody({ operator, summary: summaryLine, callerWords, outcomeType, transcript: steps, defaultTime, dataQualityNote, additionalNotes });
+        buildTrgBody({ operator, summary: summaryLine, callerWords, outcomeType, transcript: steps, defaultTime, dataQualityNote, additionalNotes, customerContact, p1Reason, p1Automatic });
 
     // F002 — Ticket Category is set on every OOH outcome ticket (Explore reporting only).
     const categoryField = { id: config.zendesk.categoryFieldId, value: config.zendesk.categoryValue };
@@ -375,8 +437,8 @@ export async function createOutcomeTicket({ operator, siteNo, siteName, subject,
  * C6 — posts the actionable cross-shift late-sync update after an IT700-style timeout finally
  * echoes (F008). This is the DURABLE channel: the ticket note is the only artefact that survives
  * a pod restart, so it is written as an operator ACTION ITEM for the next handler, not a passive
- * log line. It states the change was previously reported NOT applied to the caller, has now applied
- * LATE, names the site/device/value/time, and instructs the next handler to verify with the caller
+ * log line. It states the change was previously reported NOT applied to the customer, has now applied
+ * LATE, names the site/device/value/time, and instructs the next handler to verify with the customer
  * that the site is now correct (and to check nothing was actioned twice — C2 double-dispatch care).
  * Carries the `[TRG]` prefix + `#ooh-late-sync` marker so the OOH view can filter these.
  */
@@ -385,8 +447,8 @@ export async function addLateSyncNote(ticketId, action) {
     const site = action.siteName ? `${action.siteName} (site ${action.siteNo})` : `site ${action.siteNo}`;
     const body = [
         `[TRG] ⚠️→✅ APPLIED LATE — ACTION NEEDED. #ooh-late-sync`,
-        `The change ${action.attribute} = ${action.value} on ${action.deviceId} (${site}) was reported to the caller as NOT applied (device timed out), but the device has now confirmed it — it synced late at ${at}.`,
-        `Next handler: VERIFY WITH THE CALLER that the site is now correct, and check nothing was actioned twice (a second change may have been made after we said this one had not applied).`
+        `The change ${action.attribute} = ${action.value} on ${action.deviceId} (${site}) was reported to the customer as NOT applied (device timed out), but the device has now confirmed it — it synced late at ${at}.`,
+        `Next handler: VERIFY WITH THE CUSTOMER that the site is now correct, and check nothing was actioned twice (a second change may have been made after we said this one had not applied).`
     ].join('\n');
     return addInternalComment(ticketId, body);
 }
@@ -405,7 +467,7 @@ export async function createLateSyncTicket(action) {
         siteName: action.siteName,
         subject: `Late device confirmation — ${action.deviceId}`,
         summary: `Late device confirmation — ${action.attribute} on ${action.deviceId}`,
-        detail: `A control change on ${action.deviceId} timed out at dispatch and was reported to the caller as not applied, then confirmed late — see the [TRG] late-sync note.`,
+        detail: `A control change on ${action.deviceId} timed out at dispatch and was reported to the customer as not applied, then confirmed late — see the [TRG] late-sync note.`,
         outcomeType: 'late-sync',
         extraTags: ['ooh_late_sync']
     });
@@ -474,7 +536,7 @@ export async function setFollowUpDate(ticketId, date) {
  * Creates a Zendesk ticket for a pub heating boost dispatch. Returns { id, url }.
  * Subject: "[OOH Boost] {siteNo} {siteName} — Pub zone {n} heating {ON|OFF} until {HH:MM}"
  */
-export async function createBoostTicket({ operator, callerWords, siteNo, siteName, panelVersion, zones, direction, durationKey, requestedMin, effectiveMin, clamped, revertAtMs, previousStates, acknowledgedWarnings, outcomes }) {
+export async function createBoostTicket({ operator, callerWords, customerContact = null, siteNo, siteName, panelVersion, zones, direction, durationKey, requestedMin, effectiveMin, clamped, revertAtMs, previousStates, acknowledgedWarnings, outcomes }) {
     const dirUpper = direction === 'on' ? 'ON' : 'OFF';
     const revertTime = revertAtMs ? new Date(revertAtMs).toLocaleTimeString('en-GB', { timeZone: 'Europe/London', hour: '2-digit', minute: '2-digit' }) : '?';
 
@@ -532,6 +594,7 @@ export async function createBoostTicket({ operator, callerWords, siteNo, siteNam
         summary: subject,
         transcript: [{ time: hhmm(new Date().toISOString()), text: body }],
         callerWords,
+        customerContact,
         outcomeType: 'boiler-boost',
         extraTags
     });
@@ -585,7 +648,7 @@ const STATUS_TRANSLATIONS = {
     25999082641308: { name: 'Resolved', agent: 'Resolved', caller: 'This was marked as resolved.' },
     25999068372252: { name: 'Done', agent: 'Completed and closed', caller: 'This was completed and closed.' },
     25999038553244: { name: 'Closed', agent: 'Closed', caller: 'This ticket has been closed.' },
-    26381319932188: { name: 'Customer Replied', agent: 'Caller has replied — being reviewed', caller: 'Your message has been received and our team will review it.' }
+    26381319932188: { name: 'Customer Replied', agent: 'Customer has replied — being reviewed', caller: 'Your message has been received and our team will review it.' }
 };
 
 // Engineer-visit statuses always carry the chargeable-visit warning

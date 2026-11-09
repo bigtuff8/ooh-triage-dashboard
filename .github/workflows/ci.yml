@@ -45,7 +45,7 @@ jobs:
     # in OOHDASH-109; the suite is green on a clean main, so e2e now gates like the unit check.
     name: e2e (playwright)
     runs-on: ubuntu-24.04
-    timeout-minutes: 20
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
 

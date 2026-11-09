@@ -13,6 +13,18 @@ import { readFileSync } from 'fs';
 
 const pkg = JSON.parse(readFileSync(new URL('./package.json', import.meta.url), 'utf8'));
 
+// OOHDASH-146 D14: bank holidays for the shared urgency helper (config/bank-holidays.json).
+// Fail-soft: a missing or unreadable file means "no bank holidays" and a loud warning, never a crash.
+function loadBankHolidays() {
+    try {
+        const j = JSON.parse(readFileSync(new URL('./config/bank-holidays.json', import.meta.url), 'utf8'));
+        return Array.isArray(j?.dates) ? j.dates.map(String) : [];
+    } catch (err) {
+        console.warn(`[CONFIG] config/bank-holidays.json not loaded (${err.message}) — urgency treats every weekday as a working day`);
+        return [];
+    }
+}
+
 const env = (key, fallback = undefined) => {
     const v = process.env[key];
     return v === undefined || v === '' ? fallback : v;
@@ -183,6 +195,29 @@ export const config = {
                 offlineHours: parseInt(env('OOH_OFFLINE_HOURS_MONITOR', '48'), 10)
             }
         }
+    },
+
+    // OOHDASH-146 D14 (Q14, confirmed 2026-11-08): the IoT support office hours and response window used by
+    // urgencyOf (public/js/urgency.js, shared with the browser). Both env-overridable with no release.
+    urgency: {
+        officeHours: env('OOH_OFFICE_HOURS', 'Mon-Fri 09:00-17:00'),
+        responseWorkingHours: parseFloat(env('OOH_RESPONSE_WORKING_HOURS', '3')),
+        tz: 'Europe/London',
+        bankHolidays: loadBankHolidays()
+    },
+
+    // OOHDASH-146 D8 / B13: the kitchen one-off (keep on later / switch on earlier, next occasion only).
+    // Default OFF; only exactly "true" enables. Sits behind the runtime kill-switch as well.
+    kitchenOneOff: {
+        enabled: (process.env.OOH_KITCHEN_ONEOFF_ENABLED ?? '').trim().toLowerCase() === 'true',
+        maxMinutes: 120,
+        // A start step that cannot be carried out within this long after its start time is given up (never late).
+        startGraceMs: 10 * 60 * 1000,
+        // A switch-off still failing this long after the end time raises the automatic P1 (Q11).
+        offFailP1AfterMs: 10 * 60 * 1000,
+        // Within how long of now a booking must start.
+        horizonMs: 24 * 60 * 60 * 1000,
+        timesToleranceMs: 5 * 60 * 1000
     },
 
     // OOHDASH-119: optional additional notes. One shared constant so the limit is changed in one place.

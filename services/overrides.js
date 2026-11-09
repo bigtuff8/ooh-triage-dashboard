@@ -26,6 +26,8 @@ import { recordControlEvent, raiseAlert } from './metrics.js';
 import { config } from '../config.js';
 // Lazy import to avoid static-binding issues under the test module-mocking framework.
 const _zendesk = () => import('./zendesk.js');
+// OOHDASH-146 B13/B25: oneoff worker steps (lazy — avoids pulling in Tuya deps at startup).
+const _oneoffs = () => import('./oneoffs.js');
 
 const WORKER_INTERVAL_MS = 30 * 1000;
 // OOHDASH-123 (WU14): the revert confirm uses the per-class confirm limit, but a single worker pass must
@@ -185,6 +187,9 @@ export async function runWorkerOnce() {
     );
 
     for (const doc of due) {
+        // Skip oneoff active docs — they are handled by revertOneOff inside revert().
+        // Skip oneoff booked docs — they are handled by runOneoffStartSteps below.
+        // Both branches are reached through the same loop; revert() branches on OohOneOffKind.
         let claimed;
         try {
             doc.status = 'reverting';
@@ -197,9 +202,35 @@ export async function runWorkerOnce() {
         }
         await revert(col, claimed);
     }
+
+    // OOHDASH-146 B13: oneoff start-step (booked → active / handed-back / missed).
+    // This is a separate query branch for booked oneoff docs at their start time.
+    if (config.kitchenOneOff?.enabled) {
+        try {
+            const { runOneoffStartSteps } = await _oneoffs();
+            await runOneoffStartSteps(col);
+        } catch (err) {
+            console.error(`[OVERRIDES] oneoff start-step pass failed: ${err.message}`);
+        }
+    }
 }
 
 async function revert(col, doc) {
+    // OOHDASH-146 B13/B25: kitchen one-off end step (switch off + Q11 automatic P1 on failure).
+    // Branch before the standard revert so oneoff active docs are handled cleanly.
+    if (doc.OohOneOffKind !== undefined) {
+        try {
+            const { revertOneOff } = await _oneoffs();
+            return await revertOneOff(col, doc);
+        } catch (err) {
+            console.error(`[OVERRIDES] revertOneOff failed for ${doc.id}: ${err.message}`);
+            doc.status = 'revert-failed';
+            doc.leaseOwner = null;
+            doc.leaseUntil = null;
+            await col.upsert(doc);
+            return;
+        }
+    }
     // OOHDASH-141: boiler-panel has its own revert path with kill-switch exemption and
     // direction-based identity. Branch first before the standard kill-switch check.
     if (doc.deviceType === 'boiler-panel') {

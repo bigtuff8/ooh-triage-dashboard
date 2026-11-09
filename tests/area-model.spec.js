@@ -99,7 +99,7 @@ test.describe('OOHDASH-82 heating area model', () => {
         const shortcut = page.locator('[data-testid="aircon-shortcut"]');
         await expect(shortcut).toBeVisible();
         await shortcut.click();
-        // E1: aircon-shortcut auto-submits for non-P1
+        await page.locator('[data-testid="risk-no"]').click();
 
         const req = await postClass;
         expect(JSON.parse(req.postData())).toMatchObject({ type: 'capture', OohCaptureClass: 'aircon-referral' });

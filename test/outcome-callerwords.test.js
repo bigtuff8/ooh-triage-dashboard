@@ -23,7 +23,7 @@ function loadClient(workspace, { realFinishOutcome = false } = {}) {
     const captured = [];             // outcome payloads posted via finishOutcome
     const started = [];              // startFlow(k, freeText) calls
     const posts = [];                // api.post payloads (real-finishOutcome mode)
-    const state = { flow: null, workspace, smartEntryText: '', me: { operator: { name: 'Handler One' } }, call: null };
+    const state = { flow: null, workspace, smartEntryText: '', me: { operator: { name: 'Handler One' } }, call: null, caller: { name: '', role: '', phone: '', declined: false } };
     const sandbox = {
         state,
         $: () => ({ innerHTML: '', focus() {} }),
@@ -44,6 +44,9 @@ function loadClient(workspace, { realFinishOutcome = false } = {}) {
         notesField: () => '',
         notesPostBox: () => '',
         notesValue: () => '',
+        // OOHDASH-146: caller-contact helpers live in app.js; stub for unit isolation
+        callerContactFrom: () => null,
+        callFields: () => ({}),
         Promise, Date,
         window: {},
         console
@@ -73,8 +76,10 @@ function loadClient(workspace, { realFinishOutcome = false } = {}) {
 // OOHDASH-119: finishOutcome now shows a confirm step first; simulate the "Record outcome" click
 // by calling submitPendingOutcome with the pending key so the POST fires.
 async function driveRealScopeOutcome(ctx, state, ws) {
-    state.flow.stage = 1;
-    state.flow.data.risk = 0;
+    // B19: fridge flow now uses riskQuestion in stage 0 (no stage 1); _riskAns=0 → no path; _riskLine=1 skips doneLine
+    state.flow.stage = 0;
+    state.flow.data._riskAns = 0;
+    state.flow.data._riskLine = 1;
     ctx.FLOWR.fridge(ws, state.flow);
     // OOHDASH-119: detect the confirm-step pending key and submit it
     const confKey = Object.keys(state.flow.data).find(k => k.startsWith('_conf_'));

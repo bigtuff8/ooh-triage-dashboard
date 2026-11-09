@@ -29,6 +29,11 @@ export class ConcurrencyError extends Error {
     constructor() { super('Document was modified concurrently'); this.name = 'ConcurrencyError'; }
 }
 
+/** Thrown by create() when a document with that id already exists (OOHDASH-146 B30 unique-key guard). */
+export class DuplicateError extends Error {
+    constructor() { super('A document with that key already exists'); this.name = 'DuplicateError'; }
+}
+
 /* ------------------------------------------------------------------ */
 /* File-backed store (fixture/dev)                                     */
 /* ------------------------------------------------------------------ */
@@ -58,6 +63,16 @@ class FileCollection {
         const existing = this.docs[id];
         if (ifVersion !== undefined && existing && existing._version !== ifVersion) throw new ConcurrencyError();
         const next = { ...doc, id, _version: (existing?._version || 0) + 1 };
+        this.docs[id] = next;
+        this.persist();
+        return structuredClone(next);
+    }
+
+    /** Create-only write: fails with DuplicateError if the id exists. The unique-key primitive (B30). */
+    async create(doc) {
+        const id = doc.id || randomUUID();
+        if (this.docs[id]) throw new DuplicateError();
+        const next = { ...doc, id, _version: 1 };
         this.docs[id] = next;
         this.persist();
         return structuredClone(next);
@@ -101,6 +116,18 @@ class CosmosCollection {
             return { ...resource, _version: resource._etag };
         } catch (err) {
             if (err.code === 412) throw new ConcurrencyError();
+            throw err;
+        }
+    }
+
+    /** Create-only write (Cosmos 409 on an existing id) — the unique-key primitive (B30). */
+    async create(doc) {
+        const body = { ...doc, id: doc.id || randomUUID(), storePartition: this.partition };
+        try {
+            const { resource } = await this.container.items.create(body);
+            return { ...resource, _version: resource._etag };
+        } catch (err) {
+            if (err.code === 409) throw new DuplicateError();
             throw err;
         }
     }

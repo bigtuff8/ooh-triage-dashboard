@@ -244,8 +244,10 @@ test("T1-6b-flows: hotwater flow renders not-lighthouse branch when scope level 
     const flow = { stage: 0, done: [], data: {} };
     state.flow = flow;
     const html = ctx.FLOWR.hotwater(ws, flow);
+    // OOHDASH-146 B1: not-lighthouse path now shows riskQuestion instead of hw-nlh-capture button.
     assert.match(html, /hw-not-lighthouse/, "not-lighthouse branch renders hw-not-lighthouse testid");
-    assert.match(html, /hw-nlh-capture/, "not-lighthouse branch renders capture button (hw-nlh-capture)");
+    assert.match(html, /risk-yes/, "not-lighthouse branch shows risk question (B1: removed hw-nlh-capture button)");
+    assert.doesNotMatch(html, /hw-nlh-capture/, "B1: hw-nlh-capture button is removed from not-lighthouse branch");
     // Normal hw-capture (main boiler path) must NOT appear in the not-lighthouse branch.
     assert.doesNotMatch(html, /data-testid="hw-capture"/, "normal hw-capture button does not appear in not-lighthouse branch");
     // Verify the standard boiler-side message does NOT appear.
@@ -262,7 +264,8 @@ test("T1-6b-flows: hotwater flow renders standard boiler path when scope level i
     const flow = { stage: 0, done: [], data: {} };
     state.flow = flow;
     const html = ctx.FLOWR.hotwater(ws, flow);
-    // Standard boiler-side path (no scope override -> existing doneLine fires)
+    // OOHDASH-146 B1: standard boiler-side path now shows riskQuestion instead of hw-capture button.
     assert.doesNotMatch(html, /hw-not-lighthouse/, "standard path does not show not-lighthouse div");
-    assert.match(html, /hw-capture/, "standard path shows normal hw-capture button");
+    assert.match(html, /risk-yes/, "standard path shows risk question (B1: removed hw-capture button)");
+    assert.doesNotMatch(html, /hw-capture/, "B1: hw-capture button is removed from standard path");
 });

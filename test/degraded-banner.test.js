@@ -151,7 +151,8 @@ function loadApp(me, { siteNo = null } = {}) {
             addEventListener: () => {},
             body: { appendChild() {} },
         },
-        vHome: () => {}, vSite: () => {}, vCallback: () => {}, vTonight: () => {}, vAdmin: () => {},
+        vHome: () => {}, vSite: () => {}, vCallback: () => {}, vTonight: () => {}, vAdmin: () => {}, vCdAdd: () => {},
+        callerBanner: () => '',
         setTimeout, clearTimeout, console, Date, Number, Math, JSON, String,
         window: {},
     };

@@ -20,7 +20,9 @@ const root = join(__dirname, '..');
 
 // OOHDASH-123: +1 for the DD-WAIT-HANDOFF ctlRelease outcome post (slow-class "sent, awaiting confirm").
 // OOHDASH-144: +1 for the wrapUpSubmit api.post call (body variable carries additionalNotes).
-const EXPECTED_CALL_COUNT = 7;
+// OOHDASH-146: +1 for ctlReleaseRetry (D2 "Try logging again" re-post; additionalNotes in postData).
+// OOHDASH-146 Chunk 3 B26: +1 for ambiguousP1Submit (views.js, P1 path for ambiguous site).
+const EXPECTED_CALL_COUNT = 9;
 
 function checkFile(relPath) {
     const src = readFileSync(join(root, relPath), 'utf8');

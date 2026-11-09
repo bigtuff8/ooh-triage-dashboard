@@ -102,7 +102,7 @@ test('recordP1Raised: writes the positive status text to OohSmsLog', async () =>
     resetCaptures();
     const entry = await p1LogMod.recordP1Raised(P1_ARGS);
     assert.equal(logUpserts.length, 1, 'one upsert written');
-    assert.equal(logUpserts[0].status, 'P1 ticket raised with ooh_p1 tag; OOH side complete; IoT Support Dashboard will page the on-duty manager.');
+    assert.equal(logUpserts[0].status, 'P1 ticket raised with ooh_p1 tag; OOH side complete; IoT Support Dashboard will send a text message to the on-call agent.');
     assert.equal(entry.ticketId, 55501);
     assert.equal(entry.siteNo, '6832');
     assert.ok(entry.dispatchedAt, 'dispatchedAt is set (metrics SLA compat)');
@@ -175,13 +175,14 @@ test('Source guard: no "a text has gone" or "sent an urgent text" in flows.js', 
     assert.doesNotMatch(flowsContent, /sent an urgent text/i, '"sent an urgent text" must not appear in flows.js');
 });
 
-test('Source guard: D2 sentence appears exactly 8 times in flows.js', () => {
+test('Source guard: D2 sentence appears exactly 25 times in flows.js', () => {
     const flowsContent = readFileSync(join(__dirname, '..', 'public', 'js', 'flows.js'), 'utf8');
     // OOHDASH-159 rev4: the P1 script changed from a fixed string to a function including ticket ref.
-    // The invariant tail shared by all 8 P1 flows (kitchen P1 added in OOHDASH-159).
+    // OOHDASH-146 Chunk 3 (B1/B2/B3/B4/B24): added riskQuestion to many flows; count updated to 25.
+    // OOHDASH-146 Chunk 4 (B5/B28): added kitchen one-off auto-P1, kitchen perm P1, fan urgent P1; count updated to 28.
     const d2tail = 'on-call team will call you back shortly.';
     const count = flowsContent.split(d2tail).length - 1;
-    assert.equal(count, 8, `D2 P1 script tail must appear exactly 8 times; found ${count}`);
+    assert.equal(count, 28, `D2 P1 script tail must appear exactly 28 times; found ${count}`);
 });
 
 test('Source guard: no escalation.js import in routes/ or services/', () => {
