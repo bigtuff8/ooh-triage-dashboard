@@ -539,9 +539,9 @@ window.submitPendingOutcome = function submitPendingOutcome(key, auto) {
 // script/info HTML shown on the confirm step above the ticket box.
 function scriptText(script, res) { return typeof script === 'function' ? script(res) : script; }
 
-function outcomeCaptured(f, key, { subject, detail, script, OohCaptureClass, pre, line }) {
+function outcomeCaptured(f, key, { subject, detail, script, OohCaptureClass, pre, line, closeOnCreate }) {
     return finishOutcome(f, key,
-        { type: 'capture', subject, detail, OohCaptureClass, issueLabel: subject, issueCls: 'blue' },
+        { type: 'capture', subject, detail, OohCaptureClass, issueLabel: subject, issueCls: 'blue', ...(closeOnCreate ? { closeOnCreate: true } : {}) },
         res => afterCard('outcome-captured', 'Ticket created for the IoT team', res.ticket.id,
             `<p class="after-line">${line || 'Nothing was switched from here. The IoT team picks it up the <b>next working day</b>.'}</p><p class="after-line small">On the ticket: ${esc(subject)}</p>`,
             scriptText(script, res)), pre);
@@ -2218,7 +2218,8 @@ const FLOWR = {
                 subject: `Air conditioning request (${ws.site.siteName})`,
                 detail: 'Customer raised an air-conditioning issue. Aircon is not controllable from the dashboard, so it is captured and referred to the IoT team rather than actioned here.',
                 script: 'Air conditioning isn\'t something I can adjust from here. It\'s logged, and our IoT team picks it up the next working day.',
-                OohCaptureClass: 'aircon-referral'
+                OohCaptureClass: 'aircon-referral',
+                closeOnCreate: true
             })
         });
     },
@@ -2245,7 +2246,8 @@ const FLOWR = {
                             subject: 'Hot water issue — not on Lighthouse',
                             detail: 'Customer reports hot-water problems. Hot water at this site is not connected to Lighthouse — no remote monitoring or control available. Logged for IoT team follow-up.',
                             script: 'Hot water at this site isn\'t on Lighthouse, so I can\'t see it from here. It\'s logged, and our IoT team picks it up the next working day.',
-                            OohCaptureClass: 'hot-water'
+                            OohCaptureClass: 'hot-water',
+                            closeOnCreate: true
                         })
                     });
             }
@@ -2280,7 +2282,8 @@ const FLOWR = {
                         subject: 'Hot water issue — not resolvable remotely tonight',
                         detail: 'Customer reports hot-water problems. Hot water is boiler-side (monitor-only on Lighthouse) — there is no remote boost. Needs IoT/boiler-side investigation.' + _hwDhwTs,
                         script: 'It\'s logged, and our IoT team picks it up the next working day. If it\'s urgent tonight, the boiler\'s own controls may help, and if a boiler engineer attends, a visit can be chargeable if the fault isn\'t Lighthouse equipment.',
-                        OohCaptureClass: 'hot-water'
+                        OohCaptureClass: 'hot-water',
+                        closeOnCreate: true
                     })
                 });
         }

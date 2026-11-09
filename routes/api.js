@@ -23,6 +23,7 @@ import * as liveness from '../services/liveness.js';
 import * as notices from '../services/notices.js';
 import * as callRecord from '../services/call-record.js';
 import { zoneTimetable } from '../services/schedule.js';
+import * as oneoffs from '../services/oneoffs.js';
 
 const router = Router();
 
@@ -674,6 +675,72 @@ router.post('/outcomes', wrap(async (req, res) => {
         p1: p1 ? { raisedAt: p1.dispatchedAt, link: p1.OohP1EscalationLink } : null,
         reconciliation: reconcileResult
     });
+}));
+
+/* ---------------- OOHDASH-146 B13: kitchen one-off (section 9) ---- */
+
+/**
+ * POST /api/oneoffs — book a kitchen one-off.
+ *
+ * Body: { confirmToken, siteNo, deviceId, OohOneOffKind, OohOneOffMinutes,
+ *         customerContact, callerWords, additionalNotes }
+ *
+ * Guards (B29): siteNo and deviceId are bound to the site confirmed on the current call
+ * (non-consuming hasSiteConfirmation check). The device must belong to that site. The
+ * server recomputes urgency server-side and refuses a not-urgent request with 409.
+ *
+ * Returns: { bookingId, ticketId, startTime, endTime, deviceName }
+ */
+router.post('/oneoffs', wrap(async (req, res) => {
+    const op = req.session.operator;
+    const { siteNo, deviceId, OohOneOffKind, OohOneOffMinutes, customerContact, callerWords, additionalNotes } = req.body || {};
+
+    if (!siteNo || !deviceId || !OohOneOffKind || OohOneOffMinutes == null) {
+        return res.status(400).json({ error: 'siteNo, deviceId, OohOneOffKind and OohOneOffMinutes are required' });
+    }
+
+    // B29: bind siteNo to the site confirmed on this call (non-consuming — same as heating append).
+    if (!resolution.hasSiteConfirmation(siteNo, op.id)) {
+        return res.status(409).json({ error: 'Site not confirmed on this call. Confirm the site first.' });
+    }
+
+    const result = await oneoffs.bookOneOff({
+        siteNo, deviceId, OohOneOffKind, OohOneOffMinutes: Number(OohOneOffMinutes),
+        customerContact: customerContact || null,
+        callerWords: callerWords || null,
+        additionalNotes: additionalNotes || null,
+        operator: op
+    });
+
+    res.json(result);
+}));
+
+/**
+ * POST /api/oneoffs/:id/cancel — cancel a booked or active one-off.
+ *
+ * Allowed for any agent whose current call has confirmed the site (non-consuming check,
+ * same as the heating append). Done or handed-back one-offs return 409.
+ */
+router.post('/oneoffs/:id/cancel', wrap(async (req, res) => {
+    const op = req.session.operator;
+    const id = req.params.id;
+
+    // Load the booking to check the site (we need siteNo for the confirmation check).
+    const { collection: storeCollection } = await import('../services/store.js');
+    const col = await storeCollection('OohOverrides');
+    const doc = await col.get(id);
+
+    if (!doc || doc.OohOneOffKind === undefined) {
+        return res.status(404).json({ error: 'One-off not found' });
+    }
+
+    // Non-consuming site confirmation check (same as heating append — B29/section 9.3 Cancel).
+    if (!resolution.hasSiteConfirmation(doc.siteNo, op.id)) {
+        return res.status(409).json({ error: 'Site not confirmed on this call. You can only cancel a one-off for a site your current call has confirmed.' });
+    }
+
+    const result = await oneoffs.cancelOneOff(id, op);
+    res.json(result);
 }));
 
 /* ---------------- callback lookup (F013) + tickets ---------------- */
