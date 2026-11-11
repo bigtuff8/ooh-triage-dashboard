@@ -13,7 +13,8 @@ All secrets live in `.env` locally (gitignored) or the Spencer-managed K8s Secre
 | `OIDC_SCOPE` / `OIDC_ROLE_CLAIM` / `OIDC_ROLE_MAP` | oidc | Role claim (`extension_Role`) → app role mapping (`handler`/`iot`) |
 | `BRIDGE_BASE_URL` | live | Integration-bridge internal read API (cluster-internal, iot-services) |
 | `TB_URL` / `TB_USERNAME` / `TB_PASSWORD` | live | ThingsBoard READ credential (telemetry/status) |
-| `TB_WRITE_USERNAME` / `TB_WRITE_PASSWORD` | live | **SR-3 scoped WRITE credential** (F003 gate) — shared-attribute writes only |
+| `TB_WRITE_API_KEY` | live | **SR-3 scoped WRITE API key** (preferred; immune to TB MFA) — shared-attribute writes only. Staged as k8s secret in prod. |
+| `TB_WRITE_USERNAME` / `TB_WRITE_PASSWORD` | live | **SR-3 scoped WRITE credential** — fallback when `TB_WRITE_API_KEY` is absent. One of the two write options is required. |
 | `ZENDESK_SUBDOMAIN` / `ZENDESK_EMAIL` / `ZENDESK_API_TOKEN` | live | Zendesk API service account |
 | `COSMOS_ENDPOINT` / `COSMOS_KEY` / `COSMOS_DATABASE` | live | Durable store (holds, audit, config, SMS log) |
 | `SMS_PROVIDER` | all | `log` (record only — default until the Q-F gateway decision) / `twilio` |

@@ -96,7 +96,8 @@ The K8s secret shell exists with `REPLACE_ME` placeholders. Populate (do NOT com
 | Key | Value / source |
 |---|---|
 | `TB_URL` / `TB_USERNAME` / `TB_PASSWORD` | ThingsBoard read cred (`svc-read` in `airedale-kv-*`, `portal.lhlive.co.uk`) |
-| `TB_WRITE_USERNAME` / `TB_WRITE_PASSWORD` | **SR-3 scoped write cred** (`svc-control` in KV) — **confirm it exists & is scoped** (writes setpoint/mode/hwBoost/switch Desired; reads *Reported/*SyncStatus only) |
+| `TB_WRITE_API_KEY` | **SR-3 scoped write API key** (`svc-control` key in KV) — preferred over username/password; immune to TB MFA. Staged as k8s secret. |
+| `TB_WRITE_USERNAME` / `TB_WRITE_PASSWORD` | **SR-3 scoped write cred** (fallback when `TB_WRITE_API_KEY` absent) — confirm one of the two write options is set. |
 | `ZENDESK_SUBDOMAIN` / `ZENDESK_EMAIL` / `ZENDESK_API_TOKEN` | **RB-2** — **Jonathan Wilkinson's existing** Zendesk credentials + API key (the dashboard already operates on these). **No service account is created this release.** Never commit the values. |
 | `SESSION_SECRET`, `APP_ORIGIN`, `OIDC_ISSUER`, `OIDC_CLIENT_ID`, `OIDC_SCOPE`, `OIDC_ROLE_CLAIM`, `OIDC_ROLE_MAP`, `BRIDGE_BASE_URL`, `COSMOS_ENDPOINT`, `COSMOS_DATABASE`, `IOT_DASH_BASE_URL` | already set by Spencer (per SD-586 impl §6) |
 | `ESCALATION_ONDUTY_NUMBER` / `ESCALATION_ONDUTY_NAME` | reuse the IoT Support dash on-duty escalation recipient (D-1) |

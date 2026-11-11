@@ -72,6 +72,7 @@ export const config = {
         readUsername: env('TB_USERNAME'),
         readPassword: env('TB_PASSWORD'),
         readApiKey: env('TB_API_KEY'),
+        writeApiKey: env('TB_WRITE_API_KEY'),
         writeUsername: env('TB_WRITE_USERNAME'),
         writePassword: env('TB_WRITE_PASSWORD')
     },
@@ -305,8 +306,8 @@ export function validateConfig() {
     }
     if (config.dataMode === 'live') {
         if (!config.bridge.baseUrl) problems.push('BRIDGE_BASE_URL is required when DATA_MODE=live');
-        if (!config.thingsboard.writeUsername || !config.thingsboard.writePassword) {
-            problems.push('TB_WRITE_USERNAME / TB_WRITE_PASSWORD (SR-3 scoped credential) are required when DATA_MODE=live');
+        if (!config.thingsboard.writeApiKey && !(config.thingsboard.writeUsername && config.thingsboard.writePassword)) {
+            problems.push('TB_WRITE_API_KEY (preferred) or TB_WRITE_USERNAME + TB_WRITE_PASSWORD (SR-3 scoped credential) is required when DATA_MODE=live');
         }
         // F003/SD-586: Cosmos is reached keyless via workload identity — COSMOS_KEY is
         // intentionally NOT required. COSMOS_DATABASE defaults (config.cosmos.database) so only
