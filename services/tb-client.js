@@ -112,7 +112,7 @@ function tbSession({ username, password, apiKey }, label) {
 }
 
 const readSession = tbSession({ username: config.thingsboard.readUsername, password: config.thingsboard.readPassword, apiKey: config.thingsboard.readApiKey }, 'read');
-const writeSession = tbSession({ username: config.thingsboard.writeUsername, password: config.thingsboard.writePassword }, 'write/SR-3');
+const writeSession = tbSession({ username: config.thingsboard.writeUsername, password: config.thingsboard.writePassword, apiKey: config.thingsboard.writeApiKey }, 'write/SR-3');
 
 /**
  * Thin read-plane request wrapper (read plane / D5). Lets services/tb-device.js issue
