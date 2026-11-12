@@ -47,38 +47,28 @@ Main at 8aa6e1b (2026-11-12). Requesting go to cut v1.7.4.
 
 Stage 0 — measurement only. No user-visible changes.
 
-- 6 browser `performance.mark` calls bracketing the lookup flow
-- `navigator.sendBeacon` → authenticated `POST /api/ux-timing` (integers only, structured log line)
-- `Server-Timing total;dur` on `/resolve`, `/confirm`, `/workspace`
-- `scripts/ux-timing-report.mjs` — read-only p50/p95 parser
+- 6 browser performance.mark calls bracketing the lookup flow
+- navigator.sendBeacon to authenticated POST /api/ux-timing (integers only, structured log line)
+- Server-Timing total;dur on /resolve, /confirm, /workspace
+- scripts/ux-timing-report.mjs — read-only p50/p95 parser
 
 ## Release command
 
-From clean main (`C:\repos\ooh-triage-dashboard` or the stage0 worktree):
-
-```
-npm run release
-```
+Run "npm run release" from clean main (C:\repos\ooh-triage-dashboard or the stage0 worktree).
 
 ## After deploy — baseline collection
 
-```
-kubectl logs -n iot-services deployment/ooh-dashboard | grep '\[UX\]' | node scripts/ux-timing-report.mjs
-```
-
-Collect ≥20 lookups, record p50/p95 for t-search, t-gate, t-site. This is the Stage 0 baseline.
+Pipe kubectl logs for the ooh-dashboard deployment (namespace iot-services), filter to [UX] lines, and pass to node scripts/ux-timing-report.mjs. Collect 20 or more lookups, record p50/p95 for t-search, t-gate, t-site. This is the Stage 0 baseline.
 
 ## Proof script (before Stage 1)
 
-```powershell
-$env:TB_API_KEY = (az keyvault secret show --vault-name airedale-kv-prod --name thingsboard-read-apikey --query value -o tsv); node scripts/tb-batch-proof.mjs
-```
+Read the ThingsBoard read API key from az keyvault (vault airedale-kv-prod, secret thingsboard-read-apikey), set it as TB_API_KEY in the environment, then run node scripts/tb-batch-proof.mjs from the repo root.
 
 Proof a: HTTP 200 for all four sites. Proof b: all 53 keys present. Both must pass before Stage 1 starts.
 
 ## Rollback
 
-Previous stable image: `916f6e3` (v1.6.6).
+Previous stable image: 916f6e3 (v1.6.6). To roll back: kubectl set image on ooh-dashboard in namespace iot-services, pointing to image tag 916f6e3.
 
 ## Invariants
 
