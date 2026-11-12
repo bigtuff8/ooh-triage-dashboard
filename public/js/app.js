@@ -178,6 +178,16 @@ async function refreshMe() {
     maybeControlLiveAck();
 }
 
+function uxBeacon(siteNo) {
+    try {
+        const ts = Math.round(performance.measure('T-search', 'search-submit', 'search-result').duration);
+        const tg = Math.round(performance.measure('T-gate', 'device-read-start', 'confirm-screen-paint').duration);
+        const tt = Math.round(performance.measure('T-site', 'device-read-start', 'workspace-ready').duration);
+        const blob = new Blob([JSON.stringify({ siteNo, tSearch: ts, tGate: tg, tSite: tt })], { type: 'application/json' });
+        navigator.sendBeacon('/api/ux-timing', blob);
+    } catch { /* marks may not be available */ }
+}
+
 async function boot() {
     try {
         await refreshMe();
@@ -323,7 +333,9 @@ async function searchInput(q) {
     if (!q) { srch.hits = []; box.innerHTML = ''; return; }
     let results;
     try {
+        performance.clearMarks('search-submit'); performance.mark('search-submit');
         ({ results } = await api.get(`/api/sites/search?q=${encodeURIComponent(q)}`));
+        performance.clearMarks('search-result'); performance.mark('search-result');
     } catch (err) {
         srch.hits = [];
         box.innerHTML = `<div class="sresults"><div class="empty">${err.degraded

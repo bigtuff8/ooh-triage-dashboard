@@ -133,7 +133,9 @@ async function openSite(siteNo) {
     render();
     $('#view').innerHTML = `<div class="content narrow"><div class="card" style="padding:26px"><h2>Looking up site ${esc(siteNo)}…</h2></div></div>`;
     try {
+        performance.clearMarks('device-read-start'); performance.mark('device-read-start');
         const result = await api.get(`/api/sites/${encodeURIComponent(siteNo)}/resolve`);
+        performance.clearMarks('device-read-complete'); performance.mark('device-read-complete');
         if (result.status === 'resolved') state.pendingSite = result.site;
         else if (result.status === 'ambiguous') state.ambiguous = result;
         else { toast(`No site found for ${esc(siteNo)}`); state.view = 'home'; }
@@ -271,6 +273,7 @@ function renderConfirmGate() {
     <button class="btn primary big" data-testid="confirm-site" onclick="confirmSite()">✓ This is the right site</button>
     <button class="btn big" onclick="go('home')">Search again</button>
    </div></div></div>`;
+    performance.clearMarks('confirm-screen-paint'); performance.mark('confirm-screen-paint');
 }
 
 async function confirmSite() {
@@ -290,6 +293,10 @@ async function confirmSite() {
         if (err.resolution?.status === 'ambiguous') { state.ambiguous = err.resolution; }
     }
     render();
+    if (state.confirmToken) {
+        performance.clearMarks('workspace-ready'); performance.mark('workspace-ready');
+        uxBeacon(state.siteNo);
+    }
 }
 
 let wsRefreshTimer = null;

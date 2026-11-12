@@ -86,6 +86,18 @@ router.get('/me', wrap(async (req, res) => {
     });
 }));
 
+router.post('/ux-timing', wrap(async (req, res) => {
+    const { siteNo, tSearch, tGate, tSite } = req.body || {};
+    const sn = String(siteNo ?? '');
+    const ts = Number(tSearch), tg = Number(tGate), tt = Number(tSite);
+    if (!/^\d{1,8}$/.test(sn) || !Number.isFinite(ts) || !Number.isFinite(tg) || !Number.isFinite(tt)
+        || ts < 0 || tg < 0 || tt < 0 || !Number.isInteger(ts) || !Number.isInteger(tg) || !Number.isInteger(tt)) {
+        return res.status(400).end();
+    }
+    console.log(`[UX] site=${sn} t-search=${ts} t-gate=${tg} t-site=${tt} build=${config.appVersion}`);
+    res.status(204).end();
+}));
+
 /* ---------------- site search / resolution (F004) ---------------- */
 
 router.get('/sites/search', wrap(async (req, res) => {
@@ -107,7 +119,9 @@ router.get('/sites/search', wrap(async (req, res) => {
 }));
 
 router.get('/sites/:siteNo/resolve', wrap(async (req, res) => {
+    const t0 = Date.now();
     const result = await resolution.resolveSite(req.params.siteNo, req.session.operator);
+    res.set('Server-Timing', `total;dur=${Date.now() - t0}`);
     if (result.status === 'resolved') {
         const s = result.site;
         return res.json({
@@ -119,6 +133,7 @@ router.get('/sites/:siteNo/resolve', wrap(async (req, res) => {
 }));
 
 router.post('/sites/:siteNo/confirm', wrap(async (req, res) => {
+    const t0 = Date.now();
     const { token, site } = await resolution.confirmSite(req.params.siteNo, req.session.operator);
     // OOHDASH-159 rev 5 (E1): the call record starts here; the agent never has a "log it" step.
     // Part 2b: check for a same-operator resume before starting a new call.
@@ -126,7 +141,9 @@ router.post('/sites/:siteNo/confirm', wrap(async (req, res) => {
     const callId = resume
         ? resume.callId
         : callRecord.startCall({ operator: req.session.operator, siteNo: site.siteNo, siteName: site.siteName });
-    res.json({ confirmToken: token, callId, sameOperatorResume: resume || null, workspace: await workspacePayload(site) });
+    const ws = await workspacePayload(site);
+    res.set('Server-Timing', `total;dur=${Date.now() - t0}`);
+    res.json({ confirmToken: token, callId, sameOperatorResume: resume || null, workspace: ws });
 }));
 
 router.get('/sites/:siteNo/workspace', wrap(async (req, res) => {
@@ -136,7 +153,10 @@ router.get('/sites/:siteNo/workspace', wrap(async (req, res) => {
     }
     const sites = await bridge.getSitesByNumber(req.params.siteNo);
     if (sites.length !== 1) return res.status(409).json({ error: 'Site no longer uniquely resolvable' });
-    res.json({ workspace: await workspacePayload(sites[0]) });
+    const t0 = Date.now();
+    const ws = await workspacePayload(sites[0]);
+    res.set('Server-Timing', `total;dur=${Date.now() - t0}`);
+    res.json({ workspace: ws });
 }));
 
 function deviceSummary(site) {
