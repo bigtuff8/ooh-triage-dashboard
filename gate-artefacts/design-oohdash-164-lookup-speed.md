@@ -203,3 +203,13 @@ The build must re-check every !d.online and d.online consumer in public/js and r
 3. Stage 1 behind the admin switch (bulk read on by default, switch available). Run the parity script on 10 or more live sites, and fix any differences.
 4. Release Stage 1. Record before and after p95 with the image tag in the release record.
 5. Stage 2 gets its own build gate later, under OOHDASH-158.
+
+## Addendum A: James's decisions (PR 200 review, 2026-11-12)
+
+| Decision | Choice |
+|---|---|
+| Site cache time | A: keep 30 s, the same as the refresh |
+| Stage 0 release | A: ship Stage 0 on its own first (v1.7.4) and collect a real browser baseline of 20 or more lookups before Stage 1 |
+| Approve design | A: approved; build planning goes ahead once proofs a and b pass with the full key list |
+
+Next: OOHDASH-156 closes as a duplicate of 158. OOHDASH-158 becomes the Stage 2 build ticket. PR 185 is superseded by this design. The build goes to a fresh harness session.
