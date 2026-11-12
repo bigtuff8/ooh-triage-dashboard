@@ -95,7 +95,18 @@ Project ooh-triage-dashboard, repo bigtuff8/ooh-triage-dashboard, base main at 5
 
 Real-screen prototype of every new screen state (search rows, confirm screen while checking, ready, opening and read-failed, the "Data unavailable" tag and notice, and the unreadable-thermostat flow line). It was built on the app's own rendered pages in fixture mode:
 
-PROTOTYPE_LINK
+[Open the prototype](https://home-desktop-jb-new.tail30d2e6.ts.net/review/oohdash-164-design-prototype.html)
+
+The prototype uses a fictional site, 4217 The Red Lion. Building it on the real screens surfaced six details the build must follow:
+
+| Real-screen finding | What the build does |
+|---|---|
+| The "isn't connecting" line is on the thermostat path, which hands over to the connectivity flow. The boiler-panel path shows zone states instead. | The unreadable wording replaces the line on the thermostat path and on the connectivity flow it hands over to. When the panel is unreadable, the boiler-panel path shows "We can't read the boiler panel right now" in place of the zone states. |
+| The existing grey tag style is also used for "Not on Lighthouse here" and "Monitored only", so a grey "Data unavailable" could read as "not fitted". | The "Data unavailable" tag keeps the grey colour (D2) but adds a dashed border and a "?" icon, so it does not look like a permanent fact about the site. |
+| There is no grey alert style today. | Add a new .alert.grey style. |
+| An amber banner, "Live reads are unavailable", already shows when the whole device inventory is down. | No overlap. The amber banner stays for whole-site degraded mode, when the inventory can't be read at all. The grey notice only shows when the site resolved but some devices could not be read. The two never show together. |
+| There is no spinner style today. | Add a small .spin style, used on the confirm screen. |
+| The live search list shows only the site name. | A duplicate-ID row keeps showing the one name, plus the amber tag. Picking it still opens the existing ambiguous-site screen. |
 
 ## 1. Decisions carried in from discovery
 
