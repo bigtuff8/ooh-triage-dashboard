@@ -13,22 +13,16 @@ Build gate: PR #201 merged (520598a, 2026-11-12) — 918 unit tests pass.
 Test gate: PR #202 merged (8aa6e1b, 2026-11-12) — 181 Playwright e2e pass (fixture mode), 0 fail.
 
 SECTION: Release checklist
-1. Main is at 8aa6e1b — test gate merge commit.
-2. All CI checks pass on main.
-3. Release command: `npm run release` from clean main in C:\repos\ooh-triage-dashboard (or the stage0 worktree). This cuts the patch version bump to v1.7.4, tags, and pushes.
-4. After release tag lands: Spencer or James deploys the new image to AKS (kubectl set image or standard pipeline).
-5. After deploy: collect 20 or more real lookups from kubectl logs using `kubectl logs -n iot-services deployment/ooh-dashboard | grep '\[UX\]'`, pipe to `node scripts/ux-timing-report.mjs`, and record the p50/p95 figures as the Stage 0 baseline. This baseline governs whether Stage 1 is worth building.
+1. Main is at 8aa6e1b — test gate merge commit. All CI checks pass.
+2. Release command: run "npm run release" from clean main in the repo root. This cuts the patch version bump to v1.7.4, tags, and pushes.
+3. After release tag lands: Spencer or James deploys the new image to AKS via kubectl set image or the standard pipeline.
+4. After deploy: collect 20 or more real lookups by piping kubectl logs (filtered to [UX] lines) through scripts/ux-timing-report.mjs, and record the p50/p95 figures as the Stage 0 baseline. This baseline governs whether Stage 1 is worth building.
 
 SECTION: What happens after release
-Stage 0 is complete once the baseline is collected. Stage 1 (the bulk read, Q1–Q9) begins only after both proofs a and b pass and James gives the go for Stage 1. Proof command (run from repo root with az keyvault access):
-
-$env:TB_API_KEY = (az keyvault secret show --vault-name airedale-kv-prod --name thingsboard-read-apikey --query value -o tsv); node scripts/tb-batch-proof.mjs
-
-Proof a: HTTP 200 from bulk endpoint for all four test sites (6803, 6827, 6234, 6811).
-Proof b: all 53 keys present in at least one device across those sites.
+Stage 0 is complete once the baseline is collected. Stage 1 (the bulk read, Q1 to Q9) begins only after both proofs a and b pass and James gives the go for Stage 1. The proof script reads the ThingsBoard read API key from az keyvault and runs scripts/tb-batch-proof.mjs from the repo root. Proof a: HTTP 200 from bulk endpoint for all four test sites (6803, 6827, 6234, 6811). Proof b: all 53 keys present in at least one device across those sites.
 
 SECTION: Rollback
-Rollback image (previous stable): 916f6e3 (v1.6.6, the last release before Stage 0). To rollback: `kubectl set image deployment/ooh-dashboard ooh-dashboard=<registry>/ooh-triage-dashboard:916f6e3 -n iot-services`.
+Rollback image (previous stable): 916f6e3 (v1.6.6). To roll back: use kubectl set image on deployment/ooh-dashboard in namespace iot-services, pointing to image tag 916f6e3.
 
 SECTION: Invariants
 No production changes at this gate. No kubectl writes. No deploy. The release gate records James's go — the actual deploy follows after the gate is approved.
