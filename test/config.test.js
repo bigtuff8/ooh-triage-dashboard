@@ -17,7 +17,7 @@ import assert from 'node:assert/strict';
 const MANAGED = [
     'NODE_ENV', 'AUTH_MODE', 'DATA_MODE', 'SESSION_SECRET', 'APP_ORIGIN', 'IOT_DASH_BASE_URL',
     'OIDC_ISSUER', 'OIDC_CLIENT_ID', 'OIDC_CLIENT_SECRET',
-    'BRIDGE_BASE_URL', 'TB_WRITE_USERNAME', 'TB_WRITE_PASSWORD', 'COSMOS_ENDPOINT', 'COSMOS_KEY'
+    'BRIDGE_BASE_URL', 'TB_WRITE_API_KEY', 'TB_WRITE_USERNAME', 'TB_WRITE_PASSWORD', 'COSMOS_ENDPOINT', 'COSMOS_KEY'
 ];
 
 let importCounter = 0;
@@ -37,7 +37,7 @@ const validProdSecureModel = {
     IOT_DASH_BASE_URL: 'https://zendesk-uat.airedale-api.co.uk',
     OIDC_ISSUER: 'https://tenant.b2clogin.com/tenant/policy/v2.0', OIDC_CLIENT_ID: 'beb991e8',
     BRIDGE_BASE_URL: 'http://integration-bridge.iot-services.svc.cluster.local',
-    TB_WRITE_USERNAME: 'u', TB_WRITE_PASSWORD: 'p', COSMOS_ENDPOINT: 'https://cosmos'
+    TB_WRITE_API_KEY: 'svc-ctrl-key', COSMOS_ENDPOINT: 'https://cosmos'
 };
 
 test('secure prod model (no OIDC_CLIENT_SECRET, no COSMOS_KEY) is fully valid', async () => {
@@ -56,18 +56,30 @@ test('OIDC_ISSUER and OIDC_CLIENT_ID are still required for AUTH_MODE=oidc', asy
 });
 
 test('COSMOS_KEY is not required for DATA_MODE=live (F03)', async () => {
-    const problems = await problemsFor({ DATA_MODE: 'live', COSMOS_ENDPOINT: 'https://c', BRIDGE_BASE_URL: 'http://b', TB_WRITE_USERNAME: 'u', TB_WRITE_PASSWORD: 'p' });
+    const problems = await problemsFor({ DATA_MODE: 'live', COSMOS_ENDPOINT: 'https://c', BRIDGE_BASE_URL: 'http://b', TB_WRITE_API_KEY: 'k' });
     assert.ok(!problems.some(p => p.includes('COSMOS_KEY')), `COSMOS_KEY should not be flagged: ${JSON.stringify(problems)}`);
 });
 
 test('COSMOS_ENDPOINT is still required for DATA_MODE=live', async () => {
-    const problems = await problemsFor({ DATA_MODE: 'live', BRIDGE_BASE_URL: 'http://b', TB_WRITE_USERNAME: 'u', TB_WRITE_PASSWORD: 'p' });
+    const problems = await problemsFor({ DATA_MODE: 'live', BRIDGE_BASE_URL: 'http://b', TB_WRITE_API_KEY: 'k' });
     assert.ok(problems.some(p => p.includes('COSMOS_ENDPOINT')));
 });
 
-test('TB write credentials are still required for DATA_MODE=live (SR-3, unchanged)', async () => {
+// --- TB_WRITE_API_KEY / TB_WRITE_USERNAME+PASSWORD tri-state validation ---
+
+test('TB_WRITE_API_KEY alone satisfies DATA_MODE=live write requirement', async () => {
+    const problems = await problemsFor({ DATA_MODE: 'live', COSMOS_ENDPOINT: 'https://c', BRIDGE_BASE_URL: 'http://b', TB_WRITE_API_KEY: 'svc-ctrl-key' });
+    assert.ok(!problems.some(p => p.toLowerCase().includes('tb_write')), `no TB_WRITE problem expected; got: ${JSON.stringify(problems)}`);
+});
+
+test('TB_WRITE_USERNAME + TB_WRITE_PASSWORD alone satisfies DATA_MODE=live write requirement', async () => {
+    const problems = await problemsFor({ DATA_MODE: 'live', COSMOS_ENDPOINT: 'https://c', BRIDGE_BASE_URL: 'http://b', TB_WRITE_USERNAME: 'u', TB_WRITE_PASSWORD: 'p' });
+    assert.ok(!problems.some(p => p.toLowerCase().includes('tb_write')), `no TB_WRITE problem expected; got: ${JSON.stringify(problems)}`);
+});
+
+test('neither TB_WRITE_API_KEY nor TB_WRITE_USERNAME+PASSWORD produces a validation error', async () => {
     const problems = await problemsFor({ DATA_MODE: 'live', COSMOS_ENDPOINT: 'https://c', BRIDGE_BASE_URL: 'http://b' });
-    assert.ok(problems.some(p => p.includes('TB_WRITE_USERNAME')));
+    assert.ok(problems.some(p => p.includes('TB_WRITE_API_KEY') || p.includes('TB_WRITE_USERNAME')), `expected a TB_WRITE problem; got: ${JSON.stringify(problems)}`);
 });
 
 test('production fail-secure: AUTH_MODE=dev is rejected in production', async () => {

@@ -1,5 +1,39 @@
 # Release Notes — OOH Dashboard
 
+## Unreleased — fix/tb-write-api-key: ThingsBoard write path moved to API key
+
+**Branch:** fix/tb-write-api-key · **Base:** v1.7.2 (828b93c)
+
+### What changed
+
+The ThingsBoard **write** session (`writeSession`, SR-3 `svc-control` credential) now
+accepts an API key via `TB_WRITE_API_KEY` in addition to the existing username/password
+fallback. When `TB_WRITE_API_KEY` is set it is used exclusively; username/password remains
+as a fallback for environments that have not yet been migrated.
+
+**Motivation:** ThingsBoard MFA was enabled on the write account, breaking the JWT login
+path at `/api/auth/login`. An API key bypasses MFA entirely. The prod k8s secret already
+has `TB_WRITE_API_KEY` staged (`svc-control` key).
+
+**Files changed:**
+
+- `config.js`: `thingsboard.writeApiKey` mapped to `TB_WRITE_API_KEY`; live-mode
+  validation relaxed to accept either `TB_WRITE_API_KEY` or `TB_WRITE_USERNAME +
+  TB_WRITE_PASSWORD`.
+- `services/tb-client.js`: `writeSession` now receives `apiKey:
+  config.thingsboard.writeApiKey`; the existing `tbSession()` logic already selects
+  `ApiKey <key>` over Bearer JWT when `apiKey` is set.
+- `.env.example`: `TB_WRITE_API_KEY` documented with guidance.
+- `docs/CONFIGURATION.md`, `docs/project/DEPLOY_RUNBOOK.md`: table rows updated.
+- `test/config.test.js`: three new validation tests (api-key-only, user+pass-only, neither).
+- `test/tb-write-apikey.test.js`: four new unit tests (WS-AK-1..4).
+
+**No write performed by this build.** `writeConfigured` will read `true` once the pod
+picks up `TB_WRITE_API_KEY`; `healthz` write state will show healthy after the first
+probe cycle (≤ `HEALTH_PROBE_TTL_MS`, default 60 s).
+
+---
+
 ## v1.4.4 -- OOHDASH-137 Site number and pub name in OOH Zendesk ticket titles
 
 **Date:** 2026-10-21 · **Release commit:** d5bf838 · **Git tag:** v1.4.4 · **Image:** apitechhub.azurecr.io/ooh-dashboard:d5bf838 · **Bump type:** patch · **Branch:** build/oohdash-137
