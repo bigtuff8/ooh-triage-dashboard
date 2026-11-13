@@ -1,0 +1,21 @@
+{
+  "run": "selfgate-ooh-triage-dashboard-feat-oohdash-164-stage1",
+  "phase": "build",
+  "pr": 204,
+  "approvedBy": [
+    "bigtuff8"
+  ],
+  "reviewComments": [
+    "bigtuff8: - Approve Stage 1 build and proceed to test gate?: A: Approve — implementation matches the spec, open the test gate (recommended)\n\n(submitted via the interactive gate review)\n\n<!-- gate:selected [{\"question\":\"Approve Stage 1 build and proceed to test gate?\",\"answer\":\"A: Approve — implementation matches the spec, open the test gate (recommended)\"}] -->"
+  ],
+  "mergeCommit": "444008099fb7ad30775fabebc50897dab45eef4e",
+  "phaseBranch": "feat/oohdash-164-stage1",
+  "releaseBranch": "main",
+  "stamp": 1794585360412,
+  "selectedOptions": [
+    {
+      "question": "Approve Stage 1 build and proceed to test gate?",
+      "answer": "A: Approve — implementation matches the spec, open the test gate (recommended)"
+    }
+  ]
+}
