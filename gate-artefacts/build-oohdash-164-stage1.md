@@ -158,16 +158,25 @@ querySql method in CosmosStore and MemStore. SQL: SELECT * FROM c WHERE c.storeP
 
 The initial "152 pass, 26 fail" figure from the build agent was produced by a run where three worker processes crashed (Windows exit code 3221225794 — DLL initialisation failure) rather than tests failing. A clean follow-up run, with spec files run serially in isolation, gives the following verified results:
 
-| Spec file | Stage 1 pass | Stage 1 fail | Main pass | Main fail | Stage 1 regression? |
-|---|---|---|---|---|---|
-| additional-notes.spec.js | 24 | 2 (E16, E17) | 24 | 2 (E16, E17) | No |
-| control-rosetta.spec.js | 10 | 1 (J13) | 10 | 1 (J13) | No |
-| resolution.spec.js | 9 | 0 | 9 | 0 | No |
-| All other spec files | (clean run in progress) | — | — | — | — |
+**Full Stage 1 clean run total: 181 pass / 23 fail / 2 skip.**
 
-**E16 and E17** (additional-notes) fail on both branches — pre-existing from OOHDASH-146 UI changes not updated when CI e2e was removed.
+The 23 failing tests, confirmed against main where marked:
 
-**J13** (control-rosetta) fails on both branches — pre-existing: `hw-capture` element not found after the hot-water boost chip was removed; test spec not updated.
+| Test | Spec file | Pre-existing on main? |
+|---|---|---|
+| E16, E17 | additional-notes.spec.js | Yes (confirmed) |
+| AC4 | area-model.spec.js | Yes (confirmed) |
+| BC-E5, BC-151-E2 | boilercontrol.spec.js | Yes (confirmed) |
+| J13 | control-rosetta.spec.js | Yes (confirmed) |
+| F005, F007, Protocol4-500 | control.spec.js | Verification run in progress |
+| 134-G | oohdash-134-other-p1.spec.js | Verification run in progress |
+| E12 | oohdash-136-dhw-override.spec.js | Verification run in progress |
+| 111-A, 111-C, 111-E | outside-lighting-p1.spec.js | Verification run in progress |
+| Fix 1 | rosetta-dark-fleet-and-schedule.spec.js | Verification run in progress |
+| TF-06, TF-08, TF-09, TF-11, TF-12 | tester/oohdash-119.tester.spec.js | Verification run in progress |
+| 3 tonight/contractor/scope-check | tonight-callback.spec.js | Verification run in progress |
+
+The 6 confirmed tests match main exactly. The remaining 17 are in spec files Stage 1 did not modify (no changes to P1 escalation, DHW, outside lighting, PowerPause schedule, or callback flows). Verification run results will be in the next commit.
 
 **No Stage 1-only failures confirmed.** The Q3 slim-resolve path falls back to the full resolveSite call unconditionally in fixture mode (resolution.js line 108), so Q3 is not exercised in e2e and cannot introduce a fixture-mode regression.
 
