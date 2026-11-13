@@ -41,6 +41,9 @@ async function zd(method, path, data, params) {
         return res.data;
     } catch (err) {
         zendeskHealthy = false;
+        if (err.response) {
+            console.error(`[ZD] ${method} ${path} → ${err.response.status}: ${JSON.stringify(err.response.data)}`);
+        }
         throw err;
     }
 }
@@ -423,14 +426,22 @@ export async function createOutcomeTicket({ operator, siteNo, siteName, subject,
             subject: title,
             comment: { body: buildBody(dataQualityNote), public: false },
             priority,
-            // OOHDASH-159 rev 5: contact-history records (call records, "not controlled here") are created already solved.
-            ...(createStatus ? { status: createStatus } : {}),
             tags: [config.zendesk.oohTag, ...extraTags],
             custom_fields: customFields
         }
     };
     const data = await zd('POST', '/tickets.json', payload);
-    return { id: data.ticket.id, url: `https://${config.zendesk.subdomain}.zendesk.com/agent/tickets/${data.ticket.id}`, title };
+    const id = data.ticket.id;
+    // OOHDASH-159 rev 5: contact-history records (call records, "not controlled here") are created already solved.
+    // Split into create then solve: Zendesk rejects status:'solved' on creation when form has required-on-solve fields.
+    if (createStatus) {
+        try {
+            await zd('PUT', `/tickets/${id}.json`, { ticket: { status: createStatus } });
+        } catch (solveErr) {
+            console.error(`[ZD] Could not mark ticket #${id} as ${createStatus}: ${solveErr.message}`);
+        }
+    }
+    return { id, url: `https://${config.zendesk.subdomain}.zendesk.com/agent/tickets/${id}`, title };
 }
 
 /**
