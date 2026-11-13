@@ -37,8 +37,14 @@ without re-rendering, leaving the confirm button permanently disabled with
 absent from deviceLine. Fixed: _confirmGateReadFailed tracking variable added,
 .catch() now re-renders, deviceLine shows the correct message.
 
+Segregation-of-duties note: ef7dd36 was authored by the tester session and
+carries no automated test coverage (confirm screen is outside fixture-mode
+Playwright). Independent review and sign-off by James is required before
+release. James's approval of this test gate review serves as that sign-off,
+with the test gap explicitly accepted.
+
 VERDICT: All 6 wording strings present and correct after fix.
-DECISION | Accept fix and proceed to release gate | Reject — reopen build
+DECISION | Accept fix — James sign-off on ef7dd36 as independent reviewer | Reject — reopen build
 
 SECTION: Playwright e2e (fixture mode)
 
@@ -80,14 +86,20 @@ The parity script is a RELEASE gate blocker (must exit 0 before v1.8.0 ships).
 It is not a test gate blocker per design §8 step 3.
 
 ACTION REQUIRED before release gate:
-James (or Spencer) must run the parity script with an account that has
-unrestricted TENANT_ADMIN TB access (no MFA), or provide TB_API_KEY.
+James (or Spencer) must run the parity script. Both TB accounts in this
+session have MFA enabled (PRE_VERIFICATION_TOKEN scope), blocking device-list
+queries. The app's TB_API_KEY (held in a K8s secret the deployer-ooh service
+account cannot read) is the correct credential.
 
-  TB_READ_USERNAME=<tb-account> TB_READ_PASSWORD=<password> \
-    node scripts/tb-parity.mjs --sites 15
+Recommended (avoids shell-history / ps leakage):
+  read -s TB_READ_API_KEY; export TB_READ_API_KEY
+  node scripts/tb-parity.mjs --sites 15
 
-  Or with API key (modify the script to accept TB_READ_API_KEY):
-    node scripts/tb-parity.mjs --sites 15
+(The script must be updated to accept TB_READ_API_KEY and use
+`Authorization: ApiKey <key>` instead of username/password JWT.)
+
+Alternatively, Spencer can provide a short-lived scoped API key rather than
+a standing non-MFA TENANT_ADMIN account.
 
 Output must show "All N sites: parity OK" and exit 0.
 
@@ -96,6 +108,24 @@ DECISION | Accept parity deferral — James to run before release | Block — ru
 ```
 
 ---
+
+## Technical notes
+
+**30-second workspace refresh timer (views.js:353):** The `setInterval` that
+the "try again in 30 seconds" notice refers to is the pre-existing
+`scheduleWorkspaceRefresh` function. Stage 1 did not introduce this timer — it
+added the `anyUnknown` notice which informs operators that this refresh exists.
+The timer is guarded by `state.view !== 'site'`, `!state.confirmToken`,
+`state.flow`, and `window.ctl`; it does not check `document.hidden`.
+Page-background polling is a standing pre-Stage-1 posture, not a Stage 1
+regression. Release gate should confirm this is acceptable or add a visibility
+guard.
+
+**ef7dd36 test coverage:** The confirm screen's read-failed state (the
+`.catch()` re-render path) is not reachable in fixture mode — the test suite
+uses a mock server that always returns 200 for `/api/sites/:no/summary`. A
+manual live walkthrough confirming the button re-enables and the message
+renders is required before the release gate.
 
 ## Context
 
