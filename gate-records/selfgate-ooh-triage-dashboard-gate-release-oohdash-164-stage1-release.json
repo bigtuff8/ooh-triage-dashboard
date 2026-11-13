@@ -1,0 +1,15 @@
+{
+  "run": "selfgate-ooh-triage-dashboard-gate-release-oohdash-164-stage1",
+  "phase": "release",
+  "pr": 208,
+  "approvedBy": [
+    "bigtuff8"
+  ],
+  "reviewComments": [
+    "bigtuff8: I'm happy to approve but - you can manage the whole release process and version should be 1.7.5 - "
+  ],
+  "mergeCommit": "7a490674aa91ec29cd047eb364f705cf1ce0ca99",
+  "phaseBranch": "gate/release-oohdash-164-stage1",
+  "releaseBranch": "main",
+  "stamp": 1794601382433
+}
