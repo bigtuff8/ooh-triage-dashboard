@@ -134,6 +134,7 @@ async function openSite(siteNo) {
     _confirmInProgress = false;
     _confirmGateSummaryLoaded = false;
     _confirmGateDeviceSummary = null;
+    _confirmGateReadFailed = false;
     render();
     $('#view').innerHTML = `<div class="content narrow"><div class="card" style="padding:26px"><h2>Looking up site ${esc(siteNo)}…</h2></div></div>`;
     try {
@@ -266,14 +267,17 @@ async function ambiguousCapture() {
 // Q3: state for the confirm gate background load
 var _confirmGateSummaryLoaded = false;
 var _confirmGateDeviceSummary = null;
+var _confirmGateReadFailed = false;
 
 function renderConfirmGate() {
     const s = state.pendingSite;
     if (!s) { $('#view').innerHTML = '<div class="content narrow"><div class="card"><h2>Loading…</h2></div></div>'; return; }
     // Q3: show placeholder if background read hasn't landed yet
-    const deviceLine = _confirmGateSummaryLoaded && _confirmGateDeviceSummary
-        ? esc(_confirmGateDeviceSummary)
-        : (s.deviceSummary ? esc(s.deviceSummary) : 'Checking the Lighthouse equipment at this site…');
+    const deviceLine = (_confirmGateSummaryLoaded && _confirmGateReadFailed)
+        ? "We couldn't read the Lighthouse equipment just now. You can still confirm the site."
+        : (_confirmGateSummaryLoaded && _confirmGateDeviceSummary)
+            ? esc(_confirmGateDeviceSummary)
+            : (s.deviceSummary ? esc(s.deviceSummary) : 'Checking the Lighthouse equipment at this site…');
     // Q3: button disabled until summary arrives; Q4: re-entry guard via _confirmInProgress
     const needsSummary = !_confirmGateSummaryLoaded && !s.deviceSummary;
     const btnLabel = needsSummary ? 'Checking site…' : '✓ This is the right site';
@@ -300,7 +304,11 @@ function renderConfirmGate() {
                 // Re-render confirm gate to update device line and enable button
                 if (state.view === 'site' && !state.confirmToken) renderConfirmGate();
             })
-            .catch(() => { _confirmGateSummaryLoaded = true; });
+            .catch(() => {
+                _confirmGateSummaryLoaded = true;
+                _confirmGateReadFailed = true;
+                if (state.view === 'site' && !state.confirmToken) renderConfirmGate();
+            });
     }
 }
 
