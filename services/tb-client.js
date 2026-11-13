@@ -17,7 +17,43 @@ import * as registry from './registry.js';
 /* Live TB sessions (read + scoped write)                              */
 /* ------------------------------------------------------------------ */
 
-function tbSession({ username, password, apiKey }, label) {
+/* ------------------------------------------------------------------ */
+/* Q2 — pod-wide read concurrency limiter (max 10 in-flight reads)    */
+/* ------------------------------------------------------------------ */
+
+let _readInFlight = 0;
+const _readQueue = [];
+const READ_CONCURRENCY_CAP = 10;
+
+function _acquireReadSlot() {
+    if (_readInFlight < READ_CONCURRENCY_CAP) {
+        _readInFlight++;
+        return Promise.resolve();
+    }
+    return new Promise(resolve => _readQueue.push(resolve));
+}
+
+function _releaseReadSlot() {
+    if (_readQueue.length > 0) {
+        _readQueue.shift()();      // give the slot straight to the next waiter
+    } else {
+        _readInFlight--;
+    }
+}
+
+/** Returns true for errors that warrant a retry on the read path. Never retries writes. */
+function _isReadRetryable(err) {
+    const code = err.code;
+    const status = err.response?.status;
+    if (code === 'ECONNRESET' || code === 'ETIMEDOUT' || code === 'ECONNABORTED') return true;
+    if (status === 429 || status === 502 || status === 503 || status === 504) return true;
+    return false;
+}
+
+/** Sleep for `ms` milliseconds. */
+function _sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+function tbSession({ username, password, apiKey }, label, { readTimeout = 15000, writeTimeout = 15000, retries = 0 } = {}) {
     let token = null;
     let expiry = 0;
     // OOHDASH-24: an ACTIVE probe-result record replaces the old lazy boolean `healthy` latch.
@@ -41,22 +77,55 @@ function tbSession({ username, password, apiKey }, label) {
         console.log(`[TB] Authenticated (${label})`);
         return `Bearer ${token}`;
     }
-    async function request(method, path, data) {
-        try {
-            const res = await axios({
-                method,
-                url: `${config.thingsboard.url}${path}`,
-                headers: { 'X-Authorization': await authHeader() },
-                data,
-                timeout: 15000
-            });
-            markProbe(true);
-            return res.data;
-        } catch (err) {
-            if (err.response?.status === 401) { token = null; }
-            markProbe(false);
-            throw err;
+    async function _doRequest(method, path, data, timeout) {
+        const res = await axios({
+            method,
+            url: `${config.thingsboard.url}${path}`,
+            headers: { 'X-Authorization': await authHeader() },
+            data,
+            timeout
+        });
+        return res.data;
+    }
+    async function request(method, path, data, { isRead = false } = {}) {
+        const timeout = isRead ? readTimeout : writeTimeout;
+        const maxAttempts = (isRead && retries > 0) ? retries + 1 : 1;
+        const jitter = [200, 400];
+        let lastErr;
+        for (let attempt = 0; attempt < maxAttempts; attempt++) {
+            if (attempt > 0) await _sleep(jitter[attempt - 1] + Math.random() * 50);
+            if (isRead) {
+                await _acquireReadSlot();
+                try {
+                    const result = await _doRequest(method, path, data, timeout);
+                    markProbe(true);
+                    return result;
+                } catch (err) {
+                    if (err.response?.status === 401) { token = null; }
+                    if (attempt < maxAttempts - 1 && _isReadRetryable(err)) {
+                        lastErr = err;
+                        console.warn(`[TB] read retry ${attempt + 1}/${maxAttempts - 1} path=${path} reason=${err.code || err.response?.status}`);
+                        continue;
+                    }
+                    markProbe(false);
+                    throw err;
+                } finally {
+                    _releaseReadSlot();
+                }
+            } else {
+                try {
+                    const result = await _doRequest(method, path, data, timeout);
+                    markProbe(true);
+                    return result;
+                } catch (err) {
+                    if (err.response?.status === 401) { token = null; }
+                    markProbe(false);
+                    throw err;
+                }
+            }
         }
+        markProbe(false);
+        throw lastErr;
     }
     /**
      * OOHDASH-24 — active read probe. A cheap authenticated call that positively re-proves the
@@ -111,8 +180,17 @@ function tbSession({ username, password, apiKey }, label) {
     };
 }
 
-const readSession = tbSession({ username: config.thingsboard.readUsername, password: config.thingsboard.readPassword, apiKey: config.thingsboard.readApiKey }, 'read');
-const writeSession = tbSession({ username: config.thingsboard.writeUsername, password: config.thingsboard.writePassword, apiKey: config.thingsboard.writeApiKey }, 'write/SR-3');
+// Q2: read session uses a 3s timeout with 2 retries; write session keeps 15s and no retry.
+const readSession = tbSession(
+    { username: config.thingsboard.readUsername, password: config.thingsboard.readPassword, apiKey: config.thingsboard.readApiKey },
+    'read',
+    { readTimeout: 3000, writeTimeout: 3000, retries: 2 }
+);
+const writeSession = tbSession(
+    { username: config.thingsboard.writeUsername, password: config.thingsboard.writePassword, apiKey: config.thingsboard.writeApiKey },
+    'write/SR-3',
+    { readTimeout: 15000, writeTimeout: 15000, retries: 0 }
+);
 
 /**
  * Thin read-plane request wrapper (read plane / D5). Lets services/tb-device.js issue
@@ -124,7 +202,7 @@ const writeSession = tbSession({ username: config.thingsboard.writeUsername, pas
  * never calls this outside live mode (mirroring bridge.js's fixture/live split).
  */
 export async function readRequest(method, path, data) {
-    return readSession.request(method, path, data);
+    return readSession.request(method, path, data, { isRead: true });
 }
 
 /**
@@ -137,7 +215,9 @@ export async function readRequest(method, path, data) {
 export async function readServerScopeAttributes(uuid, keys) {
     const attrs = await readSession.request(
         'GET',
-        `/api/plugins/telemetry/DEVICE/${uuid}/values/attributes/SERVER_SCOPE?keys=${encodeURIComponent(keys)}`
+        `/api/plugins/telemetry/DEVICE/${uuid}/values/attributes/SERVER_SCOPE?keys=${encodeURIComponent(keys)}`,
+        undefined,
+        { isRead: true }
     );
     const out = {};
     for (const row of Array.isArray(attrs) ? attrs : []) {
@@ -156,7 +236,9 @@ export async function readServerScopeAttributes(uuid, keys) {
 export async function readClientScopeAttributes(uuid, keys) {
     const attrs = await readSession.request(
         'GET',
-        `/api/plugins/telemetry/DEVICE/${uuid}/values/attributes/CLIENT_SCOPE?keys=${encodeURIComponent(keys)}`
+        `/api/plugins/telemetry/DEVICE/${uuid}/values/attributes/CLIENT_SCOPE?keys=${encodeURIComponent(keys)}`,
+        undefined,
+        { isRead: true }
     );
     const out = {};
     for (const row of Array.isArray(attrs) ? attrs : []) {
@@ -173,14 +255,41 @@ export async function readClientScopeAttributes(uuid, keys) {
  */
 export async function readSharedScopeAttributes(uuid, keys) {
     const attrs = await readSession.request(
-        "GET",
-        `/api/plugins/telemetry/DEVICE/${uuid}/values/attributes/SHARED_SCOPE?keys=${encodeURIComponent(keys)}`
+        'GET',
+        `/api/plugins/telemetry/DEVICE/${uuid}/values/attributes/SHARED_SCOPE?keys=${encodeURIComponent(keys)}`,
+        undefined,
+        { isRead: true }
     );
     const out = {};
     for (const row of Array.isArray(attrs) ? attrs : []) {
         if (row && row.key !== undefined) out[row.key] = row.value;
     }
     return out;
+}
+
+/**
+ * Q1 — OOHDASH-164 Stage 1 bulk latest read. Sends ONE POST to /api/entitiesQuery/find instead of
+ * ~90 per-device timeseries + attribute reads. The response shape is:
+ *   { data: [ { entityId: { entityType, id }, latest: { TIME_SERIES: {...}, SERVER_ATTRIBUTE: {...},
+ *               CLIENT_ATTRIBUTE: {...}, SHARED_ATTRIBUTE: {...} } } ] }
+ *
+ * @param {string[]} deviceIds  Array of TB device UUIDs (the `id.id` values, not names).
+ * @param {object}  latestValues  { TIME_SERIES: [...keys], SERVER_ATTRIBUTE: [...keys],
+ *                                  CLIENT_ATTRIBUTE: [...keys], SHARED_ATTRIBUTE: [...keys] }
+ * @returns {object}  Raw TB response object.
+ */
+export async function fetchLatestBulk(deviceIds, latestValues) {
+    const body = {
+        entityFilter: {
+            type: 'entityList',
+            entityType: 'DEVICE',
+            entityList: deviceIds
+        },
+        latestValues: Object.entries(latestValues).flatMap(([scope, keys]) =>
+            keys.map(key => ({ type: scope, key }))
+        )
+    };
+    return readSession.request('POST', '/api/entitiesQuery/find', body, { isRead: true });
 }
 
 const deviceUuidCache = new Map();
@@ -384,6 +493,11 @@ export async function hasPublishedState(device) {
     const keys = await readSession.request('GET', `/api/plugins/telemetry/DEVICE/${uuid}/keys/timeseries`);
     return Array.isArray(keys) && keys.length > 0;
 }
+
+/** TEST-ONLY: returns the current number of read slots in use (for limiter tests). */
+export function __testReadInFlightCount() { return _readInFlight; }
+/** TEST-ONLY: returns the read concurrency cap (for limiter tests). */
+export function __testReadConcurrencyCap() { return READ_CONCURRENCY_CAP; }
 
 /** TEST-ONLY seam — clears the fixture sim state so edge/settle tests don't leak across each other. */
 export function __resetSim() {

@@ -100,6 +100,29 @@ router.post('/ux-timing', wrap(async (req, res) => {
 
 /* ---------------- site search / resolution (F004) ---------------- */
 
+// Q8: site index — de-duplicated directory for in-browser search (Callback + site search).
+// Served from the 1-hour Zendesk site directory cache; never makes a TB call.
+router.get('/sites/index', wrap(async (req, res) => {
+    try {
+        const { siteDirectory } = await import('../services/zendesk.js');
+        const dir = await siteDirectory();
+        // De-duplicate: same siteNo + siteName collapses to one entry
+        const seen = new Set();
+        const result = [];
+        for (const d of dir) {
+            const key = `${d.siteNo}:${d.siteName || ''}`;
+            if (!seen.has(key)) {
+                seen.add(key);
+                result.push({ siteNo: d.siteNo, siteName: d.siteName || `gk-${d.siteNo}`, brand: d.brand });
+            }
+        }
+        res.json({ sites: result, cachedAt: Date.now() });
+    } catch (err) {
+        console.error('[API] /sites/index failed:', err.message);
+        res.status(503).json({ error: 'Site index unavailable', sites: [] });
+    }
+}));
+
 router.get('/sites/search', wrap(async (req, res) => {
     let results;
     try {
@@ -120,20 +143,36 @@ router.get('/sites/search', wrap(async (req, res) => {
 
 router.get('/sites/:siteNo/resolve', wrap(async (req, res) => {
     const t0 = Date.now();
-    const result = await resolution.resolveSite(req.params.siteNo, req.session.operator);
+    // Q3: slim resolve — inventory check only (~100ms), starts background full read + Zendesk.
+    const result = await resolution.resolveSiteInventory(req.params.siteNo, req.session.operator);
     res.set('Server-Timing', `total;dur=${Date.now() - t0}`);
     if (result.status === 'resolved') {
         const s = result.site;
+        const deviceSum = s.devices.length > 0 ? deviceSummary(s) : null;
         return res.json({
             status: 'resolved',
-            site: { siteNo: s.siteNo, siteName: s.siteName, nameUnverified: s.nameUnverified, accountId: s.accountId, brand: s.brand, address: s.address, callsLast30Days: s.callsLast30Days, deviceSummary: deviceSummary(s) }
+            backgroundStarted: result.backgroundStarted || false,
+            site: { siteNo: s.siteNo, siteName: s.siteName, nameUnverified: s.nameUnverified, accountId: s.accountId, brand: s.brand, address: s.address, callsLast30Days: s.callsLast30Days, deviceSummary: deviceSum }
         });
     }
     res.json(result);
 }));
 
+// Q3: summary endpoint — waits for background full site read, returns device summary.
+// The browser polls this once after /resolve to get the real device line and enable the button.
+router.get('/sites/:siteNo/summary', wrap(async (req, res) => {
+    const siteNo = req.params.siteNo;
+    // Join the in-flight background read (or start one if /resolve wasn't called first)
+    const sites = await resolution.getBackgroundSiteRead(siteNo);
+    if (!sites || sites.length === 0) return res.json({ found: false, deviceSummary: null });
+    if (sites.length > 1) return res.json({ found: false, deviceSummary: null, ambiguous: true });
+    const s = sites[0];
+    return res.json({ found: true, deviceSummary: deviceSummary(s), siteNo: s.siteNo });
+}));
+
 router.post('/sites/:siteNo/confirm', wrap(async (req, res) => {
     const t0 = Date.now();
+    // Q4: confirmSite is now idempotent (10s window per operator+site)
     const { token, site } = await resolution.confirmSite(req.params.siteNo, req.session.operator);
     // OOHDASH-159 rev 5 (E1): the call record starts here; the agent never has a "log it" step.
     // Part 2b: check for a same-operator resume before starting a new call.
@@ -141,7 +180,15 @@ router.post('/sites/:siteNo/confirm', wrap(async (req, res) => {
     const callId = resume
         ? resume.callId
         : callRecord.startCall({ operator: req.session.operator, siteNo: site.siteNo, siteName: site.siteName });
-    const ws = await workspacePayload(site);
+    // Q3: use background read result if available to avoid a second full read
+    let fullSite = site;
+    if (site.devices.length === 0) {
+        try {
+            const sites = await resolution.getBackgroundSiteRead(site.siteNo);
+            if (sites && sites.length === 1) fullSite = sites[0];
+        } catch { /* fall through — workspace will use whatever we have */ }
+    }
+    const ws = await workspacePayload(fullSite);
     res.set('Server-Timing', `total;dur=${Date.now() - t0}`);
     res.json({ confirmToken: token, callId, sameOperatorResume: resume || null, workspace: ws });
 }));
@@ -242,6 +289,8 @@ export function scopeLevelFor(g, site, base) {
     const anchor = scopeConnectivityAnchor(site.devices);
     if (anchor && !anchor.online) return 'unreachable';
     const own = g.kinds ? g.kinds(site) : [];
+    // D2: unknown — every device in the group has readOk:false (data unavailable)
+    if (own.length && own.every(d => d.readOk === false)) return 'unknown';
     if (own.length && own.every(d => !d.online)) return 'offline';
     return level;
 }
@@ -347,6 +396,8 @@ async function workspacePayload(site) {
             return { key: g.key, label: g.label, level: scopeLevelFor(g, siteWithEffective, base) };
         }),
         anyOffline: site.devices.some(d => !d.online),
+        // D2: anyUnknown — at least one device has readOk:false (data unavailable, not offline)
+        anyUnknown: site.devices.some(d => d.readOk === false),
         tickets,
         activeP1Tickets,
         degraded: bridgeDegraded(),

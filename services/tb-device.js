@@ -83,8 +83,249 @@ async function siteDirectory() {
 let fixtureData = null;
 const LIVE_CACHE_TTL = 30 * 1000;
 const perSiteCache = new Map();     // siteNo -> { sites, at }
+const perSiteInflight = new Map();  // Q7: siteNo -> Promise<sites> (joins concurrent callers onto one read)
 let lastReadOk = config.dataMode === 'fixture';
 let lastReadError = null;
+
+/* ------------------------------------------------------------------ */
+/* Q1 — OOHDASH-164 Stage 1: bulk latest read                          */
+/* ------------------------------------------------------------------ */
+
+/**
+ * All 53+ telemetry and attribute keys the bulk query must fetch, grouped by TB scope.
+ * This constant is the single source of truth — the key-list guard test fails if any
+ * key read by a decoder in this module is absent here.
+ */
+export const BULK_LATEST_KEYS = {
+    TIME_SERIES: [
+        'temperature', 'localTemperature', 'temperatureC',
+        'heatingSetpoint', 'setPoint', 'setpoint', 'setpointC',
+        'mode', 'heatingActive', 'coolingActive', 'hotWater', 'hwBoostHours',
+        'roomSensor1Temp', 'roomSensor2Temp',
+        'output1State', 'output2State', 'output3State',
+        'output2Override', 'output3Override', 'output2FallbackEnabled', 'output3FallbackEnabled',
+        'output4Override',
+        'summerModeActive', 'summer_mode',
+        'switch_1', 'switch', 'switchOn',
+        'DHW.override',
+        'boiler.enable_output_state',
+        'CHZ1.output_state', 'CHZ2.output_state',
+        'CHZ1.override', 'CHZ2.override',
+        'CHZ1.room_temp', 'CHZ2.room_temp',
+        'CHZ1.fallback_enabled', 'CHZ2.fallback_enabled'
+    ],
+    SERVER_ATTRIBUTE: ['active', 'lastActivityTime'],
+    CLIENT_ATTRIBUTE: [
+        'site', 'salusLocation',
+        'DHW.use_boiler', 'heating_scenario',
+        'CHZ1.enabled', 'CHZ2.enabled'
+    ],
+    SHARED_ATTRIBUTE: [
+        'output1OutputMask',
+        'output1Schedule', 'output2Schedule', 'output3Schedule', 'output4Schedule',
+        'CHZ1.schedule', 'CHZ2.schedule', 'DHW.schedule',
+        'schedules'
+    ]
+};
+
+/**
+ * Coerces a single TB attribute value from string to its native type. Telemetry values
+ * stay as strings (TB delivers them as strings from the timeseries engine). Attribute
+ * values (SERVER/CLIENT/SHARED scope) are coerced: "true"/"false" → boolean,
+ * numeric strings → number, JSON-looking strings starting with "{" or "[" → parsed.
+ * Returns the original value when coercion cannot apply.
+ */
+function coerceAttrValue(v) {
+    if (typeof v !== 'string') return v;
+    if (v === 'true') return true;
+    if (v === 'false') return false;
+    if (v.startsWith('{') || v.startsWith('[')) {
+        try { return JSON.parse(v); } catch { return v; }
+    }
+    const n = Number(v);
+    if (v !== '' && Number.isFinite(n)) return n;
+    return v;
+}
+
+/**
+ * Adapts one entry from the TB bulk response `data` array into the same flat
+ * telemetry-bag shape as fetchTelemetry's per-device reads.
+ *
+ * latestEntry: { entityId: { entityType, id }, latest: { TIME_SERIES, SERVER_ATTRIBUTE,
+ *               CLIENT_ATTRIBUTE, SHARED_ATTRIBUTE } }
+ *
+ * Rules:
+ *  - Drops keys where `ts === 0` (never reported).
+ *  - Telemetry (TIME_SERIES) values are kept as-is (strings — same as per-device path).
+ *  - Attribute values are coerced via coerceAttrValue.
+ * Returns a flat `{ key: value }` bag with private keys __active, __lastActivityTime,
+ * __clientScope, __sharedScope populated exactly as the per-device path produces.
+ */
+export function latestToBag(latestEntry) {
+    const latest = latestEntry?.latest ?? {};
+    const bag = {};
+
+    // TIME_SERIES — keep as strings, same as the per-device path
+    for (const [key, entry] of Object.entries(latest.TIME_SERIES ?? {})) {
+        if (entry && entry.ts !== 0) bag[key] = entry.value;
+    }
+
+    // SERVER_ATTRIBUTE — coerce; populate __active and __lastActivityTime private keys
+    const serverAttrs = {};
+    for (const [key, entry] of Object.entries(latest.SERVER_ATTRIBUTE ?? {})) {
+        if (entry && entry.ts !== 0) serverAttrs[key] = coerceAttrValue(entry.value);
+    }
+    bag.__active = parseActive(serverAttrs);
+    bag.__lastActivityTime = parseLastActivity(serverAttrs);
+
+    // CLIENT_ATTRIBUTE — coerce; store as __clientScope
+    const clientAttrs = {};
+    for (const [key, entry] of Object.entries(latest.CLIENT_ATTRIBUTE ?? {})) {
+        if (entry && entry.ts !== 0) clientAttrs[key] = coerceAttrValue(entry.value);
+    }
+    bag.__clientScope = clientAttrs;
+
+    // SHARED_ATTRIBUTE — coerce; store as __sharedScope
+    const sharedAttrs = {};
+    for (const [key, entry] of Object.entries(latest.SHARED_ATTRIBUTE ?? {})) {
+        if (entry && entry.ts !== 0) sharedAttrs[key] = coerceAttrValue(entry.value);
+    }
+    // Only expose __sharedScope when any shared attrs were actually present
+    bag.__sharedScope = Object.keys(sharedAttrs).length > 0 ? sharedAttrs : null;
+
+    // Derive __telemLastSeenMs from time series entries the same way as the per-device path
+    const nowMs = Date.now();
+    const upperBound = nowMs + 300_000;
+    let maxTs = null;
+    for (const [, entry] of Object.entries(latest.TIME_SERIES ?? {})) {
+        if (!entry || entry.ts === 0) continue;
+        const ts = entry.ts;
+        if (typeof ts === 'number' && ts > 0 && ts <= upperBound && (maxTs === null || ts > maxTs)) maxTs = ts;
+    }
+    bag.__telemLastSeenMs = maxTs;
+
+    return bag;
+}
+
+// Q1: bulk read block timer — when a 403/404 is received, block bulk for 10 min.
+let _bulkBlockedUntil = 0;
+
+/**
+ * Q1 — Fetches latest data for a set of devices via the TB entitiesQuery/find bulk endpoint.
+ * Returns Map<uuid, telemetryBag> in the SAME shape as fetchTelemetry. Falls back to
+ * per-device reads on any failure, partial miss, or when the admin killswitch is on.
+ *
+ * Fallback rules:
+ *  - Error / timeout / empty response → all devices fall back
+ *  - Partial (some missing) → missing ones fall back; found ones use bulk data
+ *  - 403/404 → all fall back + block bulk for 10 min
+ *  - Admin switch OohTbBatchReadOff → all fall back
+ *
+ * Every fallback logs: [TB] bulk read fallback site=XXXX reason=... devices=N
+ */
+async function fetchTelemetryBulk(devices, siteKey) {
+    const uuids = devices.map(d => d?.id?.id || d?.id).filter(Boolean);
+    if (!uuids.length) return new Map();
+
+    // Check killswitch and block timer
+    async function isBatchOff() {
+        try {
+            const { tbBatchReadOff } = await import('./killswitch.js');
+            return await tbBatchReadOff();
+        } catch { return false; }
+    }
+
+    if (Date.now() < _bulkBlockedUntil || await isBatchOff()) {
+        console.log(`[TB] bulk read fallback site=${siteKey} reason=blocked devices=${uuids.length}`);
+        return fetchTelemetry(devices);
+    }
+
+    let raw;
+    try {
+        const { fetchLatestBulk } = await import('./tb-client.js');
+        raw = await fetchLatestBulk(uuids, BULK_LATEST_KEYS);
+    } catch (err) {
+        const status = err.response?.status;
+        if (status === 403 || status === 404) {
+            _bulkBlockedUntil = Date.now() + 10 * 60 * 1000;
+            console.warn(`[TB] bulk read blocked for 10min site=${siteKey} status=${status}`);
+        }
+        console.log(`[TB] bulk read fallback site=${siteKey} reason=error devices=${uuids.length}`);
+        return fetchTelemetry(devices);
+    }
+
+    const entries = Array.isArray(raw?.data) ? raw.data : [];
+
+    // Build a map uuid → latestEntry from the response
+    const byUuid = new Map();
+    for (const entry of entries) {
+        const id = entry?.entityId?.id;
+        if (id) byUuid.set(id, entry);
+    }
+
+    const out = new Map();
+    const fallbackDevices = [];
+
+    for (const d of devices) {
+        const uuid = d?.id?.id || d?.id;
+        if (!uuid) continue;
+        if (byUuid.has(uuid)) {
+            out.set(uuid, latestToBag(byUuid.get(uuid)));
+        } else {
+            fallbackDevices.push(d);
+        }
+    }
+
+    // Handle V1 boilerControl output4Override history (still needs per-device read)
+    for (const d of devices) {
+        const uuid = d?.id?.id || d?.id;
+        if (!uuid || !out.has(uuid)) continue;
+        const bag = out.get(uuid);
+        const isBoilerControl = (d.type ?? d.profile) === 'boilerControl';
+        if (!isBoilerControl) {
+            // PowerPause and non-boiler devices don't need history reads
+            if (!bag.__sharedScope) bag.__sharedScope = null;
+            continue;
+        }
+        // V1 DHW history read — same logic as fetchTelemetry
+        const ss = bag.__sharedScope ?? {};
+        const cs = bag.__clientScope ?? {};
+        const isV1panel = Object.prototype.hasOwnProperty.call(ss, 'output1OutputMask')
+            && !Object.prototype.hasOwnProperty.call(cs, 'heating_scenario');
+        if (isV1panel) {
+            const latestRaw = bag['output4Override'];
+            const latestN = (latestRaw !== undefined && latestRaw !== null && latestRaw !== '')
+                ? Number(latestRaw) : 0;
+            if (Number.isFinite(latestN) && latestN !== 0) {
+                const nowMs = Date.now();
+                const v1ConfirmMs = config.boilerV1OverrideConfirmMinutes * 60 * 1000;
+                const histPath = `/api/plugins/telemetry/DEVICE/${uuid}/values/timeseries` +
+                    `?keys=output4Override&startTs=${nowMs - v1ConfirmMs}&endTs=${nowMs}&limit=20&agg=NONE&orderBy=DESC`;
+                try {
+                    const hist = await readRequest('GET', histPath);
+                    bag.__v1OverrideHistory = (hist && Array.isArray(hist['output4Override']))
+                        ? hist['output4Override'] : [];
+                } catch (err) {
+                    console.warn(`[TB] V1 DHW override history read failed for ${uuid}: ${err.message}`);
+                    bag.__v1OverrideHistory = null;
+                }
+            } else {
+                bag.__v1OverrideHistory = [];
+            }
+        }
+    }
+
+    if (fallbackDevices.length > 0) {
+        console.log(`[TB] bulk read fallback site=${siteKey} reason=partial devices=${fallbackDevices.length}`);
+        const fallbackMap = await fetchTelemetry(fallbackDevices);
+        for (const [k, v] of fallbackMap) out.set(k, v);
+    }
+
+    return out;
+}
+
+/** Exported for tests only — resets the bulk block timer. */
+export function __resetBulkBlock() { _bulkBlockedUntil = 0; }
 
 /* ------------------------------------------------------------------ */
 /* OOHDASH-85 (design §4): freshness threshold — how recently a device */
@@ -1474,10 +1715,26 @@ async function fetchTelemetry(devices) {
     return out;
 }
 
+const SITE_DEADLINE_MS = 5000;   // Q2: any device without a result by this deadline gets readOk:false
+
 async function fetchLiveSitesByNumber(siteNo) {
     const key = String(siteNo);
     const cached = perSiteCache.get(key);
     if (cached && Date.now() - cached.at < LIVE_CACHE_TTL) return cached.sites;
+
+    // Q7: in-flight deduplication — join concurrent callers onto the same read
+    if (perSiteInflight.has(key)) return perSiteInflight.get(key);
+    const inflightPromise = _doFetchLiveSitesByNumber(key);
+    perSiteInflight.set(key, inflightPromise);
+    // Use .then(cleanup, cleanup) rather than .finally() to avoid creating a derived
+    // promise that re-rejects (which would be an unhandled rejection).
+    const cleanup = () => perSiteInflight.delete(key);
+    inflightPromise.then(cleanup, cleanup);
+    return inflightPromise;
+}
+
+async function _doFetchLiveSitesByNumber(key) {
+    const siteNo = key;
 
     const t0 = Date.now();
     const siteNamePromise = resolveSiteName(key).catch(err => { console.error(`[TB] Site name enrichment failed for ${key}: ${err.message}`); return null; });
@@ -1542,10 +1799,18 @@ async function fetchLiveSitesByNumber(siteNo) {
 
     const tuyaEnabled = config.tuya?.readEnabled && config.tuya?.clientId && !await _tuyaReadOff().catch(() => true);
 
-    // Latest telemetry + Tuya listing run concurrently
+    // Q1: bulk latest read + Tuya listing run concurrently, with site deadline (Q2)
     const t2 = Date.now();
+    const bulkPromise = fetchTelemetryBulk(matched, key);
+    const deadlinePromise = new Promise(resolve => setTimeout(() => resolve(null), SITE_DEADLINE_MS));
     const [telemetryById, tuyaListing] = await Promise.all([
-        fetchTelemetry(matched),
+        Promise.race([bulkPromise, deadlinePromise]).then(result => {
+            if (result === null) {
+                console.warn(`[TB] site deadline ${SITE_DEADLINE_MS}ms hit for ${key} — ${matched.length} devices may get readOk:false`);
+                return new Map();   // deadline: empty map → all devices get readOk:false
+            }
+            return result;
+        }),
         tuyaEnabled ? _readSiteListing(brand, key).catch(err => {
             console.warn(`[TUYA] Listing failed for site ${key}: ${err.message}`);
             return null;
@@ -1556,6 +1821,8 @@ async function fetchLiveSitesByNumber(siteNo) {
     const now = Date.now();
     const devices = matched.map(d => {
         const uuid = d?.id?.id || d?.id;
+        // D2: readOk is false when the device has no telemetry bag (deadline hit or bulk/per-device read failed).
+        const readOk = telemetryById.has(uuid);
         const bag = telemetryById.get(uuid) || {};
         // OOHDASH-80: source liveness from the SERVER_SCOPE read stashed in the bag, then strip the
         // private keys so they never leak into the canonical telemetry{} shape.
@@ -1570,6 +1837,8 @@ async function fetchLiveSitesByNumber(siteNo) {
             __clientScope || {},
             __sharedScope || null
         );
+        // D2: attach readOk flag. An unreadable device never unlocks control.
+        dev.readOk = readOk;
         // OOHDASH-85 (design §5): server-side anti-flicker debounce. `dev.online` is the raw freshness
         // verdict; the debounce holds a device online for one extra poll on its FIRST *stale* read, so
         // offline is only asserted after two consecutive stale polls. A missing/unparseable report time
@@ -1779,19 +2048,53 @@ export async function searchSites(query) {
     if (!q) return [];
     if (config.dataMode === 'live') {
         const dir = await siteDirectory();
-        return dir
-            .filter(d => String(d.siteNo ?? '').startsWith(q) || String(d.siteName ?? '').toLowerCase().includes(q))
-            .slice(0, 12)
-            .map(d => ({
-                siteNo: d.siteNo,
-                siteName: d.siteName || `gk-${d.siteNo}`,
-                nameUnverified: !d.siteName,
-                accountId: `gk-${d.siteNo}`,
-                brand: d.brand,
-                address: undefined,
-                callsLast30Days: undefined,
-                devices: []
-            }));
+        const matched = dir.filter(d => String(d.siteNo ?? '').startsWith(q) || String(d.siteName ?? '').toLowerCase().includes(q));
+        // Q5: group by site number — same name collapses to one row; distinct names become separate rows.
+        const bySiteNo = new Map();
+        for (const d of matched) {
+            const sno = String(d.siteNo ?? '');
+            const name = d.siteName || `gk-${sno}`;
+            if (!bySiteNo.has(sno)) {
+                bySiteNo.set(sno, { names: new Set([name]), d });
+            } else {
+                bySiteNo.get(sno).names.add(name);
+            }
+        }
+        const rows = [];
+        for (const { names, d } of bySiteNo.values()) {
+            if (rows.length >= 12) break;
+            const sno = String(d.siteNo ?? '');
+            if (names.size === 1) {
+                // One name — single plain row
+                rows.push({
+                    siteNo: sno,
+                    siteName: [...names][0],
+                    nameUnverified: !d.siteName,
+                    accountId: `gk-${sno}`,
+                    brand: d.brand,
+                    address: undefined,
+                    callsLast30Days: undefined,
+                    devices: []
+                });
+            } else {
+                // Distinct names — one row per name (duplicate scenario)
+                for (const name of names) {
+                    if (rows.length >= 12) break;
+                    rows.push({
+                        siteNo: sno,
+                        siteName: name,
+                        nameUnverified: !d.siteName,
+                        accountId: `gk-${sno}`,
+                        brand: d.brand,
+                        address: undefined,
+                        callsLast30Days: undefined,
+                        devices: [],
+                        duplicate: true
+                    });
+                }
+            }
+        }
+        return rows;
     }
     const sites = loadFixture().sites;
     return sites
@@ -1861,6 +2164,7 @@ export async function probeBridgeReadOnce({ timeoutMs = 8000 } = {}) {
  *  OOHDASH-85: also clears the freshness debounce state so poll-sequence tests start clean. */
 export function _resetCache() {
     perSiteCache.clear();
+    perSiteInflight.clear();
     freshnessDebounce.clear();
 }
 

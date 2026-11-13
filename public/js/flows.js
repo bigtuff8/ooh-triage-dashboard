@@ -2047,6 +2047,30 @@ const FLOWR = {
                 }
                 return `<div class="reco" data-testid="reco-dark-fleet"><b class="hd">This heating device is not reporting.</b>It is a Salus unit that has stopped sending live data to Lighthouse, so there is no live reading and it cannot be switched or adjusted from here. This usually means the device has lost power or its connection.</div>${sayBox('I can\'t read or change that heating controller from here tonight, because it isn\'t sending us any data.', 'would you like our IoT team to look into it the next working day?')}${answers('<button class="chip" data-testid="dark-capture" onclick="flowStep({need:\'darkcap\'})">Yes, please</button><button class="chip" data-testid="dark-noact" onclick="flowStep({need:\'darknoact\'})">No, leave it</button>')}`;
             }
+            // D2 (OOHDASH-164 Stage 1): all devices in the area have readOk=false → data unavailable,
+            // not confirmed offline. Use distinct wording and log-it path with specific ticket note.
+            if (set.length > 0 && set.every(d => d.readOk === false)) {
+                if (f.data.need === 'urcap') {
+                    return outcomeCaptured(f, 'urcap', {
+                        subject: `Heating thermostat unreadable (${areaLabel})`,
+                        detail: 'Thermostat data unavailable at time of call (read failed) — not confirmed offline',
+                        script: res => 'That\'s logged, reference ' + dyn(res.ticket.id) + '. Our IoT team picks it up the next working day.',
+                        OohCaptureClass: 'heating'
+                    });
+                }
+                if (f.data.need === 'urnoact') {
+                    return outcomeNoAction(f, 'urnoact', {
+                        subject: `Heating thermostat unreadable (${areaLabel}) — no action`,
+                        detail: 'Thermostat data unavailable at time of call (read failed) — not confirmed offline. Customer declined a follow-up.',
+                        script: res => 'No problem. It\'s noted on the call record, reference ' + dyn(res.ticket.id) + '. If it\'s still not working, give us a call back.'
+                    });
+                }
+                doneLine(`Area: <b>${esc(areaLabel)}</b>`, 'customer');
+                doneLine('We can\'t read the thermostat in this area right now', 'check');
+                return sayBox('We can\'t read the thermostat in this area right now, so we can\'t check or change it from here.', 'would you like our IoT team to look into it the next working day?') +
+                    answers(`<button class="chip" data-testid="area-unreadable-capture" onclick="flowStep({need:'urcap'})">Yes, please</button>` +
+                            `<button class="chip" data-testid="area-unreadable-noact" onclick="flowStep({need:'urnoact'})">No, leave it</button>`);
+            }
             doneLine(`Area: <b>${esc(areaLabel)}</b>`, 'customer');
             doneLine('The thermostat in this area isn\'t connecting to us', 'check');
             // B9: pass the zone name so the connectivity flow names the device, not "Everything is online"
@@ -2060,7 +2084,15 @@ const FLOWR = {
         const nInArea = set.length;
         if (f.stage === 1) {
             doneLine(`Area: <b>${esc(areaLabel)}</b>`, 'customer');
-            if (!z.online) { doneLine('The thermostat in this area isn\'t connecting to us', 'check'); f.data.offlineZone = areaLabel; f.cat = 'connectivity'; f.stage = 0; f.data.from = 'heating'; return FLOWR.connectivity(ws, f); }
+            if (!z.online) {
+                // D2: if device failed its read, say "can't read" rather than "isn't connecting"
+                if (z.readOk === false) {
+                    doneLine('We can\'t read the thermostat in this area right now', 'check');
+                } else {
+                    doneLine('The thermostat in this area isn\'t connecting to us', 'check');
+                    f.data.offlineZone = areaLabel; f.cat = 'connectivity'; f.stage = 0; f.data.from = 'heating'; return FLOWR.connectivity(ws, f);
+                }
+            }
             // OOHDASH-128 (OQ4): compute online/offline counts for mixed-health copy and the note.
             const nOn = set.filter(d => d.online).length;
             const nOff = nInArea - nOn;
@@ -2344,9 +2376,12 @@ const FLOWR = {
                 if (OFF_VERDICTS.includes(v)) return 'off';
                 return 'on';
             }
+            // D2: a device whose read failed is "unknown" (data unavailable), not "offline"
+            if (d.readOk === false) return 'unknown';
             return d.online ? 'unknown' : 'offline';
         }
         function factText(d) {
+            if (d.readOk === false) return kName(d) + ' — data unavailable right now.';
             const s = stateOf(d);
             if (s === 'offline') return kName(d) + ' not connecting to us.';
             if (s === 'unknown') return kName(d) + ' connecting to us (older site: on/off state not visible).';
@@ -2592,7 +2627,9 @@ const FLOWR = {
         const lgs = ws.devices.filter(d => d.kind === 'lighting');
         if (f.stage === 0) {
             const anyOnline = lgs.some(d => d.online);
-            doneLine(lgs.length ? (anyOnline ? 'The outside lighting controller is connecting to us' : 'The outside lighting controller isn\'t connecting to us') : 'Outside lighting isn\'t on Lighthouse here', 'check');
+            const allUnreadable = lgs.length > 0 && lgs.every(d => d.readOk === false);
+            // D2: if all controllers failed their read, say "can't read" not "isn't connecting"
+            doneLine(lgs.length ? (allUnreadable ? 'We can\'t read the outside lighting controller right now' : anyOnline ? 'The outside lighting controller is connecting to us' : 'The outside lighting controller isn\'t connecting to us') : 'Outside lighting isn\'t on Lighthouse here', 'check');
             // OOHDASH-146 B3: riskQuestion replaces otherShortcut for not-on-Lighthouse paths.
             if (!lgs.length) return '<div class="alert info">External lighting at this site isn\'t on Lighthouse.</div>' +
                 riskQuestion(f, {
@@ -2658,7 +2695,9 @@ const FLOWR = {
         const fans = ws.devices.filter(d => d.kind === 'fan');
         if (f.stage === 0) {
             const anyOnline = fans.some(d => d.online);
-            doneLine(fans.length ? (anyOnline ? 'The fan controller is connecting to us' : 'The fan controller isn\'t connecting to us') : 'Extractor fans aren\'t on Lighthouse here', 'check');
+            const allUnreadable = fans.length > 0 && fans.every(d => d.readOk === false);
+            // D2: if all controllers failed their read, say "can't read" not "isn't connecting"
+            doneLine(fans.length ? (allUnreadable ? 'We can\'t read the fan controller right now' : anyOnline ? 'The fan controller is connecting to us' : 'The fan controller isn\'t connecting to us') : 'Extractor fans aren\'t on Lighthouse here', 'check');
             // OOHDASH-146 B3: riskQuestion replaces otherShortcut for not-on-Lighthouse paths.
             if (!fans.length) return '<div class="alert info">Extractor fans at this site aren\'t on Lighthouse.</div>' +
                 riskQuestion(f, {
@@ -2789,7 +2828,8 @@ const FLOWR = {
             if (!f.data._cline) {
                 let cl;
                 if (anchor === null) cl = 'This site\'s equipment connects to us directly, with no wall unit';
-                else if (!anchor.online) cl = 'The Lighthouse wall unit at this site isn\'t connecting to us';
+                // D2: failed read → "can't read" (we don't know if it's offline or just unreadable)
+                else if (!anchor.online) cl = anchor.readOk === false ? 'We can\'t read the Lighthouse wall unit right now' : 'The Lighthouse wall unit at this site isn\'t connecting to us';
                 else if (offlineGroups.length) cl = `The site is connecting to us, but ${offlineGroups.length === 1 ? 'one equipment group isn\'t' : offlineGroups.length + ' equipment groups aren\'t'}`;
                 else cl = 'The site is connecting to us';
                 doneLine(cl, 'check');
@@ -2809,8 +2849,14 @@ const FLOWR = {
    ${answers(`<button class="chip" data-testid="gwless-back" onclick="flowStep({ofq:'dback'})">Yes, it's working again</button><button class="chip" data-testid="gwless-capture" onclick="flowStep({ofq:'dcap'})">No, it's still not working</button>`)}`;
             }
 
-            // Anchor OFFLINE → site unreachable → existing plain-English wall-unit outcome (verbatim, unchanged).
+            // Anchor OFFLINE (or unreadable) → site unreachable path.
             if (!anchor.online) {
+                // D2: if the read failed, say "can't read" rather than "isn't connecting"
+                if (anchor.readOk === false) {
+                    return `<div data-testid="connectivity-alert">${infoBox('We can\'t read the Lighthouse wall unit right now. It may be working — we just can\'t see it.')}</div>
+   ${sayBox('We\'re having trouble reading the Lighthouse unit on your wall just now — it may be a temporary issue.', 'could you check whether the unit has lights on?')}
+   ${answers(`<button class="chip" data-testid="connectivity-back" onclick="flowStep({ofq:'back'})">Yes, the unit looks on</button><button class="chip" data-testid="connectivity-stilldead" onclick="flowStep({ofq:'cap'})">No, it looks off</button>`)}`;
+                }
                 return `<div data-testid="connectivity-alert">${infoBox('The Lighthouse wall unit at this site isn\'t connecting to us. It connects the whole site, so nothing can be reached from here while it\'s down. This is usually power or internet at the site.')}</div>
    ${sayBox('The Lighthouse unit on your wall isn\'t responding, which normally means it\'s lost power or internet. I\'ll stay on the line.', 'could you check the fuse board hasn\'t tripped, that the unit has lights on, and the router is on?')}
    ${answers(`<button class="chip" data-testid="connectivity-back" onclick="flowStep({ofq:'back'})">Yes, the unit's lights are back on</button><button class="chip" data-testid="connectivity-stilldead" onclick="flowStep({ofq:'cap'})">No, it's still not working</button>`)}`;

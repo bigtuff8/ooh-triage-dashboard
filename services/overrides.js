@@ -104,11 +104,26 @@ export async function scheduleOverride(action) {
 export async function activeBoostHoldsForSite(siteNo) {
     try {
         const col = await collection('OohOverrides');
-        const docs = await col.query(o =>
-            o.status === 'active' &&
-            o.deviceType === 'boiler-panel' &&
-            String(o.siteNo) === String(siteNo)
-        );
+        // Q9: use querySql in live mode (index-accelerated); predicate query in fixture/file mode.
+        let docs;
+        if (typeof col.querySql === 'function' && config.dataMode === 'live') {
+            docs = await col.querySql({
+                query: 'SELECT * FROM c WHERE c.storePartition = @p AND c.status = @status AND c.deviceType = @deviceType AND (c.siteNo = @s OR c.siteNo = @n)',
+                parameters: [
+                    { name: '@p', value: 'ooh' },
+                    { name: '@status', value: 'active' },
+                    { name: '@deviceType', value: 'boiler-panel' },
+                    { name: '@s', value: String(siteNo) },
+                    { name: '@n', value: Number(siteNo) }
+                ]
+            });
+        } else {
+            docs = await col.query(o =>
+                o.status === 'active' &&
+                o.deviceType === 'boiler-panel' &&
+                String(o.siteNo) === String(siteNo)
+            );
+        }
         return docs
             .sort((a, b) => (a.boilerZone || '').localeCompare(b.boilerZone || ''))
             .map(o => ({
