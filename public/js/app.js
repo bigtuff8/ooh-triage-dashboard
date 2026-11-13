@@ -195,6 +195,8 @@ async function boot() {
     } catch (err) {
         state.loadError = err.message;
     }
+    // Q8 (OOHDASH-164 Stage 1): pre-fetch the site index for in-memory search (non-blocking).
+    fetchSiteIndex().catch(() => { /* non-fatal — server search fallback used */ });
     // OOHDASH-159 rev 5 (A1): /ticket/:id is the in-app ticket page, always opened in its own tab.
     const tm = /^\/ticket\/(\d+)\/?$/.exec((window.location && window.location.pathname) || '');
     if (tm && !state.loadError) return renderTicketPage(tm[1]);
@@ -307,6 +309,61 @@ async function signOut() {
     window.location.href = '/auth/login';
 }
 
+/* ------------------------ Q8: in-browser site index (OOHDASH-164 Stage 1) ------------------------ */
+// Fetched once on load; used for in-memory search to avoid a round-trip per keystroke.
+// Falls back to the server search route when not yet loaded.
+let _siteIndex = null; // null = not yet loaded; [] = loaded (possibly empty)
+
+async function fetchSiteIndex() {
+    try {
+        const { sites } = await api.get('/api/sites/index');
+        _siteIndex = Array.isArray(sites) ? sites : [];
+    } catch {
+        // Non-fatal: server search fallback will be used instead
+        _siteIndex = null;
+    }
+}
+
+/**
+ * Run the query against the in-memory index. Returns an array of result rows in the
+ * same shape as the /api/sites/search response, capped at 12 results.
+ * Matching: exact siteNo (pure digits match), or case-insensitive siteName contains q.
+ * Duplicate siteNo (distinct names) → separate rows with duplicate:true.
+ */
+function _indexSearch(q) {
+    if (!_siteIndex || !q) return null;
+    const ql = q.toLowerCase();
+    const isNum = /^\d+$/.test(q);
+    const matched = isNum
+        ? _siteIndex.filter(s => String(s.siteNo) === q)
+        : _siteIndex.filter(s => s.siteName.toLowerCase().includes(ql) || String(s.siteNo).includes(ql));
+    // Group by siteNo — same name collapses, distinct names are separate rows
+    const byNo = new Map();
+    for (const s of matched) {
+        const key = String(s.siteNo);
+        if (!byNo.has(key)) { byNo.set(key, []); }
+        byNo.get(key).push(s);
+    }
+    const results = [];
+    for (const [siteNo, group] of byNo) {
+        if (group.length === 1) {
+            results.push({ siteNo, siteName: group[0].siteName, brand: group[0].brand, duplicate: false });
+        } else {
+            // Distinct names for same siteNo → show each as a separate row with duplicate flag
+            const names = [...new Set(group.map(g => g.siteName))];
+            if (names.length === 1) {
+                results.push({ siteNo, siteName: names[0], brand: group[0].brand, duplicate: false });
+            } else {
+                for (const g of group) {
+                    results.push({ siteNo, siteName: g.siteName, brand: g.brand, duplicate: true });
+                }
+            }
+        }
+        if (results.length >= 12) break;
+    }
+    return results;
+}
+
 /* ------------------------ site search (keyboard-navigable) ------------------------ */
 let srch = { hits: [], sel: -1, onPick: null, boxId: '', timer: null };
 
@@ -332,16 +389,22 @@ async function searchInput(q) {
     srch.sel = -1;
     if (!q) { srch.hits = []; box.innerHTML = ''; return; }
     let results;
-    try {
-        performance.clearMarks('search-submit'); performance.mark('search-submit');
-        ({ results } = await api.get(`/api/sites/search?q=${encodeURIComponent(q)}`));
-        performance.clearMarks('search-result'); performance.mark('search-result');
-    } catch (err) {
-        srch.hits = [];
-        box.innerHTML = `<div class="sresults"><div class="empty">${err.degraded
-            ? '<b>The device inventory is unreachable right now.</b> You can still capture the customer\'s issue — go to a manual capture via "Something else" once the site is known, or raise it in Tonight → Raise a query.'
-            : esc(err.message)}</div></div>`;
-        return;
+    // Q8: use in-memory index when available; fall back to server search
+    const indexResults = _indexSearch(q);
+    if (indexResults !== null) {
+        results = indexResults;
+    } else {
+        try {
+            performance.clearMarks('search-submit'); performance.mark('search-submit');
+            ({ results } = await api.get(`/api/sites/search?q=${encodeURIComponent(q)}`));
+            performance.clearMarks('search-result'); performance.mark('search-result');
+        } catch (err) {
+            srch.hits = [];
+            box.innerHTML = `<div class="sresults"><div class="empty">${err.degraded
+                ? '<b>The device inventory is unreachable right now.</b> You can still capture the customer\'s issue — go to a manual capture via "Something else" once the site is known, or raise it in Tonight → Raise a query.'
+                : esc(err.message)}</div></div>`;
+            return;
+        }
     }
     srch.hits = results;
     if (!results.length) {
