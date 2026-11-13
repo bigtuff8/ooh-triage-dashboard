@@ -331,7 +331,7 @@ async function fetchSiteIndex() {
  * Duplicate siteNo (distinct names) → separate rows with duplicate:true.
  */
 function _indexSearch(q) {
-    if (!_siteIndex || !q) return null;
+    if (!_siteIndex || !_siteIndex.length || !q) return null;
     const ql = q.toLowerCase();
     const isNum = /^\d+$/.test(q);
     const matched = isNum
