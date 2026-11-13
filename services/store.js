@@ -86,6 +86,33 @@ class FileCollection {
     async query(predicate) {
         return Object.values(this.docs).filter(predicate).map(d => structuredClone(d));
     }
+
+    /**
+     * Q9 — SQL-style query on the in-memory store. Accepts a Cosmos-compatible query
+     * object `{ query, parameters }` and evaluates it in-process for fixture/test use.
+     * Only the patterns used by overrides.js (siteNo string+number, status, deviceType) are
+     * supported: a parameter named @p is the partition, @s the string siteNo, @n the numeric siteNo,
+     * and the WHERE clause is applied by running all docs through the predicate below.
+     *
+     * For other patterns, falls back to returning all docs (safe, overly broad).
+     */
+    async querySql({ query, parameters } = {}) {
+        const param = (name) => (parameters || []).find(p => p.name === name)?.value;
+        const p = param('@p');
+        const s = param('@s');
+        const n = param('@n');
+        const statusVal = param('@status') ?? 'active';
+        const deviceTypeVal = param('@deviceType');
+        return Object.values(this.docs).filter(doc => {
+            if (p !== undefined && doc.storePartition !== p) return false;
+            if (s !== undefined && n !== undefined) {
+                if (doc.siteNo !== s && doc.siteNo !== n) return false;
+            }
+            if (statusVal !== undefined && doc.status !== statusVal) return false;
+            if (deviceTypeVal !== undefined && doc.deviceType !== deviceTypeVal) return false;
+            return true;
+        }).map(d => structuredClone(d));
+    }
 }
 
 /* ------------------------------------------------------------------ */
@@ -153,6 +180,20 @@ class CosmosCollection {
             }, { partitionKey: this.partition })
             .fetchAll();
         return resources.map(r => ({ ...r, _version: r._etag })).filter(predicate);
+    }
+
+    /**
+     * Q9 — parameterised SQL query. Passes a full Cosmos SQL query object + parameters
+     * directly to the SDK, enabling index-accelerated lookups (e.g. boiler-panel override
+     * lookup by siteNo without an in-process full-partition scan). The query is run with
+     * the logical partition key set so the SDK routes to the right physical partition.
+     * Returns documents with _version aliased from _etag (same as query()).
+     */
+    async querySql({ query, parameters } = {}) {
+        const { resources } = await this.container.items
+            .query({ query, parameters }, { partitionKey: this.partition })
+            .fetchAll();
+        return resources.map(r => ({ ...r, _version: r._etag }));
     }
 }
 

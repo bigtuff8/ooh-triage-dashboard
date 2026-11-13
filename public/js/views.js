@@ -130,6 +130,10 @@ async function openSite(siteNo) {
     state.workspace = null;
     state.flow = null;
     state.call = null;
+    // Q3/Q4: reset confirm gate state for the new site
+    _confirmInProgress = false;
+    _confirmGateSummaryLoaded = false;
+    _confirmGateDeviceSummary = null;
     render();
     $('#view').innerHTML = `<div class="content narrow"><div class="card" style="padding:26px"><h2>Looking up site ${esc(siteNo)}…</h2></div></div>`;
     try {
@@ -259,24 +263,59 @@ async function ambiguousCapture() {
     go('home');
 }
 
+// Q3: state for the confirm gate background load
+var _confirmGateSummaryLoaded = false;
+var _confirmGateDeviceSummary = null;
+
 function renderConfirmGate() {
     const s = state.pendingSite;
     if (!s) { $('#view').innerHTML = '<div class="content narrow"><div class="card"><h2>Loading…</h2></div></div>'; return; }
+    // Q3: show placeholder if background read hasn't landed yet
+    const deviceLine = _confirmGateSummaryLoaded && _confirmGateDeviceSummary
+        ? esc(_confirmGateDeviceSummary)
+        : (s.deviceSummary ? esc(s.deviceSummary) : 'Checking the Lighthouse equipment at this site…');
+    // Q3: button disabled until summary arrives; Q4: re-entry guard via _confirmInProgress
+    const needsSummary = !_confirmGateSummaryLoaded && !s.deviceSummary;
+    const btnLabel = needsSummary ? 'Checking site…' : '✓ This is the right site';
+    const btnDisabled = needsSummary ? 'disabled' : '';
     $('#view').innerHTML = `<div class="content narrow"><div class="card" style="padding:26px" data-testid="confirm-gate">
    <h2>${esc(s.siteName)} <span class="mono" style="background:var(--surface-variant);padding:2px 10px;border-radius:6px;margin-left:6px">${esc(s.siteNo)}</span></h2>
    ${siteSubline(s)}
    ${unverifiedNotice(s)}
-   <p style="margin:10px 0 4px">${esc(s.deviceSummary)}</p>
+   <p style="margin:10px 0 4px" data-testid="confirm-device-line">${deviceLine}</p>
    ${sayBox('', `can I just confirm, you\'re calling from ${dyn(s.siteName)}, site number ${dyn(s.siteNo)}?`)}
 
    <div style="display:flex;gap:10px;margin-top:16px">
-    <button class="btn primary big" data-testid="confirm-site" onclick="confirmSite()">✓ This is the right site</button>
+    <button class="btn primary big" data-testid="confirm-site" onclick="confirmSite()" ${btnDisabled}>${btnLabel}</button>
     <button class="btn big" onclick="go('home')">Search again</button>
    </div></div></div>`;
     performance.clearMarks('confirm-screen-paint'); performance.mark('confirm-screen-paint');
+    // Q3: if summary not yet loaded, fetch it in background
+    if (needsSummary) {
+        fetch(`/api/sites/${encodeURIComponent(s.siteNo)}/summary`)
+            .then(r => r.json())
+            .then(data => {
+                _confirmGateSummaryLoaded = true;
+                _confirmGateDeviceSummary = data.deviceSummary || null;
+                // Re-render confirm gate to update device line and enable button
+                if (state.view === 'site' && !state.confirmToken) renderConfirmGate();
+            })
+            .catch(() => { _confirmGateSummaryLoaded = true; });
+    }
 }
 
+// Q4: re-entry guard — prevents duplicate confirm POSTs from rapid clicks
+var _confirmInProgress = false;
+
 async function confirmSite() {
+    // Q4: re-entry guard — only the first click fires; later clicks do nothing
+    if (_confirmInProgress) return;
+    _confirmInProgress = true;
+    // Disable button and show spinner immediately
+    const btn = document.querySelector('[data-testid="confirm-site"]');
+    if (btn) { btn.disabled = true; btn.textContent = 'Opening site…'; }
+    const searchAgainBtn = document.querySelector('.btn.big:not([data-testid="confirm-site"])');
+    if (searchAgainBtn) searchAgainBtn.disabled = true;
     try {
         const { confirmToken, workspace, callId } = await api.post(`/api/sites/${encodeURIComponent(state.siteNo)}/confirm`);
         state.confirmToken = confirmToken;
@@ -289,6 +328,7 @@ async function confirmSite() {
         }
         scheduleWorkspaceRefresh();
     } catch (err) {
+        _confirmInProgress = false;  // allow retry on error
         toast(`⚠️ ${esc(err.message)}`);
         if (err.resolution?.status === 'ambiguous') { state.ambiguous = err.resolution; }
     }
@@ -332,6 +372,8 @@ async function refreshWorkspace() {
 function scopeTag(g) {
     if (g.level === 'unreachable') return '<span class="tag amber">Can\'t be reached right now</span>';
     if (g.level === 'offline') return '<span class="tag amber">Not responding right now</span>';
+    // D2: unknown — data unavailable (grey tag with dashed border)
+    if (g.level === 'unknown') return '<span class="tag" style="color:var(--on-surface-variant,#666);border-style:dashed">? Data unavailable</span>';
     if (g.level === 'ctl') return '<span class="tag green">Controllable from here</span>';
     if (g.level === 'mon') {
         return g.key === 'hotwater'
@@ -348,6 +390,7 @@ function renderWorkspace() {
     const s = ws.site;
     const flowHtml = state.flow ? renderFlow() : `
    ${ws.anyOffline ? `<div class="alert err" data-testid="offline-banner" style="display:flex;flex-direction:column;gap:6px;margin:0 0 10px"><div style="display:flex;align-items:center;gap:10px">📡 <b>Some Lighthouse equipment at this site is not responding.</b></div><p class="small" data-testid="offline-banner-optional-hint" style="margin:0">The questions check the equipment for you if your issue involves it.</p></div>` : ''}
+   ${ws.anyUnknown ? `<div class="alert" data-testid="unknown-banner" style="display:flex;flex-direction:column;gap:6px;margin:0 0 10px;border-color:var(--on-surface-variant,#999);color:var(--on-surface-variant,#555)"><div style="display:flex;align-items:center;gap:10px">❓ <b>We couldn't read some Lighthouse equipment just now.</b></div><p class="small" style="margin:0">It may be working — we just can't see it. The page will try again in 30 seconds.</p></div>` : ''}
    ${ws.degraded ? `<div class="alert warn" data-testid="degraded-banner">⚠️ Live reads are unavailable — flows will pass issues to the IoT team rather than make changes.</div>` : ''}
    <div class="card">
    ${callSoFar()}

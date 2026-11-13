@@ -21,7 +21,8 @@ async function getDoc() {
         OohKillSwitchActor: null,
         OohKillSwitchAt: null,
         OohWriteKillSwitchSiteList: {}, // siteNo -> { reason, actor, at }
-        OohTuyaReadOff: false
+        OohTuyaReadOff: false,
+        OohTbBatchReadOff: false         // Q1: admin switch — forces per-device reads when true
     };
 }
 
@@ -75,6 +76,15 @@ export async function killSwitchState() {
 export async function tuyaReadOff() {
     const doc = await getDoc();
     return !!doc.OohTuyaReadOff;
+}
+
+/**
+ * Returns true when the TB bulk read kill-switch is engaged (Q1 / OOHDASH-164 Stage 1).
+ * When true, tb-device.js uses per-device reads instead of the bulk query endpoint.
+ */
+export async function tbBatchReadOff() {
+    const doc = await getDoc();
+    return !!doc.OohTbBatchReadOff;
 }
 
 /**

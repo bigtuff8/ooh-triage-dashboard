@@ -717,11 +717,30 @@ export async function callbackLookup(siteNo) {
         rawTickets = (data.results || []).slice(0, 12);
     }
 
+    // Q6: fetch comments for all tickets in parallel (capped at 4 concurrent), not serially.
+    const CAP = 4;
+    const commentsByTicketId = new Map();
+    if (live()) {
+        const tickets = [...rawTickets];
+        // Process in batches of CAP
+        for (let i = 0; i < tickets.length; i += CAP) {
+            const batch = tickets.slice(i, i + CAP);
+            const results = await Promise.allSettled(
+                batch.map(t => zd('GET', `/tickets/${t.id}/comments.json`, null, { sort_order: 'desc' }))
+            );
+            for (let j = 0; j < batch.length; j++) {
+                const r = results[j];
+                commentsByTicketId.set(batch[j].id,
+                    r.status === 'fulfilled' ? (r.value.comments || []) : []);
+            }
+        }
+    }
+
     const groups = { active: [], recent: [], closed: [] };
     for (const t of rawTickets) {
         const info = statusInfo(t);
         const comments = live()
-            ? (await zd('GET', `/tickets/${t.id}/comments.json`, null, { sort_order: 'desc' }).catch(() => ({ comments: [] }))).comments || []
+            ? commentsByTicketId.get(t.id) || []
             : [...(t.comments || [])].reverse();
         const visit = VISIT_STATUS_IDS.includes(t.custom_status_id) || !!t.visit;
         const enriched = {
