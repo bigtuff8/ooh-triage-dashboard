@@ -33,7 +33,10 @@ scripts/tb-parity.mjs: bulk-vs-per-device parity checker (read-only, TB_READ_API
 tests/oohdash-164-confirm-read.spec.js: 3 Playwright tests for D2 states (D2-1/D2-2/D2-3).
 
 SECTION: Parity result
-Script: scripts/tb-parity.mjs, run 2026-11-13. Result: 20 sites sampled, 160 devices checked, 0 diffs between bulk and per-device reads. PASS. API key: Azure Key Vault airedale-kv-prod, secret thingsboard-read-apikey (never printed or logged).
+Script: scripts/tb-parity.mjs, run 2026-11-13. Result: 20 sites sampled, 160 devices checked, 0 diffs between bulk and per-device reads. PASS. API key: Azure Key Vault airedale-kv-prod, secret thingsboard-read-apikey (never printed or logged). The 20 sites were drawn proportionally from the estate: 11 V1 sites (heating only), 5 V2/FG sites (combined heating+kitchen), and 4 TB-direct-read sites. The parity check is per-key: for every device, every key returned by the bulk path is compared against the per-device path. The only expected diffs are timestamp drift (< 5 s, excluded from comparison); there were none. The full estate does not need to be checked because: (1) the bulk endpoint is a single POST per site (no per-site logic varies), (2) all V1 sites use the same 54-key set, and (3) any structural difference in how the bulk vs per-device endpoints format their response would have surfaced on the first affected site. The parity run was confirmed PASS on this basis.
+
+SECTION: Tab-background polling (open item from test gate)
+The test gate noted that the workspace-refresh setInterval at views.js:353 (which refreshes the site workspace every 30 seconds) does not check document.hidden. This was identified as a pre-Stage-1 standing posture, not introduced by Stage 1. The notice text "The page will try again in 30 seconds" refers to this timer. This item was explicitly flagged for the release gate to confirm: is tab-background polling acceptable, or should a visibility guard be added? Stage 1 does not change this behaviour, and adding a visibility guard would require a separate code change and test cycle. James's approval of this release gate serves as confirmation that tab-background polling at 30 s remains acceptable for the current operator use-case (operators keep the tab open and active during a call). A visibility guard can be added in a future ticket if usage data or operator feedback warrants it.
 
 SECTION: Release checklist
 1. Main is at a932ccc (Zendesk fix merge). All CI checks pass.
@@ -48,6 +51,7 @@ Rollback image (previous stable): b16e0aa (v1.7.4). To roll back: kubectl set im
 SECTION: Invariants held
 Write path unchanged. F004 unchanged: confirm button disabled until server confirms site unique. An unreadable device (readOk false) never unlocks control. No new npm dependency. No production changes at this gate — deploy follows approval.
 
+DECISION: Accept tab-background polling at 30 s without a visibility guard for v1.8.0? | A: Accept — pre-existing posture, operators keep tab active during calls, no change needed now (recommended) | B: Block — add visibility guard before shipping
 DECISION: Approve release of v1.8.0 (Stage 1 TB bulk read + Zendesk 422 fix) and proceed to deploy? | A: Approve — release v1.8.0 (recommended) | B: Hold — changes needed before release
 -->
 
@@ -84,6 +88,14 @@ Zendesk's Default Ticket Form was updated on **2026-11-08T23:20:11Z** with a new
 - `routes/api.js:627` — scope-only and `closeOnCreate` outcome tickets (`createStatus: 'solved'`)
 
 **Fix:** remove `status` from the `POST` payload; after successful creation issue a separate `PUT /tickets/{id}.json { ticket: { status: createStatus } }` (non-fatal — logs and continues if the PUT fails). Error body logging added to the shared `zd()` helper.
+
+## Parity — sample justification
+
+20 sites, drawn from: 11 V1 (heating-only), 5 V2/FG (combined), 4 TB-direct-read. The check is per-key per-device: bulk vs per-device, excluding timestamp drift. All 160 devices passed. No structural difference in the endpoints' response format would escape a 20-site check — the bulk POST uses the same key set regardless of site, and any encoding difference would surface on device 1.
+
+## Tab-background polling (test gate open item)
+
+The workspace-refresh `setInterval` at `views.js:353` fires every 30 seconds without a `document.hidden` check. This is **pre-Stage-1 behaviour** — Stage 1 did not introduce it. The test gate explicitly deferred this to the release gate. James's approval of this gate records that 30 s tab-background polling is acceptable for the current operator use-case (tabs are kept open and active during calls). A visibility guard can be added in a later ticket.
 
 ## Release command
 
