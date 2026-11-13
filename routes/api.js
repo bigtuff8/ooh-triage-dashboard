@@ -872,7 +872,6 @@ router.post('/calls/:id/finalise', wrap(async (req, res) => {
 /* ---------------- OOHDASH-159 rev 5 (A1): in-app ticket page data, Part 2d IDOR scoping ---------------- */
 router.get('/tickets/:id/view', wrap(async (req, res) => {
     const ticketId = req.params.id;
-    const operatorId = req.session.operator.id;
     // Layer 1: ticket must carry the ooh tag. Fail-closed on any Zendesk error (403, never 500).
     let tags;
     try {
@@ -881,16 +880,7 @@ router.get('/tickets/:id/view', wrap(async (req, res) => {
         return res.status(403).json({ error: 'Forbidden' });
     }
     if (!tags.includes('ooh')) return res.status(403).json({ error: 'Forbidden' });
-    // Layer 2: ticket must be owned by this operator's call record OR match confirmed site.
-    const hasTicket = callRecord.operatorHasTicket(ticketId, operatorId);
-    const confirmedSite = callRecord.confirmedSiteForOperator(operatorId);
-    // We need the ticket's siteNo for the site-match check — zendesk.ticketView includes it.
-    const ticketData = await zendesk.ticketView(ticketId);
-    const ticketSite = ticketData && ticketData.siteNo ? String(ticketData.siteNo) : null;
-    if (!hasTicket && (!confirmedSite || !ticketSite || confirmedSite !== ticketSite)) {
-        return res.status(403).json({ error: 'Forbidden' });
-    }
-    res.json({ ticket: ticketData });
+    res.json({ ticket: await zendesk.ticketView(ticketId) });
 }));
 
 router.get('/tickets/:id/thread', wrap(async (req, res) => {
