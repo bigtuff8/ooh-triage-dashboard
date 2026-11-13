@@ -162,21 +162,23 @@ The initial "152 pass, 26 fail" figure from the build agent was produced by a ru
 
 The 23 failing tests, confirmed against main where marked:
 
-| Test | Spec file | Pre-existing on main? |
-|---|---|---|
-| E16, E17 | additional-notes.spec.js | Yes (confirmed) |
-| AC4 | area-model.spec.js | Yes (confirmed) |
-| BC-E5, BC-151-E2 | boilercontrol.spec.js | Yes (confirmed) |
-| J13 | control-rosetta.spec.js | Yes (confirmed) |
-| F005, F007, Protocol4-500 | control.spec.js | Verification run in progress |
-| 134-G | oohdash-134-other-p1.spec.js | Verification run in progress |
-| E12 | oohdash-136-dhw-override.spec.js | Verification run in progress |
-| 111-A, 111-C, 111-E | outside-lighting-p1.spec.js | Verification run in progress |
-| Fix 1 | rosetta-dark-fleet-and-schedule.spec.js | Verification run in progress |
-| TF-06, TF-08, TF-09, TF-11, TF-12 | tester/oohdash-119.tester.spec.js | Verification run in progress |
-| 3 tonight/contractor/scope-check | tonight-callback.spec.js | Verification run in progress |
+All 23 failures are confirmed pre-existing on main (verified 2026-11-13):
 
-The 6 confirmed tests match main exactly. The remaining 17 are in spec files Stage 1 did not modify (no changes to P1 escalation, DHW, outside lighting, PowerPause schedule, or callback flows). Verification run results will be in the next commit.
+| Test(s) | Spec file | Main fails? |
+|---|---|---|
+| E16, E17 | additional-notes.spec.js | Yes ✓ |
+| AC4 | area-model.spec.js | Yes ✓ |
+| BC-E5, BC-151-E2 | boilercontrol.spec.js | Yes ✓ |
+| J13 | control-rosetta.spec.js | Yes ✓ |
+| F005, F007, Protocol4-500 | control.spec.js | Yes ✓ |
+| 134-G | oohdash-134-other-p1.spec.js | Yes ✓ |
+| E12 | oohdash-136-dhw-override.spec.js | Yes ✓ |
+| 111-A, 111-C, 111-E | outside-lighting-p1.spec.js | Yes ✓ |
+| Fix 1 | rosetta-dark-fleet-and-schedule.spec.js | Yes ✓ |
+| TF-06, TF-08, TF-09, TF-11, TF-12 | tester/oohdash-119.tester.spec.js | Yes ✓ |
+| connection-check, contractor-P1, scope-check | tonight-callback.spec.js | Yes ✓ |
+
+Main-branch verification run on those 7 spec files: 65 pass, 17 fail — matching Stage 1 exactly on those same files.
 
 **No Stage 1-only failures confirmed.** The Q3 slim-resolve path falls back to the full resolveSite call unconditionally in fixture mode (resolution.js line 108), so Q3 is not exercised in e2e and cannot introduce a fixture-mode regression.
 
