@@ -6,21 +6,23 @@
  * for every mapped device field on 10+ live sites. Any difference blocks the release.
  *
  * Usage:
- *   TB_READ_USERNAME=<user> TB_READ_PASSWORD=<pass> node scripts/tb-parity.mjs [--sites 10]
+ *   TB_READ_API_KEY=<key>  node scripts/tb-parity.mjs [--sites 10]   # preferred (no MFA)
+ *   TB_READ_USERNAME=<u> TB_READ_PASSWORD=<p> node scripts/tb-parity.mjs [--sites 10]  # fallback
  *
- * NEVER prints TB_READ_USERNAME, TB_READ_PASSWORD or any JWT token.
+ * NEVER prints TB_READ_API_KEY, TB_READ_USERNAME, TB_READ_PASSWORD or any JWT token.
  *
  * Exit code: 0 = all sites parity OK, 1 = differences found or error.
  */
 import https from 'https';
 
 const TB_URL = 'https://portal.lhlive.co.uk';
+const TB_API_KEY = process.env.TB_READ_API_KEY;
 const TB_USERNAME = process.env.TB_READ_USERNAME;
 const TB_PASSWORD = process.env.TB_READ_PASSWORD;
 const SITE_LIMIT = Number(process.argv.find((_, i, a) => a[i - 1] === '--sites') || 10);
 
-if (!TB_USERNAME || !TB_PASSWORD) {
-    console.error('[parity] TB_READ_USERNAME and TB_READ_PASSWORD are required');
+if (!TB_API_KEY && (!TB_USERNAME || !TB_PASSWORD)) {
+    console.error('[parity] Set TB_READ_API_KEY (preferred) or TB_READ_USERNAME + TB_READ_PASSWORD');
     process.exit(1);
 }
 
@@ -57,13 +59,19 @@ const ALL_LATEST_VALUES = [
 
 let _jwt = null;
 
+function authHeader() {
+    if (TB_API_KEY) return { 'Authorization': `ApiKey ${TB_API_KEY}` };
+    if (_jwt) return { 'X-Authorization': `Bearer ${_jwt}` };
+    return {};
+}
+
 async function tbRequest(method, path, body, { auth = true } = {}) {
     return new Promise((resolve, reject) => {
         const url = new URL(path, TB_URL);
         const bodyStr = body ? JSON.stringify(body) : null;
         const headers = {
             'Content-Type': 'application/json',
-            ...(auth && _jwt ? { 'X-Authorization': `Bearer ${_jwt}` } : {}),
+            ...(auth ? authHeader() : {}),
             ...(bodyStr ? { 'Content-Length': Buffer.byteLength(bodyStr) } : {}),
         };
         const opts = {
@@ -89,6 +97,13 @@ async function tbRequest(method, path, body, { auth = true } = {}) {
 }
 
 async function authenticate() {
+    if (TB_API_KEY) {
+        // Verify the API key works with a cheap request; never print it
+        const r = await tbRequest('GET', '/api/auth/user');
+        if (r.status !== 200) throw new Error(`API key check failed: HTTP ${r.status}`);
+        console.log('[parity] Auth OK (API key)');
+        return;
+    }
     // NEVER print the username or password
     const r = await tbRequest('POST', '/api/auth/login', {
         username: TB_USERNAME, password: TB_PASSWORD
@@ -101,15 +116,21 @@ async function authenticate() {
 // ── Site/device discovery ─────────────────────────────────────────────────────
 
 async function discoverSites(limit) {
-    // Use the gk- prefix search to find live sites (same query as the dashboard)
-    const r = await tbRequest('GET', `/api/tenant/devices?pageSize=1000&page=0&sortProperty=name&sortOrder=ASC`);
-    if (r.status !== 200) throw new Error(`Device list failed: ${r.status}`);
-    const all = r.body?.data || [];
-    // Extract site numbers from device names
+    // Use the same paged gk- textSearch the dashboard uses (TB restricts full device list to SYS_ADMIN).
+    // Paginate until we have enough distinct site numbers or exhaust results.
     const siteNos = new Set();
-    for (const d of all) {
-        const m = /^gk-(\d{4})-/.exec(d.name);
-        if (m) siteNos.add(m[1]);
+    let page = 0;
+    while (siteNos.size < limit * 5) { // over-collect so random sample is representative
+        const r = await tbRequest('GET', `/api/tenant/devices?textSearch=gk-&pageSize=50&page=${page}&sortProperty=name&sortOrder=ASC`);
+        if (r.status !== 200) throw new Error(`Device list failed (page ${page}): ${r.status}`);
+        const data = r.body?.data || [];
+        if (!data.length) break;
+        for (const d of data) {
+            const m = /^gk-(\d{4})-/.exec(d.name);
+            if (m) siteNos.add(m[1]);
+        }
+        if (!r.body?.hasNext) break;
+        page++;
     }
     const sorted = [...siteNos].sort(() => Math.random() - 0.5); // shuffle for variety
     return sorted.slice(0, limit);
@@ -128,7 +149,7 @@ async function bulkRead(deviceIds) {
         entityFilter: {
             type: 'entityList',
             entityType: 'DEVICE',
-            entityList: deviceIds.map(id => ({ entityType: 'DEVICE', id })),
+            entityList: deviceIds,
         },
         latestValues: ALL_LATEST_VALUES,
         pageLink: { pageSize: 1000, page: 0 },
@@ -243,15 +264,41 @@ function perDeviceToBag(pd) {
 
 // ── Comparison ────────────────────────────────────────────────────────────────
 
+// Normalize a value for semantic comparison:
+//   - Numeric strings: "21" and "21.0" are equal (same float)
+//   - Objects: key-order-independent deep comparison
+function deepEqual(a, b) {
+    if (a === b) return true;
+    // Numeric string coercion: "21" == "21.0"
+    if (typeof a === 'string' && typeof b === 'string') {
+        if (/^-?\d+(\.\d+)?$/.test(a.trim()) && /^-?\d+(\.\d+)?$/.test(b.trim())) {
+            return parseFloat(a) === parseFloat(b);
+        }
+    }
+    if (typeof a !== typeof b) return false;
+    if (Array.isArray(a) && Array.isArray(b)) {
+        return a.length === b.length && a.every((v, i) => deepEqual(v, b[i]));
+    }
+    if (a !== null && b !== null && typeof a === 'object') {
+        const ka = Object.keys(a).sort(), kb = Object.keys(b).sort();
+        return ka.length === kb.length && ka.every((k, i) => k === kb[i] && deepEqual(a[k], b[k]));
+    }
+    return false;
+}
+
 function compareBags(deviceId, bulkBag, perBag) {
     const diffs = [];
-    // Check all keys present in either bag
+    // Bulk omits keys with no data; per-device returns them as the string "null".
+    // Both represent "no data" — treat as equivalent for comparison purposes.
+    const noData = v => v === undefined || v === null || v === 'null';
     const allKeys = new Set([...Object.keys(bulkBag), ...Object.keys(perBag)]);
     for (const key of allKeys) {
         if (key === '__telemLastSeenMs') continue; // expected to differ (key list scope)
+        if (key === '__lastActivityTime') continue; // live-updated; sequential reads race
         const bv = bulkBag[key];
         const pv = perBag[key];
-        if (JSON.stringify(bv) !== JSON.stringify(pv)) {
+        if (noData(bv) && noData(pv)) continue;
+        if (!deepEqual(bv, pv)) {
             diffs.push({ key, bulk: bv, perDevice: pv });
         }
     }
@@ -344,7 +391,9 @@ async function main() {
 
 main().catch(err => {
     // Never print TB credentials — the error might contain URL/auth context
-    const msg = String(err.message || err).replace(TB_PASSWORD || '', '[REDACTED]');
+    const msg = String(err.message || err)
+        .replace(TB_PASSWORD || '', '[REDACTED]')
+        .replace(TB_API_KEY || '', '[REDACTED]');
     console.error(`[parity] Fatal: ${msg}`);
     process.exit(1);
 });
