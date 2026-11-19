@@ -43,14 +43,7 @@ An operator searching any of 69 Farmhouse Inn house IDs on the OOH dashboard see
 
 Remote control is blocked. The operator cannot confirm the site. The callback lookup also returns no historical tickets. New OOH tickets created for these sites carry no site field (a data quality note is appended instead).
 
-This message comes from `services/resolution.js:resolveSiteInventory` (~L126-134):
-
-```
-if (matches.length > 1) {
-    await addDataQualityFlag(...)
-    return { status: 'ambiguous', siteNo: key, matches: [...] }
-}
-```
+This message comes from `services/resolution.js:resolveSiteInventory` (~L126-134). When the Zendesk directory returns more than one match for a house ID, the function logs a data quality flag to Cosmos and returns an `ambiguous` status object — which the calling code translates into the error message the operator sees.
 
 The two match names are always identical for 68 of the 69 blocked sites — the same pub listed twice — so the message reads "matches [X] and [X]", which correctly led James to investigate.
 
@@ -64,15 +57,7 @@ The two match names are always identical for 68 of the 69 blocked sites — the 
 
 ### v1.7.5 change (commit 52aeda5, shipped 13 Nov)
 
-`resolveSiteInventory` now reads the Zendesk site directory (a 1-hour cached call):
-
-```javascript
-// resolution.js:116-134
-const zendesk = await import('./zendesk.js');
-dir = await zendesk.siteDirectory();
-const matches = dir.filter(d => String(d.siteNo) === key);
-if (matches.length > 1) { return { status: 'ambiguous', ... } }
-```
+`resolveSiteInventory` now reads the Zendesk site directory (a 1-hour cached call). At resolution.js:116-134, it imports the zendesk service, calls `siteDirectory()`, filters the resulting array to entries whose `siteNo` matches the searched key, and if more than one entry matches, returns an `ambiguous` status.
 
 `siteDirectory()` maps the Zendesk Site field options (11405878329244) into `[{ siteNo, siteName, brand }]` entries — one entry per option. For 69 house IDs, two options exist: a legacy-named option (e.g. `green_king__farm_house_inn__hillfield_farm`) and a newer gk_ option (e.g. `gk_5674`). Both have the same `siteNo` extracted by `siteNoFromOption`. Result: `matches.length === 2` → `status: 'ambiguous'`.
 
@@ -107,14 +92,7 @@ For site 5674: **117 tickets** under `gk_5674` and **23 tickets** under `green_k
 
 ### New tickets missing site field
 
-In `createOutcomeTicket` (zendesk.js:~L419-423):
-
-```javascript
-const siteTag = await resolveSiteTag(siteNo);
-if (siteTag) customFields.push({ id: config.zendesk.siteFieldId, value: siteTag });
-const dataQualityNote = siteTag ? null
-    : `(Site field could not be resolved for house ID ${siteNo} — flagged for data-quality review)`;
-```
+In `createOutcomeTicket` (zendesk.js:~L419-423): the function calls `resolveSiteTag(siteNo)`. If a tag is returned, it is added to the ticket's custom fields as the Site field value. If `resolveSiteTag` returns null, the custom field is omitted and a data quality note is appended to the ticket body instead.
 
 Because `resolveSiteTag` returns `null` for all 69 sites, new OOH tickets are created without the site field. A data quality note is appended to the ticket body. This affects IoT Support Dashboard site filtering (the IoT Dashboard may rely on the site field for per-site views — see Q3 for Sam Day).
 
