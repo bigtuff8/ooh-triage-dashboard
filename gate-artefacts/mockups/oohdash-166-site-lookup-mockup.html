@@ -291,7 +291,7 @@ table.tbl tr.rowoff td{background:var(--danger-light)}
 
 </style>
 <style>
-:root{--proto-h:132px}
+:root{--proto-h:200px}
 #proto-bar{position:fixed;top:0;left:0;right:0;z-index:9999;background:#111827;color:#f9fafb;font:13px/1.4 system-ui,sans-serif;padding:8px 12px;box-shadow:0 2px 8px rgba(0,0,0,.3);height:var(--proto-h);box-sizing:border-box;overflow:auto}
 #proto-bar .hd{display:flex;justify-content:space-between;align-items:center;gap:8px}
 #proto-bar .pb{background:#374151;color:#f9fafb;border:1px solid #4b5563;border-radius:6px;padding:4px 8px;margin:3px 4px 0 0;cursor:pointer;font-size:12px}
@@ -303,7 +303,7 @@ body{padding-top:var(--proto-h)}
 body.proto-collapsed{--proto-h:34px}
 body.proto-collapsed #proto-bar-list,body.proto-collapsed #proto-note{display:none}
 #toasts .toast{background:#1f2937;color:#fff;padding:10px 14px;border-radius:8px;margin-top:8px;max-width:420px}
-#toasts{position:fixed;right:16px;bottom:16px;z-index:9998}
+#toasts{position:fixed!important;top:auto!important;right:16px!important;bottom:16px!important;z-index:9998!important}
 .answers{display:flex;gap:8px;margin-top:8px}
 </style>
 </head>
@@ -362,67 +362,103 @@ body.proto-collapsed #proto-bar-list,body.proto-collapsed #proto-note{display:no
   function infoBox(html) { return '<div class="gtk" data-testid="gtk-block"><span class="gtk-label">ℹ For you (background, not to read out)</span>' + html + '</div>'; }
   function toast(html) {
     var t = document.createElement('div'); t.className = 'toast'; t.innerHTML = html;
-    document.getElementById('toasts').appendChild(t); setTimeout(function () { t.remove(); }, 3500);
+    document.getElementById('toasts').appendChild(t); setTimeout(function () { t.remove(); }, 9000);
   }
   var view = function () { return document.getElementById('view'); };
   var timers = [];
   function later(fn, ms) { timers.push(setTimeout(fn, ms)); }
   function clearTimers() { timers.forEach(clearTimeout); timers = []; }
-
   var CHIP = function (n) { return ' <span class="mono" style="background:var(--surface-variant);padding:2px 10px;border-radius:6px;margin-left:6px">' + esc(n) + '</span>'; };
   var MUTED = 'color:var(--text-muted,#6b7280);font-size:14px;margin:4px 0';
 
-  /* Confirm screen — markup of renderConfirmGate() in public/js/views.js, with the OOHDASH-166 name block.
-     o.pub: { status: 'clear'|'disagree'|'lighthouse-only'|'none', primary, others[] }. No name is shown until o.loaded. */
-  function confirmGate(o) {
-    var p = o.pub || { status: 'none' };
-    var head, nameBlock = '', ask;
-    if (!o.loaded) {
-      head = 'House ID ' + o.siteNo;
-      nameBlock = '<p style="' + MUTED + '" data-testid="confirm-name-checking">Checking the pub name…</p>';
-      ask = 'can I take the name of the pub you\'re calling from?';
-    } else if (p.status === 'clear') {
-      head = p.primary + CHIP(o.siteNo);
-      ask = 'can I just confirm, you\'re calling from ' + dyn(p.primary) + ', site number ' + dyn(o.siteNo) + '?';
-    } else if (p.status === 'disagree') {
-      head = p.primary + CHIP(o.siteNo);
-      nameBlock = '<p style="margin:4px 0;font-size:14px;color:var(--success,#047857)" data-testid="confirm-name-matches">✓ Matches the equipment at house ID ' + esc(o.siteNo) + '</p>' +
-        p.others.map(function (n) { return '<p style="' + MUTED + '" data-testid="confirm-name-other">Our ticket system lists: <b>' + esc(n) + '</b></p>'; }).join('') +
-        '<p style="' + MUTED + '" data-testid="confirm-unverified">⚠ Pub name not confirmed — our records disagree. Check the pub the customer names against the names above.</p>';
-      ask = 'which pub are you calling from?';
-    } else if (p.status === 'lighthouse-only') {
-      head = p.primary + CHIP(o.siteNo);
-      nameBlock = '<p style="' + MUTED + '" data-testid="confirm-name-source">Name taken from the equipment at this house ID. This site is missing from our ticket system\'s site list.</p>' +
-        '<p style="' + MUTED + '" data-testid="confirm-unverified">⚠ Pub name not confirmed — check the pub the customer names against the name above.</p>';
-      ask = 'which pub are you calling from?';
-    } else {
-      head = 'House ID ' + o.siteNo;
-      nameBlock = '<p style="' + MUTED + '" data-testid="confirm-unverified">⚠ We don\'t hold a pub name for this house ID. Check the house ID with the customer.</p>';
-      ask = 'which pub are you calling from, and can you read me your house ID?';
+  /* ---- Name capture (OOHDASH-166 rev 3): inline, optional, never blocks confirm or control ---- */
+  // nc = { held: [{name, from}], answer: null | {name, how:'picked'|'typed'}, typing: bool }
+  function nameCheckLine(o) {
+    var nc = o.nc, held = nc.held.map(function (h) { return h.name; });
+    var listed = held.length ? 'our records list ' + held.join(' / ') : 'we hold no pub name for this house ID';
+    var says = nc.answer ? 'customer says ' + nc.answer.name : 'customer\'s answer not recorded';
+    return 'Name check (house ID ' + o.siteNo + '): ' + listed + '; ' + says + ' — please tidy the site list.';
+  }
+  function captureBlock(o) {
+    var nc = o.nc;
+    if (nc.answer) {
+      return '<div class="gtk" data-testid="name-capture-done" style="margin-top:10px"><span class="gtk-label">✓ Pub name recorded</span>' +
+        '<p>Customer says: <b>' + esc(nc.answer.name) + '</b>. This goes on the ticket so the IoT team can tidy the site list.</p>' +
+        '<button class="btn link" style="padding:0" onclick="protoNcChange()">Change</button></div>';
     }
+    var chips = nc.held.map(function (h, i) {
+      return '<button class="chip" data-testid="name-pick" onclick="protoNcPick(' + i + ')">' + esc(h.name) +
+        (h.from === 'equipment' ? ' <span style="font-size:12px;opacity:.75">· matches the equipment</span>' : ' <span style="font-size:12px;opacity:.75">· ticket system</span>') + '</button>';
+    }).join('');
+    var typer = nc.typing
+      ? '<div class="formrow" style="margin-top:8px"><label for="nc-type">Pub name the customer gives</label>' +
+        '<div style="display:flex;gap:8px"><input id="nc-type" data-testid="name-type" maxlength="120" style="flex:1" placeholder="e.g. Sycamore Farm, Burnley">' +
+        '<button class="btn" onclick="protoNcSave()">Save</button></div></div>'
+      : '<button class="chip" data-testid="name-other" onclick="protoNcType()">' + (nc.held.length ? 'Something else…' : 'Type the pub name…') + '</button>';
+    var lead = nc.held.length > 1 ? 'Our records disagree on the pub name for this house ID.'
+      : nc.held.length === 1 ? 'Our records only hold a name taken from the equipment.' : 'We don\'t hold a pub name for this house ID.';
+    return '<div class="card" data-testid="name-capture" style="margin-top:12px;padding:14px 16px;border-style:dashed">' +
+      '<div style="font-weight:600">' + esc(lead) + '</div>' + (o.isClash ? '<div class="say-ask" style="margin:6px 0"><b>Ask the customer:</b> which pub are you calling from?</div>' : '') +
+      '<div class="answers" style="flex-wrap:wrap">' + chips + typer + '</div>' +
+      '<p style="' + MUTED + '">Optional — tap the answer if you get one; you can carry on either way. Whatever you record goes on the ticket for the IoT team.</p></div>';
+  }
+  window.protoNcPick = function (i) { var o = window._protoSite; o.nc.answer = { name: o.nc.held[i].name, how: 'picked' }; o.redraw(); };
+  window.protoNcType = function () { var o = window._protoSite; o.nc.typing = true; o.redraw(); var el = document.getElementById('nc-type'); if (el) el.focus(); };
+  window.protoNcSave = function () { var o = window._protoSite; var v = (document.getElementById('nc-type') || {}).value || ''; if (!v.trim()) return; o.nc.answer = { name: v.trim(), how: 'typed' }; o.nc.typing = false; o.redraw(); };
+  window.protoNcChange = function () { var o = window._protoSite; o.nc.answer = null; o.redraw(); };
+
+  /* Confirm screen — markup of renderConfirmGate() in public/js/views.js with the rev 3 name model.
+     o.status: 'clear' | 'check' (names disagree / equipment-only / none). No name shown until o.loaded. */
+  function confirmGate(o) {
+    o.redraw = function () { confirmGate(o); };
+    var clear = o.status === 'clear';
+    var heading = (o.loaded && clear) ? esc(o.name) + CHIP(o.siteNo) : 'House ID ' + esc(o.siteNo);
+    var nameLine = !o.loaded ? '<p style="' + MUTED + '" data-testid="confirm-name-checking">Checking the pub name…</p>' : '';
+    var ask = (o.loaded && clear)
+      ? 'can I just confirm your house ID? I have it as ' + dyn(o.siteNo) + ', that\'s ' + dyn(o.name) + '.'
+      : 'can I just confirm your house ID? I have it as ' + dyn(o.siteNo) + '.' + (o.loaded ? ' And which pub are you calling from?' : '');
     var deviceLine = o.loaded ? esc(o.deviceSummary) : 'Checking the Lighthouse equipment at this site…';
-    var btn = o.loaded ? '✓ This is the right site' : 'Checking site…';
+    var btn = o.loaded ? '✓ House ID confirmed — open the site' : 'Checking site…';
     view().innerHTML = '<div class="content narrow"><div class="card" style="padding:26px" data-testid="confirm-gate">' +
-      '<h2>' + (o.loaded && p.status !== 'none' ? esc(p.primary) + CHIP(o.siteNo) : esc(head)) + '</h2>' +
-      nameBlock +
+      '<h2>' + heading + '</h2>' + nameLine +
       (o.loaded && o.brand ? '<div class="sub">' + esc(o.brand) + '</div>' : '') +
       '<p style="margin:10px 0 4px" data-testid="confirm-device-line">' + deviceLine + '</p>' +
       sayBox('', ask) +
-      '<div style="display:flex;gap:10px;margin-top:16px">' +
+      (o.loaded && !clear ? captureBlock(o) : '') +
+      '<div style="display:flex;gap:10px;margin-top:16px;flex-wrap:wrap">' +
       '<button class="btn primary big" data-testid="confirm-site" ' + (o.loaded ? '' : 'disabled') + ' onclick="protoConfirm()">' + btn + '</button>' +
-      '<button class="btn big" onclick="protoGo(protoCurrent)">Search again</button></div></div></div>';
+      '<button class="btn big" onclick="protoGo(protoCurrent)">Wrong house ID — search again</button></div></div></div>';
     window._protoSite = o;
   }
   window.protoConfirm = function () {
-    var o = window._protoSite || {}; var p = o.pub || {};
-    var name = p.status === 'none' ? 'House ID ' + o.siteNo : p.primary + ' ' + o.siteNo + (p.status === 'clear' ? '' : ' (pub name not confirmed)');
-    toast('Site confirmed: <b>' + esc(name) + '</b>. The site page opens with full remote control, exactly as today.');
+    var o = window._protoSite || {};
+    var head = o.status === 'clear' ? o.name + ' ' + o.siteNo : 'House ID ' + o.siteNo;
+    var tline = o.status === 'clear' ? '' : '<div style="margin-top:6px;font-size:13px;opacity:.9">Ticket preview — line added to this call\'s OOH ticket, tagged <span class="mono">ooh_site_name_check</span>:<br><i>' + esc(nameCheckLine(o)) + '</i></div>';
+    toast('Site opened: <b>' + esc(head) + '</b> with full remote control.' + tline);
   };
 
+  /* True clash: Lighthouse holds two sites under one house ID. Control blocked; capture the name, continue to a ticket in place. */
+  function ambiguousNew(o) {
+    o.redraw = function () { ambiguousNew(o); };
+    window._protoSite = o;
+    view().innerHTML = '<div class="content narrow"><div class="card" style="border-color:var(--warning)" data-testid="ambiguous-card">' +
+      '<h2>&#9888;&#65039; House ID ' + esc(o.siteNo) + ' has two sites on Lighthouse</h2>' +
+      '<p class="sub" style="margin:8px 0">Lighthouse has two different sites under this house ID, so we can\'t tell which equipment is the customer\'s. You can\'t make changes from here tonight, but you can log it for the IoT team.</p>' +
+      captureBlock(o) +
+      '<div style="margin-top:10px">' +
+      infoBox('<p>Trade means the site cannot serve customers or cannot open. Health and safety means anything that could hurt someone.</p><p>Yes goes to an urgent P1; No gives a next-working-day ticket.</p>') +
+      sayBox('I can\'t make changes for this site tonight — I\'ll log it, and our IoT team picks it up the next working day.', 'Is there an immediate risk to trade or to anyone\'s health and safety?') +
+      '<div class="answers"><button class="chip" onclick="protoClash(\'P1\')">Yes</button><button class="chip" onclick="protoClash(\'next-day\')">No</button></div>' +
+      '<button class="btn link" style="margin-top:8px" onclick="protoGo(protoCurrent)">Wrong house ID — search again</button></div></div></div>';
+  }
+  window.protoClash = function (kind) {
+    var o = window._protoSite;
+    toast((kind === 'P1' ? '✅ Raised as P1 — ticket <b>#48214</b>.' : '✅ Logged as ticket <b>#48213</b> for the next working day.') +
+      '<div style="margin-top:6px;font-size:13px;opacity:.9">Ticket preview, tagged <span class="mono">ooh_site_name_check</span>:<br><i>' + esc(nameCheckLine(o)) + '</i></div>');
+  };
   function lookingUp(siteNo) {
     view().innerHTML = '<div class="content narrow"><div class="card" style="padding:26px"><h2>Looking up site ' + esc(siteNo) + '…</h2></div></div>';
   }
-
   /* Ambiguous card — TODAY (live v1.7.6) wording, verbatim from renderAmbiguous(). */
   function ambiguousToday(siteNo, names) {
     view().innerHTML = '<div class="content narrow"><div class="card" style="border-color:var(--warning)" data-testid="ambiguous-card">' +
@@ -433,18 +469,6 @@ body.proto-collapsed #proto-bar-list,body.proto-collapsed #proto-note{display:no
       sayBox('I can\'t safely make changes for this site number tonight — It\'s logged, and our IoT team picks it up the next working day.', 'Is there an immediate risk to trade or to anyone\'s health and safety?') +
       '<div class="answers"><button class="chip">Yes</button><button class="chip">No</button></div>' +
       '<button class="btn" style="margin-top:8px">Search again</button></div></div></div>';
-  }
-
-  /* Ambiguous card — NEW wording (kept only for a true clash: our equipment records hold two sites under one number). */
-  function ambiguousNew(siteNo, names) {
-    view().innerHTML = '<div class="content narrow"><div class="card" style="border-color:var(--warning)" data-testid="ambiguous-card">' +
-      '<h2>&#9888;&#65039; House ID ' + esc(siteNo) + ' matches more than one pub</h2>' +
-      '<p class="sub" style="margin:8px 0">Our records list more than one pub under this house ID: ' + names.map(function (n) { return '<b>' + esc(n) + '</b>'; }).join(' and ') + '. To avoid changing the wrong pub, you can\'t make changes from here tonight.</p>' +
-      '<div style="margin-top:10px">' +
-      infoBox('<p>Trade means the site cannot serve customers or cannot open. Health and safety means anything that could hurt someone.</p><p>Yes goes to an urgent P1; No gives a next-working-day ticket.</p>') +
-      sayBox('I can\'t safely make changes for this site tonight — it\'s logged, and our IoT team picks it up the next working day.', 'Is there an immediate risk to trade or to anyone\'s health and safety?') +
-      '<div class="answers"><button class="chip" onclick="protoToast(\'P1 path — unchanged from today.\')">Yes</button><button class="chip" onclick="protoToast(\'✅ Logged as ticket <b>#48213</b> — the IoT team will sort out the duplicate house ID.\')">No</button></div>' +
-      '<button class="btn" style="margin-top:8px" onclick="protoGo(protoCurrent)">Search again</button></div></div></div>';
   }
   window.protoToast = toast;
 
@@ -465,53 +489,38 @@ body.proto-collapsed #proto-bar-list,body.proto-collapsed #proto-note{display:no
     { id: 46511, subject: 'Hot water not hot enough — engineer visit booked', when: 'Updated 5 weeks ago', status: 'On hold', tag: 'green_king__farm_house_inn__hillfield_farm' },
     { id: 45230, subject: 'Thermostat in bar not responding', when: 'Updated 8 weeks ago', status: 'Closed', tag: 'green_king__farm_house_inn__hillfield_farm' }
   ];
+  function nc(held) { return { held: held, answer: null, typing: false }; }
+  function run(o, lookupMs) {
+    if (lookupMs) { lookingUp(o.siteNo); later(function () { confirmGate(o); later(function () { o.loaded = true; confirmGate(o); }, 900); }, lookupMs); }
+    else { confirmGate(o); later(function () { o.loaded = true; confirmGate(o); }, 1200); }
+  }
+  var SYC = 'Sycamore Farm (Burnley)', SILK = 'Farmhouse Kitchen (Silkwood Park)';
 
   var SCEN = {
-    s1: { label: '1 · House ID 5674 — TODAY (live v1.7.6)', note: 'What the agent sees now for 69 Greene King sites: the same pub listed twice is called "ambiguous" and remote control is blocked.',
+    s1: { label: '1 · 5674 today (live v1.7.6): blocked as "ambiguous"', note: 'What the agent sees now for 69 Greene King sites: the same pub listed twice is called "ambiguous" and remote control is blocked.',
       run: function () { ambiguousToday('5674', ['Hillfield Farm (Solihull)', 'Hillfield Farm (Solihull)']); } },
-    s2: { label: '2 · 5674 after the fix — one clear name, shown once checked', note: 'Same pub listed twice is treated as one site. While the equipment loads the screen shows "Checking the pub name…" with the button locked; then the pub name appears, as today.',
-      run: function () {
-        var o = { siteNo: '5674', pub: { status: 'clear', primary: 'Hillfield Farm (Solihull)' }, brand: 'Greene King', loaded: false, deviceSummary: 'On Lighthouse: 2 heating zones · hot water · 3 kitchen circuits' };
-        confirmGate(o); later(function () { o.loaded = true; confirmGate(o); }, 1200);
-      } },
-    s3: { label: '3 · Callback history for 5674 — AFTER', note: 'History now searches both the old and the new site tag, so older tickets come back. Live today: 117 tickets on gk_5674 plus 23 on the old tag, all currently hidden.',
+    s2: { label: '2 · 5674 after the fix: names agree, one name shown', note: 'The house ID drives everything. While the equipment loads the screen shows "House ID 5674" and "Checking the pub name…", and the agent can already confirm the house ID. Then the one agreed name appears, as today. No name question.',
+      run: function () { run({ siteNo: '5674', status: 'clear', name: 'Hillfield Farm (Solihull)', brand: 'Greene King', loaded: false, deviceSummary: 'On Lighthouse: 2 heating zones · hot water · 3 kitchen circuits' }); } },
+    s3: { label: '3 · 5674 callback history after: both tags searched', note: 'History now searches both the old and the new site tag, so older tickets come back. Live today: 117 tickets on gk_5674 plus 23 on the old tag, all currently hidden.',
       run: function () { history({ siteNo: '5674', siteName: 'Hillfield Farm (Solihull)', total: 140, tickets: HILLFIELD_TICKETS }); } },
-    s4: { label: '4 · Callback history for 5674 — TODAY', note: 'Today the history comes back empty for all 69 sites, and also for 7 three-digit house IDs such as 220 Bull & Anchor (Exhall).',
+    s4: { label: '4 · 5674 callback history today: empty', note: 'Today the history comes back empty for all 69 sites, and also for 7 three-digit house IDs such as 220 Bull & Anchor (Exhall).',
       run: function () { history({ siteNo: '5674', siteName: 'Hillfield Farm (Solihull)', empty: 'The site list has more than one entry for this house ID.' }); } },
-    s5: { label: '5 · 5199 before rename — both ticket-system names shown, Silkwood Park marked as matching the equipment', note: 'Our ticket system lists two pub names for 5199. The equipment at 5199 is named gk-silkwoodfarm-*, so "Farmhouse Kitchen (Silkwood Park)" is shown as matching the equipment and "Sycamore Farm (Burnley)" is listed underneath. The script asks which pub the customer is calling from. Full control.',
-      run: function () {
-        var o = { siteNo: '5199', pub: { status: 'disagree', primary: 'Farmhouse Kitchen (Silkwood Park)', others: ['Sycamore Farm (Burnley)'] }, brand: 'Greene King', loaded: false, deviceSummary: 'On Lighthouse: 3 heating zones · 4 kitchen circuits' };
-        lookingUp('5199'); later(function () { confirmGate(o); later(function () { o.loaded = true; confirmGate(o); }, 900); }, 1600);
-      } },
-    s6: { label: '6 · 5190 before rename — name check shows both names (recommended)', note: 'Our ticket system currently calls 5190 "Farmhouse Kitchen (Silkwood Park)", but the equipment at 5190 is named gk-sycamorefarm-*. With the name check the screen shows "Sycamore Farm (Burnley)" as matching the equipment and lists the ticket-system name underneath. No name appears until the check has finished.',
-      run: function () {
-        var o = { siteNo: '5190', pub: { status: 'disagree', primary: 'Sycamore Farm (Burnley)', others: ['Farmhouse Kitchen (Silkwood Park)'] }, brand: 'Greene King', loaded: false, deviceSummary: 'On Lighthouse: 1 heating zone · fridge · freezer' };
-        confirmGate(o); later(function () { o.loaded = true; confirmGate(o); }, 1400);
-      } },
-    s7: { label: '7 · 5190 before rename — no name check: wrong name shown', note: 'Without the name check the screen shows the ticket-system name as if it were right. The agent asks "you are calling from Farmhouse Kitchen (Silkwood Park)?" and a Sycamore Farm manager says no.',
-      run: function () {
-        var o = { siteNo: '5190', pub: { status: 'clear', primary: 'Farmhouse Kitchen (Silkwood Park)' }, brand: 'Greene King', loaded: false, deviceSummary: 'On Lighthouse: 1 heating zone · fridge · freezer' };
-        confirmGate(o); later(function () { o.loaded = true; confirmGate(o); }, 1200);
-      } },
-    s8: { label: '8 · 5199 and 5190 after the IoT team renames — one clear name each', note: 'Both become "same pub listed twice" and show one clear name. Shown: 5199 Farmhouse Kitchen (Silkwood Park). 5190 shows Sycamore Farm (Burnley) the same way.',
-      run: function () {
-        var o = { siteNo: '5199', pub: { status: 'clear', primary: 'Farmhouse Kitchen (Silkwood Park)' }, brand: 'Greene King', loaded: false, deviceSummary: 'On Lighthouse: 3 heating zones · 4 kitchen circuits' };
-        confirmGate(o); later(function () { o.loaded = true; confirmGate(o); }, 1200);
-      } },
-    s9: { label: '9 · Missing from the ticket system — name taken from the equipment', note: 'Example house ID 6418 (fictional), equipment named gk-oakbrookfarm-*. The dashboard looks the site up on Lighthouse (the pre-v1.7.5 behaviour), takes a few seconds, then shows the name from the equipment, tidied to "Oakbrook Farm". Full control.',
-      run: function () {
-        var o = { siteNo: '6418', pub: { status: 'lighthouse-only', primary: 'Oakbrook Farm' }, loaded: false, deviceSummary: 'On Lighthouse: 1 heating zone · hot water' };
-        lookingUp('6418'); later(function () { confirmGate(o); later(function () { o.loaded = true; confirmGate(o); }, 700); }, 2200);
-      } },
-    s12: { label: '12 · Missing from the ticket system, equipment named by number — house ID only', note: 'Example house ID 6431 (fictional), equipment named gk-6431-*. No pub name exists anywhere, so the screen shows the house ID and says so. The script asks the customer for both the pub and the house ID.',
-      run: function () {
-        var o = { siteNo: '6431', pub: { status: 'none' }, loaded: false, deviceSummary: 'On Lighthouse: 2 heating zones' };
-        lookingUp('6431'); later(function () { confirmGate(o); later(function () { o.loaded = true; confirmGate(o); }, 700); }, 2200);
-      } },
-    s10: { label: '10 · Not found anywhere (unchanged)', note: 'A house ID that is on neither Zendesk nor Lighthouse: the same "No site found" message as today.',
-      run: function () { view().innerHTML = '<div class="content narrow"><div class="card" style="padding:26px"><h2>New Call</h2><p class="sub">Search by house ID or pub name.</p></div></div>'; toast('No site found for 9999'); } },
-    s11: { label: '11 · True clash — reworded card (safety net)', note: 'Only if Lighthouse itself returns two sites for one house ID. No live site does this today; the card stays as a safety net with plain wording. Example uses the fixture pair from the test suite.',
-      run: function () { ambiguousNew('6758', ['Bowers', 'Bowman']); } }
+    s5: { label: '5 · 5199 before rename: names disagree, agent taps the customer\'s answer', note: 'The ticket system lists two names for 5199. The equipment (gk-silkwoodfarm-*) matches Silkwood Park. The agent confirms the house ID, asks which pub, and taps the answer, or carries on without one. Full control either way. Press the open-site button to see the ticket line.',
+      run: function () { run({ siteNo: '5199', status: 'check', brand: 'Greene King', nc: nc([{ name: SILK, from: 'equipment' }, { name: SYC, from: 'ticket' }]), loaded: false, deviceSummary: 'On Lighthouse: 3 heating zones · 4 kitchen circuits' }, 1600); } },
+    s6: { label: '6 · 5190 before rename: equipment disagrees with the ticket system, agent taps the answer', note: 'The ticket system calls 5190 "Farmhouse Kitchen (Silkwood Park)"; the equipment (gk-sycamorefarm-fridge-1) points to Sycamore Farm (Burnley). Both are offered. The name check is now simply part of this step, not a separate decision.',
+      run: function () { run({ siteNo: '5190', status: 'check', brand: 'Greene King', nc: nc([{ name: SYC, from: 'equipment' }, { name: SILK, from: 'ticket' }]), loaded: false, deviceSummary: 'On Lighthouse: 1 heating zone · fridge · freezer' }); } },
+    s7: { label: '7 · 5190 before rename: customer gives another name, agent types it', note: 'Same as 6, but the customer gives a name we don\'t hold. Tap "Something else…", type it, Save. The typed name goes on the ticket. Optional: the open-site button works whether or not a name is saved.',
+      run: function () { var o = { siteNo: '5190', status: 'check', brand: 'Greene King', nc: nc([{ name: SYC, from: 'equipment' }, { name: SILK, from: 'ticket' }]), loaded: false, deviceSummary: 'On Lighthouse: 1 heating zone · fridge · freezer' }; o.nc.typing = true; run(o); } },
+    s8: { label: '8 · 5199 and 5190 after the IoT team renames: names agree', note: 'Both become "same pub listed twice" and show one agreed name, with no name question. Shown: 5199. 5190 shows Sycamore Farm (Burnley) the same way.',
+      run: function () { run({ siteNo: '5199', status: 'clear', name: SILK, brand: 'Greene King', loaded: false, deviceSummary: 'On Lighthouse: 3 heating zones · 4 kitchen circuits' }); } },
+    s9: { label: '9 · Missing from the ticket system: name from the equipment offered', note: 'Example house ID 6418 (fictional), equipment named gk-oakbrookfarm-*. The dashboard looks the site up on Lighthouse (pre-v1.7.5 behaviour, a few seconds). The tidied equipment name "Oakbrook Farm" is offered; the agent taps it or types what the customer says. Full control.',
+      run: function () { run({ siteNo: '6418', status: 'check', nc: nc([{ name: 'Oakbrook Farm', from: 'equipment' }]), loaded: false, deviceSummary: 'On Lighthouse: 1 heating zone · hot water' }, 2200); } },
+    s10: { label: '10 · No pub name anywhere: agent types it', note: 'Example house ID 6431 (fictional), equipment named by number (gk-6431-*), no ticket-system entry. The screen shows the house ID and a box to type the pub name. Full control.',
+      run: function () { run({ siteNo: '6431', status: 'check', nc: nc([]), loaded: false, deviceSummary: 'On Lighthouse: 2 heating zones' }, 2200); } },
+    s11: { label: '11 · Two sites on Lighthouse under one house ID: control blocked, name captured, ticket in place', note: 'Only if Lighthouse itself holds two sites under one number (no live site today). We can\'t know which equipment is the customer\'s, so control stays blocked. The agent still records the pub name and goes straight to a ticket or P1 here, with no search loop. Example uses the fixture pair from the test suite.',
+      run: function () { ambiguousNew({ siteNo: '6758', isClash: true, nc: nc([{ name: 'Bowers', from: 'ticket' }, { name: 'Bowman', from: 'ticket' }]) }); } },
+    s12: { label: '12 · House ID found nowhere (unchanged)', note: 'A house ID that is on neither the ticket system nor Lighthouse: the same "No site found" message as today. Here the house ID itself is wrong, so searching again is the right step.',
+      run: function () { view().innerHTML = '<div class="content narrow"><div class="card" style="padding:26px"><h2>New Call</h2><p class="sub">Search by house ID or pub name.</p></div></div>'; toast('No site found for 9999'); } }
   };
 
   window.protoCurrent = 's1';
