@@ -1,0 +1,547 @@
+<!doctype html>
+<html lang="en-GB"><head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>OOHDASH-166 prototype — site look-up</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%F0%9F%8C%99%3C/text%3E%3C/svg%3E">
+<style>
+/* OOH Dashboard — design-spec §1 (Airedale IoT family palette, Ant Design patterns) */
+:root{
+  --primary:#594AE2;--primary-dark:#4338CA;--primary-light:#EEF2FF;
+  --success:#10B981;--success-light:#D1FAE5;
+  --warning:#F59E0B;--warning-light:#FEF3C7;
+  --danger:#EF4444;--danger-light:#FEE2E2;
+  --info:#3B82F6;--info-light:#DBEAFE;
+  --surface:#FFFFFF;--surface-variant:#F8FAFC;--background:#F1F5F9;
+  --sidebar-bg:#1E293B;--sidebar-text:#94A3B8;--sidebar-active:#334155;
+  --text-primary:#1E293B;--text-secondary:#64748B;--text-disabled:#94A3B8;
+  --border:#E2E8F0;
+  --urgency-critical:#DC2626;--urgency-critical-bg:#FEF2F2;
+  --radius-sm:6px;--radius-md:8px;--radius-lg:12px;
+  --shadow-sm:0 1px 2px rgba(0,0,0,.05);--shadow-md:0 4px 6px -1px rgba(0,0,0,.1);--shadow-lg:0 10px 15px -3px rgba(0,0,0,.1);
+  --mono:ui-monospace,Consolas,'Cascadia Mono',monospace;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:Inter,system-ui,-apple-system,'Segoe UI',sans-serif;font-size:14px;line-height:22px;color:var(--text-primary);background:var(--background)}
+button{font:inherit;cursor:pointer}
+input,select,textarea{font:inherit}
+.mono{font-family:var(--mono);font-size:12.5px;font-weight:500}
+#app{display:flex;min-height:100vh}
+.sidebar{width:240px;background:var(--sidebar-bg);color:var(--sidebar-text);display:flex;flex-direction:column;position:fixed;top:0;bottom:0;left:0;z-index:20}
+.sidebar .brand{padding:20px 20px 16px;color:#fff;font-weight:700;font-size:16px;letter-spacing:.2px;border-bottom:1px solid #33415555}
+.sidebar .brand small{display:block;font-weight:400;font-size:11.5px;color:var(--sidebar-text);margin-top:2px}
+.nav{padding:12px 8px;flex:1}
+.nav button{display:flex;align-items:center;gap:10px;width:100%;text-align:left;background:none;border:0;color:var(--sidebar-text);padding:10px 12px;border-radius:var(--radius-md);font-size:14px;margin-bottom:2px}
+.nav button:hover{background:var(--sidebar-active);color:#fff}
+.nav button.active{background:var(--sidebar-active);color:#fff;font-weight:600}
+.sidebar .foot{padding:14px 16px;border-top:1px solid #33415555;font-size:12.5px}
+.opchip{display:flex;align-items:center;gap:10px;margin-bottom:10px}
+.opchip .avatar{width:32px;height:32px;border-radius:50%;background:var(--primary);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:600;font-size:13px}
+.opchip .nm{color:#fff;font-weight:600;line-height:16px}
+.opchip .rl{font-size:11.5px;line-height:14px}
+.main{margin-left:240px;flex:1;display:flex;flex-direction:column;min-width:0}
+.topbar{height:52px;background:var(--surface);border-bottom:1px solid var(--border);display:flex;align-items:center;gap:16px;padding:0 24px;position:sticky;top:0;z-index:10}
+.topbar .ctx{font-weight:600}
+.topbar .ver{margin-left:auto;color:var(--text-disabled);font-size:12px}
+.banner{padding:8px 24px;font-size:13.5px;font-weight:500;display:flex;align-items:center;gap:10px}
+.banner.kill{background:var(--danger-light);color:#991B1B;border-bottom:1px solid #FECACA}
+/* R8/S10: control-is-live signal — an ENABLED state (green), deliberately distinct from the red .kill block. */
+.banner.live{background:var(--success-light);color:#065F46;border-bottom:1px solid #A7F3D0}
+.banner.notice{background:var(--info-light);color:#1E40AF;border-bottom:1px solid #BFDBFE}
+.content{padding:18px 24px;max-width:1240px;width:100%;margin:0 auto}
+.content.narrow{max-width:760px}
+.card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-md);box-shadow:var(--shadow-sm);padding:18px;margin-bottom:12px}
+.card.tight{padding:12px 14px;margin-bottom:10px}
+.card h2{font-size:18px;line-height:26px;font-weight:600;margin-bottom:4px}
+.card h3{font-size:14.5px;line-height:20px;font-weight:600;margin-bottom:6px}
+.sub{color:var(--text-secondary);font-size:13px}
+.small{font-size:12.5px;line-height:17px;color:var(--text-secondary)}
+.btn{border:1px solid var(--border);background:var(--surface);color:var(--text-primary);border-radius:var(--radius-md);padding:8px 16px;font-weight:500;font-size:14px}
+.btn:hover{border-color:var(--primary);color:var(--primary)}
+.btn.primary{background:var(--primary);border-color:var(--primary);color:#fff}
+.btn.primary:hover{background:var(--primary-dark);color:#fff}
+.btn.big{padding:12px 22px;font-size:15px}
+.btn.link{border:none;background:none;color:var(--primary);padding:4px 6px}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+.tag{display:inline-flex;align-items:center;gap:5px;font-size:11.5px;font-weight:600;border-radius:var(--radius-sm);padding:1px 7px;line-height:17px;white-space:nowrap}
+.tag.green{background:var(--success-light);color:#065F46}
+.tag.amber{background:var(--warning-light);color:#92400E}
+.tag.red{background:var(--danger-light);color:#991B1B}
+.tag.blue{background:var(--info-light);color:#1E40AF}
+.tag.grey{background:#F1F5F9;color:var(--text-secondary)}
+.tag.violet{background:var(--primary-light);color:var(--primary-dark)}
+.dot{width:7px;height:7px;border-radius:50%;display:inline-block}
+.alert{border-radius:var(--radius-md);padding:11px 14px;font-size:13.5px;margin:10px 0;line-height:20px}
+.alert.warn{background:var(--warning-light);color:#92400E}
+.alert.err{background:var(--danger-light);color:#991B1B}
+.alert.info{background:var(--info-light);color:#1E40AF}
+.alert.ok{background:var(--success-light);color:#065F46}
+table.tbl{width:100%;border-collapse:collapse;font-size:13px}
+table.tbl th{text-align:left;color:var(--text-secondary);font-size:11px;text-transform:uppercase;letter-spacing:.4px;font-weight:600;padding:5px 8px;border-bottom:1px solid var(--border)}
+table.tbl td{padding:6px 8px;border-bottom:1px solid var(--surface-variant);vertical-align:middle}
+table.tbl tr:last-child td{border-bottom:none}
+table.tbl tr.rowoff td{background:var(--danger-light)}
+.searchwrap{position:relative}
+.searchwrap input{width:100%;height:46px;border:1.5px solid var(--border);border-radius:var(--radius-md);padding:0 16px;font-size:15px;outline:none}
+.searchwrap input:focus{border-color:var(--primary);box-shadow:0 0 0 3px var(--primary-light)}
+.sresults{position:absolute;top:50px;left:0;right:0;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-md);box-shadow:var(--shadow-lg);z-index:15;overflow:hidden}
+.sresults .ri{display:flex;align-items:center;gap:12px;padding:10px 14px;cursor:pointer;border-bottom:1px solid var(--surface-variant)}
+.sresults .ri:hover,.sresults .ri.sel{background:var(--primary-light)}
+.sresults .empty{padding:14px;color:var(--text-secondary);font-size:13.5px}
+.tiles{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}
+.tile{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-md);padding:10px 12px;cursor:pointer;transition:all .15s ease-out}
+.tile:hover{border-color:var(--primary);box-shadow:var(--shadow-md)}
+.tile .tt{font-weight:600;font-size:13.5px;line-height:18px}
+.tile .td{font-size:11.5px;color:var(--text-secondary);line-height:15px;margin-top:2px}
+.issueinput{width:100%;height:44px;border:1.5px solid var(--border);border-radius:var(--radius-md);padding:0 14px;font-size:14.5px;outline:none;margin-bottom:10px}
+.issueinput:focus{border-color:var(--primary);box-shadow:0 0 0 3px var(--primary-light)}
+.sugg{margin:-2px 0 10px;display:flex;gap:8px;flex-wrap:wrap;align-items:center;font-size:13px;color:var(--text-secondary)}
+.wsgrid{display:grid;grid-template-columns:minmax(0,7fr) minmax(0,5fr);gap:12px;align-items:start}
+@media(max-width:1100px){.wsgrid{grid-template-columns:minmax(0,1fr)}.tiles{grid-template-columns:repeat(2,1fr)}}
+.flowpanel{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);box-shadow:var(--shadow-md);overflow:hidden}
+.flowhead{padding:12px 18px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px;background:var(--surface-variant)}
+.flowbody{padding:18px}
+.flowfoot{padding:8px 18px;border-top:1px solid var(--border);display:flex;align-items:center;gap:12px;font-size:12px;color:var(--text-secondary)}
+.stepdone{display:flex;gap:8px;align-items:center;color:var(--text-secondary);font-size:13px;padding:5px 0;border-bottom:1px dashed var(--surface-variant)}
+.stepdone .tick{color:var(--success);font-weight:700}
+.stepq{font-size:15px;font-weight:600;margin:14px 0 10px}
+.chips{display:flex;flex-wrap:wrap;gap:8px}
+.chip{border:1.5px solid var(--border);background:var(--surface);border-radius:var(--radius-md);padding:9px 16px;font-size:14px;font-weight:500;cursor:pointer;min-height:40px}
+.chip:hover{border-color:var(--primary);color:var(--primary)}
+.chip.sel{border-color:var(--primary);background:var(--primary-light);color:var(--primary-dark);font-weight:600}
+.chip.p1{border-color:var(--danger);color:#991B1B;background:var(--surface);font-weight:600}
+.chip.p1:hover{background:var(--danger-light);border-color:var(--danger);color:#991B1B}
+.chip:disabled,.chip:disabled:hover{opacity:.5;cursor:not-allowed;border-color:var(--border);color:inherit;background:var(--surface)}
+.p1-explainer{font-size:13px;line-height:19px;color:var(--text-secondary);border-left:3px solid var(--danger);padding:6px 12px;margin:12px 0 4px}
+.p1-explainer p{margin:0 0 4px}
+.p1-blocked-note{color:#991B1B;margin:4px 0 8px}
+.zoneread{border:1px solid var(--border);border-radius:var(--radius-md);padding:10px 14px;margin:8px 0;display:flex;align-items:center;gap:14px;flex-wrap:wrap}
+.zoneread .t{font-size:20px;font-weight:700}
+.reco{border:1.5px solid var(--border);border-radius:var(--radius-lg);padding:16px;margin:12px 0;background:var(--surface-variant)}
+.reco b.hd{display:block;font-size:15px;margin-bottom:6px}
+.outcome{border-radius:var(--radius-lg);padding:16px;margin-top:14px}
+.outcome.applied{background:var(--success-light)}
+.outcome.captured{background:var(--info-light)}
+.outcome.p1{background:var(--urgency-critical-bg);border:1px solid #FECACA}
+.outcome.scope{background:#F1F5F9}
+.outcome.noaction{background:#F1F5F9;border:1px dashed var(--border)}
+.outcome h3{margin-bottom:6px;font-size:15px}
+.outbtns{display:flex;gap:10px;margin-top:12px;flex-wrap:wrap}
+.callsofar{background:var(--surface-variant);border-radius:var(--radius-md);padding:8px 12px;margin-bottom:10px;font-size:13px}
+.overlay{position:fixed;inset:0;background:rgba(15,23,42,.45);z-index:40;display:flex;align-items:center;justify-content:center;padding:20px}
+.modal{background:var(--surface);border-radius:var(--radius-lg);box-shadow:var(--shadow-lg);width:520px;max-width:100%;max-height:92vh;overflow:auto}
+.modal .mh{padding:16px 20px;border-bottom:1px solid var(--border);font-weight:600;font-size:16px;display:flex;justify-content:space-between;align-items:center}
+.modal .mb{padding:20px}
+.modal .mf{padding:14px 20px;border-top:1px solid var(--border);display:flex;justify-content:flex-end;gap:10px}
+.target{background:var(--surface-variant);border:1px solid var(--border);border-radius:var(--radius-md);padding:10px 14px;margin-bottom:16px;font-size:13.5px}
+/* B0/R0 · C9 — site identity is the most prominent element of the confirm target */
+.target-identity .target-name,.target .target-name{font-size:22px;font-weight:700;line-height:1.2;display:block}
+.target-tech{font-size:12.5px;color:var(--text-disabled);margin-top:4px}
+.target-identity.unverified .target-name{font-size:15px;font-weight:600}
+.muted{color:var(--text-disabled)}
+.stepper{display:flex;align-items:center;gap:14px;justify-content:center;margin:14px 0 6px}
+.stepper button{width:48px;height:48px;border-radius:var(--radius-md);border:1.5px solid var(--border);background:var(--surface);font-size:22px;font-weight:700;color:var(--primary)}
+.stepper button:hover{border-color:var(--primary)}
+.stepper button:disabled{color:var(--text-disabled)}
+.stepper .val{font-size:34px;font-weight:700;min-width:110px;text-align:center}
+.guard{text-align:center;font-size:12.5px;color:var(--text-secondary)}
+.syncsteps{display:flex;align-items:center;gap:8px;margin:16px 0}
+.ss{flex:1;text-align:center;padding:10px 6px;border-radius:var(--radius-md);background:var(--surface-variant);font-size:12.5px;font-weight:600;color:var(--text-disabled)}
+.ss.on{background:var(--primary-light);color:var(--primary-dark)}
+.ss.ok{background:var(--success-light);color:#065F46}
+.ss.bad{background:var(--danger-light);color:#991B1B}
+.ss.wait{animation:pulse 1.2s ease-in-out infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.55}}
+.drawer{position:fixed;top:0;right:0;bottom:0;width:480px;max-width:95vw;background:var(--surface);box-shadow:var(--shadow-lg);z-index:45;display:flex;flex-direction:column}
+.drawer .dh{padding:16px 20px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;font-weight:600}
+.drawer .db{padding:20px;overflow:auto;flex:1}
+.timeline{border-left:2px solid var(--border);margin-left:6px;padding-left:16px}
+.tlitem{position:relative;padding-bottom:14px}
+.tlitem:before{content:'';position:absolute;left:-21px;top:5px;width:8px;height:8px;border-radius:50%;background:var(--primary)}
+.tlitem .tw{font-size:11.5px;color:var(--text-disabled)}
+#toasts{position:fixed;top:16px;right:16px;z-index:60;display:flex;flex-direction:column;gap:8px}
+.toast{background:var(--surface);border:1px solid var(--border);border-left:4px solid var(--success);border-radius:var(--radius-md);box-shadow:var(--shadow-lg);padding:12px 16px;font-size:13.5px;min-width:280px;animation:slidein .2s ease-out}
+@keyframes slidein{from{transform:translateX(30px);opacity:0}to{transform:none;opacity:1}}
+.tabs{display:flex;gap:4px;border-bottom:1px solid var(--border);margin-bottom:14px}
+.tabs button{border:none;background:none;padding:9px 14px;font-size:14px;font-weight:500;color:var(--text-secondary);border-bottom:2px solid transparent}
+.tabs button.on{color:var(--primary);border-bottom-color:var(--primary);font-weight:600}
+.tabs .cnt{background:var(--surface-variant);border-radius:9px;padding:0 6px;font-size:11.5px;margin-left:5px}
+.sw{position:relative;width:40px;height:22px;border-radius:11px;background:#CBD5E1;border:none;transition:background .15s}
+.sw.on{background:var(--success)}
+.sw.off{background:var(--danger)}
+.sw:after{content:'';position:absolute;top:2px;left:2px;width:18px;height:18px;border-radius:50%;background:#fff;transition:left .15s}
+.sw.on:after{left:20px}
+.formrow{margin-bottom:12px}
+.formrow label{display:block;font-size:12.5px;font-weight:600;margin-bottom:4px;color:var(--text-secondary)}
+.formrow input,.formrow textarea,.formrow select{width:100%;border:1.5px solid var(--border);border-radius:var(--radius-sm);padding:8px 10px;outline:none}
+.formrow input:focus,.formrow textarea:focus{border-color:var(--primary)}
+.scopelist li{list-style:none;display:flex;justify-content:space-between;align-items:center;padding:4px 0;border-bottom:1px solid var(--surface-variant);font-size:13px}
+@media(max-width:900px){
+  .sidebar{width:100%;height:56px;bottom:0;top:auto;flex-direction:row;align-items:center}
+  .sidebar .brand,.sidebar .foot{display:none}
+  .nav{display:flex;padding:6px;flex:1}
+  .main{margin-left:0;padding-bottom:64px}
+  .wsgrid{grid-template-columns:minmax(0,1fr)}
+  .modal{width:100%;max-height:100vh;border-radius:0}
+}
+
+/* OOHDASH-144: new agent-screen standard (§8.1) */
+/* Automatic-log notification (§9.3) */
+.autolog{background:#EFF6FF;border:1px solid #BFDBFE;border-radius:var(--radius-md);padding:10px 14px;font-size:13.5px;margin:10px 0;color:#1E40AF;line-height:20px}
+/* Check and log wrap-up panel (§9) */
+.wrapup{border:1.5px solid var(--border);border-radius:var(--radius-lg);padding:16px;margin:12px 0;background:var(--surface)}
+.wrapup h3{font-size:16px;font-weight:700;margin-bottom:12px}
+.wrapup .wu-section{margin-bottom:10px;font-size:14px;line-height:22px}
+.wrapup .wu-section strong{display:block;font-size:12px;font-weight:700;color:var(--text-secondary);text-transform:uppercase;letter-spacing:.4px;margin-bottom:3px}
+.wrapup .wu-actions li{list-style:none;padding:3px 0;color:var(--text-primary)}
+/* boost-hold banner row (§10.1) */
+.hold-banner{background:var(--info-light);border:1px solid #BFDBFE;border-radius:var(--radius-md);padding:12px 16px;margin-bottom:10px}
+.hold-banner .hb-title{font-weight:600;font-size:14px;color:#1E40AF;margin-bottom:8px}
+.hold-banner .hb-row{display:flex;align-items:center;gap:10px;padding:4px 0;flex-wrap:wrap;font-size:13.5px}
+.hold-banner .hb-row .hb-state{flex:1;min-width:0}
+/* Notes box CSS classes (§11, replaces inline styles in notes.js) */
+:root{--notes-accent:#C7D2FE}
+.notes-group{background:var(--surface-variant);border:1px solid var(--border);border-left:3px solid var(--notes-accent);border-radius:var(--radius-md);padding:10px 14px;margin:10px 0}
+.notes-label{font-size:12.5px;font-weight:600;color:var(--text-secondary);margin-bottom:5px}
+.notes-input{width:100%;border:1.5px solid var(--border);border-radius:var(--radius-sm);padding:8px 10px;font:inherit;font-size:14px;line-height:22px;resize:vertical;outline:none;background:var(--surface);color:var(--text-primary)}
+.notes-input:focus{border-color:var(--primary);box-shadow:0 0 0 3px var(--primary-light)}
+@media(max-width:700px){.notes-input{font-size:16px}}
+.notes-counter{font-size:11.5px;color:var(--text-secondary);text-align:right;margin-top:3px}
+
+/* OOHDASH-159 rev 4: app-wide text key */
+/* Script: green "Say to the customer" box — read out word for word, one per step */
+.say{background:#ECFDF5;border-left:5px solid #047857;border-radius:0 var(--radius-md) var(--radius-md) 0;padding:11px 14px;font-size:15.5px;font-style:normal;margin:10px 0;line-height:23px;color:var(--text-primary)}
+.say .say-label{display:block;font-size:12px;font-weight:700;color:#047857;margin-bottom:5px;letter-spacing:.2px}
+.say p{margin:0 0 6px}
+.say p:last-child{margin-bottom:0}
+.say .say-ask{margin-top:8px;padding-top:8px;border-top:1px solid #A7F3D0;font-weight:500}
+.say .say-ask b{color:#047857}
+/* Agent background: blue "For you" box — never read out, never offers a choice */
+.gtk{background:#EFF6FF;border-left:3px solid #60A5FA;border-radius:0 var(--radius-md) var(--radius-md) 0;padding:9px 13px;font-size:14px;color:#1E3A8A;margin:8px 0;line-height:20px}
+.gtk .gtk-label{display:block;font-size:12px;font-weight:700;color:#1D4ED8;margin-bottom:3px}
+/* Values taken from the site */
+.dyn{background:#FEF08A;border-bottom:1.5px dashed #A16207;font-weight:700;padding:0 2px;border-radius:2px;font-style:normal}
+/* Ticket text */
+.ticketbox{background:#fff;border:1.5px dashed #94A3B8;border-radius:var(--radius-md);padding:10px 14px;margin:10px 0;font-size:14px;line-height:21px}
+.ticketbox .tb-label{display:block;font-size:12px;font-weight:700;color:var(--text-secondary);margin-bottom:5px}
+.ticketbox .tb-subject{font-weight:600}
+.ticketbox .tb-detail{margin-top:4px;color:var(--text-primary)}
+/* Warning: directly above every button that logs a ticket or switches equipment */
+.warnbox{background:#FEF2F2;border:1.5px solid #B91C1C;border-radius:var(--radius-md);padding:9px 13px;margin:12px 0 8px;font-size:14px;line-height:20px;color:#7F1D1D}
+.warnbox b{color:#B91C1C}
+.p1warn{border:1.5px solid #B91C1C;border-radius:var(--radius-md);margin:12px 0 8px;overflow:hidden;background:#FEF2F2}
+.p1warn .p1warn-head{background:#B91C1C;color:#fff;font-weight:700;padding:7px 13px;font-size:14.5px}
+.p1warn .p1warn-body{padding:8px 13px;color:#7F1D1D;font-size:14px}
+.btn.danger{background:#B91C1C;border-color:#B91C1C;color:#fff;font-weight:600}
+.btn.danger:hover{background:#991B1B;border-color:#991B1B;color:#fff}
+/* After-action card: one neutral card for every outcome */
+.outcome.after{background:#fff;border:1px solid #CBD5E1;padding:0;overflow:hidden}
+.outcome.after .after-head{background:#1E293B;color:#fff;font-weight:600;font-size:15px;padding:9px 14px;display:flex;align-items:center;gap:10px}
+.outcome.after .after-head .tktbadge{margin-left:auto;background:#fff;color:#1E293B;border-radius:var(--radius-sm);padding:1px 8px;font-size:13px;font-weight:700;white-space:nowrap}
+.outcome.after .after-body{padding:10px 14px 12px}
+.outcome.after .after-line{margin:0 0 4px}
+/* What we know so far */
+.known{background:#fff;border:1px solid var(--border);border-radius:var(--radius-md);padding:8px 12px;margin-bottom:12px}
+.known .known-title{font-size:12px;font-weight:700;color:var(--text-secondary);text-transform:uppercase;letter-spacing:.4px;margin-bottom:2px}
+.known ul{margin:0;padding:0}
+.known li{list-style:none}
+.known .stepdone{font-size:13px;color:var(--text-primary);padding:3px 0}
+.known .kicon{width:20px;flex-shrink:0;text-align:center}
+/* Site status: amber strip */
+.statusstrip{background:#FFFBEB;border:1px solid #FCD34D;border-left:5px solid #D97706;border-radius:var(--radius-md);padding:9px 13px;margin:0 0 10px;font-size:13.5px;line-height:20px;color:#78350F}
+.alert.amber{background:#FFFBEB;border:1px solid #FCD34D;border-left:5px solid #D97706;color:#78350F}
+.stepq.agentq{font-size:15px}
+/* ---- OOHDASH-159 rev 5 ---- */
+/* c: customer answers have their own look (teal, rounded "speech" pills) and a label above every set */
+.answers{margin:8px 0 6px}
+.answers .ans-label{font-size:12px;font-weight:700;color:#0E7490;margin-bottom:5px;letter-spacing:.2px}
+.chip.ans{border:1.5px solid #0E7490;background:#ECFEFF;color:#164E63;border-radius:999px;padding:8px 16px}
+.chip.ans:hover{background:#CFFAFE;border-color:#0E7490;color:#164E63}
+.chip.ans.sel{background:#0E7490;border-color:#0E7490;color:#fff}
+.chip.ans .dyn{background:transparent;border-bottom-color:#0E7490}
+/* b: dynamic names signpost */
+.fromlist{font-size:13px;line-height:19px;color:#1E3A8A;background:#EFF6FF;border:1px dashed #60A5FA;border-radius:var(--radius-md);padding:6px 10px;margin:4px 0 2px}
+/* K1 guide link + A1 ticket links */
+.guidelink{font-weight:600;color:#1D4ED8;text-decoration:underline}
+.tktlink{font-weight:700;color:inherit;text-decoration:underline}
+.outcome.after .after-head .tktbadge .tktlink{color:#1E293B}
+.outcome.after .after-kicker{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.5px;opacity:.75;margin-right:4px}
+.siteticket{display:block}
+.siteticket .tktrow{display:flex;gap:6px;align-items:center;color:inherit;text-decoration:none}
+.siteticket .tktrow:hover{color:var(--primary)}
+/* E1: one end-of-call block, with the publish note */
+.endblock{border-top:1px solid var(--border);margin-top:14px;padding-top:10px}
+.endblock .endnote{font-size:13px;line-height:19px;color:var(--text-secondary);margin:0 0 8px}
+.schedcollect .formrow{margin-top:8px}
+.schedcollect input,.schedcollect textarea{width:100%;border:1.5px solid var(--border);border-radius:6px;padding:7px 10px;font:inherit}
+
+/* ---- OOHDASH-146 D16 (B36): the permanent caller banner. Neutral card tokens; never takes colour from P1 or error states. ---- */
+.callbanner{display:flex;align-items:center;flex-wrap:wrap;gap:4px 12px;background:var(--surface-variant);border:1px solid var(--border);border-radius:var(--radius-md);padding:7px 12px;margin:0 0 10px;font-size:13px;line-height:22px;position:sticky;top:52px;z-index:5;color:var(--text-primary)}
+.callbanner .cb-who{min-width:0}
+.callbanner .cb-site{margin-left:auto;min-width:0;color:var(--text-primary)}
+.callbanner .cb-quiet{color:var(--text-secondary)}
+.callbanner .cb-add{font-size:12.5px;padding:2px 4px;margin:0}
+.cd-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:0 12px}
+.sr-only{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+@media(max-width:640px){.callbanner{flex-wrap:nowrap;gap:2px 8px;padding:4px 10px;font-size:12.5px;overflow:hidden}.callbanner .cb-who{flex:1 1 auto;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.callbanner .cb-site,.callbanner .cb-role{display:none}.callbanner .cb-add{flex:0 0 auto}}
+@media print{.callbanner{position:static;border:1px solid #999}}
+/* ---- OOHDASH-146 R1 (B17): the kitchen one-off banner on the site screen ---- */
+.oneoff-banner{display:flex;align-items:center;gap:10px;flex-wrap:wrap;background:var(--info-light);border:1px solid #BFDBFE;border-radius:var(--radius-md);padding:10px 14px;margin-bottom:10px;color:#1E40AF;font-weight:500}
+.oneoff-banner .btn{margin-left:auto}
+
+</style>
+<style>
+:root{--proto-h:200px}
+#proto-bar{position:fixed;top:0;left:0;right:0;z-index:9999;background:#111827;color:#f9fafb;font:13px/1.4 system-ui,sans-serif;padding:8px 12px;box-shadow:0 2px 8px rgba(0,0,0,.3);height:var(--proto-h);box-sizing:border-box;overflow:auto}
+#proto-bar .hd{display:flex;justify-content:space-between;align-items:center;gap:8px}
+#proto-bar .pb{background:#374151;color:#f9fafb;border:1px solid #4b5563;border-radius:6px;padding:4px 8px;margin:3px 4px 0 0;cursor:pointer;font-size:12px}
+#proto-bar .pb.on{background:#6366f1;border-color:#818cf8}
+#proto-note{margin-top:6px;color:#fde68a}
+body{padding-top:var(--proto-h)}
+.sidebar{top:var(--proto-h)!important}
+.topbar{top:var(--proto-h)!important}
+body.proto-collapsed{--proto-h:34px}
+body.proto-collapsed #proto-bar-list,body.proto-collapsed #proto-note{display:none}
+#toasts .toast{background:#1f2937;color:#fff;padding:10px 14px;border-radius:8px;margin-top:8px;max-width:420px}
+#toasts{position:fixed!important;top:auto!important;right:16px!important;bottom:16px!important;z-index:9998!important}
+.answers{display:flex;gap:8px;margin-top:8px}
+</style>
+</head>
+<body>
+<div id="proto-bar"><div class="hd"><b>OOHDASH-166 design prototype · real OOH screens (v1.7.6, fixture capture) · pick a scenario</b><button class="pb" onclick="protoToggle()">Hide / show</button></div><div id="proto-bar-list"></div><div id="proto-note"></div></div>
+<div id="app">
+ <div class="sidebar">
+  <div class="brand">OOH Dashboard<small>Lighthouse out-of-hours support</small></div>
+  <div class="nav">
+   <button data-testid="nav-home" class="active" >📞 New Call</button>
+   <button data-testid="nav-callback" class="" >↩️ Callback Lookup</button>
+   <button data-testid="nav-tonight" class="" >🌙 Tonight</button>
+   
+  </div>
+  <div class="foot">
+   <div class="opchip"><div class="avatar">JH</div>
+    <div><div class="nm" data-testid="operator-name">Jordan Hale</div><div class="rl">OOH Handler · signed in via SSO</div></div></div>
+   <button class="btn link" style="padding:2px 0" >Sign out</button>
+  </div>
+ </div>
+ <div class="main">
+  <div class="topbar">
+   <span class="ctx">New Call</span>
+   <span class="ver">v1.7.6 · prototype</span>
+  </div>
+  
+  
+  
+  
+  <div id="view"><div class="content narrow"><div class="card" style="padding:26px" data-testid="confirm-gate">
+   <h2>Test Boiler Panel V1 (Heating) <span class="mono" style="background:var(--surface-variant);padding:2px 10px;border-radius:6px;margin-left:6px">9011</span></h2>
+   <div class="sub">Catering &amp; Bars · Test Address, Test Town</div>
+   
+   <p style="margin:10px 0 4px" data-testid="confirm-device-line">On Lighthouse: 1 heating zone</p>
+   <div class="say" data-testid="say-block"><span class="say-label">🗣 Say to the customer</span><div class="say-ask" data-testid="ask-customer"><b>Ask the customer:</b> can I just confirm, you're calling from <span class="dyn">Test Boiler Panel V1 (Heating)</span>, site number <span class="dyn">9011</span>?</div></div>
+
+   <div style="display:flex;gap:10px;margin-top:16px">
+    <button class="btn primary big" data-testid="confirm-site" >✓ This is the right site</button>
+    <button class="btn big" >Search again</button>
+   </div></div></div></div>
+ </div></div>
+<div id="toasts"></div>
+<div id="modalroot"></div>
+<!-- OOHDASH-146 D16 (B37): the one visually hidden status node, written only when customer details are saved -->
+<div id="srlive" class="sr-only" role="status" data-testid="cb-status"></div>
+<!-- Cache-busting querystring MUST be bumped with the version on every deploy -->
+<script>
+/* OOHDASH-166 design prototype — scenarios mounted into the real captured OOH page (fixture mode, v1.7.6). */
+(function () {
+  function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
+  function dyn(v) { return '<span class="dyn">' + esc(v) + '</span>'; }
+  function sayBox(html, ask) {
+    var askHtml = ask ? '<div class="say-ask" data-testid="ask-customer"><b>Ask the customer:</b> ' + ask + '</div>' : '';
+    return '<div class="say" data-testid="say-block"><span class="say-label">🗣 Say to the customer</span>' + (html || '') + askHtml + '</div>';
+  }
+  function infoBox(html) { return '<div class="gtk" data-testid="gtk-block"><span class="gtk-label">ℹ For you (background, not to read out)</span>' + html + '</div>'; }
+  function toast(html) {
+    var t = document.createElement('div'); t.className = 'toast'; t.innerHTML = html;
+    document.getElementById('toasts').appendChild(t); setTimeout(function () { t.remove(); }, 9000);
+  }
+  var view = function () { return document.getElementById('view'); };
+  var timers = [];
+  function later(fn, ms) { timers.push(setTimeout(fn, ms)); }
+  function clearTimers() { timers.forEach(clearTimeout); timers = []; }
+  var CHIP = function (n) { return ' <span class="mono" style="background:var(--surface-variant);padding:2px 10px;border-radius:6px;margin-left:6px">' + esc(n) + '</span>'; };
+  var MUTED = 'color:var(--text-muted,#6b7280);font-size:14px;margin:4px 0';
+
+  /* ---- Name capture (OOHDASH-166 rev 3): inline, optional, never blocks confirm or control ---- */
+  // nc = { held: [{name, from}], answer: null | {name, how:'picked'|'typed'}, typing: bool }
+  function nameCheckLine(o) {
+    var nc = o.nc, held = nc.held.map(function (h) { return h.name; });
+    var listed = held.length ? 'our records list ' + held.join(' / ') : 'we hold no pub name for this house ID';
+    var says = nc.answer ? 'customer says ' + nc.answer.name : 'customer\'s answer not recorded';
+    return 'Name check (house ID ' + o.siteNo + '): ' + listed + '; ' + says + ' — please tidy the site list.';
+  }
+  function captureBlock(o) {
+    var nc = o.nc;
+    if (nc.answer) {
+      return '<div class="gtk" data-testid="name-capture-done" style="margin-top:10px"><span class="gtk-label">✓ Pub name recorded</span>' +
+        '<p>Customer says: <b>' + esc(nc.answer.name) + '</b>. This goes on the ticket so the IoT team can tidy the site list.</p>' +
+        '<button class="btn link" style="padding:0" onclick="protoNcChange()">Change</button></div>';
+    }
+    var chips = nc.held.map(function (h, i) {
+      return '<button class="chip" data-testid="name-pick" onclick="protoNcPick(' + i + ')">' + esc(h.name) +
+        (h.from === 'equipment' ? ' <span style="font-size:12px;opacity:.75">· matches the equipment</span>' : ' <span style="font-size:12px;opacity:.75">· ticket system</span>') + '</button>';
+    }).join('');
+    var typer = nc.typing
+      ? '<div class="formrow" style="margin-top:8px"><label for="nc-type">Pub name the customer gives</label>' +
+        '<div style="display:flex;gap:8px"><input id="nc-type" data-testid="name-type" maxlength="120" style="flex:1" placeholder="e.g. Sycamore Farm, Burnley">' +
+        '<button class="btn" onclick="protoNcSave()">Save</button></div></div>'
+      : '<button class="chip" data-testid="name-other" onclick="protoNcType()">' + (nc.held.length ? 'Something else…' : 'Type the pub name…') + '</button>';
+    var lead = nc.held.length > 1 ? 'Our records disagree on the pub name for this house ID.'
+      : nc.held.length === 1 ? 'Our records only hold a name taken from the equipment.' : 'We don\'t hold a pub name for this house ID.';
+    return '<div class="card" data-testid="name-capture" style="margin-top:12px;padding:14px 16px;border-style:dashed">' +
+      '<div style="font-weight:600">' + esc(lead) + '</div>' + (o.isClash ? '<div class="say-ask" style="margin:6px 0"><b>Ask the customer:</b> which pub are you calling from?</div>' : '') +
+      '<div class="answers" style="flex-wrap:wrap">' + chips + typer + '</div>' +
+      '<p style="' + MUTED + '">Optional — tap the answer if you get one; you can carry on either way. Whatever you record goes on the ticket for the IoT team.</p></div>';
+  }
+  window.protoNcPick = function (i) { var o = window._protoSite; o.nc.answer = { name: o.nc.held[i].name, how: 'picked' }; o.redraw(); };
+  window.protoNcType = function () { var o = window._protoSite; o.nc.typing = true; o.redraw(); var el = document.getElementById('nc-type'); if (el) el.focus(); };
+  window.protoNcSave = function () { var o = window._protoSite; var v = (document.getElementById('nc-type') || {}).value || ''; if (!v.trim()) return; o.nc.answer = { name: v.trim(), how: 'typed' }; o.nc.typing = false; o.redraw(); };
+  window.protoNcChange = function () { var o = window._protoSite; o.nc.answer = null; o.redraw(); };
+
+  /* Confirm screen — markup of renderConfirmGate() in public/js/views.js with the rev 3 name model.
+     o.status: 'clear' | 'check' (names disagree / equipment-only / none). No name shown until o.loaded. */
+  function confirmGate(o) {
+    o.redraw = function () { confirmGate(o); };
+    var clear = o.status === 'clear';
+    var heading = (o.loaded && clear) ? esc(o.name) + CHIP(o.siteNo) : 'House ID ' + esc(o.siteNo);
+    var nameLine = !o.loaded ? '<p style="' + MUTED + '" data-testid="confirm-name-checking">Checking the pub name…</p>' : '';
+    var ask = (o.loaded && clear)
+      ? 'can I just confirm your house ID? I have it as ' + dyn(o.siteNo) + ', that\'s ' + dyn(o.name) + '.'
+      : 'can I just confirm your house ID? I have it as ' + dyn(o.siteNo) + '.' + (o.loaded ? ' And which pub are you calling from?' : '');
+    var deviceLine = o.loaded ? esc(o.deviceSummary) : 'Checking the Lighthouse equipment at this site…';
+    var btn = o.loaded ? '✓ House ID confirmed — open the site' : 'Checking site…';
+    view().innerHTML = '<div class="content narrow"><div class="card" style="padding:26px" data-testid="confirm-gate">' +
+      '<h2>' + heading + '</h2>' + nameLine +
+      (o.loaded && o.brand ? '<div class="sub">' + esc(o.brand) + '</div>' : '') +
+      '<p style="margin:10px 0 4px" data-testid="confirm-device-line">' + deviceLine + '</p>' +
+      sayBox('', ask) +
+      (o.loaded && !clear ? captureBlock(o) : '') +
+      '<div style="display:flex;gap:10px;margin-top:16px;flex-wrap:wrap">' +
+      '<button class="btn primary big" data-testid="confirm-site" ' + (o.loaded ? '' : 'disabled') + ' onclick="protoConfirm()">' + btn + '</button>' +
+      '<button class="btn big" onclick="protoGo(protoCurrent)">Wrong house ID — search again</button></div></div></div>';
+    window._protoSite = o;
+  }
+  window.protoConfirm = function () {
+    var o = window._protoSite || {};
+    var head = o.status === 'clear' ? o.name + ' ' + o.siteNo : 'House ID ' + o.siteNo;
+    var tline = o.status === 'clear' ? '' : '<div style="margin-top:6px;font-size:13px;opacity:.9">Ticket preview — line added to this call\'s OOH ticket, tagged <span class="mono">ooh_site_name_check</span>:<br><i>' + esc(nameCheckLine(o)) + '</i></div>';
+    toast('Site opened: <b>' + esc(head) + '</b> with full remote control.' + tline);
+  };
+
+  /* True clash: Lighthouse holds two sites under one house ID. Control blocked; capture the name, continue to a ticket in place. */
+  function ambiguousNew(o) {
+    o.redraw = function () { ambiguousNew(o); };
+    window._protoSite = o;
+    view().innerHTML = '<div class="content narrow"><div class="card" style="border-color:var(--warning)" data-testid="ambiguous-card">' +
+      '<h2>&#9888;&#65039; House ID ' + esc(o.siteNo) + ' has two sites on Lighthouse</h2>' +
+      '<p class="sub" style="margin:8px 0">Lighthouse has two different sites under this house ID, so we can\'t tell which equipment is the customer\'s. You can\'t make changes from here tonight, but you can log it for the IoT team.</p>' +
+      captureBlock(o) +
+      '<div style="margin-top:10px">' +
+      infoBox('<p>Trade means the site cannot serve customers or cannot open. Health and safety means anything that could hurt someone.</p><p>Yes goes to an urgent P1; No gives a next-working-day ticket.</p>') +
+      sayBox('I can\'t make changes for this site tonight — I\'ll log it, and our IoT team picks it up the next working day.', 'Is there an immediate risk to trade or to anyone\'s health and safety?') +
+      '<div class="answers"><button class="chip" onclick="protoClash(\'P1\')">Yes</button><button class="chip" onclick="protoClash(\'next-day\')">No</button></div>' +
+      '<button class="btn link" style="margin-top:8px" onclick="protoGo(protoCurrent)">Wrong house ID — search again</button></div></div></div>';
+  }
+  window.protoClash = function (kind) {
+    var o = window._protoSite;
+    toast((kind === 'P1' ? '✅ Raised as P1 — ticket <b>#48214</b>.' : '✅ Logged as ticket <b>#48213</b> for the next working day.') +
+      '<div style="margin-top:6px;font-size:13px;opacity:.9">Ticket preview, tagged <span class="mono">ooh_site_name_check</span>:<br><i>' + esc(nameCheckLine(o)) + '</i></div>');
+  };
+  function lookingUp(siteNo) {
+    view().innerHTML = '<div class="content narrow"><div class="card" style="padding:26px"><h2>Looking up site ' + esc(siteNo) + '…</h2></div></div>';
+  }
+  /* Ambiguous card — TODAY (live v1.7.6) wording, verbatim from renderAmbiguous(). */
+  function ambiguousToday(siteNo, names) {
+    view().innerHTML = '<div class="content narrow"><div class="card" style="border-color:var(--warning)" data-testid="ambiguous-card">' +
+      '<h2>&#9888;&#65039; House ID ' + esc(siteNo) + ' is ambiguous</h2>' +
+      '<p class="sub" style="margin:8px 0">This ID matches more than one site (' + names.map(function (n) { return '<b>' + esc(n) + '</b>'; }).join(' and ') + '). To protect against changing the wrong site, remote control is blocked for ambiguous IDs.</p>' +
+      '<div style="margin-top:10px">' +
+      infoBox('<p>Trade means the site cannot serve customers or cannot open. Health and safety means anything that could hurt someone.</p><p>Yes goes to an urgent P1; No gives a next-working-day ticket.</p>') +
+      sayBox('I can\'t safely make changes for this site number tonight — It\'s logged, and our IoT team picks it up the next working day.', 'Is there an immediate risk to trade or to anyone\'s health and safety?') +
+      '<div class="answers"><button class="chip">Yes</button><button class="chip">No</button></div>' +
+      '<button class="btn" style="margin-top:8px">Search again</button></div></div></div>';
+  }
+  window.protoToast = toast;
+
+  /* Callback history panel — illustrative counts from live Zendesk, 19 Nov 2026. */
+  function history(o) {
+    var rows = (o.tickets || []).map(function (t) {
+      return '<div class="card" style="padding:12px 16px;margin:8px 0"><b>#' + t.id + '</b> · ' + esc(t.subject) + '<div class="sub">' + esc(t.when) + ' · ' + esc(t.status) + ' · <span class="mono small">' + esc(t.tag) + '</span></div></div>';
+    }).join('');
+    view().innerHTML = '<div class="content narrow"><div class="card" style="padding:22px"><h2>Callback Lookup — ' + esc(o.siteName) + ' <span class="mono">' + esc(o.siteNo) + '</span></h2>' +
+      (o.empty ? '<div class="alert warn">⚠ We couldn\'t find this site\'s ticket history. ' + esc(o.empty) + '</div>' :
+        '<p class="sub">Last 90 days · ' + o.total + ' tickets found (the screen lists the 12 most recently updated; 4 are shown in this prototype). The small grey label shows which site tag the ticket carries — it is shown here for the reviewer only, not in the real screen.</p>' + rows) +
+      '</div></div>';
+  }
+
+  var HILLFIELD_TICKETS = [
+    { id: 48177, subject: 'No heating in the restaurant — boost applied 60 min', when: 'Updated 2 days ago', status: 'Solved', tag: 'gk_5674' },
+    { id: 47902, subject: 'Kitchen fryer bank off — customer turned back on', when: 'Updated 9 days ago', status: 'Solved', tag: 'gk_5674' },
+    { id: 46511, subject: 'Hot water not hot enough — engineer visit booked', when: 'Updated 5 weeks ago', status: 'On hold', tag: 'green_king__farm_house_inn__hillfield_farm' },
+    { id: 45230, subject: 'Thermostat in bar not responding', when: 'Updated 8 weeks ago', status: 'Closed', tag: 'green_king__farm_house_inn__hillfield_farm' }
+  ];
+  function nc(held) { return { held: held, answer: null, typing: false }; }
+  function run(o, lookupMs) {
+    if (lookupMs) { lookingUp(o.siteNo); later(function () { confirmGate(o); later(function () { o.loaded = true; confirmGate(o); }, 900); }, lookupMs); }
+    else { confirmGate(o); later(function () { o.loaded = true; confirmGate(o); }, 1200); }
+  }
+  var SYC = 'Sycamore Farm (Burnley)', SILK = 'Farmhouse Kitchen (Silkwood Park)';
+
+  var SCEN = {
+    s1: { label: '1 · 5674 today (live v1.7.6): blocked as "ambiguous"', note: 'What the agent sees now for 69 Greene King sites: the same pub listed twice is called "ambiguous" and remote control is blocked.',
+      run: function () { ambiguousToday('5674', ['Hillfield Farm (Solihull)', 'Hillfield Farm (Solihull)']); } },
+    s2: { label: '2 · 5674 after the fix: names agree, one name shown', note: 'The house ID drives everything. While the equipment loads the screen shows "House ID 5674" and "Checking the pub name…", and the agent can already confirm the house ID. Then the one agreed name appears, as today. No name question.',
+      run: function () { run({ siteNo: '5674', status: 'clear', name: 'Hillfield Farm (Solihull)', brand: 'Greene King', loaded: false, deviceSummary: 'On Lighthouse: 2 heating zones · hot water · 3 kitchen circuits' }); } },
+    s3: { label: '3 · 5674 callback history after: both tags searched', note: 'History now searches both the old and the new site tag, so older tickets come back. Live today: 117 tickets on gk_5674 plus 23 on the old tag, all currently hidden.',
+      run: function () { history({ siteNo: '5674', siteName: 'Hillfield Farm (Solihull)', total: 140, tickets: HILLFIELD_TICKETS }); } },
+    s4: { label: '4 · 5674 callback history today: empty', note: 'Today the history comes back empty for all 69 sites, and also for 7 three-digit house IDs such as 220 Bull & Anchor (Exhall).',
+      run: function () { history({ siteNo: '5674', siteName: 'Hillfield Farm (Solihull)', empty: 'The site list has more than one entry for this house ID.' }); } },
+    s5: { label: '5 · 5199 before rename: names disagree, agent taps the customer\'s answer', note: 'The ticket system lists two names for 5199. The equipment (gk-silkwoodfarm-*) matches Silkwood Park. The agent confirms the house ID, asks which pub, and taps the answer, or carries on without one. Full control either way. Press the open-site button to see the ticket line.',
+      run: function () { run({ siteNo: '5199', status: 'check', brand: 'Greene King', nc: nc([{ name: SILK, from: 'equipment' }, { name: SYC, from: 'ticket' }]), loaded: false, deviceSummary: 'On Lighthouse: 3 heating zones · 4 kitchen circuits' }, 1600); } },
+    s6: { label: '6 · 5190 before rename: equipment disagrees with the ticket system, agent taps the answer', note: 'The ticket system calls 5190 "Farmhouse Kitchen (Silkwood Park)"; the equipment (gk-sycamorefarm-fridge-1) points to Sycamore Farm (Burnley). Both are offered. The name check is now simply part of this step, not a separate decision.',
+      run: function () { run({ siteNo: '5190', status: 'check', brand: 'Greene King', nc: nc([{ name: SYC, from: 'equipment' }, { name: SILK, from: 'ticket' }]), loaded: false, deviceSummary: 'On Lighthouse: 1 heating zone · fridge · freezer' }); } },
+    s7: { label: '7 · 5190 before rename: customer gives another name, agent types it', note: 'Same as 6, but the customer gives a name we don\'t hold. Tap "Something else…", type it, Save. The typed name goes on the ticket. Optional: the open-site button works whether or not a name is saved.',
+      run: function () { var o = { siteNo: '5190', status: 'check', brand: 'Greene King', nc: nc([{ name: SYC, from: 'equipment' }, { name: SILK, from: 'ticket' }]), loaded: false, deviceSummary: 'On Lighthouse: 1 heating zone · fridge · freezer' }; o.nc.typing = true; run(o); } },
+    s8: { label: '8 · 5199 and 5190 after the IoT team renames: names agree', note: 'Both become "same pub listed twice" and show one agreed name, with no name question. Shown: 5199. 5190 shows Sycamore Farm (Burnley) the same way.',
+      run: function () { run({ siteNo: '5199', status: 'clear', name: SILK, brand: 'Greene King', loaded: false, deviceSummary: 'On Lighthouse: 3 heating zones · 4 kitchen circuits' }); } },
+    s9: { label: '9 · Missing from the ticket system: name from the equipment offered', note: 'Example house ID 6418 (fictional), equipment named gk-oakbrookfarm-*. The dashboard looks the site up on Lighthouse (pre-v1.7.5 behaviour, a few seconds). The tidied equipment name "Oakbrook Farm" is offered; the agent taps it or types what the customer says. Full control.',
+      run: function () { run({ siteNo: '6418', status: 'check', nc: nc([{ name: 'Oakbrook Farm', from: 'equipment' }]), loaded: false, deviceSummary: 'On Lighthouse: 1 heating zone · hot water' }, 2200); } },
+    s10: { label: '10 · No pub name anywhere: agent types it', note: 'Example house ID 6431 (fictional), equipment named by number (gk-6431-*), no ticket-system entry. The screen shows the house ID and a box to type the pub name. Full control.',
+      run: function () { run({ siteNo: '6431', status: 'check', nc: nc([]), loaded: false, deviceSummary: 'On Lighthouse: 2 heating zones' }, 2200); } },
+    s11: { label: '11 · Two sites on Lighthouse under one house ID: control blocked, name captured, ticket in place', note: 'Only if Lighthouse itself holds two sites under one number (no live site today). We can\'t know which equipment is the customer\'s, so control stays blocked. The agent still records the pub name and goes straight to a ticket or P1 here, with no search loop. Example uses the fixture pair from the test suite.',
+      run: function () { ambiguousNew({ siteNo: '6758', isClash: true, nc: nc([{ name: 'Bowers', from: 'ticket' }, { name: 'Bowman', from: 'ticket' }]) }); } },
+    s12: { label: '12 · House ID found nowhere (unchanged)', note: 'A house ID that is on neither the ticket system nor Lighthouse: the same "No site found" message as today. Here the house ID itself is wrong, so searching again is the right step.',
+      run: function () { view().innerHTML = '<div class="content narrow"><div class="card" style="padding:26px"><h2>New Call</h2><p class="sub">Search by house ID or pub name.</p></div></div>'; toast('No site found for 9999'); } }
+  };
+
+  window.protoCurrent = 's1';
+  window.protoGo = function (k) {
+    clearTimers();
+    window.protoCurrent = k;
+    var s = SCEN[k];
+    document.getElementById('proto-note').textContent = s.note;
+    document.querySelectorAll('#proto-bar .pb').forEach(function (b) { b.classList.toggle('on', b.dataset.k === k); });
+    s.run();
+  };
+  window.protoToggle = function () { document.body.classList.toggle('proto-collapsed'); };
+  document.addEventListener('DOMContentLoaded', function () {
+    var bar = document.getElementById('proto-bar-list');
+    Object.keys(SCEN).forEach(function (k) {
+      var b = document.createElement('button'); b.className = 'pb'; b.dataset.k = k; b.textContent = SCEN[k].label;
+      b.onclick = function () { protoGo(k); }; bar.appendChild(b);
+    });
+    protoGo('s1');
+  });
+})();
+
+</script>
+</body></html>
