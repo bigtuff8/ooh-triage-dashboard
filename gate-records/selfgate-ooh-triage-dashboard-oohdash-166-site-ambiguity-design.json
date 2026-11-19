@@ -1,0 +1,21 @@
+{
+  "run": "selfgate-ooh-triage-dashboard-oohdash-166-site-ambiguity",
+  "phase": "design",
+  "pr": 211,
+  "approvedBy": [
+    "bigtuff8"
+  ],
+  "reviewComments": [
+    "bigtuff8: - What to do when a call with a name mismatch raises no ticket the IoT team will see: Keep the call record open at low priority, tagged ooh_site_name_check, so the IoT team finds it in their daily search (recommended)\n\n(submitted via the interactive gate review)\n\n<!-- gate:selected [{\"question\":\"What to do when a call with a name mismatch raises no ticket the IoT team will see\",\"answer\":\"Keep the call record open at low priority, tagged ooh_site_name_check, so the IoT team finds it in their daily search (recommended)\"}] -->"
+  ],
+  "mergeCommit": "13d8534aff9775e090c3300d6f684efad2067ad4",
+  "phaseBranch": "design/oohdash-166-site-ambiguity",
+  "releaseBranch": "main",
+  "stamp": 1795109228526,
+  "selectedOptions": [
+    {
+      "question": "What to do when a call with a name mismatch raises no ticket the IoT team will see",
+      "answer": "Keep the call record open at low priority, tagged ooh_site_name_check, so the IoT team finds it in their daily search (recommended)"
+    }
+  ]
+}
