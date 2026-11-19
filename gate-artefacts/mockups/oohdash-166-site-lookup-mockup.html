@@ -369,25 +369,43 @@ body.proto-collapsed #proto-bar-list,body.proto-collapsed #proto-note{display:no
   function later(fn, ms) { timers.push(setTimeout(fn, ms)); }
   function clearTimers() { timers.forEach(clearTimeout); timers = []; }
 
-  /* NEW wording — "Pub name not confirmed" notice (replaces "Site name unverified" on the confirm screen). */
-  function notConfirmedNotice(siteNo) {
-    return '<div class="alert warn" data-testid="confirm-unverified">⚠ <b>Pub name not confirmed</b> — our records don\'t give one clear pub name for house ID ' + esc(siteNo) +
-      '. Check the house ID with the customer before you make any change. The equipment shown is the equipment for this house ID.</div>';
-  }
+  var CHIP = function (n) { return ' <span class="mono" style="background:var(--surface-variant);padding:2px 10px;border-radius:6px;margin-left:6px">' + esc(n) + '</span>'; };
+  var MUTED = 'color:var(--text-muted,#6b7280);font-size:14px;margin:4px 0';
 
-  /* Confirm screen — same markup as renderConfirmGate() in public/js/views.js. */
+  /* Confirm screen — markup of renderConfirmGate() in public/js/views.js, with the OOHDASH-166 name block.
+     o.pub: { status: 'clear'|'disagree'|'lighthouse-only'|'none', primary, others[] }. No name is shown until o.loaded. */
   function confirmGate(o) {
-    var unverified = !!o.unverified;
-    var title = unverified ? 'House ID ' + o.siteNo : o.siteName;
+    var p = o.pub || { status: 'none' };
+    var head, nameBlock = '', ask;
+    if (!o.loaded) {
+      head = 'House ID ' + o.siteNo;
+      nameBlock = '<p style="' + MUTED + '" data-testid="confirm-name-checking">Checking the pub name…</p>';
+      ask = 'can I take the name of the pub you\'re calling from?';
+    } else if (p.status === 'clear') {
+      head = p.primary + CHIP(o.siteNo);
+      ask = 'can I just confirm, you\'re calling from ' + dyn(p.primary) + ', site number ' + dyn(o.siteNo) + '?';
+    } else if (p.status === 'disagree') {
+      head = p.primary + CHIP(o.siteNo);
+      nameBlock = '<p style="margin:4px 0;font-size:14px;color:var(--success,#047857)" data-testid="confirm-name-matches">✓ Matches the equipment at house ID ' + esc(o.siteNo) + '</p>' +
+        p.others.map(function (n) { return '<p style="' + MUTED + '" data-testid="confirm-name-other">Our ticket system lists: <b>' + esc(n) + '</b></p>'; }).join('') +
+        '<p style="' + MUTED + '" data-testid="confirm-unverified">⚠ Pub name not confirmed — our records disagree. Check the pub the customer names against the names above.</p>';
+      ask = 'which pub are you calling from?';
+    } else if (p.status === 'lighthouse-only') {
+      head = p.primary + CHIP(o.siteNo);
+      nameBlock = '<p style="' + MUTED + '" data-testid="confirm-name-source">Name taken from the equipment at this house ID. This site is missing from our ticket system\'s site list.</p>' +
+        '<p style="' + MUTED + '" data-testid="confirm-unverified">⚠ Pub name not confirmed — check the pub the customer names against the name above.</p>';
+      ask = 'which pub are you calling from?';
+    } else {
+      head = 'House ID ' + o.siteNo;
+      nameBlock = '<p style="' + MUTED + '" data-testid="confirm-unverified">⚠ We don\'t hold a pub name for this house ID. Check the house ID with the customer.</p>';
+      ask = 'which pub are you calling from, and can you read me your house ID?';
+    }
     var deviceLine = o.loaded ? esc(o.deviceSummary) : 'Checking the Lighthouse equipment at this site…';
     var btn = o.loaded ? '✓ This is the right site' : 'Checking site…';
-    var ask = unverified
-      ? 'can I just confirm your house ID? I have it as ' + dyn(o.siteNo) + '. And which pub are you calling from?'
-      : 'can I just confirm, you\'re calling from ' + dyn(o.siteName) + ', site number ' + dyn(o.siteNo) + '?';
     view().innerHTML = '<div class="content narrow"><div class="card" style="padding:26px" data-testid="confirm-gate">' +
-      '<h2>' + esc(title) + (unverified ? '' : ' <span class="mono" style="background:var(--surface-variant);padding:2px 10px;border-radius:6px;margin-left:6px">' + esc(o.siteNo) + '</span>') + '</h2>' +
-      (o.brand ? '<div class="sub">' + esc(o.brand) + '</div>' : '') +
-      (unverified ? notConfirmedNotice(o.siteNo) : '') +
+      '<h2>' + (o.loaded && p.status !== 'none' ? esc(p.primary) + CHIP(o.siteNo) : esc(head)) + '</h2>' +
+      nameBlock +
+      (o.loaded && o.brand ? '<div class="sub">' + esc(o.brand) + '</div>' : '') +
       '<p style="margin:10px 0 4px" data-testid="confirm-device-line">' + deviceLine + '</p>' +
       sayBox('', ask) +
       '<div style="display:flex;gap:10px;margin-top:16px">' +
@@ -396,8 +414,8 @@ body.proto-collapsed #proto-bar-list,body.proto-collapsed #proto-note{display:no
     window._protoSite = o;
   }
   window.protoConfirm = function () {
-    var o = window._protoSite || {};
-    var name = o.unverified ? 'House ID ' + o.siteNo + ' (pub name not confirmed)' : o.siteName + ' ' + o.siteNo;
+    var o = window._protoSite || {}; var p = o.pub || {};
+    var name = p.status === 'none' ? 'House ID ' + o.siteNo : p.primary + ' ' + o.siteNo + (p.status === 'clear' ? '' : ' (pub name not confirmed)');
     toast('Site confirmed: <b>' + esc(name) + '</b>. The site page opens with full remote control, exactly as today.');
   };
 
@@ -451,39 +469,44 @@ body.proto-collapsed #proto-bar-list,body.proto-collapsed #proto-note{display:no
   var SCEN = {
     s1: { label: '1 · House ID 5674 — TODAY (live v1.7.6)', note: 'What the agent sees now for 69 Greene King sites: the same pub listed twice is called "ambiguous" and remote control is blocked.',
       run: function () { ambiguousToday('5674', ['Hillfield Farm (Solihull)', 'Hillfield Farm (Solihull)']); } },
-    s2: { label: '2 · House ID 5674 — AFTER the fix', note: 'Same pub listed twice is treated as one site. The confirm screen appears at once with the pub name; the equipment line fills in a moment later. Nothing new on screen.',
+    s2: { label: '2 · 5674 after the fix — one clear name, shown once checked', note: 'Same pub listed twice is treated as one site. While the equipment loads the screen shows "Checking the pub name…" with the button locked; then the pub name appears, as today.',
       run: function () {
-        var o = { siteNo: '5674', siteName: 'Hillfield Farm (Solihull)', brand: 'Greene King', loaded: false, deviceSummary: 'On Lighthouse: 2 heating zones · hot water · 3 kitchen circuits' };
+        var o = { siteNo: '5674', pub: { status: 'clear', primary: 'Hillfield Farm (Solihull)' }, brand: 'Greene King', loaded: false, deviceSummary: 'On Lighthouse: 2 heating zones · hot water · 3 kitchen circuits' };
         confirmGate(o); later(function () { o.loaded = true; confirmGate(o); }, 1200);
       } },
     s3: { label: '3 · Callback history for 5674 — AFTER', note: 'History now searches both the old and the new site tag, so older tickets come back. Live today: 117 tickets on gk_5674 plus 23 on the old tag, all currently hidden.',
       run: function () { history({ siteNo: '5674', siteName: 'Hillfield Farm (Solihull)', total: 140, tickets: HILLFIELD_TICKETS }); } },
     s4: { label: '4 · Callback history for 5674 — TODAY', note: 'Today the history comes back empty for all 69 sites, and also for 7 three-digit house IDs such as 220 Bull & Anchor (Exhall).',
       run: function () { history({ siteNo: '5674', siteName: 'Hillfield Farm (Solihull)', empty: 'The site list has more than one entry for this house ID.' }); } },
-    s5: { label: '5 · House ID 5199 — BEFORE the IoT team renames', note: 'Zendesk lists two different pub names for 5199 until the rename. The equipment always loads by house ID, so a pick would change nothing. The agent gets full control; the screen shows "Pub name not confirmed" and asks for the house ID instead of naming a pub.',
+    s5: { label: '5 · 5199 before rename — both ticket-system names shown, Silkwood Park marked as matching the equipment', note: 'Our ticket system lists two pub names for 5199. The equipment at 5199 is named gk-silkwoodfarm-*, so "Farmhouse Kitchen (Silkwood Park)" is shown as matching the equipment and "Sycamore Farm (Burnley)" is listed underneath. The script asks which pub the customer is calling from. Full control.',
       run: function () {
-        var o = { siteNo: '5199', brand: '', unverified: true, loaded: false, deviceSummary: 'On Lighthouse: 3 heating zones · 4 kitchen circuits' };
+        var o = { siteNo: '5199', pub: { status: 'disagree', primary: 'Farmhouse Kitchen (Silkwood Park)', others: ['Sycamore Farm (Burnley)'] }, brand: 'Greene King', loaded: false, deviceSummary: 'On Lighthouse: 3 heating zones · 4 kitchen circuits' };
         lookingUp('5199'); later(function () { confirmGate(o); later(function () { o.loaded = true; confirmGate(o); }, 900); }, 1600);
       } },
-    s6: { label: '6 · House ID 5190 — BEFORE rename, WITH the name check (Decision 2, recommended)', note: 'Zendesk currently names 5190 "Farmhouse Kitchen (Silkwood Park)", but the equipment at 5190 is named for Sycamore Farm. The name check spots the clash when the equipment loads and switches to "Pub name not confirmed" before the button unlocks.',
+    s6: { label: '6 · 5190 before rename — name check shows both names (recommended)', note: 'Our ticket system currently calls 5190 "Farmhouse Kitchen (Silkwood Park)", but the equipment at 5190 is named gk-sycamorefarm-*. With the name check the screen shows "Sycamore Farm (Burnley)" as matching the equipment and lists the ticket-system name underneath. No name appears until the check has finished.',
       run: function () {
-        var o = { siteNo: '5190', siteName: 'Farmhouse Kitchen (Silkwood Park)', brand: 'Greene King', loaded: false, deviceSummary: 'On Lighthouse: 2 heating zones · hot water · 3 kitchen circuits' };
-        confirmGate(o); later(function () { o.loaded = true; o.unverified = true; confirmGate(o); }, 1400);
+        var o = { siteNo: '5190', pub: { status: 'disagree', primary: 'Sycamore Farm (Burnley)', others: ['Farmhouse Kitchen (Silkwood Park)'] }, brand: 'Greene King', loaded: false, deviceSummary: 'On Lighthouse: 1 heating zone · fridge · freezer' };
+        confirmGate(o); later(function () { o.loaded = true; confirmGate(o); }, 1400);
       } },
-    s7: { label: '7 · House ID 5190 — BEFORE rename, WITHOUT the name check', note: 'Without the check, the screen confidently shows the wrong pub name. The agent asks "you\'re calling from Farmhouse Kitchen (Silkwood Park)?" and a Sycamore Farm manager says no.',
+    s7: { label: '7 · 5190 before rename — no name check: wrong name shown', note: 'Without the name check the screen shows the ticket-system name as if it were right. The agent asks "you are calling from Farmhouse Kitchen (Silkwood Park)?" and a Sycamore Farm manager says no.',
       run: function () {
-        var o = { siteNo: '5190', siteName: 'Farmhouse Kitchen (Silkwood Park)', brand: 'Greene King', loaded: false, deviceSummary: 'On Lighthouse: 2 heating zones · hot water · 3 kitchen circuits' };
+        var o = { siteNo: '5190', pub: { status: 'clear', primary: 'Farmhouse Kitchen (Silkwood Park)' }, brand: 'Greene King', loaded: false, deviceSummary: 'On Lighthouse: 1 heating zone · fridge · freezer' };
         confirmGate(o); later(function () { o.loaded = true; confirmGate(o); }, 1200);
       } },
-    s8: { label: '8 · House IDs 5199 and 5190 — AFTER the IoT team renames', note: 'Both become "same pub listed twice" and resolve normally. Shown: 5199. 5190 reads "Sycamore Farm (Burnley)" the same way.',
+    s8: { label: '8 · 5199 and 5190 after the IoT team renames — one clear name each', note: 'Both become "same pub listed twice" and show one clear name. Shown: 5199 Farmhouse Kitchen (Silkwood Park). 5190 shows Sycamore Farm (Burnley) the same way.',
       run: function () {
-        var o = { siteNo: '5199', siteName: 'Farmhouse Kitchen (Silkwood Park)', brand: 'Greene King', loaded: false, deviceSummary: 'On Lighthouse: 3 heating zones · 4 kitchen circuits' };
+        var o = { siteNo: '5199', pub: { status: 'clear', primary: 'Farmhouse Kitchen (Silkwood Park)' }, brand: 'Greene King', loaded: false, deviceSummary: 'On Lighthouse: 3 heating zones · 4 kitchen circuits' };
         confirmGate(o); later(function () { o.loaded = true; confirmGate(o); }, 1200);
       } },
-    s9: { label: '9 · On Lighthouse but missing from the Zendesk site list', note: 'Example house ID 6418 (fictional). Restores the pre-v1.7.5 behaviour: the dashboard looks the site up on Lighthouse instead. This takes a few seconds longer than a listed site, then shows "Pub name not confirmed" with full control.',
+    s9: { label: '9 · Missing from the ticket system — name taken from the equipment', note: 'Example house ID 6418 (fictional), equipment named gk-oakbrookfarm-*. The dashboard looks the site up on Lighthouse (the pre-v1.7.5 behaviour), takes a few seconds, then shows the name from the equipment, tidied to "Oakbrook Farm". Full control.',
       run: function () {
-        var o = { siteNo: '6418', unverified: true, loaded: true, deviceSummary: 'On Lighthouse: 1 heating zone · hot water' };
-        lookingUp('6418'); later(function () { confirmGate(o); }, 2600);
+        var o = { siteNo: '6418', pub: { status: 'lighthouse-only', primary: 'Oakbrook Farm' }, loaded: false, deviceSummary: 'On Lighthouse: 1 heating zone · hot water' };
+        lookingUp('6418'); later(function () { confirmGate(o); later(function () { o.loaded = true; confirmGate(o); }, 700); }, 2200);
+      } },
+    s12: { label: '12 · Missing from the ticket system, equipment named by number — house ID only', note: 'Example house ID 6431 (fictional), equipment named gk-6431-*. No pub name exists anywhere, so the screen shows the house ID and says so. The script asks the customer for both the pub and the house ID.',
+      run: function () {
+        var o = { siteNo: '6431', pub: { status: 'none' }, loaded: false, deviceSummary: 'On Lighthouse: 2 heating zones' };
+        lookingUp('6431'); later(function () { confirmGate(o); later(function () { o.loaded = true; confirmGate(o); }, 700); }, 2200);
       } },
     s10: { label: '10 · Not found anywhere (unchanged)', note: 'A house ID that is on neither Zendesk nor Lighthouse: the same "No site found" message as today.',
       run: function () { view().innerHTML = '<div class="content narrow"><div class="card" style="padding:26px"><h2>New Call</h2><p class="sub">Search by house ID or pub name.</p></div></div>'; toast('No site found for 9999'); } },
