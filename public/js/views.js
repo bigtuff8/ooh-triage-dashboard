@@ -18,9 +18,8 @@ function siteSubline(s) {
  * Zendesk miss). Keeps a wrong-site dispatch honest: confirm the house number by voice.
  */
 function unverifiedNotice(s) {
-    return s.nameUnverified
-        ? `<div class="alert warn" data-testid="confirm-unverified">⚠ <b>Site name unverified</b> — we couldn\'t resolve a recognisable name for this house number. Confirm the house number by voice before making any change.</div>`
-        : '';
+    // OOHDASH-166: the name step in renderConfirmGate replaces this warning.
+    return '';
 }
 
 /* ------------------------ OOHDASH-146 D16 (B33): permanent caller banner ------------------------ */
@@ -33,7 +32,15 @@ function unverifiedNotice(s) {
 function callerBanner(s) {
     const c = s.caller || {};
     const site = s.workspace && s.workspace.site;
-    const siteLine = site ? `<span class="cb-site">${esc(site.siteName)} ${esc(site.siteNo)}</span>` : '';
+    // OOHDASH-166: show agreed name, or "House ID N" with optional customer-says annotation.
+    let siteLine = '';
+    if (site) {
+        const nameOk = !site.nameUnverified;
+        const siteLabel = nameOk ? `${esc(site.siteName)} ${esc(site.siteNo)}` : `House ID ${esc(site.siteNo)}`;
+        const nc = s.nameCheck;
+        const customerSays = nc && nc.answer ? ` \xb7 customer says ${esc(nc.answer)}` : '';
+        siteLine = `<span class="cb-site">${siteLabel}${customerSays}</span>`;
+    }
     const hasName = c.name && c.name.trim();
     const hasRole = c.role && c.role.trim();
     const hasPhone = c.phone && c.phone.trim();
@@ -135,6 +142,11 @@ async function openSite(siteNo) {
     _confirmGateSummaryLoaded = false;
     _confirmGateDeviceSummary = null;
     _confirmGateReadFailed = false;
+    // OOHDASH-166: reset name-step state for the new site
+    _confirmGatePubNames = null;
+    _nameCheckTyping = false;
+    _nameStepHeld = [];
+    state.nameCheck = null;
     render();
     $('#view').innerHTML = `<div class="content narrow"><div class="card" style="padding:26px"><h2>Looking up site ${esc(siteNo)}…</h2></div></div>`;
     try {
@@ -188,14 +200,18 @@ function renderAmbiguous() {
             ? answers(`<button class="chip" data-testid="risk-yes" onclick="state.ambiguousNotes=notesValue('addnotes-amb');state.ambiguousRisk=true;renderAmbiguous()">Yes</button><button class="chip" data-testid="risk-no" onclick="ambiguousCapture()">No</button>`)
             : '';
         actionArea = riskNote +
-            (typeof sayBox === 'function' ? sayBox('I can\'t safely make changes for this site number tonight — It\'s logged, and our IoT team picks it up the next working day.', riskQ) : '') +
+            (typeof sayBox === 'function' ? sayBox('I can\'t make changes for this site tonight — I\'ll log it, and our IoT team picks it up the next working day.', riskQ) : '') +
             answerHtml +
-            `<button class="btn" onclick="go('home')" style="margin-top:8px">Search again</button>`;
+            `<p style="margin-top:8px"><button class="btn link" onclick="go(\'home\')" data-testid="wrong-houseid-link">Wrong house ID — search again</button></p>`;
     }
 
+    // OOHDASH-166: set _nameStepHeld so name step chips reference the two Lighthouse sites.
+    _nameStepHeld = (a.matches || []).map(m => ({ name: m.siteName, from: 'ticket-system' }));
+
     $('#view').innerHTML = `<div class="content narrow"><div class="card" style="border-color:var(--warning)" data-testid="ambiguous-card">
-   <h2>&#9888;&#65039; House ID ${esc(a.siteNo)} is ambiguous</h2>
-   <p class="sub" style="margin:8px 0">This ID matches more than one site (${a.matches.map(m => `<b>${esc(m.siteName)}</b>`).join(' and ')}). To protect against changing the wrong site, remote control is blocked for ambiguous IDs.</p>
+   <h2>&#9888;&#65039; House ID ${esc(a.siteNo)} has two sites on Lighthouse</h2>
+   <p class="sub" style="margin:8px 0">Lighthouse has two different sites under this house ID, so we can\'t tell which equipment is the customer\'s. You can\'t make changes from here tonight, but you can log it for the IoT team.</p>
+   ${nameStepHtml({ status: 'disagree', held: _nameStepHeld }, state.nameCheck)}
    ${notesField({ id: 'addnotes-amb', value: savedNotes })}
    <div style="margin-top:10px">
     ${actionArea}
@@ -268,30 +284,140 @@ async function ambiguousCapture() {
 var _confirmGateSummaryLoaded = false;
 var _confirmGateDeviceSummary = null;
 var _confirmGateReadFailed = false;
+// OOHDASH-166: pub-name check state
+var _confirmGatePubNames = null;
+var _nameCheckTyping = false;
+var _nameStepHeld = []; // set in nameStepHtml; callbacks reference by index
+
+/**
+ * OOHDASH-166: renders the name step box for the confirm gate and two-sites card.
+ * pubNames: { status, held: [{ name, from: 'equipment'|'ticket-system' }] }
+ * nameCheck: state.nameCheck (may be null).
+ * Sets _nameStepHeld so chip callbacks can resolve by index without JSON in onclick.
+ */
+function nameStepHtml(pubNames, nameCheck) {
+    if (!pubNames || pubNames.status === 'agreed') return '';
+    _nameStepHeld = pubNames.held || [];
+
+    if (nameCheck && nameCheck.how !== 'none' && nameCheck.answer) {
+        const ans = esc(nameCheck.answer || '');
+        return `<div class="name-step-box" data-testid="name-step" style="border:1.5px dashed var(--border,#ccc);border-radius:8px;padding:12px 14px;margin-top:10px">
+  <span data-testid="name-step-recorded">✓ Pub name recorded. Customer says: <b>${ans}</b>. This goes on the ticket so the IoT team can tidy the site list.</span>
+  <button class="btn link" style="margin-left:8px" onclick="clearNameCheck()" data-testid="name-step-change">Change</button>
+</div>`;
+    }
+
+    let reason;
+    if (pubNames.status === 'disagree') reason = 'Our records disagree on the pub name for this house ID.';
+    else if (pubNames.status === 'equipment-only') reason = 'Our records only hold a name taken from the equipment.';
+    else reason = "We don’t hold a pub name for this house ID.";
+
+    const noHeld = _nameStepHeld.length === 0;
+    const chipsHtml = _nameStepHeld.map((h, i) =>
+        `<button class="chip" data-testid="name-chip" onclick="pickNameCheck(${i})">${esc(h.name)} <span class="small" style="opacity:.7">${h.from === 'equipment' ? 'matches the equipment' : 'ticket system'}</span></button>`
+    ).join(' ');
+    const somethingElseChip = _nameCheckTyping ? '' :
+        `<button class="chip" data-testid="name-chip-type" onclick="toggleNameCheckType()">${noHeld ? 'Type the pub name…' : 'Something else…'}</button>`;
+    const typeBoxHtml = _nameCheckTyping ? `<div style="margin-top:8px;display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap">
+  <input id="name-check-input" data-testid="name-check-input" maxlength="120" style="flex:1;min-width:120px" placeholder="Pub name">
+  <button class="btn primary" onclick="saveTypedNameCheck(document.getElementById(\'name-check-input\').value)">Save</button>
+  <button class="btn" onclick="cancelNameCheckType()">Cancel</button></div>` : '';
+
+    return `<div class="name-step-box" data-testid="name-step" style="border:1.5px dashed var(--border,#ccc);border-radius:8px;padding:12px 14px;margin-top:10px">
+  <p style="margin:0 0 8px" data-testid="name-step-reason">${reason}</p>
+  <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">${chipsHtml}${somethingElseChip}</div>
+  ${typeBoxHtml}
+  <p class="small" style="margin:8px 0 0">Optional: tap the answer if you get one; you can carry on either way. Whatever you record goes on the ticket for the IoT team.</p>
+</div>`;
+}
+
+function reRenderForNameStep() {
+    if (state.ambiguous) renderAmbiguous();
+    else if (!state.confirmToken) renderConfirmGate();
+}
+
+function pickNameCheck(idx) {
+    const h = _nameStepHeld[idx];
+    if (!h) return;
+    state.nameCheck = { siteNo: state.siteNo, held: _nameStepHeld.map(x => x.name), answer: h.name, how: 'picked', at: Date.now() };
+    _nameCheckTyping = false;
+    reRenderForNameStep();
+}
+
+function clearNameCheck() {
+    state.nameCheck = null;
+    _nameCheckTyping = false;
+    reRenderForNameStep();
+}
+
+function toggleNameCheckType() {
+    _nameCheckTyping = true;
+    reRenderForNameStep();
+    setTimeout(() => { const el = document.getElementById('name-check-input'); if (el) el.focus(); }, 0);
+}
+
+function cancelNameCheckType() {
+    _nameCheckTyping = false;
+    reRenderForNameStep();
+}
+
+function saveTypedNameCheck(val) {
+    const answer = String(val || '').trim().slice(0, 120);
+    if (!answer) return; // require non-empty to save
+    state.nameCheck = { siteNo: state.siteNo, held: _nameStepHeld.map(x => x.name), answer, how: 'typed', at: Date.now() };
+    _nameCheckTyping = false;
+    reRenderForNameStep();
+}
 
 function renderConfirmGate() {
     const s = state.pendingSite;
     if (!s) { $('#view').innerHTML = '<div class="content narrow"><div class="card"><h2>Loading…</h2></div></div>'; return; }
     // Q3: show placeholder if background read hasn't landed yet
     const deviceLine = (_confirmGateSummaryLoaded && _confirmGateReadFailed)
-        ? "We couldn't read the Lighthouse equipment just now. You can still confirm the site."
+        ? "We couldn’t read the Lighthouse equipment just now. You can still confirm the site."
         : (_confirmGateSummaryLoaded && _confirmGateDeviceSummary)
             ? esc(_confirmGateDeviceSummary)
             : (s.deviceSummary ? esc(s.deviceSummary) : 'Checking the Lighthouse equipment at this site…');
     // Q3: button disabled until summary arrives; Q4: re-entry guard via _confirmInProgress
     const needsSummary = !_confirmGateSummaryLoaded && !s.deviceSummary;
-    const btnLabel = needsSummary ? 'Checking site…' : '✓ This is the right site';
+    const btnLabel = needsSummary ? 'Checking site…' : '✓ House ID confirmed — open the site';
     const btnDisabled = needsSummary ? 'disabled' : '';
-    $('#view').innerHTML = `<div class="content narrow"><div class="card" style="padding:26px" data-testid="confirm-gate">
-   <h2>${esc(s.siteName)} <span class="mono" style="background:var(--surface-variant);padding:2px 10px;border-radius:6px;margin-left:6px">${esc(s.siteNo)}</span></h2>
-   ${siteSubline(s)}
-   ${unverifiedNotice(s)}
-   <p style="margin:10px 0 4px" data-testid="confirm-device-line">${deviceLine}</p>
-   ${sayBox('', `can I just confirm, you\'re calling from ${dyn(s.siteName)}, site number ${dyn(s.siteNo)}?`)}
 
-   <div style="display:flex;gap:10px;margin-top:16px">
+    // OOHDASH-166: heading and script depend on pubNames status.
+    const pn = _confirmGatePubNames;
+    let heading, nameSubline, scriptLine;
+    if (!_confirmGateSummaryLoaded) {
+        // Loading: no name yet — heading is "House ID N", muted loading line
+        heading = `House ID <span class="mono" style="background:var(--surface-variant);padding:2px 10px;border-radius:6px;margin-left:6px">${esc(s.siteNo)}</span>`;
+        nameSubline = `<p class="sub" style="margin:4px 0 0" data-testid="name-loading-line">Checking the pub name…</p>`;
+        scriptLine = `can I just confirm your house ID? I have it as ${dyn(s.siteNo)}.`;
+    } else if (pn && pn.status === 'agreed') {
+        // Agreed name: show it in heading
+        const agreedName = pn.agreedName || s.siteName || '';
+        heading = `${esc(agreedName)} <span class="mono" style="background:var(--surface-variant);padding:2px 10px;border-radius:6px;margin-left:6px">${esc(s.siteNo)}</span>`;
+        nameSubline = '';
+        scriptLine = `can I just confirm your house ID? I have it as ${dyn(s.siteNo)}, that’s ${dyn(agreedName)}.`;
+    } else {
+        // Name in doubt, equipment-only or none: house ID heading, name step shown
+        heading = `House ID <span class="mono" style="background:var(--surface-variant);padding:2px 10px;border-radius:6px;margin-left:6px">${esc(s.siteNo)}</span>`;
+        nameSubline = '';
+        const hasNameStep = pn && pn.status !== 'agreed';
+        scriptLine = hasNameStep
+            ? `can I just confirm your house ID? I have it as ${dyn(s.siteNo)}. And which pub are you calling from?`
+            : `can I just confirm your house ID? I have it as ${dyn(s.siteNo)}.`;
+    }
+    const nameStep = nameStepHtml(pn, state.nameCheck);
+
+    $('#view').innerHTML = `<div class="content narrow"><div class="card" style="padding:26px" data-testid="confirm-gate">
+   <h2>${heading}</h2>
+   ${siteSubline(s)}${nameSubline}
+   ${nameStep}
+   <p style="margin:10px 0 4px" data-testid="confirm-device-line">${deviceLine}</p>
+   ${sayBox('', scriptLine)}
+
+   <div style="display:flex;gap:10px;margin-top:16px;flex-wrap:wrap">
     <button class="btn primary big" data-testid="confirm-site" onclick="confirmSite()" ${btnDisabled}>${btnLabel}</button>
-    <button class="btn big" onclick="go('home')">Search again</button>
+    <button class="btn big" onclick="go(\'home\')">Wrong house ID — search again</button>
    </div></div></div>`;
     performance.clearMarks('confirm-screen-paint'); performance.mark('confirm-screen-paint');
     // Q3: if summary not yet loaded, fetch it in background
@@ -301,7 +427,8 @@ function renderConfirmGate() {
             .then(data => {
                 _confirmGateSummaryLoaded = true;
                 _confirmGateDeviceSummary = data.deviceSummary || null;
-                // Re-render confirm gate to update device line and enable button
+                _confirmGatePubNames = data.pubNames || null; // OOHDASH-166
+                // Re-render confirm gate to update device line, name and enable button
                 if (state.view === 'site' && !state.confirmToken) renderConfirmGate();
             })
             .catch(() => {
@@ -310,6 +437,8 @@ function renderConfirmGate() {
                 if (state.view === 'site' && !state.confirmToken) renderConfirmGate();
             });
     }
+    // If summary already loaded (re-render due to nameCheck change) and typing box shown, focus it
+    if (_nameCheckTyping) setTimeout(() => { const el = document.getElementById('name-check-input'); if (el) el.focus(); }, 0);
 }
 
 // Q4: re-entry guard — prevents duplicate confirm POSTs from rapid clicks
@@ -325,7 +454,10 @@ async function confirmSite() {
     const searchAgainBtn = document.querySelector('.btn.big:not([data-testid="confirm-site"])');
     if (searchAgainBtn) searchAgainBtn.disabled = true;
     try {
-        const { confirmToken, workspace, callId } = await api.post(`/api/sites/${encodeURIComponent(state.siteNo)}/confirm`);
+        const confirmBody = state.nameCheck ? { nameCheck: state.nameCheck } : undefined;
+        const { confirmToken, workspace, callId } = await api.post(`/api/sites/${encodeURIComponent(state.siteNo)}/confirm`, confirmBody);
+        // OOHDASH-166: name-step typing guard off; nameCheck stays in state so callerBanner can show it.
+        _nameCheckTyping = false;
         state.confirmToken = confirmToken;
         state.workspace = workspace;
         // OOHDASH-159 rev 5 (E1): the server started the call record when the site was confirmed.

@@ -43,7 +43,9 @@ test('D2-1: confirm gate shows checking state while summary is pending', async (
     });
 
     await openSiteByKeyboard(page, '6832');
-    await expect(page.locator('[data-testid="confirm-gate"]')).toContainText('Old Grey Mare');
+    // While /summary is blocked, pubNames is unknown so heading shows "House ID N" (OOHDASH-166).
+    await expect(page.locator('[data-testid="confirm-gate"]')).toContainText('House ID');
+    await expect(page.locator('[data-testid="confirm-gate"]')).toContainText('6832');
 
     // Button must be disabled with 'Checking site…' label.
     const btn = page.locator('[data-testid="confirm-site"]');
@@ -69,12 +71,14 @@ test('D2-2 (ef7dd36): confirm gate re-enables button and shows read-failed messa
     await page.route('**/api/sites/6832/summary', route => route.abort('failed'));
 
     await openSiteByKeyboard(page, '6832');
-    await expect(page.locator('[data-testid="confirm-gate"]')).toContainText('Old Grey Mare');
+    // After a failed /summary, pubNames is null so the heading shows "House ID 6832" (OOHDASH-166).
+    await expect(page.locator('[data-testid="confirm-gate"]')).toContainText('House ID');
+    await expect(page.locator('[data-testid="confirm-gate"]')).toContainText('6832');
 
     // Button must re-enable (not 'Checking site…') after the fetch fails.
     const btn = page.locator('[data-testid="confirm-site"]');
     await expect(btn).not.toBeDisabled({ timeout: 10000 });
-    await expect(btn).toHaveText('✓ This is the right site');
+    await expect(btn).toHaveText('✓ House ID confirmed — open the site');
 
     // Device line must show the ef7dd36 read-failed message, not the checking copy.
     await expect(page.locator('[data-testid="confirm-device-line"]')).toContainText(
@@ -100,7 +104,7 @@ test('D2-3: confirm gate enables button and shows device summary on /summary suc
     // Button must enable once the summary lands.
     const btn = page.locator('[data-testid="confirm-site"]');
     await expect(btn).not.toBeDisabled({ timeout: 10000 });
-    await expect(btn).toHaveText('✓ This is the right site');
+    await expect(btn).toHaveText('✓ House ID confirmed — open the site');
 
     // Device line must show real Lighthouse content (not checking or read-failed copy).
     await expect(page.locator('[data-testid="confirm-device-line"]')).toContainText('On Lighthouse:');

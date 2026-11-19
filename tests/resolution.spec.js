@@ -29,7 +29,7 @@ test.describe('F004 resolution', () => {
         await page.keyboard.press('ArrowDown');
         await page.keyboard.press('Enter');
         const card = page.locator('[data-testid="ambiguous-card"]');
-        await expect(card).toContainText('House ID 6758 is ambiguous');
+        await expect(card).toContainText('House ID 6758 has two sites on Lighthouse');
         await expect(card).toContainText('Bowers');
         await expect(card).toContainText('Bowman');
         // no confirm button, no workspace

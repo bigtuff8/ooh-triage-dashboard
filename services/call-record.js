@@ -144,10 +144,16 @@ async function writeIssue(rec, issue, reason, nowMs) {
         return { ticketId: issue.ticketId, appended: true };
     }
     const subject = issue && issue.cat ? `Call record — ${issue.cat} (no outcome reached)` : 'Call record — no issue raised';
+    // OOHDASH-166: when a no-issue call has a nameCheck the ticket stays open (priority low,
+    // tagged ooh_site_name_check) so the IoT team can tidy the site list; otherwise it closes.
+    const hasNameCheck = !issue && rec.nameCheck && rec.nameCheck.siteNo;
     const t = await zendesk.createOutcomeTicket({
         operator: { name: rec.operatorName, id: rec.operatorId }, siteNo: rec.siteNo, siteName: rec.siteName,
         subject, summary: subject, detail: body, outcomeType: 'call-record',
-        extraTags: ['ooh_call_record'], status: 'solved'
+        extraTags: hasNameCheck ? ['ooh_call_record', 'ooh_site_name_check'] : ['ooh_call_record'],
+        priority: hasNameCheck ? 'low' : undefined,
+        status: hasNameCheck ? undefined : 'solved',
+        nameCheck: rec.nameCheck || null
     });
     if (issue) issue.ticketId = t.id;
     return { ticketId: t.id, appended: false };

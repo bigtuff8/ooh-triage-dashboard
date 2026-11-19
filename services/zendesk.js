@@ -54,6 +54,11 @@ async function zd(method, path, data, params) {
 
 let siteOptionsCache = { at: 0, options: [] };
 
+/** OOHDASH-166 test hook: pre-seed the options cache (bypasses live() check in siteOptionsFor). */
+export function _setOptionsCache(options) {
+    siteOptionsCache = { at: Date.now(), options: Array.isArray(options) ? options : [] };
+}
+
 /**
  * Ensures the site custom-field options are loaded (paged, 1h cache). Returns the cached
  * options array. Throws only on a live fetch failure so callers can decide how to degrade.
@@ -73,13 +78,12 @@ async function loadSiteOptions() {
 }
 
 /**
- * The exactly-one option whose embedded house ID matches `siteNo`, else null. The house ID is
- * embedded in the option name AND value; an ambiguous (>1) match resolves to null so callers
- * fall through to their safe/unverified path rather than guessing.
+ * The exactly-one option whose embedded house ID matches `siteNo`, else null. Uses
+ * siteNoFromOption for exact match only — the old o.value.includes(siteNo) arm is removed
+ * because it caused house 220 to also match gk_6220 (OOHDASH-166 fix).
  */
 function matchSiteOption(options, siteNo) {
-    const matches = options.filter(o =>
-        new RegExp(`(^|[^0-9])${siteNo}([^0-9]|$)`).test(o.name) || o.value.includes(siteNo));
+    const matches = options.filter(o => siteNoFromOption(o) === String(siteNo));
     return matches.length === 1 ? matches[0] : null;
 }
 
@@ -103,9 +107,8 @@ function humanNameFromOption(option, siteNo) {
 async function resolveSiteTag(siteNo) {
     if (!live()) return `fixture::site::${siteNo}`;
     try {
-        const options = await loadSiteOptions();
-        const match = matchSiteOption(options, siteNo);
-        return match ? match.value : null;
+        const m = await siteOptionsFor(siteNo);
+        return m.status === 'one' ? m.preferredTag : null;
     } catch (err) {
         console.error(`[ZD] Site tag resolution failed for ${siteNo}: ${err.message}`);
         return null;
@@ -122,9 +125,8 @@ async function resolveSiteTag(siteNo) {
 export async function resolveSiteName(siteNo) {
     if (!live()) return null;
     try {
-        const options = await loadSiteOptions();
-        const match = matchSiteOption(options, siteNo);
-        return match ? humanNameFromOption(match, siteNo) : null;
+        const m = await siteOptionsFor(siteNo);
+        return m.status === 'one' ? m.siteName : null;
     } catch (err) {
         console.error(`[ZD] Site name resolution failed for ${siteNo}: ${err.message}`);
         return null;
@@ -153,6 +155,53 @@ function brandFromOption(option) {
 }
 
 /**
+ * OOHDASH-166 — single shared rule for "which options belong to this house ID".
+ *
+ * Returns:
+ *   { status:'one',      preferredTag, allTags, siteName, brand } — all options for this house ID
+ *                                                                    have the same normalised pub name.
+ *                                                                    preferredTag is the gk_ option
+ *                                                                    value; if none, the first option.
+ *   { status:'conflict', names, allTags }                         — two or more different pub names.
+ *   { status:'none' }                                             — no option for this house ID.
+ *
+ * "For this house ID" means siteNoFromOption(option) === String(siteNo) — exact match only.
+ * This is what fixes house 220 and the other eight three-digit house IDs.
+ * In fixture mode (not live()) returns { status:'none' }.
+ */
+export async function siteOptionsFor(siteNo) {
+    // In fixture mode, only run if the cache has been explicitly seeded by _setOptionsCache.
+    if (!live() && !siteOptionsCache.options.length) return { status: 'none' };
+    try {
+        const options = await loadSiteOptions();
+        const forThis = options.filter(o => siteNoFromOption(o) === String(siteNo));
+        if (forThis.length === 0) return { status: 'none' };
+
+        const normName = n => String(n || '').replace(/\s+/g, ' ').trim().toLowerCase();
+        const distinctNorm = [...new Set(forThis.map(o => normName(humanNameFromOption(o, String(siteNo)))))];
+        const allTags = forThis.map(o => o.value);
+
+        if (distinctNorm.length > 1) {
+            const names = [...new Set(forThis.map(o => humanNameFromOption(o, String(siteNo))))];
+            return { status: 'conflict', names, allTags };
+        }
+
+        const gkOption = forThis.find(o => o.value.startsWith('gk_'));
+        const preferred = gkOption || forThis[0];
+        return {
+            status: 'one',
+            preferredTag: preferred.value,
+            allTags,
+            siteName: humanNameFromOption(preferred, String(siteNo)),
+            brand: brandFromOption(preferred)
+        };
+    } catch (err) {
+        console.error(`[ZD] siteOptionsFor failed for ${siteNo}: ${err.message}`);
+        return { status: 'none' };
+    }
+}
+
+/**
  * D8 — the pub-name search index source. Returns the cached Zendesk site directory as
  * `[{ siteNo, siteName, brand }]` — the REVERSE of resolveSiteName (name-by-number), used by the
  * TB-direct read service's searchSites() so pub-name search does NOT depend on a TB call (TB
@@ -162,27 +211,52 @@ function brandFromOption(option) {
  * Zendesk fault yields the last cache (or [])so search degrades rather than erroring.
  */
 export async function siteDirectory() {
-    if (!live()) return [];
+    if (!live() && !siteOptionsCache.options.length) return [];
     let options;
     try {
         options = await loadSiteOptions();
     } catch (err) {
         console.error(`[ZD] Site directory load failed: ${err.message}`);
-        return siteOptionsCache.options.length
-            ? siteOptionsCache.options.map(toDirectoryEntry).filter(Boolean)
-            : [];
+        options = siteOptionsCache.options.length ? siteOptionsCache.options : [];
+        if (!options.length) return [];
     }
-    return options.map(toDirectoryEntry).filter(Boolean);
+    return _buildDirectoryFromOptions(options);
 }
 
-function toDirectoryEntry(option) {
-    const siteNo = siteNoFromOption(option);
-    if (!siteNo) return null;
-    return {
-        siteNo,
-        siteName: humanNameFromOption(option, siteNo),
-        brand: brandFromOption(option)
-    };
+/**
+ * Builds a de-duplicated directory from raw options. Groups by house ID using the same
+ * matching rule as siteOptionsFor: for 'one' (all options same pub name), one entry per house
+ * ID using the gk_ option's name and brand. For 'conflict' (different names), one entry per
+ * distinct name so search still surfaces the amber "duplicate ID" row (OOHDASH-164 Q5).
+ */
+function _buildDirectoryFromOptions(options) {
+    const normName = n => String(n || '').replace(/\s+/g, ' ').trim().toLowerCase();
+    const houseIds = [...new Set(options.map(o => siteNoFromOption(o)).filter(Boolean))];
+    const result = [];
+    for (const houseId of houseIds) {
+        const forThis = options.filter(o => siteNoFromOption(o) === houseId);
+        const distinctNorm = [...new Set(forThis.map(o => normName(humanNameFromOption(o, houseId))))];
+        if (distinctNorm.length <= 1) {
+            const gkOption = forThis.find(o => o.value.startsWith('gk_'));
+            const preferred = gkOption || forThis[0];
+            result.push({
+                siteNo: houseId,
+                siteName: humanNameFromOption(preferred, houseId),
+                brand: brandFromOption(preferred)
+            });
+        } else {
+            const seen = new Set();
+            for (const o of forThis) {
+                const name = humanNameFromOption(o, houseId);
+                const norm = normName(name);
+                if (norm && !seen.has(norm)) {
+                    seen.add(norm);
+                    result.push({ siteNo: houseId, siteName: name, brand: brandFromOption(o) });
+                }
+            }
+        }
+    }
+    return result;
 }
 
 /* ------------------------------------------------------------------ */
@@ -346,7 +420,7 @@ export function normaliseP1Reason(raw) {
  * the (unbounded) transcript so they survive Zendesk's ~1500-char description truncation (CT-I1),
  * which is what the consumer's oversight parser reads.
  */
-function buildTrgBody({ operator, summary, callerWords, outcomeType, transcript, defaultTime, dataQualityNote, additionalNotes, customerContact, p1Reason, p1Automatic }) {
+function buildTrgBody({ operator, summary, callerWords, outcomeType, transcript, defaultTime, dataQualityNote, additionalNotes, customerContact, p1Reason, p1Automatic, nameCheck }) {
     const lines = [`[TRG] ${oneLine(summary).slice(0, 180)}`];
     lines.push(`Operator: ${oneLine(operator?.name) || 'OOH'} (OOH)`);
     // OOHDASH-146 B10 / B21: the customer contact line and the P1 reason sit right after the Operator line
@@ -372,6 +446,19 @@ function buildTrgBody({ operator, summary, callerWords, outcomeType, transcript,
         lines.push(`${defaultTime} | Additional notes from OOH agent: "${escFence(additionalNotes)}"`);
     }
     if (dataQualityNote) lines.push('', dataQualityNote);
+    if (nameCheck && nameCheck.siteNo) {
+        // Section F: name-check line for the IoT team to tidy the site list.
+        const held = Array.isArray(nameCheck.held) ? nameCheck.held : [];
+        const heldPart = held.length > 0
+            ? `our records list ${held.map(h => sanitiseTrgValue(String(h?.name ?? h), 120)).join(' / ')}; `
+            : held.length === 0 ? 'we hold no pub name for this house ID; ' : '';
+        // Strip HTML tags from the answer before writing to plain-text ticket body (XSS guard).
+        const ans = sanitiseTrgValue(String(nameCheck.answer ?? '').replace(/<[^>]*>/g, ''), 120);
+        const customerPart = (!nameCheck.answer || nameCheck.how === 'none')
+            ? "customer's answer not recorded"
+            : `customer says ${ans} — please tidy the site list`;
+        lines.push(`Name check (house ID ${sanitiseTrgValue(String(nameCheck.siteNo), 20)}): ${heldPart}${customerPart}`);
+    }
     return lines.join('\n');
 }
 
@@ -381,7 +468,7 @@ function buildTrgBody({ operator, summary, callerWords, outcomeType, transcript,
  * and the full timestamped action transcript (the ticket requester is the API service account,
  * so identity always lives in the comment body).
  */
-export async function createOutcomeTicket({ operator, siteNo, siteName, subject, summary, transcript = [], detail, callerWords, outcomeType, priority = 'normal', extraTags = [], additionalNotes: rawNotes, status: createStatus, customerContact = null, p1Reason = null, p1Automatic = false }) {
+export async function createOutcomeTicket({ operator, siteNo, siteName, subject, summary, transcript = [], detail, callerWords, outcomeType, priority = 'normal', extraTags = [], additionalNotes: rawNotes, status: createStatus, customerContact = null, p1Reason = null, p1Automatic = false, nameCheck = null }) {
     const summaryLine = summary || subject || detail || 'OOH outcome';
     const defaultTime = hhmm(new Date().toISOString());
     // If no structured transcript was supplied but a detail string exists, keep at least one step
@@ -393,8 +480,8 @@ export async function createOutcomeTicket({ operator, siteNo, siteName, subject,
     // it here (server) means tests can exercise the full path with a raw string.
     const additionalNotes = normaliseAdditionalNotes(rawNotes);
 
-    const buildBody = dataQualityNote =>
-        buildTrgBody({ operator, summary: summaryLine, callerWords, outcomeType, transcript: steps, defaultTime, dataQualityNote, additionalNotes, customerContact, p1Reason, p1Automatic });
+    const buildBody = (dataQualityNote, nc) =>
+        buildTrgBody({ operator, summary: summaryLine, callerWords, outcomeType, transcript: steps, defaultTime, dataQualityNote, additionalNotes, customerContact, p1Reason, p1Automatic, nameCheck: nc || null });
 
     // F002 — Ticket Category is set on every OOH outcome ticket (Explore reporting only).
     const categoryField = { id: config.zendesk.categoryFieldId, value: config.zendesk.categoryValue };
@@ -404,19 +491,23 @@ export async function createOutcomeTicket({ operator, siteNo, siteName, subject,
     // live-mode tickets send the built title to Zendesk.
     const title = buildOohTitle({ siteNo, siteName, outcome: subject });
 
+    // Section F: add ooh_site_name_check tag when a name check is present on this ticket.
+    const allTags = nameCheck ? [...extraTags, 'ooh_site_name_check'] : [...extraTags];
+
     if (!live()) {
         const t = {
             id: fixtureSeq++, siteNo, subject, title, status: createStatus || 'new', custom_status_id: createStatus === 'solved' ? 25999068372252 : 11404223315612,
             priority, created_at: new Date().toISOString(), updated_at: new Date().toISOString(),
-            tags: [config.zendesk.oohTag, ...extraTags], visit: false,
+            tags: [config.zendesk.oohTag, ...allTags], visit: false,
             custom_fields: [categoryField],
-            comments: [{ public: false, body: buildBody(null), created_at: new Date().toISOString() }]
+            comments: [{ public: false, body: buildBody(null, nameCheck), created_at: new Date().toISOString() }]
         };
         fixtureTickets.unshift(t);
-        return { id: t.id, url: `#fixture-ticket-${t.id}`, title };
+        return { id: t.id, url: `#fixture-ticket-${t.id}`, title, tags: t.tags };
     }
 
-    const siteTag = await resolveSiteTag(siteNo);
+    const zdMatch = await siteOptionsFor(siteNo);
+    const siteTag = zdMatch.status === 'one' ? zdMatch.preferredTag : null;
     const customFields = [categoryField];
     if (siteTag) customFields.push({ id: config.zendesk.siteFieldId, value: siteTag });
     const dataQualityNote = siteTag ? null
@@ -424,9 +515,9 @@ export async function createOutcomeTicket({ operator, siteNo, siteName, subject,
     const payload = {
         ticket: {
             subject: title,
-            comment: { body: buildBody(dataQualityNote), public: false },
+            comment: { body: buildBody(dataQualityNote, nameCheck), public: false },
             priority,
-            tags: [config.zendesk.oohTag, ...extraTags],
+            tags: [config.zendesk.oohTag, ...allTags],
             custom_fields: customFields
         }
     };
@@ -718,14 +809,33 @@ export async function callbackLookup(siteNo) {
     if (!live()) {
         rawTickets = fixtureTickets.filter(t => t.siteNo === String(siteNo));
     } else {
-        const siteTag = await resolveSiteTag(siteNo);
-        if (!siteTag) return { tickets: { active: [], recent: [], closed: [] }, totalFound: 0, unresolvedSiteTag: true };
+        const zdMatch = await siteOptionsFor(siteNo);
+        if (zdMatch.status !== 'one') {
+            return { tickets: { active: [], recent: [], closed: [] }, totalFound: 0, unresolvedSiteTag: true };
+        }
         const daysAgoStr = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
-        const data = await zd('GET', '/search.json', null, {
-            query: `type:ticket custom_field_${config.zendesk.siteFieldId}:${siteTag} created>${daysAgoStr}`,
-            sort_by: 'updated_at', sort_order: 'desc'
-        });
-        rawTickets = (data.results || []).slice(0, 12);
+        // Rate limits are per replica; this doubles the per-search rate for the 69 two-tag sites.
+        const searchResults = await Promise.allSettled(
+            zdMatch.allTags.map(tag =>
+                zd('GET', '/search.json', null, {
+                    query: `type:ticket custom_field_${config.zendesk.siteFieldId}:${tag} created>${daysAgoStr}`,
+                    sort_by: 'updated_at', sort_order: 'desc'
+                })
+            )
+        );
+        const ticketMap = new Map();
+        for (const r of searchResults) {
+            if (r.status === 'fulfilled') {
+                for (const t of (r.value.results || [])) {
+                    if (!ticketMap.has(t.id)) ticketMap.set(t.id, t);
+                }
+            } else {
+                console.error(`[ZD] Callback search failed for site ${siteNo}: ${r.reason?.message}`);
+            }
+        }
+        rawTickets = [...ticketMap.values()]
+            .sort((a, b) => new Date(b.updated_at) - new Date(a.updated_at))
+            .slice(0, 12);
     }
 
     // Q6: fetch comments for all tickets in parallel (capped at 4 concurrent), not serially.

@@ -27,7 +27,7 @@
 
 import { readFileSync } from 'fs';
 import { config } from '../config.js';
-import { resolveSiteName } from './zendesk.js';
+import { resolveSiteName, siteOptionsFor } from './zendesk.js';
 import * as registry from './registry.js';
 import { describeNextChange, zoneTimetable } from './schedule.js';
 
@@ -402,6 +402,129 @@ function loadAliases() {
         }
     }
     return aliasData;
+}
+
+/* ------------------------------------------------------------------ */
+/* OOHDASH-166: pub name verification (computePubNames)                */
+/* ------------------------------------------------------------------ */
+
+const EQUIPMENT_SKIP = new Set(['salus','tuya','intesis','gateway','boiler','boilercontrol','powerpause','it500','it700','lwgateway','test']);
+const GENERIC_WORDS = new Set(['farm','farmhouse','house','kitchen','inn','inns','arms','hotel','tavern','park','lodge','grill','carvery','restaurant','the']);
+
+/**
+ * Returns a de-duped list of tbEquipmentWords extracted from device names for this site.
+ * Rule E: take normaliseName(name), find the first segment after 'gk-', keep if all-letters
+ * and length ≥ 4 and not in EQUIPMENT_SKIP.
+ */
+function extractEquipmentWords(deviceNames) {
+    const words = new Set();
+    for (const name of deviceNames) {
+        const norm = normaliseName(name);
+        const gkIdx = norm.indexOf('gk-');
+        if (gkIdx === -1) continue;
+        const after = norm.slice(gkIdx + 3);
+        const seg = after.split('-')[0];
+        if (seg && /^[a-z]+$/.test(seg) && seg.length >= 4 && !EQUIPMENT_SKIP.has(seg)) {
+            words.add(seg);
+        }
+    }
+    return [...words];
+}
+
+/**
+ * Splits a pub name into non-generic words of 4+ letters (Rule P).
+ */
+function pubWordsFrom(zdName) {
+    // Strip parenthetical location notes (e.g. "(Silkwood Park)") before splitting so a
+    // location word inside parentheses doesn't falsely match the equipment word.
+    return String(zdName || '').replace(/\([^)]*\)/g, ' ').split(/\s+/)
+        .map(w => w.toLowerCase().replace(/[^a-z]/g, ''))
+        .filter(w => w.length >= 4 && !GENERIC_WORDS.has(w));
+}
+
+/**
+ * Returns true when a Zendesk pub name "fits" a set of equipment words:
+ * one of its pub words appears as a case-insensitive substring inside an equipment word.
+ */
+function namesFitEquipment(zdName, equipWords) {
+    const pubs = pubWordsFrom(zdName);
+    return pubs.some(p => equipWords.some(e => e.includes(p)));
+}
+
+/**
+ * Tidies an equipment word by splitting before any trailing generic word and capitalising.
+ * e.g. silkwoodfarm → Silkwood Farm, meridian → Meridian.
+ */
+export function tidyEquipmentWord(word) {
+    let w = String(word).toLowerCase();
+    for (const g of GENERIC_WORDS) {
+        if (w !== g && w.endsWith(g)) {
+            const stem = w.slice(0, w.length - g.length);
+            if (stem.length >= 2) {
+                return stem.charAt(0).toUpperCase() + stem.slice(1) + ' ' + g.charAt(0).toUpperCase() + g.slice(1);
+            }
+        }
+    }
+    return w.charAt(0).toUpperCase() + w.slice(1);
+}
+
+/**
+ * OOHDASH-166 — computes pubNames for a site after devices and the Zendesk answer are known.
+ *
+ * @param {string} siteNo       — house ID
+ * @param {object} zdMatch      — result of siteOptionsFor(siteNo)
+ * @param {string[]} deviceNames — raw TB device names for this site
+ * @param {object} aliases      — loadAliases() map (not used for name, reserved for future)
+ * @returns {{ status, agreedName, held }}
+ */
+export function computePubNames(siteNo, zdMatch, deviceNames, aliases) {
+    const equipWords = extractEquipmentWords(deviceNames || []);
+
+    if (zdMatch.status === 'none') {
+        // No Zendesk option
+        if (equipWords.length === 0) return { status: 'none', agreedName: null, held: [] };
+        const tidied = tidyEquipmentWord(equipWords[0]);
+        return { status: 'equipment-only', agreedName: null, held: [{ name: tidied, from: 'equipment' }] };
+    }
+
+    // Gather all zdPubNames for this house ID (from zdMatch)
+    const zdNames = zdMatch.status === 'one'
+        ? (zdMatch.siteName ? [zdMatch.siteName] : [])
+        : (zdMatch.names || []);
+
+    if (zdNames.length === 0) {
+        // Has a Zendesk entry but no readable name
+        if (equipWords.length === 0) return { status: 'none', agreedName: null, held: [] };
+        const tidied = tidyEquipmentWord(equipWords[0]);
+        return { status: 'equipment-only', agreedName: null, held: [{ name: tidied, from: 'equipment' }] };
+    }
+
+    const uniqueNorm = [...new Set(zdNames.map(n => String(n || '').replace(/\s+/g, ' ').trim().toLowerCase()))];
+
+    if (uniqueNorm.length === 1) {
+        // Single agreed Zendesk name
+        const zdName = zdNames[0];
+        if (equipWords.length === 0 || namesFitEquipment(zdName, equipWords)) {
+            return { status: 'agreed', agreedName: zdName, held: [] };
+        }
+        // Single zdName but doesn't fit equipment → disagree
+        const held = [];
+        // Find the equipment word that best fits any Zendesk name in the whole option set
+        // (resolved by caller when zdMatch is 'conflict'; here we just use the tidied word)
+        const equipFit = equipWords.find(e => zdNames.some(n => namesFitEquipment(n, [e])));
+        if (equipFit) held.push({ name: tidyEquipmentWord(equipFit), from: 'equipment' });
+        else if (equipWords.length > 0) held.push({ name: tidyEquipmentWord(equipWords[0]), from: 'equipment' });
+        for (const n of zdNames) held.push({ name: n, from: 'ticket-system' });
+        return { status: 'disagree', agreedName: null, held };
+    }
+
+    // Multiple distinct zdNames (conflict)
+    const held = [];
+    const equipFit = equipWords.find(e => zdNames.some(n => namesFitEquipment(n, [e])));
+    if (equipFit) held.push({ name: tidyEquipmentWord(equipFit), from: 'equipment' });
+    else if (equipWords.length > 0) held.push({ name: tidyEquipmentWord(equipWords[0]), from: 'equipment' });
+    for (const n of zdNames) held.push({ name: n, from: 'ticket-system' });
+    return { status: 'disagree', agreedName: null, held };
 }
 
 /* ------------------------------------------------------------------ */
@@ -1903,16 +2026,26 @@ async function _doFetchLiveSitesByNumber(key) {
         boilerControlField = { present: false, isV1: false, isV2: false, heatingControllable: false, dhwControllable: false, deviceId: null, heating: null };
     }
     const accountId = `${brand}-${key}`;
+
+    // OOHDASH-166: compute pubNames now that devices and the Zendesk answer are both available.
+    let zdMatch = { status: 'none' };
+    try {
+        zdMatch = await siteOptionsFor(key);
+    } catch (_) { /* non-fatal — pubNames degrades gracefully */ }
+    const deviceNames = matched.map(d => d.name || '').filter(Boolean);
+    const pubNames = computePubNames(key, zdMatch, deviceNames, loadAliases());
+
     const site = {
         siteNo: key,
         siteName: humanName || accountId,
-        nameUnverified: !humanName,
+        nameUnverified: pubNames.status !== 'agreed',
         accountId,
         brand: undefined,       // not sourced from TB — stays undefined pre-B2 (parity with bridge.js)
         address: undefined,
         callsLast30Days: undefined,
         devices,
-        boilerControl: boilerControlField
+        boilerControl: boilerControlField,
+        pubNames
     };
     const sites = [site];
     perSiteCache.set(key, { sites, at: Date.now() });
