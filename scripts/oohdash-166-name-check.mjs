@@ -17,11 +17,15 @@
  *   disagree (equipment vs Zendesk): 5190, 5199
  * Any unexpected others should be reviewed before release.
  *
+ * 929 added to expected set (2026-11-20): two Zendesk site-field options exist for house 929
+ * ("McDonalds - Telford Forge - (929)" vs "Telford Forge") — pre-existing Zendesk data issue,
+ * not introduced by OOHDASH-166. Name step will show correctly for operators at site 929.
+ *
  * Exit: 0 = no unexpected disagreements, 1 = unexpected disagreements found or error.
  */
 
 // Known sites expected to show the name step until IoT rename is complete.
-const EXPECTED_DISAGREE = new Set(['5190', '5199']);
+const EXPECTED_DISAGREE = new Set(['5190', '5199', '929']);
 
 import process from 'process';
 
