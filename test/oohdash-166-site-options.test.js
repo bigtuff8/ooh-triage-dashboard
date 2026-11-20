@@ -459,3 +459,46 @@ test('ooh_site_name_check tag NOT added when nameCheck is null', async () => {
     });
     assert.ok(!t.tags || !t.tags.includes('ooh_site_name_check'), 'tag absent when no nameCheck');
 });
+
+// ================================================================
+// U24 — golden test: wording table (views.js source string literals)
+// ================================================================
+
+test('U24: golden wording strings match design section 4 / 3.5 wording table', async () => {
+    const { readFileSync } = await import('node:fs');
+    const { fileURLToPath } = await import('node:url');
+    const { dirname, resolve } = await import('node:path');
+    const dir = dirname(fileURLToPath(import.meta.url));
+    const src = readFileSync(resolve(dir, '../public/js/views.js'), 'utf8');
+
+    const checks = [
+        // Confirm screen — loading state
+        ["Checking the pub name…", 'name-loading sub-line'],
+        ["Checking site…", 'confirm button loading label'],
+        ["can I just confirm your house ID? I have it as", 'script loading + agreed + doubt (stem)'],
+        // Confirm screen — agreed
+        [", that's ", 'agreed script tail'],
+        // Confirm screen — name in doubt
+        [". And which pub are you calling from?", 'name-in-doubt script tail'],
+        // Buttons
+        ["✓ House ID confirmed — open the site", 'main confirm button'],
+        ["Wrong house ID — search again", 'second / link button'],
+        // Name step lead lines (no trailing period — matches design 3.5 exactly)
+        ["Our records disagree on the pub name for this house ID", 'name-step lead disagree'],
+        ["Our records only hold a name taken from the equipment", 'name-step lead equipment-only'],
+        ["We don't hold a pub name for this house ID", 'name-step lead none'],
+        // Name step help and confirmation
+        ["Optional: tap the answer if you get one; you can carry on either way. Whatever you record goes on the ticket for the IoT team.", 'name-step help line'],
+        ["✓ Pub name recorded. Customer says:", 'name recorded confirmation'],
+        ["This goes on the ticket so the IoT team can tidy the site list.", 'name recorded tail'],
+        // Two-sites card
+        ["has two sites on Lighthouse", 'two-sites heading'],
+        ["Lighthouse has two different sites under this house ID, so we can't tell which equipment is the customer's.", 'two-sites text'],
+        ["You can't make changes from here tonight, but you can log it for the IoT team.", 'two-sites text tail'],
+        ["I can't make changes for this site tonight — I'll log it, and our IoT team picks it up the next working day.", 'two-sites script'],
+    ];
+
+    for (const [str, label] of checks) {
+        assert.ok(src.includes(str), `views.js missing wording: ${label}\n  expected: ${JSON.stringify(str)}`);
+    }
+});

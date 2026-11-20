@@ -200,9 +200,9 @@ function renderAmbiguous() {
             ? answers(`<button class="chip" data-testid="risk-yes" onclick="state.ambiguousNotes=notesValue('addnotes-amb');state.ambiguousRisk=true;renderAmbiguous()">Yes</button><button class="chip" data-testid="risk-no" onclick="ambiguousCapture()">No</button>`)
             : '';
         actionArea = riskNote +
-            (typeof sayBox === 'function' ? sayBox('I can\'t make changes for this site tonight — I\'ll log it, and our IoT team picks it up the next working day.', riskQ) : '') +
+            (typeof sayBox === 'function' ? sayBox("I can't make changes for this site tonight — I'll log it, and our IoT team picks it up the next working day.", riskQ) : '') +
             answerHtml +
-            `<p style="margin-top:8px"><button class="btn link" onclick="go(\'home\')" data-testid="wrong-houseid-link">Wrong house ID — search again</button></p>`;
+            `<p style="margin-top:8px"><button class="btn link" onclick="go('home')" data-testid="wrong-houseid-link">Wrong house ID — search again</button></p>`;
     }
 
     // OOHDASH-166: set _nameStepHeld so name step chips reference the two Lighthouse sites.
@@ -210,7 +210,7 @@ function renderAmbiguous() {
 
     $('#view').innerHTML = `<div class="content narrow"><div class="card" style="border-color:var(--warning)" data-testid="ambiguous-card">
    <h2>&#9888;&#65039; House ID ${esc(a.siteNo)} has two sites on Lighthouse</h2>
-   <p class="sub" style="margin:8px 0">Lighthouse has two different sites under this house ID, so we can\'t tell which equipment is the customer\'s. You can\'t make changes from here tonight, but you can log it for the IoT team.</p>
+   <p class="sub" style="margin:8px 0">Lighthouse has two different sites under this house ID, so we can't tell which equipment is the customer's. You can't make changes from here tonight, but you can log it for the IoT team.</p>
    ${nameStepHtml({ status: 'disagree', held: _nameStepHeld }, state.nameCheck)}
    ${notesField({ id: 'addnotes-amb', value: savedNotes })}
    <div style="margin-top:10px">
@@ -308,9 +308,9 @@ function nameStepHtml(pubNames, nameCheck) {
     }
 
     let reason;
-    if (pubNames.status === 'disagree') reason = 'Our records disagree on the pub name for this house ID.';
-    else if (pubNames.status === 'equipment-only') reason = 'Our records only hold a name taken from the equipment.';
-    else reason = "We don’t hold a pub name for this house ID.";
+    if (pubNames.status === 'disagree') reason = 'Our records disagree on the pub name for this house ID';
+    else if (pubNames.status === 'equipment-only') reason = 'Our records only hold a name taken from the equipment';
+    else reason = "We don't hold a pub name for this house ID";
 
     const noHeld = _nameStepHeld.length === 0;
     const chipsHtml = _nameStepHeld.map((h, i) =>
@@ -374,7 +374,7 @@ function renderConfirmGate() {
     if (!s) { $('#view').innerHTML = '<div class="content narrow"><div class="card"><h2>Loading…</h2></div></div>'; return; }
     // Q3: show placeholder if background read hasn't landed yet
     const deviceLine = (_confirmGateSummaryLoaded && _confirmGateReadFailed)
-        ? "We couldn’t read the Lighthouse equipment just now. You can still confirm the site."
+        ? "We couldn't read the Lighthouse equipment just now. You can still confirm the site."
         : (_confirmGateSummaryLoaded && _confirmGateDeviceSummary)
             ? esc(_confirmGateDeviceSummary)
             : (s.deviceSummary ? esc(s.deviceSummary) : 'Checking the Lighthouse equipment at this site…');
@@ -396,7 +396,7 @@ function renderConfirmGate() {
         const agreedName = pn.agreedName || s.siteName || '';
         heading = `${esc(agreedName)} <span class="mono" style="background:var(--surface-variant);padding:2px 10px;border-radius:6px;margin-left:6px">${esc(s.siteNo)}</span>`;
         nameSubline = '';
-        scriptLine = `can I just confirm your house ID? I have it as ${dyn(s.siteNo)}, that’s ${dyn(agreedName)}.`;
+        scriptLine = `can I just confirm your house ID? I have it as ${dyn(s.siteNo)}, that's ${dyn(agreedName)}.`;
     } else {
         // Name in doubt, equipment-only or none: house ID heading, name step shown
         heading = `House ID <span class="mono" style="background:var(--surface-variant);padding:2px 10px;border-radius:6px;margin-left:6px">${esc(s.siteNo)}</span>`;
