@@ -80,7 +80,11 @@ mock.module('../services/zendesk.js', {
         },
         // tb-device.searchSites/getSites reach the directory in live mode; keep it inert here.
         siteDirectory: async () => [],
-        siteOptionsFor: async () => ({ status: 'none' }),
+        // 6261 has a Zendesk entry with the same name as resolveSiteName → agreed (no name step).
+        // 4741 is thrown by resolveSiteName, so siteOptionsFor returning none keeps it unverified.
+        siteOptionsFor: async (siteNo) => String(siteNo) === '6261'
+            ? { status: 'one', siteName: 'Wheatstone Inn (Gloucester)', preferredTag: 'gk_6261', allTags: ['gk_6261'] }
+            : { status: 'none' },
         // control.js imports these from zendesk; keep them inert.
         addLateSyncNote: async () => ({ ok: true }),
         createLateSyncTicket: async () => ({ id: 99999, url: '#lazy' })
