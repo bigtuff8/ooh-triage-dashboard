@@ -65,6 +65,7 @@ mock.module('../services/zendesk.js', {
     namedExports: {
         resolveSiteName: async () => 'Test Site',
         siteDirectory: async () => mockSiteDir(),
+        siteOptionsFor: async () => ({ status: 'none' }),
     }
 });
 

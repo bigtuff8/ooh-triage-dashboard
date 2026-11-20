@@ -19,6 +19,21 @@ import { config } from '../config.js';
 import * as bridge from './bridge.js';
 import { addDataQualityFlag } from './notices.js';
 
+// OOHDASH-166: in-memory rate-limit for name-mismatch data-quality notes.
+// At most one note per house ID per hour; map capped at 200 entries.
+const _nameMismatchLog = new Map(); // siteNo -> epochMs of last note
+const NAME_MISMATCH_COOLDOWN = 60 * 60 * 1000;
+function _shouldWriteNameMismatch(siteNo) {
+    const last = _nameMismatchLog.get(String(siteNo));
+    if (last && Date.now() - last < NAME_MISMATCH_COOLDOWN) return false;
+    if (_nameMismatchLog.size >= 200) {
+        const oldest = [..._nameMismatchLog.entries()].sort((a, b) => a[1] - b[1])[0];
+        if (oldest) _nameMismatchLog.delete(oldest[0]);
+    }
+    _nameMismatchLog.set(String(siteNo), Date.now());
+    return true;
+}
+
 // Q3: background reads keyed by siteNo → { sitePromise, zdPromise, startedAt }
 const backgroundReads = new Map();
 const BACKGROUND_TTL_MS = 5 * 60 * 1000; // drop stale entries after 5 min
@@ -121,17 +136,21 @@ export async function resolveSiteInventory(siteNo, operator) {
 
     const matches = dir.filter(d => String(d.siteNo) === key);
 
-    if (matches.length === 0) return { status: 'none', siteNo: key };
+    if (matches.length === 0) {
+        // OOHDASH-166: no Zendesk entry — fall back to Lighthouse (restores pre-v1.7.5 behaviour).
+        return resolveSite(siteNo, operator);
+    }
 
     if (matches.length > 1) {
-        await addDataQualityFlag(
-            `House ID ${siteNo} ambiguous — multiple directory entries. Handler ${operator?.name || 'unknown'} routed to escalate.`
-        ).catch(() => {});
-        return {
-            status: 'ambiguous',
-            siteNo: key,
-            matches: matches.map(m => ({ siteName: m.siteName || `gk-${key}`, brand: m.brand }))
-        };
+        // OOHDASH-166: two distinct Zendesk names for this house ID — data-quality note (rate-limited),
+        // then fall back to Lighthouse.
+        if (_shouldWriteNameMismatch(key)) {
+            const names = matches.map(m => m.siteName || `gk-${key}`).join(' / ');
+            await addDataQualityFlag(
+                `House ID ${siteNo} has more than one pub name in the Zendesk site list: ${names}`
+            ).catch(() => {});
+        }
+        return resolveSite(siteNo, operator);
     }
 
     // Exactly one — start background full read and return stub

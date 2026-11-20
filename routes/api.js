@@ -158,7 +158,7 @@ router.get('/sites/:siteNo/resolve', wrap(async (req, res) => {
     res.json(result);
 }));
 
-// Q3: summary endpoint — waits for background full site read, returns device summary.
+// Q3: summary endpoint — waits for background full site read, returns device summary and pubNames.
 // The browser polls this once after /resolve to get the real device line and enable the button.
 router.get('/sites/:siteNo/summary', wrap(async (req, res) => {
     const siteNo = req.params.siteNo;
@@ -167,7 +167,10 @@ router.get('/sites/:siteNo/summary', wrap(async (req, res) => {
     if (!sites || sites.length === 0) return res.json({ found: false, deviceSummary: null });
     if (sites.length > 1) return res.json({ found: false, deviceSummary: null, ambiguous: true });
     const s = sites[0];
-    return res.json({ found: true, deviceSummary: deviceSummary(s), siteNo: s.siteNo });
+    // OOHDASH-166: in fixture mode pubNames is not computed; use agreed with the site name so the
+    // confirm screen shows the name rather than "House ID N" in fixture-mode e2e tests.
+    const pubNamesOut = s.pubNames || (s.siteName ? { status: 'agreed', agreedName: s.siteName, held: [] } : null);
+    return res.json({ found: true, deviceSummary: deviceSummary(s), siteNo: s.siteNo, pubNames: pubNamesOut });
 }));
 
 router.post('/sites/:siteNo/confirm', wrap(async (req, res) => {
@@ -180,6 +183,20 @@ router.post('/sites/:siteNo/confirm', wrap(async (req, res) => {
     const callId = resume
         ? resume.callId
         : callRecord.startCall({ operator: req.session.operator, siteNo: site.siteNo, siteName: site.siteName });
+
+    // OOHDASH-166: store nameCheck on the call record if present in the confirm body.
+    // An unrecorded name check answer is lost on pod restart (call records are in-memory).
+    const rawNameCheck = req.body?.nameCheck;
+    if (rawNameCheck && typeof rawNameCheck === 'object') {
+        const rec = callRecord._get(callId);
+        if (rec) {
+            const answer = typeof rawNameCheck.answer === 'string' ? rawNameCheck.answer.slice(0, 120) : '';
+            const how = ['picked', 'typed', 'none'].includes(rawNameCheck.how) ? rawNameCheck.how : 'none';
+            const held = Array.isArray(rawNameCheck.held) ? rawNameCheck.held : [];
+            rec.nameCheck = { siteNo: String(site.siteNo), held, answer, how, at: Date.now() };
+        }
+    }
+
     // Q3: use background read result if available to avoid a second full read
     let fullSite = site;
     if (site.devices.length === 0) {
@@ -662,6 +679,16 @@ router.post('/outcomes', wrap(async (req, res) => {
     const outcomeTime = new Date().toISOString();
     const transcript = buildOutcomeTranscript({ action, type, siteNo, siteName, detail, holdText, outcomeTime, knownSoFar });
 
+    // OOHDASH-166: include nameCheck on the first ticket of this call only.
+    let outcomeNameCheck = null;
+    if (callId) {
+        const rec = callRecord._get(callId);
+        if (rec && rec.nameCheck) {
+            const hasTicket = Object.values(rec.issues || {}).some(iss => iss.ticketId);
+            if (!hasTicket) outcomeNameCheck = rec.nameCheck;
+        }
+    }
+
     const ticket = await zendesk.createOutcomeTicket({
         operator: op, siteNo, siteName, subject,
         summary: subject,          // clean one-liner (≤180); detail/holdText live in the transcript
@@ -678,7 +705,9 @@ router.post('/outcomes', wrap(async (req, res) => {
         status: (!isP1 && (type === 'scope-only' || closeOnCreate)) ? 'solved' : undefined,
         // B21: p1Reason and p1Automatic for manual vs automatic P1s.
         p1Reason: isP1 ? (p1Reason || null) : undefined,
-        p1Automatic: isP1 ? p1Automatic : undefined
+        p1Automatic: isP1 ? p1Automatic : undefined,
+        // OOHDASH-166: name check on the first ticket of the call.
+        nameCheck: outcomeNameCheck
     });
     // OOHDASH-159 rev 5 (E1): link the ticket to its issue so the call record is appended, not duplicated.
     if (callId) callRecord.recordProgress(callId, op.id, { issueKey, outcome: subject, ticketId: ticket.id, knownSoFar: sanitiseKnownSoFar(knownSoFar) });
@@ -830,6 +859,21 @@ router.post('/tickets/:id/followup', wrap(async (req, res) => {
 }));
 
 /* ---------------- OOHDASH-159 rev 5 (E1): call record ---------------- */
+
+// OOHDASH-166: update nameCheck on an existing call record (e.g. the agent records the name after confirm).
+// An unrecorded name check answer is lost on pod restart (call records are in-memory).
+router.post('/calls/:id/name-check', wrap(async (req, res) => {
+    const rec = callRecord._get(req.params.id);
+    if (!rec) return res.status(404).json({ error: 'Call not found' });
+    if (rec.operatorId && rec.operatorId !== req.session.operator.id) return res.status(403).json({ error: 'Forbidden' });
+    const { answer, how, held } = req.body || {};
+    const safeAnswer = typeof answer === 'string' ? answer.slice(0, 120) : '';
+    const safeHow = ['picked', 'typed', 'none'].includes(how) ? how : 'none';
+    const safeHeld = Array.isArray(held) ? held : [];
+    rec.nameCheck = { siteNo: rec.siteNo, held: safeHeld, answer: safeAnswer, how: safeHow, at: Date.now() };
+    res.json({ ok: true });
+}));
+
 router.post('/calls/:id/progress', wrap(async (req, res) => {
     const { issueKey, cat, knownSoFar, notes } = req.body || {};
     const ok = callRecord.recordProgress(req.params.id, req.session.operator.id, { issueKey, cat, knownSoFar, notes });

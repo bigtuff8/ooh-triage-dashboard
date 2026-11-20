@@ -226,7 +226,7 @@ test('E13: notes carried into POST for ambiguous site capture', async ({ page })
     await page.keyboard.press('Enter');
     const ambCard = page.locator('[data-testid="ambiguous-card"]');
     await expect(ambCard).toBeVisible();
-    await expect(ambCard).toContainText('House ID 6758 is ambiguous');
+    await expect(ambCard).toContainText('House ID 6758 has two sites on Lighthouse');
     const noteField = page.locator('#addnotes-amb');
     await expect(noteField).toBeVisible();
     const NOTE = 'E13 ambiguous note';
