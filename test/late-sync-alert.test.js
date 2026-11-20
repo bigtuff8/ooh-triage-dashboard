@@ -60,6 +60,7 @@ mock.module('../services/zendesk.js', {
         addLateSyncNote: async (ticketId, action) => { zdCalls.notes.push({ ticketId, action }); },
         createLateSyncTicket: async () => { zdCalls.created += 1; return { id: lazyTicketSeq++, url: '#lazy' }; },
         resolveSiteName: async () => null,
+        siteOptionsFor: async () => ({ status: 'none' }),
         zendeskStatus: () => ({ mode: 'fixture', healthy: true, configured: true }),
         hhmm: () => '00:00'
     }

@@ -80,6 +80,7 @@ mock.module('../services/zendesk.js', {
         },
         // tb-device.searchSites/getSites reach the directory in live mode; keep it inert here.
         siteDirectory: async () => [],
+        siteOptionsFor: async () => ({ status: 'none' }),
         // control.js imports these from zendesk; keep them inert.
         addLateSyncNote: async () => ({ ok: true }),
         createLateSyncTicket: async () => ({ id: 99999, url: '#lazy' })

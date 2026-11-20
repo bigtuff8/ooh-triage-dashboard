@@ -61,6 +61,7 @@ mock.module('../services/zendesk.js', {
     namedExports: {
         resolveSiteName: async () => 'Test Site',
         siteDirectory: async () => [],
+        siteOptionsFor: async () => ({ status: 'none' }),
         hhmm: () => '',
         zendeskStatus: () => ({ healthy: true }),
         addLateSyncNote: _noop,
