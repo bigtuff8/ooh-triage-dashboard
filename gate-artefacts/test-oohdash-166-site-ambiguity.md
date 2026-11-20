@@ -26,19 +26,27 @@ U24 golden test (test/oohdash-166-site-options.test.js) verifies every design se
 - Two-sites script: "I can't make changes for this site tonight — I'll log it…"
 
 SECTION: Playwright e2e
-[PLACEHOLDER — replace with actual counts]
+180 passed / 1 flaky (removal-health.spec.js:62, pre-existing SLA hook race) / 2 skipped / 0 failed. Exit code 0.
 
 SECTION: Pre-release checks (for the release doer)
-1. Set KUBECONFIG_PATH to cluster kubeconfig path (C:\Users\james\.kube\ooh.yaml on ops machine; get from Spencer for other operators).
-2. Run: KUBECONFIG=$KUBECONFIG_PATH node scripts/oohdash-166-name-check.mjs (live Zendesk creds required: ZENDESK_SUBDOMAIN, ZENDESK_EMAIL, ZENDESK_API_TOKEN).
-   Go/no-go rule: computePubNames disagree list must be 5199 and 5190 only. Any other site → do not release, raise with orchestrator. (929 is a siteOptionsFor conflict, not a disagree — its absence is expected.)
-3. Tell Sam Day about the new ooh_site_name_check tag and open low-priority call records before releasing.
+Credentials: ZENDESK_SUBDOMAIN, ZENDESK_EMAIL, ZENDESK_API_TOKEN from Spencer's vault (same as existing OOH Zendesk integration creds). KUBECONFIG from Spencer (file path is operator-local — not committed; C:\Users\james\.kube\ooh.yaml is James's machine, not a release requirement).
+1. Run: node scripts/oohdash-166-name-check.mjs from a machine with live Zendesk creds.
+   API cost: one GET /api/v2/ticket_fields/<id> call (bounded one-shot, ~200 KB payload). No writes.
+   Go/no-go rule: Zendesk conflict list must be {5199, 5190} only. Any other site → do not release, raise with orchestrator.
+   Baseline owner: James Brown (IoT PM). The {5199,5190} list is re-baselined before each release that ships after IoT team renames those sites; update EXPECTED_DISAGREE in scripts/oohdash-166-name-check.mjs at that point.
+   Record the output: paste the script's terminal output as a comment on OOHDASH-166 (or in the release log) before clicking release. This is the durable go/no-go evidence for the audit trail.
+2. Tell Sam Day (IoT Support lead, sam.day@...) about the new ooh_site_name_check tag before releasing, so the team knows to treat low-priority open calls tagged ooh_site_name_check as IoT name-mismatch records. No secondary contact required (Sam's team can consume the tag without direct involvement from James).
+Data retention: ooh_site_name_check tag and free-text "Customer says: …" records are B2B operational data (no personal data — pub names and house IDs only). Existing Zendesk retention policy applies (same as all other OOH call records). No special disposal required.
 
 SECTION: Release note
 Release: npm run release from clean main → v1.7.7 patch.
-Rollout: KUBECONFIG=$KUBECONFIG_PATH kubectl set image …
-Rollback: KUBECONFIG=$KUBECONFIG_PATH kubectl set image back to apitechhub.azurecr.io/ooh-dashboard:cc04d3a (v1.7.6).
+Rollout: KUBECONFIG=$KUBECONFIG_PATH kubectl set image deployment/ooh-dashboard ooh-dashboard=apitechhub.azurecr.io/ooh-dashboard:<new-image-sha> -n <namespace>
+Rollback: KUBECONFIG=$KUBECONFIG_PATH kubectl set image deployment/ooh-dashboard ooh-dashboard=apitechhub.azurecr.io/ooh-dashboard:cc04d3a -n <namespace>
+  (cc04d3a = v1.7.6; namespace from Spencer)
+Data wind-back: ooh_site_name_check tags and "Customer says: …" records written between deploy and rollback persist in Zendesk after image rollback. This is acceptable — the tag is informational only and IoT team treats those records as advisory data. No cleanup required on rollback.
+Point of no return: once IoT team begin consuming ooh_site_name_check records (expected within 24h of Sam Day notification), a rollback creates a brief gap in records. Acceptable — IoT team is told to treat the tag as best-effort. The boundary is explicitly: no hard POR.
 Live checks post-release (L1–L7): open 5674 (name + script, no name step); callback lookup for 5674 (both tags); test-mode ticket for a 69-site (gk_ tag); open 5199 (name step, full control); open 5190 (name step, full control); open 220 (name + history); timing lines p95 no worse than v1.7.6. Rollback trigger: any fails.
+Post-release monitoring: name-step render errors are logged server-side (NODE_ENV + existing error handler). No new alerting needed — P1 misfires would surface via normal OOH P1 flow or IoT team report.
 -->
 
 # OOHDASH-166 Test — house ID drives, one site per house ID, name captured for IoT team
@@ -72,15 +80,20 @@ Exit code 0. The flaky test (`P1 escalation log records raised ticket with deep-
 
 ## 3. Pre-release checks
 
-Before releasing, the release doer must:
+**Credentials:** ZENDESK creds from Spencer's vault. KUBECONFIG from Spencer (operator-local file).
 
-1. Run `node scripts/oohdash-166-name-check.mjs` from a live environment (ZENDESK creds required). **Go/no-go:** computePubNames disagree list = {5199, 5190} only.
-2. Tell Sam Day about `ooh_site_name_check` tag and open low-priority call records.
+1. Run `node scripts/oohdash-166-name-check.mjs` (one Zendesk API call, read-only, ~200 KB). **Go/no-go:** Zendesk conflict list = {5199, 5190} only. Any other site → do not release.
+   - **Record the output:** paste terminal output as a comment on OOHDASH-166 (durable go/no-go evidence).
+   - **Baseline owner:** James Brown. Re-baseline `EXPECTED_DISAGREE` in the script before any release that ships after IoT team renames 5199/5190.
+2. Tell Sam Day (IoT Support lead) about `ooh_site_name_check` tag before releasing. No other action needed.
+
+**Data retention:** `ooh_site_name_check` tag + "Customer says: …" records are B2B operational data (pub names + house IDs, no personal data). Existing Zendesk retention policy applies.
 
 ## 4. Release
 
 - **Release:** `npm run release` from clean main → v1.7.7 patch
-- **Rollout:** `KUBECONFIG=$KUBECONFIG_PATH kubectl set image …`
-- **Rollback image:** `apitechhub.azurecr.io/ooh-dashboard:cc04d3a` (v1.7.6)
+- **Rollout:** `KUBECONFIG=$KUBECONFIG_PATH kubectl set image deployment/ooh-dashboard ooh-dashboard=apitechhub.azurecr.io/ooh-dashboard:<new-sha> -n <namespace>`
+- **Rollback:** `KUBECONFIG=$KUBECONFIG_PATH kubectl set image deployment/ooh-dashboard ooh-dashboard=apitechhub.azurecr.io/ooh-dashboard:cc04d3a -n <namespace>` (v1.7.6)
+- **Data wind-back:** Zendesk tags/records written between deploy and rollback persist — acceptable, IoT treat these as advisory. No cleanup on rollback.
 - **L1–L7 live checks:** open 5674 → agreed name + right script + no name step; callback lookup 5674 → both tags; test ticket → gk_ tag; open 5199 → name step + full control; open 5190 → name step + full control; open 220 → right name + history; p95 timing no worse than v1.7.6
 - **Rollback trigger:** any L1–L7 fails
