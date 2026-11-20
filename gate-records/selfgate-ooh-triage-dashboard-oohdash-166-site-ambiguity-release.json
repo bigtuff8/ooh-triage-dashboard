@@ -1,0 +1,21 @@
+{
+  "run": "selfgate-ooh-triage-dashboard-oohdash-166-site-ambiguity",
+  "phase": "release",
+  "pr": 214,
+  "approvedBy": [
+    "bigtuff8"
+  ],
+  "reviewComments": [
+    "bigtuff8: - Release approved?: YES — approve and close\n\n(submitted via the interactive gate review)\n\n<!-- gate:selected [{\"question\":\"Release approved?\",\"answer\":\"YES — approve and close\"}] -->"
+  ],
+  "mergeCommit": "d3cad23a93f6b85a4dc09ec01a9ae4bbea5ef89e",
+  "phaseBranch": "release/oohdash-166-site-ambiguity",
+  "releaseBranch": "main",
+  "stamp": 1795182197620,
+  "selectedOptions": [
+    {
+      "question": "Release approved?",
+      "answer": "YES — approve and close"
+    }
+  ]
+}
