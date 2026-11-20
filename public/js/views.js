@@ -420,8 +420,9 @@ function renderConfirmGate() {
     <button class="btn big" onclick="go(\'home\')">Wrong house ID — search again</button>
    </div></div></div>`;
     performance.clearMarks('confirm-screen-paint'); performance.mark('confirm-screen-paint');
-    // Q3: if summary not yet loaded, fetch it in background
-    if (needsSummary) {
+    // Q3: always fetch /summary the first time — pubNames must load even when deviceSummary
+    // arrived from the full /resolve payload (fixture mode & fast live responses)
+    if (!_confirmGateSummaryLoaded) {
         fetch(`/api/sites/${encodeURIComponent(s.siteNo)}/summary`)
             .then(r => r.json())
             .then(data => {
