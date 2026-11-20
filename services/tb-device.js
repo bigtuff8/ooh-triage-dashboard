@@ -505,6 +505,8 @@ export function computePubNames(siteNo, zdMatch, deviceNames, aliases) {
         // Single agreed Zendesk name
         const zdName = zdNames[0];
         if (equipWords.length === 0 || namesFitEquipment(zdName, equipWords)) {
+            // OOHDASH-166: audit agreed path so a false-agree isn't silent
+            console.log(`[PUB-NAMES] agreed site=${siteNo} name="${zdName}" equipWords=${JSON.stringify(equipWords)}`);
             return { status: 'agreed', agreedName: zdName, held: [] };
         }
         // Single zdName but doesn't fit equipment → disagree
