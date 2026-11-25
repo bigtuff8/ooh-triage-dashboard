@@ -927,7 +927,8 @@ export async function ticketView(ticketId) {
     const thread = await getFeedbackThread(id).catch(() => []);
     // siteNo is included for IDOR site-match check in api.js
     const siteNo = t.siteNo || null;
-    // OOHDASH-167: pick-up status
+    // OOHDASH-167: pick-up status. != null covers both null (Zendesk unassigned) and undefined
+    // (absent field on fixture tickets) via JS abstract equality — no false positives on absent fields.
     const isAssigned = t.assignee_id != null;
     let pickedUpBy = null;
     if (isAssigned) {

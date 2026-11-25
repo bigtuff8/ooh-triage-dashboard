@@ -204,11 +204,22 @@ test('T1: ticketView(45097) in fixture mode returns isAssigned true + pickedUpBy
     assert.ok(typeof r.fetchedAt === 'string' && r.fetchedAt.length > 0, 'fetchedAt is a non-empty string');
 });
 
-test('T2a: ticketView() with no assignee returns isAssigned false and pickedUpBy null', async () => {
-    seedFixtureTicket({ id: 55001, siteNo: '6360', subject: 'Test no assignee', status: 'open', priority: 'normal', created_at: new Date().toISOString(), updated_at: new Date().toISOString(), tags: ['ooh'] });
+test('T2a: ticketView() with explicit null assignee_id returns isAssigned false and pickedUpBy null', async () => {
+    seedFixtureTicket({ id: 55001, siteNo: '6360', subject: 'Test no assignee', status: 'open', priority: 'normal', created_at: new Date().toISOString(), updated_at: new Date().toISOString(), tags: ['ooh'], assignee_id: null });
     try {
         const r = await ticketView(55001);
-        assert.equal(r.isAssigned, false, 'isAssigned must be false');
+        assert.equal(r.isAssigned, false, 'isAssigned must be false for null assignee_id');
+        assert.equal(r.pickedUpBy, null, 'pickedUpBy must be null');
+    } finally {
+        resetSeededFixtureTickets();
+    }
+});
+
+test('T2a-absent: ticketView() with absent assignee_id field (undefined) returns isAssigned false', async () => {
+    seedFixtureTicket({ id: 55001, siteNo: '6360', subject: 'Test absent assignee field', status: 'open', priority: 'normal', created_at: new Date().toISOString(), updated_at: new Date().toISOString(), tags: ['ooh'] });
+    try {
+        const r = await ticketView(55001);
+        assert.equal(r.isAssigned, false, '!= null covers undefined — absent field must not show as assigned');
         assert.equal(r.pickedUpBy, null, 'pickedUpBy must be null');
     } finally {
         resetSeededFixtureTickets();
