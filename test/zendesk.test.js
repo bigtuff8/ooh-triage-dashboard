@@ -12,7 +12,7 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { buildAuthHeader, normaliseAdditionalNotes, createOutcomeTicket, getFeedbackThread } from '../services/zendesk.js';
+import { buildAuthHeader, normaliseAdditionalNotes, createOutcomeTicket, getFeedbackThread, ticketView, seedFixtureTicket, resetSeededFixtureTickets, _setResolveAgentName } from '../services/zendesk.js';
 
 process.env.DATA_MODE = 'fixture';
 process.env.WRITES_DISABLED = 'false';
@@ -191,4 +191,75 @@ test('normaliseAdditionalNotes: multiple free-text pipes all replaced', () => {
 
 test('normaliseAdditionalNotes: N5 (whitespace-only) returns null', () => {
     assert.equal(normaliseAdditionalNotes(N5, testCfg), null);
+});
+
+/* ================================================================ */
+/* OOHDASH-167 — ticketView() pick-up status (T1, T2a, T2b, T4a, T4b) */
+/* ================================================================ */
+
+test('T1: ticketView(45097) in fixture mode returns isAssigned true + pickedUpBy Jamie Ashton + fetchedAt string', async () => {
+    const r = await ticketView(45097);
+    assert.equal(r.isAssigned, true, 'isAssigned must be true');
+    assert.deepEqual(r.pickedUpBy, { name: 'Jamie Ashton' });
+    assert.ok(typeof r.fetchedAt === 'string' && r.fetchedAt.length > 0, 'fetchedAt is a non-empty string');
+});
+
+test('T2a: ticketView() with explicit null assignee_id returns isAssigned false and pickedUpBy null', async () => {
+    seedFixtureTicket({ id: 55001, siteNo: '6360', subject: 'Test no assignee', status: 'open', priority: 'normal', created_at: new Date().toISOString(), updated_at: new Date().toISOString(), tags: ['ooh'], assignee_id: null });
+    try {
+        const r = await ticketView(55001);
+        assert.equal(r.isAssigned, false, 'isAssigned must be false for null assignee_id');
+        assert.equal(r.pickedUpBy, null, 'pickedUpBy must be null');
+    } finally {
+        resetSeededFixtureTickets();
+    }
+});
+
+test('T2a-absent: ticketView() with absent assignee_id field (undefined) returns isAssigned false', async () => {
+    seedFixtureTicket({ id: 55001, siteNo: '6360', subject: 'Test absent assignee field', status: 'open', priority: 'normal', created_at: new Date().toISOString(), updated_at: new Date().toISOString(), tags: ['ooh'] });
+    try {
+        const r = await ticketView(55001);
+        assert.equal(r.isAssigned, false, '!= null covers undefined — absent field must not show as assigned');
+        assert.equal(r.pickedUpBy, null, 'pickedUpBy must be null');
+    } finally {
+        resetSeededFixtureTickets();
+    }
+});
+
+test('T2b: ticketView() with P1 ooh_p1 tag and no assignee returns isAssigned false, isP1 true, pickedUpBy null', async () => {
+    seedFixtureTicket({ id: 55002, siteNo: '6360', subject: 'Test P1 no assignee', status: 'open', priority: 'urgent', created_at: new Date().toISOString(), updated_at: new Date().toISOString(), tags: ['ooh', 'ooh_p1'] });
+    try {
+        const r = await ticketView(55002);
+        assert.equal(r.isAssigned, false, 'isAssigned must be false');
+        assert.equal(r.isP1, true, 'isP1 must be true');
+        assert.equal(r.pickedUpBy, null, 'pickedUpBy must be null');
+    } finally {
+        resetSeededFixtureTickets();
+    }
+});
+
+test('T4a: when resolveAgentName stub throws, pickedUpBy is null and isAssigned is true', async () => {
+    _setResolveAgentName(async () => { throw new Error('lookup failed'); });
+    seedFixtureTicket({ id: 55003, siteNo: '6360', subject: 'Test stub throws', status: 'open', priority: 'normal', created_at: new Date().toISOString(), updated_at: new Date().toISOString(), tags: ['ooh'], assignee_id: 99991 });
+    try {
+        const r = await ticketView(55003);
+        assert.equal(r.isAssigned, true, 'isAssigned must be true even when name lookup throws');
+        assert.equal(r.pickedUpBy, null, 'pickedUpBy must be null when name lookup throws');
+    } finally {
+        resetSeededFixtureTickets();
+        _setResolveAgentName(null);
+    }
+});
+
+test('T4b: when resolveAgentName stub returns null (deleted user), pickedUpBy is null and isAssigned is true', async () => {
+    _setResolveAgentName(async () => null);
+    seedFixtureTicket({ id: 55004, siteNo: '6360', subject: 'Test stub null', status: 'open', priority: 'normal', created_at: new Date().toISOString(), updated_at: new Date().toISOString(), tags: ['ooh'], assignee_id: 99992 });
+    try {
+        const r = await ticketView(55004);
+        assert.equal(r.isAssigned, true, 'isAssigned must be true even when name lookup returns null');
+        assert.equal(r.pickedUpBy, null, 'pickedUpBy must be null when name is null');
+    } finally {
+        resetSeededFixtureTickets();
+        _setResolveAgentName(null);
+    }
 });
