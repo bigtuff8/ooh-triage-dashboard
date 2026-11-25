@@ -269,7 +269,7 @@ function _buildDirectoryFromOptions(options) {
 // for dev (tester finding 7, 2026-07-11).
 let fixtureSeq = 45121;
 const fixtureTickets = [
-    { id: 45097, siteNo: '6234', subject: 'No hot water — intermittent', status: 'hold', custom_status_id: 25999056633884, priority: 'normal', created_at: daysAgo(3), updated_at: daysAgo(1), tags: ['ooh'], visit: true, comments: [
+    { id: 45097, siteNo: '6234', subject: 'No hot water — intermittent', status: 'hold', custom_status_id: 25999056633884, priority: 'normal', created_at: daysAgo(3), updated_at: daysAgo(1), tags: ['ooh'], assignee_id: 21142139507484, visit: true, comments: [
         { public: false, body: '[TRG] Call taken by OOH — no hot water, boost applied (2h), issue recurred · Operator: Test Handler', created_at: daysAgo(3) },
         { public: false, body: 'IoT team review — DHW sensor suspected, Bellrock visit requested', created_at: daysAgo(2) }] },
     { id: 45102, siteNo: '6360', subject: 'Accommodation heating — thermostat capped at 21', status: 'open', custom_status_id: 25999053444508, priority: 'normal', created_at: daysAgo(2), updated_at: daysAgo(1), tags: ['ooh'], visit: false, comments: [
@@ -927,10 +927,19 @@ export async function ticketView(ticketId) {
     const thread = await getFeedbackThread(id).catch(() => []);
     // siteNo is included for IDOR site-match check in api.js
     const siteNo = t.siteNo || null;
+    // OOHDASH-167: pick-up status
+    const isAssigned = t.assignee_id != null;
+    let pickedUpBy = null;
+    if (isAssigned) {
+        const name = await _resolveAgentNameFn(t.assignee_id).catch(() => null);
+        if (name) pickedUpBy = { name };
+    }
+    const fetchedAt = new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
     return {
         id, subject: t.title || t.subject, siteNo,
         status: { raw: t.status, agent: info.agent, caller: info.caller },
         isP1: tags.includes('ooh_p1'), fromOoh: tags.includes(config.zendesk.oohTag),
+        isAssigned, pickedUpBy, fetchedAt,
         createdFriendly: friendlyTimeElapsed(t.created_at), updatedFriendly: friendlyTimeElapsed(t.updated_at),
         thread: thread.map(c => ({ at: c.at, text: translateComment(c.body) }))
     };
@@ -955,6 +964,9 @@ export async function getTicketTags(ticketId) {
  */
 let _resolveForQuery = resolveSiteName;
 export function _setQueryResolver(fn) { _resolveForQuery = fn; }
+
+let _resolveAgentNameFn = resolveAgentName;
+export function _setResolveAgentName(fn) { _resolveAgentNameFn = fn ?? resolveAgentName; }
 
 /**
  * "Raise a query" from the Tonight view — lands on a ticket for the IoT team.
@@ -1075,6 +1087,7 @@ const agentNameCache = new Map();
  * degrades to link-only, never throws.
  */
 async function resolveAgentName(agentId) {
+    if (!live() && agentId === 21142139507484) return 'Jamie Ashton';
     if (agentId == null) return null;
     if (agentNameCache.has(agentId)) return agentNameCache.get(agentId);
     try {

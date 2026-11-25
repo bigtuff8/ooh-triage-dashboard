@@ -212,6 +212,10 @@ table.tbl tr.rowoff td{background:var(--danger-light)}
 /* Agent background: blue "For you" box — never read out, never offers a choice */
 .gtk{background:#EFF6FF;border-left:3px solid #60A5FA;border-radius:0 var(--radius-md) var(--radius-md) 0;padding:9px 13px;font-size:14px;color:#1E3A8A;margin:8px 0;line-height:20px}
 .gtk .gtk-label{display:block;font-size:12px;font-weight:700;color:#1D4ED8;margin-bottom:3px}
+.gtk.ok { background: #D1FAE5; border-left-color: #10B981; color: #065F46; }
+.gtk.ok .gtk-label { color: #059669; }
+.gtk.warn { background: #FEF3C7; border-left-color: #F59E0B; color: #92400E; }
+.gtk.warn .gtk-label { color: #D97706; }
 /* Values taken from the site */
 .dyn{background:#FEF08A;border-bottom:1.5px dashed #A16207;font-weight:700;padding:0 2px;border-radius:2px;font-style:normal}
 /* Ticket text */

@@ -214,6 +214,10 @@ async function renderTicketPage(id) {
    <h2 style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">Ticket #${esc(String(t.id))} ${t.isP1 ? '<span class="tag red" data-testid="ticket-page-p1">P1</span>' : ''}</h2>
    <p style="margin:6px 0"><b>${esc(t.subject)}</b></p>
    <div class="gtk" data-testid="ticket-page-status"><span class="gtk-label">ℹ Status right now (from the IoT team)</span>${esc(t.status.agent)}</div>
+   ${t.fromOoh ? `<div class="gtk${t.isAssigned ? ' ok' : (t.isP1 ? ' warn' : '')}" data-testid="ticket-page-pickup">
+  <span class="gtk-label">${t.isAssigned ? `✅ Picked up — as of ${esc(t.fetchedAt)}` : (t.isP1 ? `⏳ Not yet picked up — as of ${esc(t.fetchedAt)}` : '⏳ Logged — IoT team to review')}</span>
+  ${t.isAssigned ? esc(t.pickedUpBy ? t.pickedUpBy.name : '(agent name unavailable)') : (t.isP1 ? `Raised ${esc(t.createdFriendly)}` : '')}
+</div>` : ''}
    <p class="small">Opened ${esc(t.createdFriendly)} · last updated ${esc(t.updatedFriendly)}${t.fromOoh ? ' · raised from this dashboard' : ''}</p>
    <h3 style="margin-top:14px">What's on the ticket</h3>
    ${t.thread.length ? `<div class="timeline">${t.thread.slice().reverse().map(c => `<div class="tlitem"><div class="tw">${esc(new Date(c.at).toLocaleString('en-GB', { weekday: 'short', hour: '2-digit', minute: '2-digit' }))}</div><div style="white-space:pre-line">${esc(c.text)}</div></div>`).join('')}</div>` : '<p class="small">Nothing on the ticket yet.</p>'}
