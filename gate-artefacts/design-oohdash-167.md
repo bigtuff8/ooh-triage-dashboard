@@ -244,3 +244,68 @@ No background component. Zero idle cost. The pick-up status is fetched on demand
 - The brief uses `getAgentName` as the function name; the existing code uses `resolveAgentName` (line 1077). Build should use `resolveAgentName`.
 - The brief states `gtk ok` / `gtk warn` "already exist in the stylesheet". They do not — `.alert.ok` and `.ss.ok` exist but not `.gtk.ok`. Build must add the two new CSS modifier rules.
 - Fixture guard for `resolveAgentName` is a build-phase decision: the simplest approach is a small in-function check (`if (!live() && agentId === 21142139507484) return 'Jamie Ashton'`) rather than a full fixture branch. Build to confirm.
+
+
+---
+
+## Rework addendum — round 1 (design/draft)
+
+### Panel verdicts addressed
+
+**critical-thinker — Assignee ≠ IoT team member (false-fact risk)**
+
+The concern is valid. `assignee_id` proves only that someone has the ticket assigned; it does not prove that person is an IoT team member. Routing automation or non-IoT staff can appear as assignees in Zendesk.
+
+This addendum amends the green-row label from **"✅ Picked up by the IoT team"** to **"✅ Picked up — [name]"** (e.g. "✅ Picked up — Jamie Ashton"). The copy now asserts only what the data actually supports: the ticket has a named assignee. The team-membership claim is removed. If build-phase discovery confirms that OOH ticket assignment is structurally constrained to the IoT Zendesk group (e.g. via a group-scoped assignment rule), the "IoT team" phrasing can be reinstated — but that confirmation is a build-phase item, not a design assumption. The amended copy is correct regardless of how assignment works. The DECISION block is updated accordingly: option A becomes "✅ Picked up — [name]" (recommended); option C remains excluded.
+
+**critical-thinker — Stale amber reads as live status**
+
+The concern is valid. A once-per-open fetch means an amber "Not yet picked up" row can sit on screen for minutes while the ticket is in fact being worked. The agent sees a present-tense statement that is actually historical.
+
+This addendum amends all three row states to carry a point-in-time marker. The amber state renders as:
+
+```
+[amber box]  ⏳ Not yet picked up — as of [HH:MM]
+             Raised 23 minutes ago
+```
+
+The "as of [HH:MM]" timestamp is derived at `ticketView()` call time (no extra API call; `Date.now()` at the moment of the fetch, formatted to local time). Green and blue states receive the same marker for consistency, though the urgency signal matters most for amber. The agent now understands the status is a snapshot and knows they may need to reload if the situation is live. No polling is introduced; this is a copy and data-shape change only. `ticketView()` returns a `fetchedAt` timestamp in its result object; `renderTicketPage()` formats it.
+
+**critical-thinker — Assigned-but-unresolvable renders as "not picked up" (false negative)**
+
+The concern is valid. `resolveAgentName` can return null without throwing — for a deleted or deprovisioned Zendesk user. The current design collapses `pickedUpBy: null` into the "not picked up" branch regardless of whether `assignee_id` is present, so a ticket that IS assigned shows the wrong state.
+
+This addendum amends `ticketView()` to track the two signals separately:
+
+- `isAssigned: boolean` — derived from `assignee_id !== null`, before any network call.
+- `pickedUpBy: { name: string } | null` — derived from `resolveAgentName(assignee_id)`; null if the lookup throws or returns null.
+
+A fourth render state is added for `isAssigned: true, pickedUpBy: null`:
+
+```
+[green box]  ✅ Picked up — as of [HH:MM]
+             (agent name unavailable)
+```
+
+CSS class: `gtk ok`. The ticket IS assigned; the green signal is correct. The body text signals that the name lookup failed without hiding the assignment. The P1 amber guard tightens from `pickedUpBy === null` to `isAssigned === false`. An assigned-but-unresolvable P1 ticket now correctly shows green, not amber.
+
+T4 is split into two discrete tests:
+
+- **T4a** — `resolveAgentName` throws for a given `assignee_id`: `pickedUpBy` degrades to null, `isAssigned` remains true; renders green "Picked up — as of [HH:MM] / (agent name unavailable)".
+- **T4b** — `resolveAgentName` returns null (deleted user): same outcome as T4a.
+
+The data dictionary gains one new field: `isAssigned` (boolean, derived from `assignee_id !== null`, not exposed to UI directly, used only to control row state).
+
+---
+
+### Summary of additions
+
+Four concrete changes to the existing design, none of which alter the no-polling, single-lookup-per-open architecture:
+
+1. **Copy — picked-up label softened.** "Picked up by the IoT team" → "Picked up — [name]". Removes the unenforceable team-membership assertion; the row now claims only what the assignee_id field proves.
+
+2. **Point-in-time marker on all row states.** Each state gains "as of [HH:MM]" derived at fetch time. The amber row no longer reads as a live signal; it communicates clearly that the agent is seeing a snapshot and may need to reload.
+
+3. **New fourth state — assigned but name unresolvable.** `isAssigned: true, pickedUpBy: null` renders green ("Picked up — as of [HH:MM] / agent name unavailable") rather than collapsing into the "not picked up" branch. This closes the false-negative path the critical-thinker identified. The amber P1 guard now gates on `isAssigned === false`, not `pickedUpBy === null`.
+
+4. **T4 split into T4a and T4b.** Throw and null-return are now tested and specified as distinct paths, both resolving to the fourth state above. The data dictionary gains `isAssigned` as a new field.
